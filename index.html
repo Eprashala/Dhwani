@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dhwani - AI Teacher (Free TTS)</title>
-    <!-- 1. Load Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* Custom styles for the app */
@@ -26,19 +25,15 @@
 
     <div class="bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-2xl">
         
-        <!-- Header Section -->
         <div class="flex items-center justify-between mb-6">
             <h1 class="text-3xl font-bold text-white">Dhwani (AI Teacher)</h1>
             <div id="status-indicator" class="w-4 h-4 rounded-full bg-gray-500 transition-colors" title="Offline"></div>
         </div>
 
-        <!-- Conversation Log -->
         <div id="conversation-log" class="h-80 overflow-y-auto bg-gray-900 rounded-lg p-4 mb-6 border border-gray-700 space-y-4">
-            <!-- Messages will be added here -->
             <div class="text-gray-400 text-center">Press the button and say "Dhwani" to begin.</div>
         </div>
 
-        <!-- Control Button -->
         <button id="talk-button" class="w-full py-4 px-6 rounded-lg text-lg font-semibold transition-all duration-300 ease-in-out
                        bg-blue-600 text-white
                        hover:bg-blue-700
@@ -47,7 +42,6 @@
             Start Listening
         </button>
 
-        <!-- API Key Input -->
         <div class="mt-6">
             <label for="api-key" class="block text-sm font-medium text-gray-400 mb-2">Google Gemini API Key (For AI Brain)</label>
             <input type="password" id="api-key" placeholder="Enter your API key here"
@@ -71,8 +65,9 @@
         let systemInstruction = '';
         let recognition;
         
-        // --- This audio object will be used to play the TTS audio ---
-        let audio = new Audio();
+        // --- This is the browser's built-in speech synthesizer ---
+        const synth = window.speechSynthesis;
+        let voices = []; // This will hold the list of available voices
         
         // --- Add window.onload to load API key and check protocol ---
         window.onload = () => {
@@ -138,8 +133,8 @@
             } else {
                 setState('IDLE');
                 recognition.stop();
-                if (audio) {
-                    audio.pause(); // Stop any speaking
+                if (synth.speaking) {
+                    synth.cancel(); // Stop any speaking
                 }
             }
         }
@@ -204,8 +199,8 @@
                             // --- FIX: Changed to Devanagari script ---
                             const greeting = "नमस्कार, मी ध्वनी, तुमचे नाव काय आहे?";
                             logMessage('Dhwani', greeting);
-                            // --- MODIFICATION: Use Google Translate TTS ---
-                            await speakText(greeting, 'mr');
+                            // --- MODIFICATION: Use Browser TTS ---
+                            await speakText(greeting, 'mr-IN');
                             setState('LISTENING_FOR_NAME');
                             recognition.start(); 
                         } else {
@@ -223,8 +218,8 @@
                         // --- FIX: Changed to Devanagari script ---
                         const agePrompt = `खूप छान, ${userName}, तुमचे वय काय आहे?`;
                         logMessage('Dhwani', agePrompt);
-                        // --- MODIFICATION: Use Google Translate TTS ---
-                        await speakText(agePrompt, 'mr');
+                        // --- MODIFICATION: Use Browser TTS ---
+                        await speakText(agePrompt, 'mr-IN');
                         setState('LISTENING_FOR_AGE');
                         recognition.start();
                         break;
@@ -238,8 +233,8 @@
                         
                         const startPrompt = `धन्यवाद, ${userName}! मी लक्षात ठेवीन की तुझे वय ${userAge} आहे. मी आता तुझ्या प्रश्नांसाठी तयार आहे!`;
                         logMessage('Dhwani', startPrompt);
-                        // --- MODIFICATION: Use Google Translate TTS ---
-                        await speakText(startPrompt, 'mr');
+                        // --- MODIFICATION: Use Browser TTS ---
+                        await speakText(startPrompt, 'mr-IN');
                         setState('CONVERSATION');
                         recognition.start();
                         break;
@@ -256,7 +251,7 @@
                         // Use the *cleaned* text for history, logging, and speech
                         chatHistory.push({ role: 'model', parts: [{ text: cleanedResponseText }] });
                         logMessage('Dhwani', cleanedResponseText);
-                        await speakText(cleanedResponseText, 'mr');
+                        await speakText(cleanedResponseText, 'mr-IN');
                         
                         setState('CONVERSATION'); // Go back to listening
                         recognition.start();
@@ -452,101 +447,73 @@
             return text.replace(/[\*#`]/g, ' ').replace(/\s+/g, ' ').trim();
         }
 
-        // --- MODIFICATION: This is the new "Voice" function using the free Google Translate endpoint ---
         
+        // --- 6. Speech Synthesis (Browser TTS) ---
+
         /**
-         * Splits a long text into chunks of 200 characters without breaking words,
-         * preferring to split at sentence-ending punctuation.
+         * Loads the list of available voices. This is sometimes asynchronous.
          */
-        function splitTextIntoChunks(text) {
-            const maxChunkLength = 200;
-            let chunks = [];
-            let remainingText = text;
+        function loadVoices() {
+            voices = synth.getVoices();
+            // Some browsers need this event to load voices
+            if (synth.onvoiceschanged !== undefined) {
+                synth.onvoiceschanged = () => {
+                    voices = synth.getVoices();
+                    console.log("Voices loaded:", voices);
+                };
+            }
+        }
+        // Load voices when the script starts
+        loadVoices();
 
-            while (remainingText.length > 0) {
-                if (remainingText.length <= maxChunkLength) {
-                    chunks.push(remainingText);
-                    break;
+        /**
+         * Main function to speak text using the browser's built-in SpeechSynthesis.
+         */
+        async function speakText(text, lang = 'mr-IN') {
+            if (synth.speaking) {
+                // If it's already speaking, cancel it to say the new thing
+                synth.cancel();
+            }
+
+            // This is a fix for a bug in some browsers where getVoices() is empty
+            if (voices.length === 0) {
+                voices = synth.getVoices();
+            }
+
+            return new Promise((resolve, reject) => {
+                const utterance = new SpeechSynthesisUtterance(text);
+                
+                // --- Promise handlers ---
+                utterance.onend = resolve;
+                utterance.onerror = (event) => {
+                    console.error("SpeechSynthesisUtterance.onerror", event);
+                    logMessage('Error', 'Failed to play audio.'); // Log a user-friendly error
+                    reject(event.error);
+                };
+
+                // --- Find the best voice ---
+                // 1. Try to find a perfect 'mr-IN' match
+                let marathiVoice = voices.find(voice => voice.lang === 'mr-IN');
+                
+                // 2. If not found, try a 'hi-IN' (Hindi) voice, as it's also Devanagari
+                if (!marathiVoice) {
+                    marathiVoice = voices.find(voice => voice.lang === 'hi-IN');
                 }
 
-                let splitIndex = maxChunkLength;
-                
-                // Try to find a sentence-ending punctuation mark near the limit
-                const punctuation = ".?!।"; // English and Devanagari Danda
-                let bestSplit = -1;
-                
-                for (let i = maxChunkLength - 1; i > 0; i--) {
-                    if (punctuation.includes(remainingText[i])) {
-                        bestSplit = i + 1;
-                        break;
-                    }
-                }
-
-                if (bestSplit !== -1) {
-                    splitIndex = bestSplit;
+                // 3. If a good voice is found, use it
+                if (marathiVoice) {
+                    utterance.voice = marathiVoice;
+                    console.log("Using voice:", marathiVoice.name);
                 } else {
-                    // If no punctuation, find the last space
-                    const lastSpace = remainingText.lastIndexOf(' ', maxChunkLength);
-                    if (lastSpace !== -1) {
-                        splitIndex = lastSpace + 1;
-                    }
+                    // 4. If no specific voice, just set the lang. The browser will try.
+                    utterance.lang = 'mr-IN';
+                    console.warn("No 'mr-IN' or 'hi-IN' voice found. Using browser default.");
                 }
-
-                chunks.push(remainingText.substring(0, splitIndex));
-                remainingText = remainingText.substring(splitIndex);
-            }
-            return chunks;
-        }
-
-        /**
-         * Plays a queue of audio chunks sequentially.
-         */
-        async function playAudioQueue(chunks, lang) {
-            if (chunks.length === 0) {
-                return;
-            }
-            
-            const textChunk = chunks.shift(); // Get the next chunk
-            const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(textChunk)}&tl=${lang}&client=tw-ob`;
-
-            try {
-                // Set the audio source and play
-                audio.src = url;
-                await new Promise((resolve, reject) => { // <-- The stray 'F' was here
-                    audio.onended = resolve;
-                    audio.onerror = reject;
-                    audio.play();
-                });
                 
-                // When this chunk is done, play the next one
-                await playAudioQueue(chunks, lang);
+                utterance.pitch = 1;
+                utterance.rate = 1; // You can make this 0.9 for a slower pace
 
-            } catch (error) {
-                console.error("Error playing audio chunk:", error);
-                throw new Error("Failed to play audio chunk");
-            }
-        }
-
-        /**
-         * Main function to speak text. Splits text into chunks and plays them in order.
-         */
-        async function speakText(text, lang = 'mr') {
-            if (audio.paused === false) {
-                audio.pause(); // Stop any currently playing audio
-            }
-
-            const textChunks = splitTextIntoChunks(text);
-            console.log("Speaking chunks:", textChunks);
-
-            return new Promise(async (resolve, reject) => {
-                try {
-                    await playAudioQueue([...textChunks], lang); // Pass a copy of the array
-                    resolve();
-                } catch (error) {
-                    console.error("speakText error:", error);
-                    logMessage('Error', 'Failed to play audio.');
-                    reject(error);
-                }
+                synth.speak(utterance);
             });
         }
         
