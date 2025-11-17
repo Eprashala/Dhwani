@@ -19,13 +19,21 @@
             70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
             100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
         }
-        /* Custom styles for new buttons */
+        /* Style for audio control buttons */
         .control-btn {
             @apply px-4 py-2 rounded-lg text-sm font-medium transition-colors
                    bg-gray-600 text-white
                    hover:bg-gray-500
                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-blue-500
                    disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed;
+        }
+        /* NEW: Style for chat utility buttons */
+        .utility-btn {
+            @apply w-full py-3 px-4 rounded-lg text-sm font-semibold transition-colors
+                   bg-gray-700 text-white
+                   hover:bg-gray-600
+                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-blue-500
+                   disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed;
         }
     </style>
 </head>
@@ -57,7 +65,12 @@
             Start Listening
         </button>
 
+        <div class="mt-4 grid grid-cols-2 gap-3">
+            <button id="restart-chat-button" class="utility-btn" disabled>Restart Chat</button>
+            <button id="end-chat-button" class="utility-btn" disabled>End Chat</button>
         </div>
+
+    </div>
 
     <script>
         // --- 1. DOM Elements ---
@@ -65,17 +78,17 @@
         const statusIndicator = document.getElementById('status-indicator');
         const conversationLog = document.getElementById('conversation-log');
         
-        // Audio control DOM elements
         const pauseResumeButton = document.getElementById('pause-resume-button');
         const stopSpeechButton = document.getElementById('stop-speech-button');
         const replayButton = document.getElementById('replay-button');
-        // NEW: Share button DOM element
         const shareButton = document.getElementById('share-button');
+        
+        // NEW: Chat control buttons
+        const endChatButton = document.getElementById('end-chat-button');
+        const restartChatButton = document.getElementById('restart-chat-button');
 
 
         // --- DANGER: API KEY ---
-        // WARNING: Do NOT use this on a public website (like GitHub Pages).
-        // Anyone can see this key, steal it, and use your money/quota.
         // This is ONLY for your own private, local testing.
         const GEMINI_API_KEY = "AIzaSyA4Ts-x9EKRUY9nBEegxlBUtNiJ_Qvo_zo"; 
         // -------------------------
@@ -88,11 +101,14 @@
         let chatHistory = [];
         let systemInstruction = '';
         let recognition;
-        let lastSpokenText = ''; // For the replay button
-        let speechManuallyStopped = false; // Flag for stop button logic
+        let lastSpokenText = ''; 
+        let speechManuallyStopped = false; 
         
         const synth = window.speechSynthesis;
         let voices = [];
+        
+        // NEW: Wake Lock
+        let wakeLock = null;
         
         window.onload = () => {
             if (window.location.protocol !== 'https:') {
@@ -125,17 +141,22 @@
         // --- 4. Event Listeners ---
         talkButton.addEventListener('click', toggleListening);
         
-        // Audio control listeners
         pauseResumeButton.addEventListener('click', togglePauseResume);
         stopSpeechButton.addEventListener('click', stopSpeech);
         replayButton.addEventListener('click', replaySpeech);
-        // NEW: Share listener
         shareButton.addEventListener('click', shareChat);
+
+        // NEW: Chat control listeners
+        endChatButton.addEventListener('click', endChat);
+        restartChatButton.addEventListener('click', restartChat);
+        
+        // NEW: Wake Lock listener
+        document.addEventListener('visibilitychange', handleVisibilityChange);
 
 
         // --- 5. Core Functions ---
 
-        function toggleListening() {
+        async function toggleListening() {
             if (GEMINI_API_KEY === "PASTE_YOUR_GEMINI_API_KEY_HERE") {
                  logMessage('Error', 'Please paste your API key into the script tag.');
                  return;
@@ -144,12 +165,14 @@
             if (appState === 'IDLE') {
                 setState('LISTENING_FOR_WAKEWORD');
                 recognition.start();
+                await acquireWakeLock(); // NEW: Acquire wake lock
             } else {
                 setState('IDLE');
                 recognition.stop();
                 if (synth.speaking) {
                     synth.cancel();
                 }
+                await releaseWakeLock(); // NEW: Release wake lock
             }
         }
 
@@ -162,25 +185,24 @@
                     talkButton.textContent = 'Start Listening';
                     talkButton.disabled = false;
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-gray-500 transition-colors';
-                    statusIndicator.title = 'Offline';
+                    endChatButton.disabled = true; // NEW
                     break;
                 case 'BUSY':
                     talkButton.textContent = 'Thinking...';
                     talkButton.disabled = true;
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-400 transition-colors';
-                    statusIndicator.title = 'Busy';
+                    endChatButton.disabled = false; // NEW
                     break;
                 default: // All "LISTENING" states
                     talkButton.textContent = 'Stop Listening';
                     talkButton.disabled = false;
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-blue-500 listening-pulse transition-colors';
-                    statusIndicator.title = 'Listening...';
+                    endChatButton.disabled = false; // NEW
                     break;
             }
         }
 
         function handleSpeechEnd() {
-            // Keep listening unless we are IDLE or BUSY
             if (appState !== 'IDLE' && appState !== 'BUSY') {
                 try {
                     recognition.start();
@@ -231,7 +253,7 @@
                         logMessage('You', transcript);
                         const age = await extractAgeFromTranscript(transcript);
                         userAge = Math.min(age, 18);
-                        buildSystemPrompt();
+                        buildSystemPrompt(); // <-- This will enable the Restart button
                         
                         const startPrompt = `धन्यवाद, ${userName}! मी लक्षात ठेवीन की तुझे वय ${userAge} आहे. मी आता तुझ्या प्रश्नांसाठी तयार आहे!`;
                         logMessage('Dhwani', startPrompt);
@@ -250,18 +272,17 @@
                         chatHistory.push({ role: 'model', parts: [{ text: cleanedResponseText }] });
                         logMessage('Dhwani', cleanedResponseText);
                         
-                        // NEW: try...catch block for speech interruption
                         try {
                             await speakText(cleanedResponseText, 'mr-IN');
                         } catch (error) {
                             if (error.message === "Speech manually stopped") {
                                 console.log("Speech was stopped, auto-listen handled by stopSpeech().");
-                                return; // Eject from function, stopSpeech is in control
+                                return;
                             }
-                            throw error; // Re-throw other errors
+                            throw error;
                         }
                         
-                        setState('CONVERSATION'); // Go back to listening
+                        setState('CONVERSATION');
                         recognition.start();
                         break;
                 }
@@ -292,7 +313,6 @@
                 4.  You MUST tailor all answers to be easily understood by a ${userAge}-year-old.
                 5.  You are kind, encouraging, and use simple language.
             `;
-            // ... (rest of prompt is unchanged) ...
             
             if (userAge <= 8) {
                 systemInstruction += "\n8. CRITICAL: The user is very young. Use extremely simple, short sentences. Explain things one step at a time. Be very gentle and encouraging.";
@@ -302,14 +322,19 @@
                 systemInstruction += "\n8. CRITICAL: The user is a teenager. You can use more complex sentences, but still be encouraging and clear, like a good teacher.";
             }
 
+            // Add the system prompt to the chat history
             chatHistory = [{ role: 'user', parts: [{ text: 'Here are my instructions' }] }];
             chatHistory.push({ role: 'model', parts: [{ text: `Okay, I understand. I am Dhwani, a Marathi teacher, and I am speaking to ${userName} (${userAge}). I will answer all questions simply.` }] });
+        
+            // NEW: Enable the restart button now that we have user info
+            restartChatButton.disabled = false;
         }
 
         // --- 6. Gemini API Functions ---
-
+        // ... (These functions: extractNameFromTranscript, extractAgeFromTranscript, 
+        //     generateTextResponseFromChat are all unchanged from the previous version) ...
+        
         async function extractNameFromTranscript(transcript) {
-            // ... (this function is unchanged) ...
             const processingMsg = document.createElement('div');
             processingMsg.innerHTML = `<strong class="text-yellow-400">Dhwani:</strong> <span class="text-gray-400">(...processing name...)</span>`;
             conversationLog.appendChild(processingMsg);
@@ -353,7 +378,6 @@
 
 
         async function extractAgeFromTranscript(transcript) {
-            // ... (this function is unchanged from last time) ...
             const processingMsg = document.createElement('div');
             processingMsg.innerHTML = `<strong class="text-yellow-400">Dhwani:</strong> <span class="text-gray-400">(...processing age...)</span>`;
             conversationLog.appendChild(processingMsg);
@@ -366,17 +390,14 @@
                 You are a simple utility. Your only job is to extract a single number (age) from the user's text.
                 - Respond ONLY with the digits (e.g., "10", "8").
                 - If you cannot find a number, respond with "18".
-
                 EXAMPLES:
                 User Text: "मी दहा वर्षांचा आहे" -> Response: "10"
-                User Text: "माझं वय पंधरा आहे" -> Response: "15"
                 User Text: "10 varsha" -> Response: "10"
                 User Text: "majhe vaay 10 varsha aahe" -> Response: "10"
                 User Text: "mi 10 varshacha aahe" -> Response: "10"
                 User Text: "मी १० वर्षांचा आहे" -> Response: "10"
                 User Text: "१० वर्षे" -> Response: "10"
                 User Text: "माझं वय आठ आहे" -> Response: "8"
-
                 Text to analyze: "${transcript}"
             `;
 
@@ -405,7 +426,6 @@
         }
 
         async function generateTextResponseFromChat() {
-            // ... (this function is unchanged) ...
             const apiKey = GEMINI_API_KEY;
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
@@ -440,6 +460,8 @@
 
         
         // --- 7. Speech Synthesis (Browser TTS) ---
+        // ... (loadVoices, togglePauseResume, stopSpeech, replaySpeech, speakText
+        //     are all unchanged from the previous version) ...
 
         function loadVoices() {
             voices = synth.getVoices();
@@ -452,31 +474,25 @@
         }
         loadVoices();
 
-        // UPDATED: Audio control functions
-        
-        // REQUEST 1: Pause/Replay stops the mic
         function togglePauseResume() {
-            if (synth.paused) { // Clicking Resume
+            if (synth.paused) { 
                 synth.resume();
                 pauseResumeButton.textContent = 'Pause';
-                // Mic will restart automatically when speech finishes
-            } else if (synth.speaking) { // Clicking Pause
+            } else if (synth.speaking) { 
                 synth.pause();
                 pauseResumeButton.textContent = 'Resume';
-                recognition.stop(); // Stop the mic
-                setState('BUSY'); // Set state to BUSY to prevent mic restart
+                recognition.stop(); 
+                setState('BUSY'); 
             }
         }
 
-        // REQUEST 2: Stop stops audio, then listens after 2s
         function stopSpeech() {
             if (!synth.speaking) return;
 
-            speechManuallyStopped = true; // Set flag to block normal 'onend' logic
-            synth.cancel(); // Stop audio
-            recognition.stop(); // Stop mic
+            speechManuallyStopped = true; 
+            synth.cancel(); 
+            recognition.stop(); 
 
-            // Manually disable buttons
             pauseResumeButton.disabled = true;
             stopSpeechButton.disabled = true;
             pauseResumeButton.textContent = 'Pause';
@@ -484,7 +500,7 @@
             logMessage('Info', 'Speech stopped. Listening in 2 seconds...');
 
             setTimeout(() => {
-                speechManuallyStopped = false; // Reset flag
+                speechManuallyStopped = false;
                 if (systemInstruction) { 
                     setState('CONVERSATION');
                     try { recognition.start(); } catch(e) {}
@@ -495,46 +511,21 @@
             }, 2000);
         }
 
-        // REQUEST 1: Pause/Replay stops the mic
         function replaySpeech() {
             if (lastSpokenText) {
-                recognition.stop(); // Stop the mic
-                setState('BUSY'); // Set state to busy
-                // This will call speakText, which restarts the promise chain
-                handleSpeechResult({
-                    results: [[{ transcript: `(replay last message)` }]],
-                    // A "fake" event to re-trigger the logic
-                    // This is a bit of a hack. A cleaner way:
-                    _isReplay: true 
-                });
-                
-                // Let's do the cleaner way.
-                // Re-think: Just call speakText.
-                speakText(lastSpokenText);
-                // The problem: `handleSpeechResult` won't know.
-                // Let's stick to the simplest logic:
-                // recognition.stop();
-                // setState('BUSY');
-                // speakText(lastSpokenText);
-                // --> This will hang the `await speakText` in handleSpeechResult.
-                
-                // --- FINAL, ROBUST LOGIC ---
-                recognition.stop(); // Stop mic
-                setState('BUSY');   // Set state to busy
-                // Call speakText. We don't care about the previous `await`.
-                // The `onend` handler will restart listening.
+                recognition.stop(); 
+                setState('BUSY');   
                 speakText(lastSpokenText); 
             }
         }
         
-        // UPDATED: speakText function
         async function speakText(text, lang = 'mr-IN') {
             if (synth.speaking) {
                 synth.cancel();
             }
 
             lastSpokenText = text;
-            speechManuallyStopped = false; // Reset flag
+            speechManuallyStopped = false;
 
             if (voices.length === 0) {
                 voices = synth.getVoices();
@@ -556,10 +547,8 @@
                     pauseResumeButton.textContent = 'Pause';
                     
                     if (speechManuallyStopped) {
-                        // REJECT the promise if stopped
                         reject(new Error("Speech manually stopped"));
                     } else {
-                        // RESOLVE normally
                         resolve();
                     }
                 };
@@ -572,7 +561,6 @@
                     reject(event.error);
                 };
 
-                // --- Find the best voice ---
                 let marathiVoice = voices.find(voice => voice.lang === 'mr-IN');
                 if (!marathiVoice) {
                     marathiVoice = voices.find(voice => voice.lang === 'hi-IN');
@@ -590,9 +578,9 @@
         }
         
         // --- 8. Utility Functions ---
+        // ... (logMessage is unchanged from the previous version) ...
 
         function logMessage(sender, message) {
-            // ... (this function is unchanged) ...
             const div = document.createElement('div');
             let senderClass = 'text-blue-300 font-semibold';
             let messageClass = 'text-white';
@@ -614,28 +602,19 @@
             conversationLog.scrollTop = conversationLog.scrollHeight;
         }
 
-        // --- 9. NEW: Share Functions ---
-
-        /**
-         * Gets the entire chat log as a clean text string.
-         */
+        // --- 9. Share Functions ---
+        // ... (getChatLogAsText, shareChat are unchanged from the previous version) ...
+        
         function getChatLogAsText() {
             const messages = [];
-            // Select all message divs inside the log
             conversationLog.querySelectorAll('div').forEach(div => {
-                // Use textContent to get a clean "Sender: Message" string
                 if (div.textContent) {
                     messages.push(div.textContent);
                 }
             });
-            // Join all messages with a new line
             return messages.join('\n');
         }
 
-        /**
-         * Handles the Share Chat button click.
-         * Uses Web Share API (Mobile) or Clipboard API (Desktop).
-         */
         async function shareChat() {
             const chatText = getChatLogAsText();
             if (!chatText || chatText.trim().length === 0) {
@@ -648,7 +627,6 @@
                 text: chatText,
             };
 
-            // Try Web Share API (Mobile) first
             if (navigator.share) {
                 try {
                     await navigator.share(shareData);
@@ -658,7 +636,6 @@
                     logMessage('Error', 'Could not share chat.');
                 }
             } else if (navigator.clipboard) {
-                // Fallback to Clipboard API (Desktop)
                 try {
                     await navigator.clipboard.writeText(chatText);
                     logMessage('Info', 'Chat copied to clipboard!');
@@ -667,8 +644,129 @@
                     logMessage('Error', 'Could not copy chat to clipboard.');
                 }
             } else {
-                // No support for either
                 logMessage('Error', 'Sharing and copying are not supported in this browser.');
+            }
+        }
+
+        // --- 10. NEW: Wake Lock API Functions ---
+        
+        /**
+         * Requests a screen wake lock.
+         */
+        async function acquireWakeLock() {
+            if ('wakeLock' in navigator) {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('Screen Wake Lock acquired.');
+                    
+                    // Handle cases where the lock is released by the system
+                    wakeLock.addEventListener('release', () => {
+                        console.log('Screen Wake Lock was released by system.');
+                        wakeLock = null;
+                    });
+                } catch (err) {
+                    console.error(`Wake Lock failed: ${err.name}, ${err.message}`);
+                }
+            } else {
+                console.warn('Wake Lock API not supported in this browser.');
+            }
+        }
+
+        /**
+         * Releases the screen wake lock.
+         */
+        async function releaseWakeLock() {
+            if (wakeLock !== null) {
+                try {
+                    await wakeLock.release();
+                    wakeLock = null;
+                    console.log('Screen Wake Lock released.');
+                } catch (err) {
+                    console.error(`Wake Lock release failed: ${err.name}, ${err.message}`);
+                }
+            }
+        }
+
+        /**
+         * Handles re-acquiring the lock if the tab becomes visible again.
+         */
+        async function handleVisibilityChange() {
+            // If we are *not* idle (i.e., supposed to be listening) and
+            // the wake lock is gone, and the doc is visible... re-acquire lock.
+            if (appState !== 'IDLE' && wakeLock === null && document.visibilityState === 'visible') {
+                await acquireWakeLock();
+            }
+        }
+
+
+        // --- 11. NEW: Chat Control Functions ---
+
+        /**
+         * Ends the chat completely, clears user data, and resets the app.
+         */
+        function endChat() {
+            console.log("Ending chat...");
+            
+            // 1. Stop all activity
+            if (synth.speaking) synth.cancel();
+            if (appState !== 'IDLE') recognition.stop(); // Stop mic
+            
+            setState('IDLE'); // This handles button states and UI
+            releaseWakeLock(); // Explicitly release lock
+
+            // 2. Clear credentials
+            userName = '';
+            userAge = 18;
+            
+            // 3. Clear history
+            chatHistory = [];
+            systemInstruction = '';
+            
+            // 4. Reset UI
+            conversationLog.innerHTML = '<div class="text-gray-400 text-center">Press the button and say "Dhwani" to begin.</div>';
+            restartChatButton.disabled = true; // Disable restart
+            
+            logMessage('Info', 'Chat ended. Press "Start Listening" to begin again.');
+        }
+
+        /**
+         * Restarts the chat, keeping user data but clearing the log.
+         */
+        async function restartChat() {
+            console.log("Restarting chat...");
+
+            // 1. Check if chat has started (user info is present)
+            if (!systemInstruction) {
+                logMessage('Error', 'Please start a chat first.');
+                return;
+            }
+
+            // 2. Stop current activity
+            if (synth.speaking) synth.cancel();
+            if (appState !== 'IDLE') recognition.stop();
+            setState('BUSY'); // Show "Thinking..."
+
+            // 3. Clear visual log
+            conversationLog.innerHTML = '';
+            
+            // 4. Rebuild logical history (this keeps name/age)
+            buildSystemPrompt(); // This re-initializes chatHistory
+            
+            // 5. Ask the restart prompt
+            const restartPrompt = `${userName}, तुम्हाला अजून कोणत्या विषयावर माहिती हवी आहे?`;
+            
+            try {
+                logMessage('Dhwani', restartPrompt);
+                await speakText(restartPrompt);
+                
+                // 6. Go to conversation state
+                setState('CONVERSATION');
+                recognition.start();
+
+            } catch (error) {
+                console.error("Restart chat failed:", error);
+                logMessage('Error', 'Could not restart chat.');
+                setState('IDLE');
             }
         }
 
