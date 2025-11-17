@@ -19,6 +19,14 @@
             70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
             100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
         }
+        /* Custom styles for new buttons */
+        .control-btn {
+            @apply px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                   bg-gray-600 text-white
+                   hover:bg-gray-500
+                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-blue-500
+                   disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
@@ -26,12 +34,18 @@
     <div class="bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-2xl">
         
         <div class="flex items-center justify-between mb-6">
-            <h1 class="text-3xl font-bold text-white">Dhwani (AI Teacher)</h1>
+            <h1 class="text-3xl font-bold text-white">ध्वनी AI शिक्षिका </h1>
             <div id="status-indicator" class="w-4 h-4 rounded-full bg-gray-500 transition-colors" title="Offline"></div>
         </div>
 
         <div id="conversation-log" class="h-80 overflow-y-auto bg-gray-900 rounded-lg p-4 mb-6 border border-gray-700 space-y-4">
             <div class="text-gray-400 text-center">Press the button and say "Dhwani" to begin.</div>
+        </div>
+
+        <div id="audio-controls" class="flex justify-center space-x-4 mb-6">
+            <button id="pause-resume-button" class="control-btn w-1/3" disabled>Pause</button>
+            <button id="stop-speech-button" class="control-btn w-1/3" disabled>Stop</button>
+            <button id="replay-button" class="control-btn w-1/3" disabled>Replay</button>
         </div>
 
         <button id="talk-button" class="w-full py-4 px-6 rounded-lg text-lg font-semibold transition-all duration-300 ease-in-out
@@ -42,21 +56,29 @@
             Start Listening
         </button>
 
-        <div class="mt-6">
-            <label for="api-key" class="block text-sm font-medium text-gray-400 mb-2">Google Gemini API Key (For AI Brain)</label>
-            <input type="password" id="api-key" placeholder="Enter your API key here"
-                   class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <p id="https-warning" class="text-xs text-yellow-400 mt-2" style="display: none;"></p>
         </div>
-    </div>
 
     <script>
         // --- 1. DOM Elements ---
         const talkButton = document.getElementById('talk-button');
         const statusIndicator = document.getElementById('status-indicator');
         const conversationLog = document.getElementById('conversation-log');
-        const apiKeyInput = document.getElementById('api-key');
+        
+        // NEW: Audio control DOM elements
+        const pauseResumeButton = document.getElementById('pause-resume-button');
+        const stopSpeechButton = document.getElementById('stop-speech-button');
+        const replayButton = document.getElementById('replay-button');
 
+
+        // --- DANGER: API KEY ---
+        // WARNING: Do NOT use this on a public website (like GitHub Pages).
+        // Anyone can see this key, steal it, and use your money/quota.
+        // This is ONLY for your own private, local testing.
+        // For a public site, you MUST use the old input box method.
+        const GEMINI_API_KEY = "AIzaSyA4Ts-x9EKRUY9nBEegxlBUtNiJ_Qvo_zo"; 
+        // -------------------------
+
+        
         // --- 2. State Management ---
         let appState = 'IDLE'; // IDLE, LISTENING_FOR_WAKEWORD, LISTENING_FOR_NAME, LISTENING_FOR_AGE, CONVERSATION, BUSY
         let userName = '';
@@ -64,24 +86,18 @@
         let chatHistory = [];
         let systemInstruction = '';
         let recognition;
+        let lastSpokenText = ''; // For the replay button
         
         // --- This is the browser's built-in speech synthesizer ---
         const synth = window.speechSynthesis;
         let voices = []; // This will hold the list of available voices
         
-        // --- Add window.onload to load API key and check protocol ---
+        // --- Add window.onload to check protocol ---
         window.onload = () => {
-            // 1. Load API key from localStorage
-            const storedApiKey = localStorage.getItem('geminiApiKey');
-            if (storedApiKey) {
-                apiKeyInput.value = storedApiKey;
-            }
-
-            // 2. Check for HTTPS (for persistent mic permission)
+            // Check for HTTPS (for persistent mic permission)
             if (window.location.protocol !== 'https:') {
-                const warningMsg = document.getElementById('https-warning');
-                warningMsg.textContent = 'Note: To stop asking for mic permission, this page must be on a secure (https://) server.';
-                warningMsg.style.display = 'block';
+                // We can't find 'https-warning' so let's log to console
+                console.warn('Note: To stop asking for mic permission, this page must be on a secure (https://) server.');
             }
         };
 
@@ -109,23 +125,21 @@
 
         // --- 4. Event Listeners ---
         talkButton.addEventListener('click', toggleListening);
+        
+        // NEW: Audio control listeners
+        pauseResumeButton.addEventListener('click', togglePauseResume);
+        stopSpeechButton.addEventListener('click', stopSpeech);
+        replayButton.addEventListener('click', replaySpeech);
 
-        // --- Add listener to save API key on change ---
-        apiKeyInput.addEventListener('input', () => {
-            localStorage.setItem('geminiApiKey', apiKeyInput.value.trim());
-        });
 
         // --- 5. Core Functions ---
 
         function toggleListening() {
-            const apiKey = apiKeyInput.value.trim();
-            if (!apiKey) {
-                logMessage('Error', 'Please enter your Google Gemini API key.');
-                return;
+            // API key check is removed, as it's now embedded
+            if (GEMINI_API_KEY === "PASTE_YOUR_GEMINI_API_KEY_HERE") {
+                 logMessage('Error', 'Please paste your API key into the script tag (line 125).');
+                 return;
             }
-            
-            // --- Save the key on successful start ---
-            localStorage.setItem('geminiApiKey', apiKey);
 
             if (appState === 'IDLE') {
                 setState('LISTENING_FOR_WAKEWORD');
@@ -196,15 +210,12 @@
                 switch (currentState) { // <-- FIX: Use the captured state
                     case 'LISTENING_FOR_WAKEWORD':
                         if (transcript.toLowerCase().includes('dhwani') || transcript.toLowerCase().includes('ध्वनी')) {
-                            // --- FIX: Changed to Devanagari script ---
                             const greeting = "नमस्कार, मी ध्वनी, तुमचे नाव काय आहे?";
                             logMessage('Dhwani', greeting);
-                            // --- MODIFICATION: Use Browser TTS ---
                             await speakText(greeting, 'mr-IN');
                             setState('LISTENING_FOR_NAME');
                             recognition.start(); 
                         } else {
-                            // Wake word not detected, go back to listening
                             setState('LISTENING_FOR_WAKEWORD');
                             recognition.start();
                         }
@@ -215,10 +226,8 @@
                         logMessage('You', transcript);
                         userName = await extractNameFromTranscript(transcript);
                         
-                        // --- FIX: Changed to Devanagari script ---
                         const agePrompt = `खूप छान, ${userName}, तुमचे वय काय आहे?`;
                         logMessage('Dhwani', agePrompt);
-                        // --- MODIFICATION: Use Browser TTS ---
                         await speakText(agePrompt, 'mr-IN');
                         setState('LISTENING_FOR_AGE');
                         recognition.start();
@@ -233,7 +242,6 @@
                         
                         const startPrompt = `धन्यवाद, ${userName}! मी लक्षात ठेवीन की तुझे वय ${userAge} आहे. मी आता तुझ्या प्रश्नांसाठी तयार आहे!`;
                         logMessage('Dhwani', startPrompt);
-                        // --- MODIFICATION: Use Browser TTS ---
                         await speakText(startPrompt, 'mr-IN');
                         setState('CONVERSATION');
                         recognition.start();
@@ -244,11 +252,8 @@
                         chatHistory.push({ role: 'user', parts: [{ text: transcript }] });
                         
                         const aiResponseText = await generateTextResponseFromChat();
-                        
-                        // --- FIX: Clean the text from the AI ---
                         const cleanedResponseText = cleanTextForTTS(aiResponseText);
 
-                        // Use the *cleaned* text for history, logging, and speech
                         chatHistory.push({ role: 'model', parts: [{ text: cleanedResponseText }] });
                         logMessage('Dhwani', cleanedResponseText);
                         await speakText(cleanedResponseText, 'mr-IN');
@@ -304,13 +309,12 @@
         // --- 6. Gemini API Functions ---
 
         async function extractNameFromTranscript(transcript) {
-            // Give user feedback that we're processing
             const processingMsg = document.createElement('div');
             processingMsg.innerHTML = `<strong class="text-yellow-400">Dhwani:</strong> <span class="text-gray-400">(...processing name...)</span>`;
             conversationLog.appendChild(processingMsg);
             conversationLog.scrollTop = conversationLog.scrollHeight;
             
-            const apiKey = apiKeyInput.value.trim();
+            const apiKey = GEMINI_API_KEY;
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
             const extractionPrompt = `
@@ -354,24 +358,32 @@
 
 
         async function extractAgeFromTranscript(transcript) {
-            // Give user feedback that we're processing
             const processingMsg = document.createElement('div');
             processingMsg.innerHTML = `<strong class="text-yellow-400">Dhwani:</strong> <span class="text-gray-400">(...processing age...)</span>`;
             conversationLog.appendChild(processingMsg);
             conversationLog.scrollTop = conversationLog.scrollHeight;
 
-            const apiKey = apiKeyInput.value.trim();
+            const apiKey = GEMINI_API_KEY;
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
+            // --- IMPROVED PROMPT ---
             const extractionPrompt = `
-                You are a simple utility. Your only job is to extract a single number from the user's text.
-                - If the user says "मी दहा वर्षांचा आहे", you respond "10".
-                - If the user says "पंधरा", you respond "15".
-                - If the user says "माझं वय 8 आहे", you respond "8".
-                - If the user says "My age is 40", you respond "40".
-                - If the user says "10 varsha", you respond "10".
+                You are a simple utility. Your only job is to extract a single number (age) from the user's text.
+                - Respond ONLY with the digits (e.g., "10", "8").
                 - If you cannot find a number, respond with "18".
-                - Only respond with the digits. Do not add any other text.
+
+                EXAMPLES:
+                User Text: "मी दहा वर्षांचा आहे" -> Response: "10"
+                User Text: "माझं वय पंधरा आहे" -> Response: "15"
+                User Text: "8" -> Response: "8"
+                User Text: "My age is 40" -> Response: "40"
+                User Text: "10 varsha" -> Response: "10"
+                User Text: "majhe vaay 10 varsha aahe" -> Response: "10"
+                User Text: "mi 10 varshacha aahe" -> Response: "10"
+                User Text: "मी १० वर्षांचा आहे" (Devanagari numeral) -> Response: "10"
+                User Text: "१० वर्षे" (Devanagari numeral) -> Response: "10"
+                User Text: "माझं वय आठ आहे" (Marathi word) -> Response: "8"
+                User Text: "Just twelve" -> Response: "12"
 
                 Text to analyze: "${transcript}"
             `;
@@ -395,9 +407,7 @@
                 const text = result.candidates[0].content.parts[0].text;
                 const age = parseInt(text.trim()) || 18; // Default to 18 if LLM fails
                 
-                // Remove the "(...processing...)" message
                 conversationLog.removeChild(processingMsg);
-                
                 return age;
             } catch (error) {
                 console.error("extractAgeFromTranscript error:", error);
@@ -408,7 +418,7 @@
 
         // --- This is the "Brain" function (Text Generation) ---
         async function generateTextResponseFromChat() {
-            const apiKey = apiKeyInput.value.trim();
+            const apiKey = GEMINI_API_KEY;
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
             const payload = {
@@ -440,22 +450,16 @@
             }
         }
         
-        // --- NEW UTILITY FUNCTION to clean text for TTS ---
         function cleanTextForTTS(text) {
             // Removes *, #, and ` -- Parentheses are now allowed
-            // Also replaces multiple spaces (from removals) with a single space
             return text.replace(/[\*#`]/g, ' ').replace(/\s+/g, ' ').trim();
         }
 
         
         // --- 6. Speech Synthesis (Browser TTS) ---
 
-        /**
-         * Loads the list of available voices. This is sometimes asynchronous.
-         */
         function loadVoices() {
             voices = synth.getVoices();
-            // Some browsers need this event to load voices
             if (synth.onvoiceschanged !== undefined) {
                 synth.onvoiceschanged = () => {
                     voices = synth.getVoices();
@@ -463,19 +467,38 @@
                 };
             }
         }
-        // Load voices when the script starts
         loadVoices();
 
-        /**
-         * Main function to speak text using the browser's built-in SpeechSynthesis.
-         */
+        // NEW: Audio control functions
+        function togglePauseResume() {
+            if (synth.paused) {
+                synth.resume();
+                pauseResumeButton.textContent = 'Pause';
+            } else if (synth.speaking) {
+                synth.pause();
+                pauseResumeButton.textContent = 'Resume';
+            }
+        }
+
+        function stopSpeech() {
+            synth.cancel(); // This will trigger 'onend'
+        }
+
+        function replaySpeech() {
+            if (lastSpokenText) {
+                speakText(lastSpokenText);
+            }
+        }
+
+        // UPDATED: speakText function
         async function speakText(text, lang = 'mr-IN') {
             if (synth.speaking) {
-                // If it's already speaking, cancel it to say the new thing
                 synth.cancel();
             }
 
-            // This is a fix for a bug in some browsers where getVoices() is empty
+            // Store for replay
+            lastSpokenText = text;
+
             if (voices.length === 0) {
                 voices = synth.getVoices();
             }
@@ -483,35 +506,51 @@
             return new Promise((resolve, reject) => {
                 const utterance = new SpeechSynthesisUtterance(text);
                 
-                // --- Promise handlers ---
-                utterance.onend = resolve;
+                // Enable buttons when speech starts
+                utterance.onstart = () => {
+                    pauseResumeButton.disabled = false;
+                    stopSpeechButton.disabled = false;
+                    replayButton.disabled = false;
+                    pauseResumeButton.textContent = 'Pause';
+                };
+                
+                // Reset buttons when speech ends
+                utterance.onend = () => {
+                    pauseResumeButton.disabled = true;
+                    stopSpeechButton.disabled = true;
+                    // replayButton remains enabled
+                    pauseResumeButton.textContent = 'Pause';
+                    resolve();
+                };
+                
                 utterance.onerror = (event) => {
                     console.error("SpeechSynthesisUtterance.onerror", event);
-                    logMessage('Error', 'Failed to play audio.'); // Log a user-friendly error
+                    logMessage('Error', 'Failed to play audio.');
+                    
+                    // Reset buttons on error
+                    pauseResumeButton.disabled = true;
+                    stopSpeechButton.disabled = true;
+                    pauseResumeButton.textContent = 'Pause';
+                    
                     reject(event.error);
                 };
 
                 // --- Find the best voice ---
-                // 1. Try to find a perfect 'mr-IN' match
                 let marathiVoice = voices.find(voice => voice.lang === 'mr-IN');
-                
-                // 2. If not found, try a 'hi-IN' (Hindi) voice, as it's also Devanagari
                 if (!marathiVoice) {
                     marathiVoice = voices.find(voice => voice.lang === 'hi-IN');
                 }
 
-                // 3. If a good voice is found, use it
                 if (marathiVoice) {
                     utterance.voice = marathiVoice;
                     console.log("Using voice:", marathiVoice.name);
                 } else {
-                    // 4. If no specific voice, just set the lang. The browser will try.
                     utterance.lang = 'mr-IN';
                     console.warn("No 'mr-IN' or 'hi-IN' voice found. Using browser default.");
                 }
                 
                 utterance.pitch = 1;
-                utterance.rate = 1; // You can make this 0.9 for a slower pace
+                utterance.rate = 1;
 
                 synth.speak(utterance);
             });
