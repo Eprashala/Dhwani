@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dhwani - AI Teacher (Free TTS)</title>
+    <title>ध्वनी AI शिक्षिका (Free TTS)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* Custom styles for the app */
@@ -27,7 +27,7 @@
                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-blue-500
                    disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed;
         }
-        /* NEW: Style for chat utility buttons */
+        /* Style for chat utility buttons */
         .utility-btn {
             @apply w-full py-3 px-4 rounded-lg text-sm font-semibold transition-colors
                    bg-gray-700 text-white
@@ -42,7 +42,7 @@
     <div class="bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-2xl">
         
         <div class="flex items-center justify-between mb-6">
-            <h1 class="text-3xl font-bold text-white">ध्वनी  AI शिक्षिका </h1>
+            <h1 class="text-3xl font-bold text-white">ध्वनी AI शिक्षिका</h1>
             <div id="status-indicator" class="w-4 h-4 rounded-full bg-gray-500 transition-colors" title="Offline"></div>
         </div>
 
@@ -83,7 +83,6 @@
         const replayButton = document.getElementById('replay-button');
         const shareButton = document.getElementById('share-button');
         
-        // NEW: Chat control buttons
         const endChatButton = document.getElementById('end-chat-button');
         const restartChatButton = document.getElementById('restart-chat-button');
 
@@ -106,8 +105,6 @@
         
         const synth = window.speechSynthesis;
         let voices = [];
-        
-        // NEW: Wake Lock
         let wakeLock = null;
         
         window.onload = () => {
@@ -124,16 +121,32 @@
             talkButton.disabled = true;
         } else {
             recognition = new SpeechRecognition();
-            recognition.continuous = false;
+            recognition.continuous = false; // Keep this false. We will handle timeouts via the 'onerror' event.
             recognition.interimResults = false;
             recognition.lang = 'mr-IN';
 
             recognition.onresult = handleSpeechResult;
             recognition.onend = handleSpeechEnd;
+            
+            // --- UPDATED: 'onerror' for 5-second pause ---
             recognition.onerror = (event) => {
-                logMessage('Error', `Speech recognition error: ${event.error}`);
-                if (appState !== 'IDLE') {
-                    setState('IDLE');
+                if (event.error === 'no-speech') {
+                    // This error means the user paused (e.g., for 5+ seconds)
+                    console.warn('Speech recognition timeout (no-speech). Restarting.');
+                    
+                    // Silently restart the mic if we're supposed to be listening
+                    if (appState !== 'IDLE' && appState !== 'BUSY') {
+                        try { recognition.start(); } catch(e) {
+                            console.error("Mic restart failed:", e);
+                            setState('IDLE');
+                        }
+                    }
+                } else {
+                    // For all other errors, log them and reset
+                    logMessage('Error', `Speech recognition error: ${event.error}`);
+                    if (appState !== 'IDLE') {
+                        setState('IDLE'); // Reset on critical error
+                    }
                 }
             };
         }
@@ -146,11 +159,9 @@
         replayButton.addEventListener('click', replaySpeech);
         shareButton.addEventListener('click', shareChat);
 
-        // NEW: Chat control listeners
         endChatButton.addEventListener('click', endChat);
         restartChatButton.addEventListener('click', restartChat);
         
-        // NEW: Wake Lock listener
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
 
@@ -165,14 +176,14 @@
             if (appState === 'IDLE') {
                 setState('LISTENING_FOR_WAKEWORD');
                 recognition.start();
-                await acquireWakeLock(); // NEW: Acquire wake lock
+                await acquireWakeLock();
             } else {
                 setState('IDLE');
                 recognition.stop();
                 if (synth.speaking) {
                     synth.cancel();
                 }
-                await releaseWakeLock(); // NEW: Release wake lock
+                await releaseWakeLock();
             }
         }
 
@@ -185,33 +196,34 @@
                     talkButton.textContent = 'Start Listening';
                     talkButton.disabled = false;
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-gray-500 transition-colors';
-                    endChatButton.disabled = true; // NEW
+                    endChatButton.disabled = true;
                     break;
                 case 'BUSY':
                     talkButton.textContent = 'Thinking...';
                     talkButton.disabled = true;
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-400 transition-colors';
-                    endChatButton.disabled = false; // NEW
+                    endChatButton.disabled = false;
                     break;
                 default: // All "LISTENING" states
                     talkButton.textContent = 'Stop Listening';
                     talkButton.disabled = false;
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-blue-500 listening-pulse transition-colors';
-                    endChatButton.disabled = false; // NEW
+                    endChatButton.disabled = false;
                     break;
             }
         }
 
         function handleSpeechEnd() {
+            // Safety net: Keep listening unless we are IDLE or BUSY
             if (appState !== 'IDLE' && appState !== 'BUSY') {
                 try {
                     recognition.start();
                 } catch (e) {
+                    // This can happen if stop() was called right before
                     console.error("Safety net restart recognition error:", e);
-                    setState('IDLE');
                 }
             } else if (appState === 'IDLE') {
-                setState('IDLE');
+                setState('IDLE'); // Ensure UI is reset
             }
         }
         
@@ -220,7 +232,7 @@
             console.log(`Transcript: ${transcript}`);
 
             const currentState = appState;
-            recognition.stop();
+            recognition.stop(); // Stop mic while we process
             setState('BUSY');
 
             try {
@@ -233,6 +245,7 @@
                             setState('LISTENING_FOR_NAME');
                             recognition.start(); 
                         } else {
+                            // Wake word not detected, go back to listening
                             setState('LISTENING_FOR_WAKEWORD');
                             recognition.start();
                         }
@@ -253,7 +266,7 @@
                         logMessage('You', transcript);
                         const age = await extractAgeFromTranscript(transcript);
                         userAge = Math.min(age, 18);
-                        buildSystemPrompt(); // <-- This will enable the Restart button
+                        buildSystemPrompt(); // <-- This enables Restart button
                         
                         const startPrompt = `धन्यवाद, ${userName}! मी लक्षात ठेवीन की तुझे वय ${userAge} आहे. मी आता तुझ्या प्रश्नांसाठी तयार आहे!`;
                         logMessage('Dhwani', startPrompt);
@@ -282,6 +295,7 @@
                             throw error;
                         }
                         
+                        // After speaking, go back to listening
                         setState('CONVERSATION');
                         recognition.start();
                         break;
@@ -290,6 +304,7 @@
                 console.error("Error in speech handling:", error);
                 logMessage('Error', `Sorry, an error occurred: ${error.message}`);
                 
+                // Reset to a safe state
                 if (systemInstruction) {
                     setState('CONVERSATION');
                     recognition.start();
@@ -300,6 +315,7 @@
             }
         }
 
+        // --- UPDATED: buildSystemPrompt ---
         function buildSystemPrompt() {
             systemInstruction = `
                 You are "Dhwani," a sweet and patient female AI teacher from Maharashtra.
@@ -312,21 +328,30 @@
                 3.  Do NOT include formatting in your response (like asterisks *).
                 4.  You MUST tailor all answers to be easily understood by a ${userAge}-year-old.
                 5.  You are kind, encouraging, and use simple language.
+                6.  Do not just give the answer; try to explain it simply, like a teacher would.
+                7.  Your responses should be conversational.
+                
+                8.  CRITICAL INTERACTION RULE: Keep your answers very short (2-3 sentences). After your answer, 
+                    YOU MUST ALWAYS ask a follow-up question to keep the chat interactive.
+                    Examples of follow-up questions:
+                    - 'तुम्हाला याबद्दल अधिक माहिती हवी आहे का?' (Do you want more information?)
+                    - 'हे तुम्हाला समजले का?' (Did you understand this?)
+                    - 'आपण पुढे जाऊया का?' (Shall we move on?)
             `;
             
             if (userAge <= 8) {
-                systemInstruction += "\n8. CRITICAL: The user is very young. Use extremely simple, short sentences. Explain things one step at a time. Be very gentle and encouraging.";
+                systemInstruction += "\n9. CRITICAL: The user is very young. Use extremely simple, short sentences. Explain things one step at a time. Be very gentle and encouraging.";
             } else if (userAge <= 12) {
-                systemInstruction += "\n8. CRITICAL: The user is a child. Use simple language, but you can be a bit more detailed. Avoid complex words.";
+                systemInstruction += "\n9. CRITICAL: The user is a child. Use simple language, but you can be a bit more detailed. Avoid complex words.";
             } else {
-                systemInstruction += "\n8. CRITICAL: The user is a teenager. You can use more complex sentences, but still be encouraging and clear, like a good teacher.";
+                systemInstruction += "\n9. CRITICAL: The user is a teenager. You can use more complex sentences, but still be encouraging and clear, like a good teacher.";
             }
 
             // Add the system prompt to the chat history
             chatHistory = [{ role: 'user', parts: [{ text: 'Here are my instructions' }] }];
-            chatHistory.push({ role: 'model', parts: [{ text: `Okay, I understand. I am Dhwani, a Marathi teacher, and I am speaking to ${userName} (${userAge}). I will answer all questions simply.` }] });
+            chatHistory.push({ role: 'model', parts: [{ text: `Okay, I understand. I am Dhwani, a Marathi teacher, and I am speaking to ${userName} (${userAge}). I will answer all questions simply and ask follow-up questions.` }] });
         
-            // NEW: Enable the restart button now that we have user info
+            // Enable the restart button now that we have user info
             restartChatButton.disabled = false;
         }
 
@@ -648,18 +673,16 @@
             }
         }
 
-        // --- 10. NEW: Wake Lock API Functions ---
+        // --- 10. Wake Lock API Functions ---
+        // ... (acquireWakeLock, releaseWakeLock, handleVisibilityChange
+        //     are all unchanged from the previous version) ...
         
-        /**
-         * Requests a screen wake lock.
-         */
         async function acquireWakeLock() {
             if ('wakeLock' in navigator) {
                 try {
                     wakeLock = await navigator.wakeLock.request('screen');
                     console.log('Screen Wake Lock acquired.');
                     
-                    // Handle cases where the lock is released by the system
                     wakeLock.addEventListener('release', () => {
                         console.log('Screen Wake Lock was released by system.');
                         wakeLock = null;
@@ -672,9 +695,6 @@
             }
         }
 
-        /**
-         * Releases the screen wake lock.
-         */
         async function releaseWakeLock() {
             if (wakeLock !== null) {
                 try {
@@ -687,24 +707,20 @@
             }
         }
 
-        /**
-         * Handles re-acquiring the lock if the tab becomes visible again.
-         */
         async function handleVisibilityChange() {
-            // If we are *not* idle (i.e., supposed to be listening) and
-            // the wake lock is gone, and the doc is visible... re-acquire lock.
             if (appState !== 'IDLE' && wakeLock === null && document.visibilityState === 'visible') {
                 await acquireWakeLock();
             }
         }
 
 
-        // --- 11. NEW: Chat Control Functions ---
+        // --- 11. Chat Control Functions ---
 
         /**
          * Ends the chat completely, clears user data, and resets the app.
+         * User must press "Start Listening" to begin again.
          */
-        function endChat() {
+        async function endChat() {
             console.log("Ending chat...");
             
             // 1. Stop all activity
@@ -712,7 +728,7 @@
             if (appState !== 'IDLE') recognition.stop(); // Stop mic
             
             setState('IDLE'); // This handles button states and UI
-            releaseWakeLock(); // Explicitly release lock
+            await releaseWakeLock(); // Explicitly release lock
 
             // 2. Clear credentials
             userName = '';
@@ -730,44 +746,33 @@
         }
 
         /**
-         * Restarts the chat, keeping user data but clearing the log.
+         * Restarts the chat: stops activity, clears log, keeps user data.
+         * User must press "Start Listening" to continue.
          */
         async function restartChat() {
             console.log("Restarting chat...");
 
-            // 1. Check if chat has started (user info is present)
             if (!systemInstruction) {
                 logMessage('Error', 'Please start a chat first.');
                 return;
             }
 
-            // 2. Stop current activity
+            // 1. Stop all activity
             if (synth.speaking) synth.cancel();
             if (appState !== 'IDLE') recognition.stop();
-            setState('BUSY'); // Show "Thinking..."
+            
+            // 2. Set state to IDLE (forces user to press button)
+            setState('IDLE');
+            await releaseWakeLock(); // Release lock
 
             // 3. Clear visual log
             conversationLog.innerHTML = '';
             
-            // 4. Rebuild logical history (this keeps name/age)
-            buildSystemPrompt(); // This re-initializes chatHistory
+            // 4. Rebuild logical history (keeps name/age)
+            buildSystemPrompt(); 
             
-            // 5. Ask the restart prompt
-            const restartPrompt = `${userName}, तुम्हाला अजून कोणत्या विषयावर माहिती हवी आहे?`;
-            
-            try {
-                logMessage('Dhwani', restartPrompt);
-                await speakText(restartPrompt);
-                
-                // 6. Go to conversation state
-                setState('CONVERSATION');
-                recognition.start();
-
-            } catch (error) {
-                console.error("Restart chat failed:", error);
-                logMessage('Error', 'Could not restart chat.');
-                setState('IDLE');
-            }
+            // 5. Log message
+            logMessage('Info', `Chat restarted for ${userName}. Press "Start Listening" to continue.`);
         }
 
     </script>
