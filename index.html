@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dhwani - AI Teacher (Free TTS)</title>
+    <!-- 1. Load Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for the app */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Style for the pulsing "listening" indicator */
+        .listening-pulse {
+            animation: pulse 1.5s infinite ease-in-out;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
+
+    <div class="bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-2xl">
+        
+        <!-- Header Section -->
+        <div class="flex items-center justify-between mb-6">
+            <h1 class="text-3xl font-bold text-white">Dhwani (AI Teacher)</h1>
+            <div id="status-indicator" class="w-4 h-4 rounded-full bg-gray-500 transition-colors" title="Offline"></div>
+        </div>
+
+        <!-- Conversation Log -->
+        <div id="conversation-log" class="h-80 overflow-y-auto bg-gray-900 rounded-lg p-4 mb-6 border border-gray-700 space-y-4">
+            <!-- Messages will be added here -->
+            <div class="text-gray-400 text-center">Press the button and say "Dhwani" to begin.</div>
+        </div>
+
+        <!-- Control Button -->
+        <button id="talk-button" class="w-full py-4 px-6 rounded-lg text-lg font-semibold transition-all duration-300 ease-in-out
+                       bg-blue-600 text-white
+                       hover:bg-blue-700
+                       focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50
+                       disabled:bg-gray-500 disabled:cursor-not-allowed">
+            Start Listening
+        </button>
+
+        <!-- API Key Input -->
+        <div class="mt-6">
+            <label for="api-key" class="block text-sm font-medium text-gray-400 mb-2">Google Gemini API Key (For AI Brain)</label>
+            <input type="password" id="api-key" placeholder="Enter your API key here"
+                   class="w-full px-4 py-2 rounded-lg bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <p id="https-warning" class="text-xs text-yellow-400 mt-2" style="display: none;"></p>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. DOM Elements ---
+        const talkButton = document.getElementById('talk-button');
+        const statusIndicator = document.getElementById('status-indicator');
+        const conversationLog = document.getElementById('conversation-log');
+        const apiKeyInput = document.getElementById('api-key');
+
+        // --- 2. State Management ---
+        let appState = 'IDLE'; // IDLE, LISTENING_FOR_WAKEWORD, LISTENING_FOR_NAME, LISTENING_FOR_AGE, CONVERSATION, BUSY
+        let userName = '';
+        let userAge = 18;
+        let chatHistory = [];
+        let systemInstruction = '';
+        let recognition;
+        
+        // --- This audio object will be used to play the TTS audio ---
+        let audio = new Audio();
+        
+        // --- Add window.onload to load API key and check protocol ---
+        window.onload = () => {
+            // 1. Load API key from localStorage
+            const storedApiKey = localStorage.getItem('geminiApiKey');
+            if (storedApiKey) {
+                apiKeyInput.value = storedApiKey;
+            }
+
+            // 2. Check for HTTPS (for persistent mic permission)
+            if (window.location.protocol !== 'https:') {
+                const warningMsg = document.getElementById('https-warning');
+                warningMsg.textContent = 'Note: To stop asking for mic permission, this page must be on a secure (https://) server.';
+                warningMsg.style.display = 'block';
+            }
+        };
+
+
+        // --- 3. Speech Recognition (Browser STT) ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            logMessage('Error', 'Speech Recognition API is not supported in this browser.');
+            talkButton.disabled = true;
+        } else {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false; // We will manually control when it stops
+            recognition.interimResults = false;
+            recognition.lang = 'mr-IN'; // Set to Marathi
+
+            recognition.onresult = handleSpeechResult;
+            recognition.onend = handleSpeechEnd;
+            recognition.onerror = (event) => {
+                logMessage('Error', `Speech recognition error: ${event.error}`);
+                if (appState !== 'IDLE') {
+                    setState('IDLE'); // Reset on error
+                }
+            };
+        }
+
+        // --- 4. Event Listeners ---
+        talkButton.addEventListener('click', toggleListening);
+
+        // --- Add listener to save API key on change ---
+        apiKeyInput.addEventListener('input', () => {
+            localStorage.setItem('geminiApiKey', apiKeyInput.value.trim());
+        });
+
+        // --- 5. Core Functions ---
+
+        function toggleListening() {
+            const apiKey = apiKeyInput.value.trim();
+            if (!apiKey) {
+                logMessage('Error', 'Please enter your Google Gemini API key.');
+                return;
+            }
+            
+            // --- Save the key on successful start ---
+            localStorage.setItem('geminiApiKey', apiKey);
+
+            if (appState === 'IDLE') {
+                setState('LISTENING_FOR_WAKEWORD');
+                recognition.start();
+            } else {
+                setState('IDLE');
+                recognition.stop();
+                if (audio) {
+                    audio.pause(); // Stop any speaking
+                }
+            }
+        }
+
+        function setState(newState) {
+            appState = newState;
+            console.log(`New State: ${appState}`); // For debugging
+
+            switch (newState) {
+                case 'IDLE':
+                    talkButton.textContent = 'Start Listening';
+                    talkButton.disabled = false;
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-gray-500 transition-colors';
+                    statusIndicator.title = 'Offline';
+                    break;
+                case 'BUSY':
+                    talkButton.textContent = 'Thinking...';
+                    talkButton.disabled = true;
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-400 transition-colors';
+                    statusIndicator.title = 'Busy';
+                    break;
+                default: // All "LISTENING" states
+                    talkButton.textContent = 'Stop Listening';
+                    talkButton.disabled = false;
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-blue-500 listening-pulse transition-colors';
+                    statusIndicator.title = 'Listening...';
+                    break;
+            }
+        }
+
+        function handleSpeechEnd() {
+            // Keep listening unless we are IDLE or BUSY
+            if (appState !== 'IDLE' && appState !== 'BUSY') {
+                try {
+                    // This is a safety net. If recognition stops for some reason (e.g., timeout),
+                    // and we're in a listening state, restart it.
+                    recognition.start();
+                } catch (e) {
+                    console.error("Safety net restart recognition error:", e);
+                    setState('IDLE'); // Failsafe
+                }
+            } else if (appState === 'IDLE') {
+                setState('IDLE'); // Ensure UI is reset if manually stopped
+            }
+        }
+        
+        async function handleSpeechResult(event) {
+            const transcript = event.results[event.results.length - 1][0].transcript.trim();
+            console.log(`Transcript: ${transcript}`);
+
+            // --- FIX: Capture the state *before* changing it ---
+            const currentState = appState;
+
+            // Stop recognition while we process and speak
+            recognition.stop();
+            setState('BUSY');
+
+            try {
+                switch (currentState) { // <-- FIX: Use the captured state
+                    case 'LISTENING_FOR_WAKEWORD':
+                        if (transcript.toLowerCase().includes('dhwani') || transcript.toLowerCase().includes('ध्वनी')) {
+                            // --- FIX: Changed to Devanagari script ---
+                            const greeting = "नमस्कार, मी ध्वनी, तुमचे नाव काय आहे?";
+                            logMessage('Dhwani', greeting);
+                            // --- MODIFICATION: Use Google Translate TTS ---
+                            await speakText(greeting, 'mr');
+                            setState('LISTENING_FOR_NAME');
+                            recognition.start(); 
+                        } else {
+                            // Wake word not detected, go back to listening
+                            setState('LISTENING_FOR_WAKEWORD');
+                            recognition.start();
+                        }
+                        break;
+
+                    case 'LISTENING_FOR_NAME':
+                        setState('BUSY'); 
+                        logMessage('You', transcript);
+                        userName = await extractNameFromTranscript(transcript);
+                        
+                        // --- FIX: Changed to Devanagari script ---
+                        const agePrompt = `खूप छान, ${userName}, तुमचे वय काय आहे?`;
+                        logMessage('Dhwani', agePrompt);
+                        // --- MODIFICATION: Use Google Translate TTS ---
+                        await speakText(agePrompt, 'mr');
+                        setState('LISTENING_FOR_AGE');
+                        recognition.start();
+                        break;
+
+                    case 'LISTENING_FOR_AGE':
+                        logMessage('You', transcript);
+                        
+                        const age = await extractAgeFromTranscript(transcript);
+                        userAge = Math.min(age, 18); // Apply the "max 18" rule
+                        buildSystemPrompt();
+                        
+                        const startPrompt = `धन्यवाद, ${userName}! मी लक्षात ठेवीन की तुझे वय ${userAge} आहे. मी आता तुझ्या प्रश्नांसाठी तयार आहे!`;
+                        logMessage('Dhwani', startPrompt);
+                        // --- MODIFICATION: Use Google Translate TTS ---
+                        await speakText(startPrompt, 'mr');
+                        setState('CONVERSATION');
+                        recognition.start();
+                        break;
+
+                    case 'CONVERSATION':
+                        logMessage(userName || 'You', transcript);
+                        chatHistory.push({ role: 'user', parts: [{ text: transcript }] });
+                        
+                        const aiResponseText = await generateTextResponseFromChat();
+                        
+                        // --- FIX: Clean the text from the AI ---
+                        const cleanedResponseText = cleanTextForTTS(aiResponseText);
+
+                        // Use the *cleaned* text for history, logging, and speech
+                        chatHistory.push({ role: 'model', parts: [{ text: cleanedResponseText }] });
+                        logMessage('Dhwani', cleanedResponseText);
+                        await speakText(cleanedResponseText, 'mr');
+                        
+                        setState('CONVERSATION'); // Go back to listening
+                        recognition.start();
+                        break;
+                }
+            } catch (error) {
+                console.error("Error in speech handling:", error);
+                logMessage('Error', `Sorry, an error occurred: ${error.message}`);
+                
+                // Reset to a safe state and start listening again
+                if (systemInstruction) {
+                    setState('CONVERSATION');
+                    recognition.start();
+                } else {
+                    setState('LISTENING_FOR_WAKEWORD');
+                    recognition.start();
+                }
+            }
+        }
+
+        function buildSystemPrompt() {
+            systemInstruction = `
+                You are "Dhwani," a sweet and patient female AI teacher from Maharashtra.
+                You are speaking to ${userName}, who is ${userAge} years old.
+                Your task is to be a virtual teacher.
+                
+                RULES:
+                1.  You MUST speak and answer *only* in the Marathi language using Devanagari script (मराठी फॉन्ट).
+                2.  CRITICAL: Do NOT use English letters (transliteration) to write Marathi. For example, do NOT write "Tumcha divas changla javo." Instead, you MUST write "तुमचा दिवस चांगला जावो."
+                3.  Do NOT include formatting in your response (like asterisks *, parentheses (), or #).
+                4.  You MUST tailor all answers to be easily understood by a ${userAge}-year-old.
+                5.  You are kind, encouraging, and use simple language.
+                6.  Do not just give the answer; try to explain it simply, like a teacher would.
+                7.  Your responses should be concise and conversational.
+            `;
+            
+            if (userAge <= 8) {
+                systemInstruction += "\n8. CRITICAL: The user is very young. Use extremely simple, short sentences. Explain things one step at a time. Be very gentle and encouraging.";
+            } else if (userAge <= 12) {
+                systemInstruction += "\n8. CRITICAL: The user is a child. Use simple language, but you can be a bit more detailed. Avoid complex words.";
+            } else {
+                systemInstruction += "\n8. CRITICAL: The user is a teenager. You can use more complex sentences, but still be encouraging and clear, like a good teacher.";
+            }
+
+            // Add the system prompt to the chat history
+            chatHistory = [{ role: 'user', parts: [{ text: 'Here are my instructions' }] }];
+            chatHistory.push({ role: 'model', parts: [{ text: `Okay, I understand. I am Dhwani, a Marathi teacher, and I am speaking to ${userName} (${userAge}). I will answer all questions simply.` }] });
+        }
+
+        // --- 6. Gemini API Functions ---
+
+        async function extractNameFromTranscript(transcript) {
+            // Give user feedback that we're processing
+            const processingMsg = document.createElement('div');
+            processingMsg.innerHTML = `<strong class="text-yellow-400">Dhwani:</strong> <span class="text-gray-400">(...processing name...)</span>`;
+            conversationLog.appendChild(processingMsg);
+            conversationLog.scrollTop = conversationLog.scrollHeight;
+            
+            const apiKey = apiKeyInput.value.trim();
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+            const extractionPrompt = `
+                You are a simple utility. Your only job is to extract a single person's first name from the user's text.
+                - If the user says "माझं नाव प्रमोद आहे", you respond "Pramod".
+                - If the user says "प्रमोद शिंदे", you respond "Pramod".
+                - If the user says "मी आहे प्रमोद", you respond "Pramod".
+                - If the user says "Just Pramod", you respond "Pramod".
+                - If you cannot find a name, respond with "Friend".
+                - Only respond with the single name. Do not add any other text.
+
+                Text to analyze: "${transcript}"
+            `;
+            
+            const payload = {
+                contents: [{ parts: [{ text: extractionPrompt }] }],
+                generationConfig: {
+                    temperature: 0.0, // Be deterministic
+                    maxOutputTokens: 10
+                }
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) throw new Error('API Error');
+                const result = await response.json();
+                const name = result.candidates[0].content.parts[0].text.trim();
+                
+                conversationLog.removeChild(processingMsg); // Remove processing message
+                return name;
+            } catch (error) {
+                console.error("extractNameFromTranscript error:", error);
+                conversationLog.removeChild(processingMsg);
+                return "Friend"; // Default on error
+            }
+        }
+
+
+        async function extractAgeFromTranscript(transcript) {
+            // Give user feedback that we're processing
+            const processingMsg = document.createElement('div');
+            processingMsg.innerHTML = `<strong class="text-yellow-400">Dhwani:</strong> <span class="text-gray-400">(...processing age...)</span>`;
+            conversationLog.appendChild(processingMsg);
+            conversationLog.scrollTop = conversationLog.scrollHeight;
+
+            const apiKey = apiKeyInput.value.trim();
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+            const extractionPrompt = `
+                You are a simple utility. Your only job is to extract a single number from the user's text.
+                - If the user says "मी दहा वर्षांचा आहे", you respond "10".
+                - If the user says "पंधरा", you respond "15".
+                - If the user says "माझं वय 8 आहे", you respond "8".
+                - If the user says "My age is 40", you respond "40".
+                - If the user says "10 varsha", you respond "10".
+                - If you cannot find a number, respond with "18".
+                - Only respond with the digits. Do not add any other text.
+
+                Text to analyze: "${transcript}"
+            `;
+
+            const payload = {
+                contents: [{ parts: [{ text: extractionPrompt }] }],
+                generationConfig: {
+                    temperature: 0.0,
+                    maxOutputTokens: 4
+                }
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) throw new Error('API Error');
+                const result = await response.json();
+                const text = result.candidates[0].content.parts[0].text;
+                const age = parseInt(text.trim()) || 18; // Default to 18 if LLM fails
+                
+                // Remove the "(...processing...)" message
+                conversationLog.removeChild(processingMsg);
+                
+                return age;
+            } catch (error) {
+                console.error("extractAgeFromTranscript error:", error);
+                conversationLog.removeChild(processingMsg);
+                return 18; // Default on error
+            }
+        }
+
+        // --- This is the "Brain" function (Text Generation) ---
+        async function generateTextResponseFromChat() {
+            const apiKey = apiKeyInput.value.trim();
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+            const payload = {
+                contents: chatHistory,
+                systemInstruction: {
+                    parts: [{ text: systemInstruction }]
+                }
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    const errorBody = await response.json();
+                    throw new Error(`API Error: ${response.statusText} - ${errorBody?.error?.message || 'Unknown'}`);
+                }
+
+                const result = await response.json();
+                const text = result.candidates[0].content.parts[0].text.trim();
+                return text;
+
+            } catch (error) {
+                console.error("Gemini Text API error:", error);
+                logMessage('Error', `Failed to generate response: ${error.message}`);
+                return "मला माफ करा, मला एक समस्या आली आहे."; // Return a Marathi error
+            }
+        }
+        
+        // --- NEW UTILITY FUNCTION to clean text for TTS ---
+        function cleanTextForTTS(text) {
+            // Removes *, #, and ` -- Parentheses are now allowed
+            // Also replaces multiple spaces (from removals) with a single space
+            return text.replace(/[\*#`]/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+
+        // --- MODIFICATION: This is the new "Voice" function using the free Google Translate endpoint ---
+        
+        /**
+         * Splits a long text into chunks of 200 characters without breaking words,
+         * preferring to split at sentence-ending punctuation.
+         */
+        function splitTextIntoChunks(text) {
+            const maxChunkLength = 200;
+            let chunks = [];
+            let remainingText = text;
+
+            while (remainingText.length > 0) {
+                if (remainingText.length <= maxChunkLength) {
+                    chunks.push(remainingText);
+                    break;
+                }
+
+                let splitIndex = maxChunkLength;
+                
+                // Try to find a sentence-ending punctuation mark near the limit
+                const punctuation = ".?!।"; // English and Devanagari Danda
+                let bestSplit = -1;
+                
+                for (let i = maxChunkLength - 1; i > 0; i--) {
+                    if (punctuation.includes(remainingText[i])) {
+                        bestSplit = i + 1;
+                        break;
+                    }
+                }
+
+                if (bestSplit !== -1) {
+                    splitIndex = bestSplit;
+                } else {
+                    // If no punctuation, find the last space
+                    const lastSpace = remainingText.lastIndexOf(' ', maxChunkLength);
+                    if (lastSpace !== -1) {
+                        splitIndex = lastSpace + 1;
+                    }
+                }
+
+                chunks.push(remainingText.substring(0, splitIndex));
+                remainingText = remainingText.substring(splitIndex);
+            }
+            return chunks;
+        }
+
+        /**
+         * Plays a queue of audio chunks sequentially.
+         */
+        async function playAudioQueue(chunks, lang) {
+            if (chunks.length === 0) {
+                return;
+            }
+            
+            const textChunk = chunks.shift(); // Get the next chunk
+            const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(textChunk)}&tl=${lang}&client=tw-ob`;
+
+            try {
+                // Set the audio source and play
+                audio.src = url;
+                await new Promise((resolve, reject) => { // <-- The stray 'F' was here
+                    audio.onended = resolve;
+                    audio.onerror = reject;
+                    audio.play();
+                });
+                
+                // When this chunk is done, play the next one
+                await playAudioQueue(chunks, lang);
+
+            } catch (error) {
+                console.error("Error playing audio chunk:", error);
+                throw new Error("Failed to play audio chunk");
+            }
+        }
+
+        /**
+         * Main function to speak text. Splits text into chunks and plays them in order.
+         */
+        async function speakText(text, lang = 'mr') {
+            if (audio.paused === false) {
+                audio.pause(); // Stop any currently playing audio
+            }
+
+            const textChunks = splitTextIntoChunks(text);
+            console.log("Speaking chunks:", textChunks);
+
+            return new Promise(async (resolve, reject) => {
+                try {
+                    await playAudioQueue([...textChunks], lang); // Pass a copy of the array
+                    resolve();
+                } catch (error) {
+                    console.error("speakText error:", error);
+                    logMessage('Error', 'Failed to play audio.');
+                    reject(error);
+                }
+            });
+        }
+        
+        // --- 7. Utility Functions ---
+
+        function logMessage(sender, message) {
+            const div = document.createElement('div');
+            let senderClass = 'text-blue-300 font-semibold';
+            let messageClass = 'text-white';
+
+            if (sender === 'Dhwani') {
+                senderClass = 'text-cyan-300 font-semibold';
+            } else if (sender === 'Error') {
+                senderClass = 'text-red-400 font-bold';
+                messageClass = 'text-red-300';
+            } else if (sender === 'You') {
+                 senderClass = 'text-green-300 font-semibold';
+            }
+
+            div.innerHTML = `<strong class="${senderClass}">${sender}:</strong> <span class_="${messageClass}">${message}</span>`;
+            conversationLog.appendChild(div);
+            // Auto-scroll to the bottom
+            conversationLog.scrollTop = conversationLog.scrollHeight;
+        }
+
+    </script>
+</body>
+</html>
