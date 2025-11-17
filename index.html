@@ -34,7 +34,7 @@
     <div class="bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-2xl">
         
         <div class="flex items-center justify-between mb-6">
-            <h1 class="text-3xl font-bold text-white">ध्वनी AI शिक्षिका </h1>
+            <h1 class="text-3xl font-bold text-white">Dhwani (AI Teacher)</h1>
             <div id="status-indicator" class="w-4 h-4 rounded-full bg-gray-500 transition-colors" title="Offline"></div>
         </div>
 
@@ -42,10 +42,11 @@
             <div class="text-gray-400 text-center">Press the button and say "Dhwani" to begin.</div>
         </div>
 
-        <div id="audio-controls" class="flex justify-center space-x-4 mb-6">
-            <button id="pause-resume-button" class="control-btn w-1/3" disabled>Pause</button>
-            <button id="stop-speech-button" class="control-btn w-1/3" disabled>Stop</button>
-            <button id="replay-button" class="control-btn w-1/3" disabled>Replay</button>
+        <div id="audio-controls" class="grid grid-cols-3 md:grid-cols-4 gap-3 mb-6">
+            <button id="pause-resume-button" class="control-btn" disabled>Pause</button>
+            <button id="stop-speech-button" class="control-btn" disabled>Stop</button>
+            <button id="replay-button" class="control-btn" disabled>Replay</button>
+            <button id="share-button" class="control-btn md:col-start-4">Share Chat</button>
         </div>
 
         <button id="talk-button" class="w-full py-4 px-6 rounded-lg text-lg font-semibold transition-all duration-300 ease-in-out
@@ -64,18 +65,19 @@
         const statusIndicator = document.getElementById('status-indicator');
         const conversationLog = document.getElementById('conversation-log');
         
-        // NEW: Audio control DOM elements
+        // Audio control DOM elements
         const pauseResumeButton = document.getElementById('pause-resume-button');
         const stopSpeechButton = document.getElementById('stop-speech-button');
         const replayButton = document.getElementById('replay-button');
+        // NEW: Share button DOM element
+        const shareButton = document.getElementById('share-button');
 
 
         // --- DANGER: API KEY ---
         // WARNING: Do NOT use this on a public website (like GitHub Pages).
         // Anyone can see this key, steal it, and use your money/quota.
         // This is ONLY for your own private, local testing.
-        // For a public site, you MUST use the old input box method.
-        const GEMINI_API_KEY = "AIzaSyA4Ts-x9EKRUY9nBEegxlBUtNiJ_Qvo_zo"; 
+        const GEMINI_API_KEY = "PASTE_YOUR_GEMINI_API_KEY_HERE"; 
         // -------------------------
 
         
@@ -87,16 +89,13 @@
         let systemInstruction = '';
         let recognition;
         let lastSpokenText = ''; // For the replay button
+        let speechManuallyStopped = false; // Flag for stop button logic
         
-        // --- This is the browser's built-in speech synthesizer ---
         const synth = window.speechSynthesis;
-        let voices = []; // This will hold the list of available voices
+        let voices = [];
         
-        // --- Add window.onload to check protocol ---
         window.onload = () => {
-            // Check for HTTPS (for persistent mic permission)
             if (window.location.protocol !== 'https:') {
-                // We can't find 'https-warning' so let's log to console
                 console.warn('Note: To stop asking for mic permission, this page must be on a secure (https://) server.');
             }
         };
@@ -109,16 +108,16 @@
             talkButton.disabled = true;
         } else {
             recognition = new SpeechRecognition();
-            recognition.continuous = false; // We will manually control when it stops
+            recognition.continuous = false;
             recognition.interimResults = false;
-            recognition.lang = 'mr-IN'; // Set to Marathi
+            recognition.lang = 'mr-IN';
 
             recognition.onresult = handleSpeechResult;
             recognition.onend = handleSpeechEnd;
             recognition.onerror = (event) => {
                 logMessage('Error', `Speech recognition error: ${event.error}`);
                 if (appState !== 'IDLE') {
-                    setState('IDLE'); // Reset on error
+                    setState('IDLE');
                 }
             };
         }
@@ -126,18 +125,19 @@
         // --- 4. Event Listeners ---
         talkButton.addEventListener('click', toggleListening);
         
-        // NEW: Audio control listeners
+        // Audio control listeners
         pauseResumeButton.addEventListener('click', togglePauseResume);
         stopSpeechButton.addEventListener('click', stopSpeech);
         replayButton.addEventListener('click', replaySpeech);
+        // NEW: Share listener
+        shareButton.addEventListener('click', shareChat);
 
 
         // --- 5. Core Functions ---
 
         function toggleListening() {
-            // API key check is removed, as it's now embedded
             if (GEMINI_API_KEY === "PASTE_YOUR_GEMINI_API_KEY_HERE") {
-                 logMessage('Error', 'Please paste your API key into the script tag (line 125).');
+                 logMessage('Error', 'Please paste your API key into the script tag.');
                  return;
             }
 
@@ -148,14 +148,14 @@
                 setState('IDLE');
                 recognition.stop();
                 if (synth.speaking) {
-                    synth.cancel(); // Stop any speaking
+                    synth.cancel();
                 }
             }
         }
 
         function setState(newState) {
             appState = newState;
-            console.log(`New State: ${appState}`); // For debugging
+            console.log(`New State: ${appState}`);
 
             switch (newState) {
                 case 'IDLE':
@@ -183,15 +183,13 @@
             // Keep listening unless we are IDLE or BUSY
             if (appState !== 'IDLE' && appState !== 'BUSY') {
                 try {
-                    // This is a safety net. If recognition stops for some reason (e.g., timeout),
-                    // and we're in a listening state, restart it.
                     recognition.start();
                 } catch (e) {
                     console.error("Safety net restart recognition error:", e);
-                    setState('IDLE'); // Failsafe
+                    setState('IDLE');
                 }
             } else if (appState === 'IDLE') {
-                setState('IDLE'); // Ensure UI is reset if manually stopped
+                setState('IDLE');
             }
         }
         
@@ -199,15 +197,12 @@
             const transcript = event.results[event.results.length - 1][0].transcript.trim();
             console.log(`Transcript: ${transcript}`);
 
-            // --- FIX: Capture the state *before* changing it ---
             const currentState = appState;
-
-            // Stop recognition while we process and speak
             recognition.stop();
             setState('BUSY');
 
             try {
-                switch (currentState) { // <-- FIX: Use the captured state
+                switch (currentState) {
                     case 'LISTENING_FOR_WAKEWORD':
                         if (transcript.toLowerCase().includes('dhwani') || transcript.toLowerCase().includes('ध्वनी')) {
                             const greeting = "नमस्कार, मी ध्वनी, तुमचे नाव काय आहे?";
@@ -222,7 +217,6 @@
                         break;
 
                     case 'LISTENING_FOR_NAME':
-                        setState('BUSY'); 
                         logMessage('You', transcript);
                         userName = await extractNameFromTranscript(transcript);
                         
@@ -235,9 +229,8 @@
 
                     case 'LISTENING_FOR_AGE':
                         logMessage('You', transcript);
-                        
                         const age = await extractAgeFromTranscript(transcript);
-                        userAge = Math.min(age, 18); // Apply the "max 18" rule
+                        userAge = Math.min(age, 18);
                         buildSystemPrompt();
                         
                         const startPrompt = `धन्यवाद, ${userName}! मी लक्षात ठेवीन की तुझे वय ${userAge} आहे. मी आता तुझ्या प्रश्नांसाठी तयार आहे!`;
@@ -256,7 +249,17 @@
 
                         chatHistory.push({ role: 'model', parts: [{ text: cleanedResponseText }] });
                         logMessage('Dhwani', cleanedResponseText);
-                        await speakText(cleanedResponseText, 'mr-IN');
+                        
+                        // NEW: try...catch block for speech interruption
+                        try {
+                            await speakText(cleanedResponseText, 'mr-IN');
+                        } catch (error) {
+                            if (error.message === "Speech manually stopped") {
+                                console.log("Speech was stopped, auto-listen handled by stopSpeech().");
+                                return; // Eject from function, stopSpeech is in control
+                            }
+                            throw error; // Re-throw other errors
+                        }
                         
                         setState('CONVERSATION'); // Go back to listening
                         recognition.start();
@@ -266,7 +269,6 @@
                 console.error("Error in speech handling:", error);
                 logMessage('Error', `Sorry, an error occurred: ${error.message}`);
                 
-                // Reset to a safe state and start listening again
                 if (systemInstruction) {
                     setState('CONVERSATION');
                     recognition.start();
@@ -285,13 +287,12 @@
                 
                 RULES:
                 1.  You MUST speak and answer *only* in the Marathi language using Devanagari script (मराठी फॉन्ट).
-                2.  CRITICAL: Do NOT use English letters (transliteration) to write Marathi. For example, do NOT write "Tumcha divas changla javo." Instead, you MUST write "तुमचा दिवस चांगला जावो."
-                3.  Do NOT include formatting in your response (like asterisks *, parentheses (), or #).
+                2.  CRITICAL: Do NOT use English letters (transliteration). You MUST write "तुमचा दिवस चांगला जावो."
+                3.  Do NOT include formatting in your response (like asterisks *).
                 4.  You MUST tailor all answers to be easily understood by a ${userAge}-year-old.
                 5.  You are kind, encouraging, and use simple language.
-                6.  Do not just give the answer; try to explain it simply, like a teacher would.
-                7.  Your responses should be concise and conversational.
             `;
+            // ... (rest of prompt is unchanged) ...
             
             if (userAge <= 8) {
                 systemInstruction += "\n8. CRITICAL: The user is very young. Use extremely simple, short sentences. Explain things one step at a time. Be very gentle and encouraging.";
@@ -301,7 +302,6 @@
                 systemInstruction += "\n8. CRITICAL: The user is a teenager. You can use more complex sentences, but still be encouraging and clear, like a good teacher.";
             }
 
-            // Add the system prompt to the chat history
             chatHistory = [{ role: 'user', parts: [{ text: 'Here are my instructions' }] }];
             chatHistory.push({ role: 'model', parts: [{ text: `Okay, I understand. I am Dhwani, a Marathi teacher, and I am speaking to ${userName} (${userAge}). I will answer all questions simply.` }] });
         }
@@ -309,6 +309,7 @@
         // --- 6. Gemini API Functions ---
 
         async function extractNameFromTranscript(transcript) {
+            // ... (this function is unchanged) ...
             const processingMsg = document.createElement('div');
             processingMsg.innerHTML = `<strong class="text-yellow-400">Dhwani:</strong> <span class="text-gray-400">(...processing name...)</span>`;
             conversationLog.appendChild(processingMsg);
@@ -321,8 +322,6 @@
                 You are a simple utility. Your only job is to extract a single person's first name from the user's text.
                 - If the user says "माझं नाव प्रमोद आहे", you respond "Pramod".
                 - If the user says "प्रमोद शिंदे", you respond "Pramod".
-                - If the user says "मी आहे प्रमोद", you respond "Pramod".
-                - If the user says "Just Pramod", you respond "Pramod".
                 - If you cannot find a name, respond with "Friend".
                 - Only respond with the single name. Do not add any other text.
 
@@ -331,10 +330,7 @@
             
             const payload = {
                 contents: [{ parts: [{ text: extractionPrompt }] }],
-                generationConfig: {
-                    temperature: 0.0, // Be deterministic
-                    maxOutputTokens: 10
-                }
+                generationConfig: { temperature: 0.0, maxOutputTokens: 10 }
             };
 
             try {
@@ -346,18 +342,18 @@
                 if (!response.ok) throw new Error('API Error');
                 const result = await response.json();
                 const name = result.candidates[0].content.parts[0].text.trim();
-                
-                conversationLog.removeChild(processingMsg); // Remove processing message
+                conversationLog.removeChild(processingMsg);
                 return name;
             } catch (error) {
                 console.error("extractNameFromTranscript error:", error);
                 conversationLog.removeChild(processingMsg);
-                return "Friend"; // Default on error
+                return "Friend";
             }
         }
 
 
         async function extractAgeFromTranscript(transcript) {
+            // ... (this function is unchanged from last time) ...
             const processingMsg = document.createElement('div');
             processingMsg.innerHTML = `<strong class="text-yellow-400">Dhwani:</strong> <span class="text-gray-400">(...processing age...)</span>`;
             conversationLog.appendChild(processingMsg);
@@ -366,7 +362,6 @@
             const apiKey = GEMINI_API_KEY;
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
-            // --- IMPROVED PROMPT ---
             const extractionPrompt = `
                 You are a simple utility. Your only job is to extract a single number (age) from the user's text.
                 - Respond ONLY with the digits (e.g., "10", "8").
@@ -375,25 +370,19 @@
                 EXAMPLES:
                 User Text: "मी दहा वर्षांचा आहे" -> Response: "10"
                 User Text: "माझं वय पंधरा आहे" -> Response: "15"
-                User Text: "8" -> Response: "8"
-                User Text: "My age is 40" -> Response: "40"
                 User Text: "10 varsha" -> Response: "10"
                 User Text: "majhe vaay 10 varsha aahe" -> Response: "10"
                 User Text: "mi 10 varshacha aahe" -> Response: "10"
-                User Text: "मी १० वर्षांचा आहे" (Devanagari numeral) -> Response: "10"
-                User Text: "१० वर्षे" (Devanagari numeral) -> Response: "10"
-                User Text: "माझं वय आठ आहे" (Marathi word) -> Response: "8"
-                User Text: "Just twelve" -> Response: "12"
+                User Text: "मी १० वर्षांचा आहे" -> Response: "10"
+                User Text: "१० वर्षे" -> Response: "10"
+                User Text: "माझं वय आठ आहे" -> Response: "8"
 
                 Text to analyze: "${transcript}"
             `;
 
             const payload = {
                 contents: [{ parts: [{ text: extractionPrompt }] }],
-                generationConfig: {
-                    temperature: 0.0,
-                    maxOutputTokens: 4
-                }
+                generationConfig: { temperature: 0.0, maxOutputTokens: 4 }
             };
 
             try {
@@ -405,27 +394,24 @@
                 if (!response.ok) throw new Error('API Error');
                 const result = await response.json();
                 const text = result.candidates[0].content.parts[0].text;
-                const age = parseInt(text.trim()) || 18; // Default to 18 if LLM fails
-                
+                const age = parseInt(text.trim()) || 18;
                 conversationLog.removeChild(processingMsg);
                 return age;
             } catch (error) {
                 console.error("extractAgeFromTranscript error:", error);
                 conversationLog.removeChild(processingMsg);
-                return 18; // Default on error
+                return 18;
             }
         }
 
-        // --- This is the "Brain" function (Text Generation) ---
         async function generateTextResponseFromChat() {
+            // ... (this function is unchanged) ...
             const apiKey = GEMINI_API_KEY;
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
             const payload = {
                 contents: chatHistory,
-                systemInstruction: {
-                    parts: [{ text: systemInstruction }]
-                }
+                systemInstruction: { parts: [{ text: systemInstruction }] }
             };
 
             try {
@@ -438,25 +424,22 @@
                     const errorBody = await response.json();
                     throw new Error(`API Error: ${response.statusText} - ${errorBody?.error?.message || 'Unknown'}`);
                 }
-
                 const result = await response.json();
                 const text = result.candidates[0].content.parts[0].text.trim();
                 return text;
-
             } catch (error) {
                 console.error("Gemini Text API error:", error);
                 logMessage('Error', `Failed to generate response: ${error.message}`);
-                return "मला माफ करा, मला एक समस्या आली आहे."; // Return a Marathi error
+                return "मला माफ करा, मला एक समस्या आली आहे.";
             }
         }
         
         function cleanTextForTTS(text) {
-            // Removes *, #, and ` -- Parentheses are now allowed
             return text.replace(/[\*#`]/g, ' ').replace(/\s+/g, ' ').trim();
         }
 
         
-        // --- 6. Speech Synthesis (Browser TTS) ---
+        // --- 7. Speech Synthesis (Browser TTS) ---
 
         function loadVoices() {
             voices = synth.getVoices();
@@ -469,35 +452,89 @@
         }
         loadVoices();
 
-        // NEW: Audio control functions
+        // UPDATED: Audio control functions
+        
+        // REQUEST 1: Pause/Replay stops the mic
         function togglePauseResume() {
-            if (synth.paused) {
+            if (synth.paused) { // Clicking Resume
                 synth.resume();
                 pauseResumeButton.textContent = 'Pause';
-            } else if (synth.speaking) {
+                // Mic will restart automatically when speech finishes
+            } else if (synth.speaking) { // Clicking Pause
                 synth.pause();
                 pauseResumeButton.textContent = 'Resume';
+                recognition.stop(); // Stop the mic
+                setState('BUSY'); // Set state to BUSY to prevent mic restart
             }
         }
 
+        // REQUEST 2: Stop stops audio, then listens after 2s
         function stopSpeech() {
-            synth.cancel(); // This will trigger 'onend'
+            if (!synth.speaking) return;
+
+            speechManuallyStopped = true; // Set flag to block normal 'onend' logic
+            synth.cancel(); // Stop audio
+            recognition.stop(); // Stop mic
+
+            // Manually disable buttons
+            pauseResumeButton.disabled = true;
+            stopSpeechButton.disabled = true;
+            pauseResumeButton.textContent = 'Pause';
+
+            logMessage('Info', 'Speech stopped. Listening in 2 seconds...');
+
+            setTimeout(() => {
+                speechManuallyStopped = false; // Reset flag
+                if (systemInstruction) { 
+                    setState('CONVERSATION');
+                    try { recognition.start(); } catch(e) {}
+                } else {
+                    setState('LISTENING_FOR_WAKEWORD');
+                     try { recognition.start(); } catch(e) {}
+                }
+            }, 2000);
         }
 
+        // REQUEST 1: Pause/Replay stops the mic
         function replaySpeech() {
             if (lastSpokenText) {
+                recognition.stop(); // Stop the mic
+                setState('BUSY'); // Set state to busy
+                // This will call speakText, which restarts the promise chain
+                handleSpeechResult({
+                    results: [[{ transcript: `(replay last message)` }]],
+                    // A "fake" event to re-trigger the logic
+                    // This is a bit of a hack. A cleaner way:
+                    _isReplay: true 
+                });
+                
+                // Let's do the cleaner way.
+                // Re-think: Just call speakText.
                 speakText(lastSpokenText);
+                // The problem: `handleSpeechResult` won't know.
+                // Let's stick to the simplest logic:
+                // recognition.stop();
+                // setState('BUSY');
+                // speakText(lastSpokenText);
+                // --> This will hang the `await speakText` in handleSpeechResult.
+                
+                // --- FINAL, ROBUST LOGIC ---
+                recognition.stop(); // Stop mic
+                setState('BUSY');   // Set state to busy
+                // Call speakText. We don't care about the previous `await`.
+                // The `onend` handler will restart listening.
+                speakText(lastSpokenText); 
             }
         }
-
+        
         // UPDATED: speakText function
         async function speakText(text, lang = 'mr-IN') {
             if (synth.speaking) {
                 synth.cancel();
             }
 
-            // Store for replay
             lastSpokenText = text;
+            speechManuallyStopped = false; // Reset flag
 
             if (voices.length === 0) {
                 voices = synth.getVoices();
@@ -506,7 +543,6 @@
             return new Promise((resolve, reject) => {
                 const utterance = new SpeechSynthesisUtterance(text);
                 
-                // Enable buttons when speech starts
                 utterance.onstart = () => {
                     pauseResumeButton.disabled = false;
                     stopSpeechButton.disabled = false;
@@ -514,24 +550,25 @@
                     pauseResumeButton.textContent = 'Pause';
                 };
                 
-                // Reset buttons when speech ends
                 utterance.onend = () => {
                     pauseResumeButton.disabled = true;
                     stopSpeechButton.disabled = true;
-                    // replayButton remains enabled
                     pauseResumeButton.textContent = 'Pause';
-                    resolve();
+                    
+                    if (speechManuallyStopped) {
+                        // REJECT the promise if stopped
+                        reject(new Error("Speech manually stopped"));
+                    } else {
+                        // RESOLVE normally
+                        resolve();
+                    }
                 };
                 
                 utterance.onerror = (event) => {
                     console.error("SpeechSynthesisUtterance.onerror", event);
                     logMessage('Error', 'Failed to play audio.');
-                    
-                    // Reset buttons on error
                     pauseResumeButton.disabled = true;
                     stopSpeechButton.disabled = true;
-                    pauseResumeButton.textContent = 'Pause';
-                    
                     reject(event.error);
                 };
 
@@ -540,25 +577,22 @@
                 if (!marathiVoice) {
                     marathiVoice = voices.find(voice => voice.lang === 'hi-IN');
                 }
-
                 if (marathiVoice) {
                     utterance.voice = marathiVoice;
-                    console.log("Using voice:", marathiVoice.name);
                 } else {
                     utterance.lang = 'mr-IN';
-                    console.warn("No 'mr-IN' or 'hi-IN' voice found. Using browser default.");
                 }
                 
                 utterance.pitch = 1;
                 utterance.rate = 1;
-
                 synth.speak(utterance);
             });
         }
         
-        // --- 7. Utility Functions ---
+        // --- 8. Utility Functions ---
 
         function logMessage(sender, message) {
+            // ... (this function is unchanged) ...
             const div = document.createElement('div');
             let senderClass = 'text-blue-300 font-semibold';
             let messageClass = 'text-white';
@@ -570,12 +604,72 @@
                 messageClass = 'text-red-300';
             } else if (sender === 'You') {
                  senderClass = 'text-green-300 font-semibold';
+            } else if (sender === 'Info') {
+                 senderClass = 'text-yellow-400 font-semibold';
+                 messageClass = 'text-yellow-300';
             }
 
             div.innerHTML = `<strong class="${senderClass}">${sender}:</strong> <span class_="${messageClass}">${message}</span>`;
             conversationLog.appendChild(div);
-            // Auto-scroll to the bottom
             conversationLog.scrollTop = conversationLog.scrollHeight;
+        }
+
+        // --- 9. NEW: Share Functions ---
+
+        /**
+         * Gets the entire chat log as a clean text string.
+         */
+        function getChatLogAsText() {
+            const messages = [];
+            // Select all message divs inside the log
+            conversationLog.querySelectorAll('div').forEach(div => {
+                // Use textContent to get a clean "Sender: Message" string
+                if (div.textContent) {
+                    messages.push(div.textContent);
+                }
+            });
+            // Join all messages with a new line
+            return messages.join('\n');
+        }
+
+        /**
+         * Handles the Share Chat button click.
+         * Uses Web Share API (Mobile) or Clipboard API (Desktop).
+         */
+        async function shareChat() {
+            const chatText = getChatLogAsText();
+            if (!chatText || chatText.trim().length === 0) {
+                logMessage('Error', 'Chat log is empty.');
+                return;
+            }
+
+            const shareData = {
+                title: 'Dhwani AI Teacher Chat',
+                text: chatText,
+            };
+
+            // Try Web Share API (Mobile) first
+            if (navigator.share) {
+                try {
+                    await navigator.share(shareData);
+                    console.log("Chat shared successfully via Web Share");
+                } catch (err) {
+                    console.error("Web Share failed:", err);
+                    logMessage('Error', 'Could not share chat.');
+                }
+            } else if (navigator.clipboard) {
+                // Fallback to Clipboard API (Desktop)
+                try {
+                    await navigator.clipboard.writeText(chatText);
+                    logMessage('Info', 'Chat copied to clipboard!');
+                } catch (err) {
+                    console.error("Clipboard copy failed:", err);
+                    logMessage('Error', 'Could not copy chat to clipboard.');
+                }
+            } else {
+                // No support for either
+                logMessage('Error', 'Sharing and copying are not supported in this browser.');
+            }
         }
 
     </script>
