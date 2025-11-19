@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ninad - AI Marathi Teacher</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --text-color: #e0e0e0;
+            --accent-color: #4CAF50;
+            --bot-color: #2196F3;
+            --user-color: #FF9800;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            background-color: #000;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        h1 { margin: 0; font-size: 1.2rem; color: var(--accent-color); }
+        .status { font-size: 0.8rem; color: #888; margin-top: 5px; }
+
+        #chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 15px;
+            line-height: 1.4;
+            font-size: 1rem;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .bot {
+            align-self: flex-start;
+            background-color: #2c3e50;
+            border-left: 4px solid var(--bot-color);
+        }
+
+        .user {
+            align-self: flex-end;
+            background-color: #3e2723;
+            border-right: 4px solid var(--user-color);
+        }
+
+        .controls {
+            padding: 20px;
+            background-color: #000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+        }
+
+        input[type="password"] {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #555;
+            background: #333;
+            color: white;
+            width: 80%;
+        }
+
+        button {
+            padding: 12px 30px;
+            border-radius: 50px;
+            border: none;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        #start-btn { background-color: var(--accent-color); color: white; }
+        #stop-btn { background-color: #f44336; color: white; display: none; }
+        
+        button:active { transform: scale(0.95); }
+        
+        .visualizer {
+            height: 4px;
+            width: 100%;
+            background: linear-gradient(90deg, var(--bg-color), var(--accent-color), var(--bg-color));
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .listening .visualizer { opacity: 1; animation: pulse 1.5s infinite; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Dhwani: Project Ninad</h1>
+        <div id="status-text" class="status">Setup required</div>
+    </header>
+
+    <div id="chat-container">
+        <div class="message bot">Namaskar! Please enter your OpenAI API Key and press Start. Then say "Ninad" to wake me up.</div>
+    </div>
+
+    <div class="controls" id="controls-area">
+        <div class="visualizer"></div>
+        <input type="password" id="api-key" placeholder="Paste OpenAI API Key here sk-..." />
+        <button id="start-btn">Start Dhwani System</button>
+        <button id="stop-btn">End Session</button>
+    </div>
+
+<script>
+    // --- Configuration & State ---
+    let apiKey = '';
+    let recognition;
+    let isListening = false;
+    let wakeLock = null;
+    
+    // Conversation State Machine: 'IDLE' | 'WAKE_DETECTED' | 'NAME_INPUT' | 'AGE_INPUT' | 'TEACHER_MODE'
+    let conversationState = 'IDLE'; 
+    
+    let userData = {
+        name: '',
+        rawAge: 0,
+        effectiveAge: 18
+    };
+
+    let conversationHistory = [];
+
+    // --- DOM Elements ---
+    const startBtn = document.getElementById('start-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    const chatContainer = document.getElementById('chat-container');
+    const statusText = document.getElementById('status-text');
+    const controlsArea = document.getElementById('controls-area');
+    const apiKeyInput = document.getElementById('api-key');
+
+    // --- Initialization ---
+
+    startBtn.addEventListener('click', async () => {
+        apiKey = apiKeyInput.value.trim();
+        if (!apiKey) {
+            alert("Please enter an OpenAI API Key.");
+            return;
+        }
+        
+        // Hide Input, Show Stop
+        apiKeyInput.style.display = 'none';
+        startBtn.style.display = 'none';
+        stopBtn.style.display = 'inline-block';
+        
+        await requestWakeLock();
+        initSpeechRecognition();
+        startListening();
+        
+        updateStatus("Listening for wake word: 'Ninad'...");
+        addMessage('system', "System Active. Say 'Ninad'...");
+    });
+
+    stopBtn.addEventListener('click', () => {
+        location.reload();
+    });
+
+    // --- Wake Lock API ---
+    async function requestWakeLock() {
+        try {
+            wakeLock = await navigator.wakeLock.request('screen');
+            console.log('Screen Wake Lock active');
+        } catch (err) {
+            console.error(`${err.name}, ${err.message}`);
+        }
+    }
+
+    // --- Speech Recognition (Web Speech API) ---
+    function initSpeechRecognition() {
+        if (!('webkitSpeechRecognition' in window)) {
+            alert("Web Speech API not supported. Please use Chrome.");
+            return;
+        }
+
+        recognition = new webkitSpeechRecognition();
+        recognition.lang = 'mr-IN'; // Marathi India
+        recognition.continuous = false; // We restart manually for better control
+        recognition.interimResults = false;
+
+        recognition.onstart = () => {
+            isListening = true;
+            controlsArea.classList.add('listening');
+        };
+
+        recognition.onend = () => {
+            isListening = false;
+            controlsArea.classList.remove('listening');
+            // Auto-restart unless explicit stop, but wait if processing
+            if (startBtn.style.display === 'none') {
+                setTimeout(() => {
+                    if (!isListening) recognition.start();
+                }, 500); 
+            }
+        };
+
+        recognition.onresult = async (event) => {
+            const transcript = event.results[0][0].transcript.trim();
+            console.log("Heard:", transcript);
+            processInput(transcript);
+        };
+    }
+
+    function startListening() {
+        try {
+            recognition.start();
+        } catch(e) {
+            // Already started
+        }
+    }
+
+    function stopListening() {
+        recognition.stop();
+    }
+
+    // --- Core Logic Brain ---
+
+    async function processInput(text) {
+        const lowerText = text.toLowerCase();
+
+        // 1. Wake Word Stage
+        if (conversationState === 'IDLE') {
+            if (lowerText.includes('ninad') || lowerText.includes('निनाद')) {
+                conversationState = 'WAKE_DETECTED';
+                addMessage('user', text);
+                await speakAndAct("Namaskar, Me Ninad? tumche naav kay aahe", 'NAME_INPUT');
+            }
+            return;
+        }
+
+        addMessage('user', text);
+
+        // 2. Name Input Stage
+        if (conversationState === 'NAME_INPUT') {
+            // Intelligence: Extract name (e.g., "Majhe naav Pramod Shinde" -> "Pramod")
+            const extractedName = extractNameSmartly(text);
+            userData.name = extractedName;
+            
+            const response = `Khup Chan ${userData.name}, tumche vaay kay aahe?`;
+            await speakAndAct(response, 'AGE_INPUT');
+            return;
+        }
+
+        // 3. Age Input Stage
+        if (conversationState === 'AGE_INPUT') {
+            const extractedAge = extractAgeSmartly(text);
+            userData.rawAge = extractedAge;
+            // Cap age at 18 for logic
+            userData.effectiveAge = extractedAge > 18 ? 18 : extractedAge;
+            
+            // Initialize Teacher Persona
+            initializeTeacherPersona();
+            
+            // Send first interaction to LLM (or just acknowledge)
+            // But prompt says "during entire conversation act as skilled marathi teacher".
+            // We will transition to AI mode now.
+            conversationState = 'TEACHER_MODE';
+            
+            // Generate the first AI welcome based on the age
+            await getAIResponse(`My age is ${userData.rawAge}. Let's start.`);
+            return;
+        }
+
+        // 4. Teacher/Chat Mode
+        if (conversationState === 'TEACHER_MODE') {
+            await getAIResponse(text);
+        }
+    }
+
+    // --- Smart Parsing Functions ---
+
+    function extractNameSmartly(text) {
+        // Remove common Marathi prefixes
+        let clean = text.replace(/majhe naav/i, '')
+                        .replace(/maze nav/i, '')
+                        .replace(/aahe/i, '')
+                        .replace(/namaskar/i, '')
+                        .trim();
+        
+        // Take the first word as the first name
+        const parts = clean.split(' ');
+        let name = parts[0];
+        
+        // Capitalize
+        return name.charAt(0).toUpperCase() + name.slice(1);
+    }
+
+    function extractAgeSmartly(text) {
+        // 1. Try to find digits
+        const digits = text.match(/\d+/);
+        if (digits) {
+            return parseInt(digits[0]);
+        }
+        
+        // 2. Rudimentary mapping for Marathi numbers (fallback)
+        const marathiNums = {
+            'ek': 1, 'don': 2, 'teen': 3, 'char': 4, 'paach': 5,
+            'saha': 6, 'saat': 7, 'aath': 8, 'nau': 9, 'daha': 10,
+            'vis': 20, 'tis': 30, 'chalis': 40
+        };
+        
+        for (let [word, num] of Object.entries(marathiNums)) {
+            if (text.toLowerCase().includes(word)) return num;
+        }
+        
+        // Default fallback if unknown
+        return 10; 
+    }
+
+    // --- OpenAI Integration ---
+
+    function initializeTeacherPersona() {
+        conversationHistory = [
+            {
+                role: "system",
+                content: `You are Ninad, a skilled, sweet, and polite Marathi teacher. 
+                You are talking to ${userData.name}. 
+                The user said their age is ${userData.rawAge}, so you must assume their mental capacity is ${userData.effectiveAge} years old. 
+                
+                RULES:
+                1. Keep answers SHORT (maximum 2-3 sentences).
+                2. Language: Strictly Marathi. 
+                3. If asked to teach English, explain the English concept using Marathi.
+                4. Even if speaking English terms, use Marathi sentence structure/grammar explanation.
+                5. Be interactive. End your responses with a simple question to keep the child engaged.
+                6. Never mention you are an AI. You are Ninad.
+                7. If the user is an adult (age > 18), you still treat them as a student (max 18 level) simply and politely.`
+            }
+        ];
+    }
+
+    async function getAIResponse(userInput) {
+        updateStatus("Ninad is thinking...");
+        
+        conversationHistory.push({ role: "user", content: userInput });
+
+        try {
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: "gpt-4o", 
+                    messages: conversationHistory,
+                    max_tokens: 150,
+                    temperature: 0.7
+                })
+            });
+
+            const data = await response.json();
+            if (data.error) throw new Error(data.error.message);
+
+            const aiText = data.choices[0].message.content;
+            conversationHistory.push({ role: "assistant", content: aiText });
+
+            await speakAndAct(aiText, conversationState); // State remains same
+
+        } catch (error) {
+            console.error(error);
+            addMessage('bot', "Error: " + error.message);
+            speakText("Kahi tari chuk zali, krupaya punha sanga.");
+        }
+    }
+
+    // --- Text-to-Speech (OpenAI Audio API) ---
+    
+    async function speakAndAct(text, nextState) {
+        // Update UI first
+        addMessage('bot', text);
+        updateStatus("Ninad is speaking...");
+        
+        // Pause listening while speaking
+        stopListening();
+
+        try {
+            const response = await fetch('https://api.openai.com/v1/audio/speech', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: "tts-1",
+                    input: text,
+                    voice: "onyx", // Male, deep, polite
+                    response_format: "mp3",
+                    speed: 1.0
+                })
+            });
+
+            if (!response.ok) throw new Error("TTS Error");
+
+            const blob = await response.blob();
+            const audioUrl = URL.createObjectURL(blob);
+            const audio = new Audio(audioUrl);
+
+            audio.onended = () => {
+                conversationState = nextState;
+                updateStatus("Listening...");
+                // Resume listening
+                try { recognition.start(); } catch(e){}
+            };
+
+            audio.play();
+
+        } catch (error) {
+            console.error("TTS Failed, falling back to browser", error);
+            // Fallback
+            speakBrowser(text, nextState);
+        }
+    }
+
+    // Browser TTS Fallback
+    function speakBrowser(text, nextState) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'mr-IN';
+        utterance.onend = () => {
+            conversationState = nextState;
+            updateStatus("Listening...");
+            try { recognition.start(); } catch(e){}
+        };
+        window.speechSynthesis.speak(utterance);
+    }
+
+    // --- UI Helper ---
+    function addMessage(sender, text) {
+        const div = document.createElement('div');
+        div.classList.add('message', sender);
+        div.innerText = text;
+        chatContainer.appendChild(div);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function updateStatus(msg) {
+        statusText.innerText = msg;
+    }
+
+</script>
+</body>
+</html>
