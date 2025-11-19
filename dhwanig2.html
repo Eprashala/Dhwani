@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dhwani - AI Teacher</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #111827; /* Dark background */
+        }
+        
+        /* Hide scrollbar for clean UI */
+        #conversation-log::-webkit-scrollbar {
+            width: 6px;
+        }
+        #conversation-log::-webkit-scrollbar-track {
+            background: #1f2937; 
+        }
+        #conversation-log::-webkit-scrollbar-thumb {
+            background: #4b5563; 
+            border-radius: 10px;
+        }
+
+        /* Pulsing animation for the Mic button */
+        .mic-pulse {
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            animation: pulse-red 1.5s infinite cubic-bezier(0.66, 0, 0, 1);
+        }
+
+        @keyframes pulse-red {
+            to {
+                box-shadow: 0 0 0 20px rgba(239, 68, 68, 0);
+            }
+        }
+        
+        /* Animation for new messages */
+        .fade-in-up {
+            animation: fadeInUp 0.3s ease-out forwards;
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="text-white flex flex-col items-center min-h-screen p-4">
+
+    <!-- Main Card -->
+    <div class="w-full max-w-md bg-gray-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col h-[85vh] border border-gray-700">
+        
+        <!-- Header -->
+        <div class="bg-gray-900 p-4 md:p-6 text-center shadow-md border-b border-gray-700 z-10">
+            <h1 class="text-2xl md:text-3xl font-bold tracking-wide">
+                <span class="text-orange-500">Eप्रशाला</span> 
+                <span class="text-white">ध्वनी</span> 
+                <span class="text-cyan-400 font-extrabold">AI</span> 
+                <span class="text-white">शिक्षिका</span>
+            </h1>
+            <div class="mt-2 flex justify-center items-center gap-2">
+                <div id="status-dot" class="w-2.5 h-2.5 rounded-full bg-gray-500 transition-colors"></div>
+                <span id="status-text" class="text-[10px] md:text-xs text-gray-400 uppercase tracking-wider font-semibold">Offline</span>
+            </div>
+        </div>
+
+        <!-- Chat Area -->
+        <div id="conversation-log" class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-800 relative">
+            <div id="welcome-msg" class="text-gray-500 text-center text-sm mt-10 opacity-70 px-6">
+                <div class="mb-2 text-4xl">👋</div>
+                "Start" बटनावर क्लिक करा आणि "ध्वनी" म्हणा...
+            </div>
+        </div>
+
+        <!-- Controls Area (Bottom) -->
+        <div class="p-4 bg-gray-900 border-t border-gray-700">
+            
+            <!-- Action Bar (Replay, Share, Restart) -->
+            <div class="grid grid-cols-3 gap-3 mb-4">
+                <button onclick="replayLastMessage()" class="flex flex-col items-center justify-center p-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition text-cyan-400 active:scale-95">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mb-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
+                    </svg>
+                    <span class="text-[10px]">Replay</span>
+                </button>
+
+                <button onclick="shareChat()" class="flex flex-col items-center justify-center p-2 rounded-xl bg-gray-800 hover:bg-gray-700 transition text-green-400 active:scale-95">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mb-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
+                    </svg>
+                    <span class="text-[10px]">Share</span>
+                </button>
+
+                <button onclick="restartChat()" class="flex flex-col items-center justify-center p-2 rounded-xl bg-gray-800 hover:bg-red-900/30 transition text-red-400 active:scale-95">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mb-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
+                    </svg>
+                    <span class="text-[10px]">Restart</span>
+                </button>
+            </div>
+
+            <!-- Error Message -->
+            <div id="error-msg" class="text-red-400 text-xs text-center mb-2 hidden animate-pulse"></div>
+
+            <!-- Big Action Button -->
+            <button id="talk-button" class="w-full py-4 rounded-full text-xl font-bold text-white shadow-lg transform transition-all duration-200 active:scale-95 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 flex items-center justify-center gap-3 ring-2 ring-orange-500/30">
+                <!-- Mic Icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
+                <span>Start Listening</span>
+            </button>
+            
+            <!-- Settings Toggle -->
+            <div class="mt-3 text-center">
+                <button onclick="toggleApiSection()" class="text-[10px] text-gray-600 hover:text-gray-400 uppercase tracking-widest">
+                    Settings
+                </button>
+            </div>
+
+            <!-- API Key Section -->
+            <div id="api-section" class="mt-3 hidden transition-all bg-gray-800 p-3 rounded-xl border border-gray-700">
+                <label class="block text-xs text-gray-400 mb-1">Google Gemini API Key</label>
+                <input type="password" id="api-key" placeholder="Paste API Key here"
+                       class="w-full px-3 py-2 rounded bg-gray-900 text-white text-sm border border-gray-600 focus:border-orange-500 focus:outline-none">
+                <p id="https-warning" class="text-xs text-yellow-500 mt-2 hidden"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const talkButton = document.getElementById('talk-button');
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+        const conversationLog = document.getElementById('conversation-log');
+        const apiKeyInput = document.getElementById('api-key');
+        const errorMsg = document.getElementById('error-msg');
+
+        // --- State ---
+        let appState = 'IDLE'; 
+        let userName = '';
+        let userAge = 18;
+        let chatHistory = []; // Array of {role: 'user'|'model', parts: [{text: '...'}]}
+        let systemInstruction = '';
+        let recognition;
+        let audio = new Audio();
+        let lastSpokenText = ""; // Store for Replay functionality
+
+        // --- Init ---
+        window.onload = () => {
+            const storedApiKey = localStorage.getItem('geminiApiKey');
+            if (storedApiKey) apiKeyInput.value = storedApiKey;
+
+            if (window.location.protocol !== 'https:') {
+                document.getElementById('https-warning').textContent = 'Mic requires HTTPS.';
+                document.getElementById('https-warning').classList.remove('hidden');
+            }
+        };
+
+        // --- UI Helper Functions ---
+        function toggleApiSection() {
+            document.getElementById('api-section').classList.toggle('hidden');
+        }
+
+        function restartChat() {
+            if (confirm('तुम्हाला नक्की चॅट पुन्हा सुरू करायचे आहे का? (Are you sure you want to restart?)')) {
+                // Stop everything
+                if (recognition) try { recognition.stop(); } catch(e) {}
+                if (audio) audio.pause();
+                
+                // Reset State
+                appState = 'IDLE';
+                userName = '';
+                userAge = 18;
+                chatHistory = [];
+                systemInstruction = '';
+                lastSpokenText = '';
+                
+                // Clear UI
+                conversationLog.innerHTML = `
+                    <div id="welcome-msg" class="text-gray-500 text-center text-sm mt-10 opacity-70 px-6 fade-in-up">
+                        <div class="mb-2 text-4xl">👋</div>
+                        "Start" बटनावर क्लिक करा आणि "ध्वनी" म्हणा...
+                    </div>`;
+                
+                setState('IDLE');
+                showError('');
+            }
+        }
+
+        function replayLastMessage() {
+            if (!lastSpokenText) {
+                showError("No message to replay yet.");
+                setTimeout(() => showError(''), 3000);
+                return;
+            }
+            // Stop current audio and play again
+            speakText(lastSpokenText, 'mr');
+        }
+
+        async function shareChat() {
+            if (chatHistory.length === 0) {
+                showError("Nothing to share yet.");
+                setTimeout(() => showError(''), 3000);
+                return;
+            }
+
+            // Format chat for sharing
+            let shareText = "Eप्रशाला ध्वनी AI शिक्षिका - Chat Transcript:\n\n";
+            chatHistory.forEach(msg => {
+                if (msg.role === 'user' && msg.parts[0].text !== 'Instructions received.') {
+                    shareText += `Student: ${msg.parts[0].text}\n`;
+                } else if (msg.role === 'model') {
+                    shareText += `Dhwani: ${msg.parts[0].text}\n`;
+                }
+            });
+
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: 'Eप्रशाला Chat',
+                        text: shareText
+                    });
+                } catch (err) {
+                    console.log('Share cancelled');
+                }
+            } else {
+                // Fallback to clipboard
+                navigator.clipboard.writeText(shareText).then(() => {
+                    const oldText = document.getElementById('status-text').innerText;
+                    statusText.innerText = "COPIED!";
+                    setTimeout(() => statusText.innerText = oldText, 2000);
+                });
+            }
+        }
+
+        // --- Speech Recognition Setup ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            showError('Browser does not support Speech Recognition.');
+            talkButton.disabled = true;
+        } else {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false; 
+            recognition.interimResults = false;
+            recognition.lang = 'mr-IN'; 
+
+            recognition.onresult = handleSpeechResult;
+            recognition.onend = handleSpeechEnd;
+            recognition.onerror = (event) => {
+                console.log("Recognition error:", event.error);
+                if (event.error === 'no-speech') {
+                    // Just restart if no speech detected and we expect input
+                    if (appState !== 'IDLE' && appState !== 'BUSY') {
+                        startRecognitionSafe();
+                    }
+                } else if (event.error !== 'not-allowed' && event.error !== 'aborted') {
+                    showError(`Error: ${event.error}`);
+                    setState('IDLE');
+                }
+            };
+        }
+
+        // --- Listeners ---
+        talkButton.addEventListener('click', toggleListening);
+        apiKeyInput.addEventListener('input', () => {
+            localStorage.setItem('geminiApiKey', apiKeyInput.value.trim());
+        });
+
+        // --- Functions ---
+
+        function startRecognitionSafe() {
+            try {
+                recognition.start();
+                console.log("Recognition started safely.");
+            } catch (e) {
+                console.warn("Recognition already started or failed to start:", e.message);
+            }
+        }
+
+        function toggleListening() {
+            const apiKey = apiKeyInput.value.trim();
+            if (!apiKey) {
+                showError('Please enter API Key in settings.');
+                document.getElementById('api-section').classList.remove('hidden');
+                return;
+            }
+            localStorage.setItem('geminiApiKey', apiKey);
+            showError(''); 
+
+            if (appState === 'IDLE') {
+                setState('LISTENING_FOR_WAKEWORD');
+                startRecognitionSafe();
+            } else {
+                setState('IDLE');
+                recognition.stop();
+                if (audio) audio.pause(); // Stop Audio
+            }
+        }
+
+        function setState(newState) {
+            appState = newState;
+            console.log(`State: ${appState}`);
+
+            switch (newState) {
+                case 'IDLE':
+                    talkButton.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                        </svg> <span>Start Listening</span>`;
+                    talkButton.className = "w-full py-4 rounded-full text-xl font-bold text-white shadow-lg transform transition-all duration-200 active:scale-95 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 flex items-center justify-center gap-3 ring-2 ring-orange-500/30";
+                    
+                    statusDot.className = "w-2.5 h-2.5 rounded-full bg-gray-500";
+                    statusText.innerText = "Offline";
+                    statusText.className = "text-[10px] md:text-xs text-gray-400 uppercase tracking-wider font-semibold";
+                    break;
+
+                case 'BUSY':
+                    talkButton.innerHTML = `
+                        <svg class="animate-spin h-7 w-7 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg> <span>Thinking...</span>`;
+                    talkButton.className = "w-full py-4 rounded-full text-xl font-bold text-white bg-gray-600 cursor-wait flex items-center justify-center gap-3";
+                    
+                    statusDot.className = "w-2.5 h-2.5 rounded-full bg-yellow-400 animate-pulse";
+                    statusText.innerText = "Thinking";
+                    statusText.className = "text-[10px] md:text-xs text-yellow-400 uppercase tracking-wider font-semibold";
+                    break;
+
+                default: // Listening states
+                    talkButton.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                        </svg> <span>Listening...</span>`;
+                    talkButton.className = "w-full py-4 rounded-full text-xl font-bold text-white shadow-lg bg-gradient-to-r from-blue-500 to-cyan-500 mic-pulse flex items-center justify-center gap-3";
+                    
+                    statusDot.className = "w-2.5 h-2.5 rounded-full bg-green-500";
+                    statusText.innerText = "Listening";
+                    statusText.className = "text-[10px] md:text-xs text-green-500 uppercase tracking-wider font-semibold";
+                    break;
+            }
+        }
+
+        function handleSpeechEnd() {
+            if (appState !== 'IDLE' && appState !== 'BUSY') {
+                startRecognitionSafe();
+            }
+        }
+        
+        async function handleSpeechResult(event) {
+            const transcript = event.results[event.results.length - 1][0].transcript.trim();
+            console.log(`Transcript: ${transcript}`);
+
+            const currentState = appState;
+            
+            recognition.stop(); 
+            setState('BUSY');
+
+            try {
+                switch (currentState) { 
+                    case 'LISTENING_FOR_WAKEWORD':
+                        if (transcript.toLowerCase().includes('dhwani') || transcript.toLowerCase().includes('ध्वनी')) {
+                            const greeting = "नमस्कार, मी ध्वनी, तुमचे नाव काय आहे?";
+                            logMessage('Dhwani', greeting);
+                            await speakText(greeting, 'mr');
+                            setState('LISTENING_FOR_NAME');
+                            startRecognitionSafe();
+                        } else {
+                            setState('LISTENING_FOR_WAKEWORD');
+                            startRecognitionSafe();
+                        }
+                        break;
+
+                    case 'LISTENING_FOR_NAME':
+                        logMessage('You', transcript);
+                        userName = await extractNameFromTranscript(transcript);
+                        
+                        const agePrompt = `खूप छान ${userName}, तुमचे वय काय आहे?`;
+                        logMessage('Dhwani', agePrompt);
+                        await speakText(agePrompt, 'mr');
+                        setState('LISTENING_FOR_AGE');
+                        startRecognitionSafe();
+                        break;
+
+                    case 'LISTENING_FOR_AGE':
+                        logMessage('You', transcript);
+                        const age = await extractAgeFromTranscript(transcript);
+                        userAge = Math.min(age, 18); 
+                        buildSystemPrompt();
+                        
+                        const startPrompt = `धन्यवाद ${userName}! मी लक्षात ठेवीन की तुझे वय ${userAge} आहे. आता तू मला कोणताही प्रश्न विचारू शकतोस.`;
+                        logMessage('Dhwani', startPrompt);
+                        await speakText(startPrompt, 'mr');
+                        setState('CONVERSATION');
+                        startRecognitionSafe();
+                        break;
+
+                    case 'CONVERSATION':
+                        logMessage(userName || 'You', transcript);
+                        chatHistory.push({ role: 'user', parts: [{ text: transcript }] });
+                        
+                        const aiResponseText = await generateTextResponseFromChat();
+                        const cleanedResponseText = cleanTextForTTS(aiResponseText);
+
+                        chatHistory.push({ role: 'model', parts: [{ text: cleanedResponseText }] });
+                        logMessage('Dhwani', cleanedResponseText);
+                        await speakText(cleanedResponseText, 'mr');
+                        
+                        setState('CONVERSATION'); 
+                        startRecognitionSafe();
+                        break;
+                }
+            } catch (error) {
+                console.error("Logic error:", error);
+                showError(`Error: ${error.message}`);
+                
+                if (systemInstruction) {
+                    setState('CONVERSATION');
+                } else {
+                    setState('LISTENING_FOR_WAKEWORD');
+                }
+                startRecognitionSafe();
+            }
+        }
+
+        // --- Helper Functions ---
+
+        function buildSystemPrompt() {
+            systemInstruction = `
+                You are "Dhwani," a sweet and patient female AI teacher from Maharashtra.
+                User: ${userName}, Age: ${userAge}.
+                
+                RULES:
+                1. Answer ONLY in Marathi (Devanagari).
+                2. NO English letters. Write "शाळा" not "Shala".
+                3. NO formatting (*, #, bold).
+                4. Adapt complexity for a ${userAge} year old.
+                5. Be concise, kind, and educational.
+            `;
+            if (userAge <= 8) systemInstruction += " Use very simple, short sentences.";
+            else if (userAge <= 12) systemInstruction += " Use simple language.";
+            
+            chatHistory = [
+                { role: 'user', parts: [{ text: 'Instructions received.' }] },
+                { role: 'model', parts: [{ text: `नमस्कार ${userName}, मी तयार आहे.` }] }
+            ];
+        }
+
+        async function extractNameFromTranscript(transcript) {
+            return callGemini(`Extract just the first name from: "${transcript}". If none, reply "Friend". Output ONLY the name in Marathi Devanagari if possible, or English.`, 5);
+        }
+
+        async function extractAgeFromTranscript(transcript) {
+            const res = await callGemini(`Extract the number from: "${transcript}". If none, reply "18". Output ONLY the digits.`, 5);
+            return parseInt(res.trim()) || 18;
+        }
+
+        async function generateTextResponseFromChat() {
+             const apiKey = apiKeyInput.value.trim();
+             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+             
+             try {
+                 const response = await fetch(url, {
+                     method: 'POST',
+                     headers: {'Content-Type': 'application/json'},
+                     body: JSON.stringify({
+                         contents: chatHistory,
+                         systemInstruction: { parts: [{ text: systemInstruction }] }
+                     })
+                 });
+                 const data = await response.json();
+                 if (!response.ok) throw new Error(data.error?.message || response.statusText);
+                 return data.candidates[0].content.parts[0].text.trim();
+             } catch (e) {
+                 throw e;
+             }
+        }
+
+        async function callGemini(prompt, maxTokens) {
+            const apiKey = apiKeyInput.value.trim();
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: { temperature: 0, maxOutputTokens: maxTokens }
+                    })
+                });
+                const data = await response.json();
+                return data.candidates[0].content.parts[0].text.trim();
+            } catch (e) {
+                console.error("Extraction error", e);
+                return "";
+            }
+        }
+
+        function cleanTextForTTS(text) {
+            return text.replace(/[\*#`]/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+
+        function splitTextIntoChunks(text) {
+            const maxChunkLength = 180; 
+            let chunks = [];
+            let remaining = text;
+            while (remaining.length > 0) {
+                if (remaining.length <= maxChunkLength) {
+                    chunks.push(remaining);
+                    break;
+                }
+                let split = maxChunkLength;
+                const punc = ".?!।";
+                let foundPunc = false;
+                for (let i = maxChunkLength; i > 0; i--) {
+                    if (punc.includes(remaining[i])) {
+                        split = i + 1;
+                        foundPunc = true;
+                        break;
+                    }
+                }
+                if (!foundPunc) {
+                    const space = remaining.lastIndexOf(' ', maxChunkLength);
+                    if (space > 0) split = space + 1;
+                }
+                chunks.push(remaining.substring(0, split));
+                remaining = remaining.substring(split);
+            }
+            return chunks;
+        }
+
+        async function speakText(text, lang = 'mr') {
+            if (audio.paused === false) audio.pause();
+            lastSpokenText = text; // Save for replay
+            
+            const chunks = splitTextIntoChunks(text);
+            
+            for (const chunk of chunks) {
+                await new Promise((resolve, reject) => {
+                    const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(chunk)}&tl=${lang}&client=tw-ob`;
+                    audio.src = url;
+                    audio.onended = resolve;
+                    audio.onerror = () => resolve();
+                    audio.play().catch(e => {
+                        console.warn("Playback failed", e);
+                        resolve();
+                    });
+                });
+            }
+        }
+
+        function logMessage(sender, message) {
+            const div = document.createElement('div');
+            const isUser = sender === 'You';
+            const bubbleClass = isUser 
+                ? 'bg-blue-600 text-white rounded-tr-none self-end ml-auto' 
+                : 'bg-gray-700 text-gray-100 rounded-tl-none self-start mr-auto';
+            
+            div.className = `max-w-[85%] p-3 rounded-2xl shadow-sm mb-2 ${bubbleClass} text-sm md:text-base fade-in-up`;
+            
+            const cleanMessage = message.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            div.innerHTML = `<div class="font-bold text-[10px] opacity-75 mb-1 uppercase tracking-wide">${sender}</div>${cleanMessage}`;
+            
+            conversationLog.appendChild(div);
+            conversationLog.scrollTop = conversationLog.scrollHeight;
+        }
+
+        function showError(msg) {
+            errorMsg.textContent = msg;
+            errorMsg.classList.toggle('hidden', !msg);
+        }
+
+    </script>
+</body>
+</html>
