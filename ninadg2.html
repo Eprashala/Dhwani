@@ -41,7 +41,8 @@
     
     <script>
         window.onerror = function(message, source, lineno, colno, error) {
-            alert("System Error: " + message + "\nLine: " + lineno);
+            // alert("System Error: " + message + "\nLine: " + lineno);
+            console.error(message);
         };
     </script>
 </head>
@@ -122,6 +123,7 @@
         const restartChatButton = document.getElementById('restart-chat-button');
 
         // --- API KEY ---
+        // WARNING: In production, do not expose API keys in frontend code.
         const GEMINI_API_KEY = "AIzaSyDBn-xo4iQrOhlr0ohb07tn_fswYfv4-VM"; 
         // -------------------------
 
@@ -142,19 +144,19 @@
 
         // --- 3. Initialization ---
         window.onload = () => {
-            // Clear any stuck audio on load
             if (synth.speaking) synth.cancel();
             
             if (window.location.protocol === 'file:') {
                 console.warn("Warning: Mic permissions often fail on file:// protocol. Use a local server.");
             }
             loadUserData();
+            
+            // Force load voices eagerly
             loadVoices();
         };
 
         function loadUserData() {
             try {
-                // Updated keys for Ninad
                 const savedName = localStorage.getItem('ninad_userName');
                 const savedAge = localStorage.getItem('ninad_userAge');
 
@@ -208,7 +210,6 @@
                 recognition.onend = handleSpeechEnd;
                 
                 recognition.onerror = (event) => {
-                    console.log("Speech Error Event:", event.error);
                     if (event.error === 'no-speech') {
                         if (appState !== 'IDLE' && appState !== 'BUSY') {
                             startRecognitionSafe();
@@ -217,7 +218,7 @@
                         logMessage('Error', 'Microphone blocked. Please allow permission.');
                         setState('IDLE');
                     } else if (event.error !== 'aborted') {
-                        logMessage('Error', `Mic Error: ${event.error}`);
+                        // Silent fail on minor errors to keep UI clean
                         if (appState !== 'IDLE') setState('IDLE');
                     }
                 };
@@ -226,23 +227,17 @@
             }
         }
 
-        // Safe Start Function
         function startRecognitionSafe() {
             if (!recognition) return;
             try {
                 recognition.start();
             } catch (e) {
                 // Ignore 'already started' errors
-                if (e.name !== 'InvalidStateError') {
-                    console.error("Recognition Start Error:", e);
-                }
             }
         }
 
         // --- 5. Main Interactions ---
         talkButton.addEventListener('click', toggleListening);
-        
-        // Buttons
         pauseResumeButton.addEventListener('click', togglePauseResume);
         stopSpeechButton.addEventListener('click', stopSpeech);
         replayButton.addEventListener('click', replaySpeech);
@@ -258,48 +253,38 @@
         // --- 6. Core Logic ---
 
         async function toggleListening() {
-            console.log("Button Clicked. Current State:", appState);
-
             try {
                 if (appState === 'IDLE') {
-                    // 1. Visual Update FIRST
                     talkButton.textContent = "Starting...";
-                    talkButton.disabled = true; // Prevent double clicks
-
+                    talkButton.disabled = true;
                     await acquireWakeLock();
                     
-                    // 2. Logic Branch
                     if (userIsRemembered && userName && userAge) {
-                        // --- Resume Mode ---
+                        // Resume
                         buildSystemPrompt(); 
-                        
-                        // Ensure chat history has context if empty
                         if (chatHistory.length === 2) {
                              chatHistory.push({ role: 'user', parts: [{ text: "नमस्कार." }] });
                              chatHistory.push({ role: 'model', parts: [{ text: `नमस्कार ${userName}.` }] });
                         }
-
                         const welcomeBackText = `नमस्कार ${userName}, आपण पुन्हा सुरुवात करूया!`;
                         logMessage('Ninad', welcomeBackText);
                         
                         setState('BUSY'); 
-                        await speakText(welcomeBackText, 'mr-IN');
+                        await speakText(welcomeBackText);
                         setState('CONVERSATION');
                         startRecognitionSafe();
 
                     } else {
-                        // --- New User Mode ---
+                        // New Session
                         setState('LISTENING_FOR_WAKEWORD');
                         startRecognitionSafe();
-                        
-                        // Add a hint if the log is empty
                         if (conversationLog.childElementCount < 3) {
                             logMessage('Info', 'Listening... Say "Ninad"');
                         }
                     }
 
                 } else {
-                    // --- Stop Mode ---
+                    // Stop
                     setState('IDLE');
                     recognition.stop();
                     if (synth.speaking) synth.cancel();
@@ -307,15 +292,12 @@
                 }
             } catch (error) {
                 console.error("Toggle Error:", error);
-                alert("Error starting: " + error.message);
                 setState('IDLE');
             }
         }
 
         function setState(newState) {
             appState = newState;
-            console.log(`State Updated: ${appState}`);
-
             switch (newState) {
                 case 'IDLE':
                     talkButton.textContent = userIsRemembered ? `Resume as ${userName}` : 'Start Listening';
@@ -331,12 +313,11 @@
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-400 transition-colors';
                     endChatButton.disabled = false;
                     break;
-                default: // All "LISTENING" states
+                default: // LISTENING
                     talkButton.textContent = 'Stop Listening';
                     talkButton.disabled = false;
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-blue-500 listening-pulse transition-colors';
                     endChatButton.disabled = false;
-                    // Make button Red to indicate "Stop" action
                     talkButton.classList.remove('bg-blue-600', 'hover:bg-blue-700');
                     talkButton.classList.add('bg-red-600', 'hover:bg-red-700');
                     break;
@@ -344,11 +325,9 @@
         }
 
         function handleSpeechEnd() {
-            // If we are supposedly listening, but mic stopped (timeout), restart it.
             if (appState !== 'IDLE' && appState !== 'BUSY') {
                 startRecognitionSafe();
             } else if (appState === 'IDLE') {
-                // Ensure UI matches reality
                 setState('IDLE'); 
             }
         }
@@ -357,8 +336,6 @@
             const transcript = event.results[event.results.length - 1][0].transcript.trim();
             if (!transcript) return;
             
-            console.log(`Heard: ${transcript}`);
-
             const currentState = appState;
             recognition.stop(); 
             setState('BUSY');
@@ -366,11 +343,10 @@
             try {
                 switch (currentState) {
                     case 'LISTENING_FOR_WAKEWORD':
-                        // Updated Wake Word Logic for Ninad
                         if (transcript.toLowerCase().includes('ninad') || transcript.toLowerCase().includes('निनाद')) {
                             const greeting = "नमस्कार, मी निनाद, तुमचे नाव काय आहे?";
                             logMessage('Ninad', greeting);
-                            await speakText(greeting, 'mr-IN');
+                            await speakText(greeting);
                             setState('LISTENING_FOR_NAME');
                             startRecognitionSafe(); 
                         } else {
@@ -385,7 +361,7 @@
                         
                         const agePrompt = `खूप छान, ${userName}, तुमचे वय काय आहे?`;
                         logMessage('Ninad', agePrompt);
-                        await speakText(agePrompt, 'mr-IN');
+                        await speakText(agePrompt);
                         setState('LISTENING_FOR_AGE');
                         startRecognitionSafe();
                         break;
@@ -401,7 +377,7 @@
                         
                         const startPrompt = `धन्यवाद, ${userName}! मी लक्षात ठेवीन की तुझे वय ${userAge} आहे. मी तयार आहे!`;
                         logMessage('Ninad', startPrompt);
-                        await speakText(startPrompt, 'mr-IN');
+                        await speakText(startPrompt);
                         setState('CONVERSATION');
                         startRecognitionSafe();
                         break;
@@ -417,7 +393,7 @@
                         logMessage('Ninad', cleanedResponseText);
                         
                         try {
-                            await speakText(cleanedResponseText, 'mr-IN');
+                            await speakText(cleanedResponseText);
                         } catch (error) {
                             if (error.message === "Speech manually stopped") return;
                             throw error;
@@ -430,7 +406,6 @@
             } catch (error) {
                 console.error("Logic Error:", error);
                 logMessage('Error', `Error: ${error.message}`);
-                // Attempt recovery
                 if (systemInstruction) {
                     setState('CONVERSATION');
                     startRecognitionSafe();
@@ -442,7 +417,6 @@
         }
 
         function buildSystemPrompt() {
-            // Updated Persona for Ninad (Male, Polite, Teacher)
             systemInstruction = `
                 You are "Ninad," a polite, soft-spoken, and patient male AI teacher from Maharashtra.
                 You are speaking to ${userName}, who is ${userAge} years old.
@@ -453,7 +427,6 @@
                 4. Be simple and encouraging.
                 5. Use a gentle, brotherly or teacher-like tone (Dada or Sir).
             `;
-            
             if (userAge <= 10) systemInstruction += "\n Use extremely simple language for a child.";
 
             chatHistory = [{ role: 'user', parts: [{ text: 'Instructions received.' }] }];
@@ -522,7 +495,7 @@
             return text.replace(/[\*#`]/g, ' ').replace(/\s+/g, ' ').trim();
         }
 
-        // --- 8. Audio Utils ---
+        // --- 8. Audio Utils (Voice Selection Logic) ---
         function loadVoices() {
             voices = synth.getVoices();
             if (synth.onvoiceschanged !== undefined) {
@@ -545,13 +518,10 @@
             speechManuallyStopped = true; 
             synth.cancel(); 
             recognition.stop(); 
-            
             toggleMediaButtons(true);
-            logMessage('Info', 'Stopped.');
-
+            
             setTimeout(() => {
                 speechManuallyStopped = false;
-                // If we were in conversation, listen again. If IDLE, stay IDLE.
                 if (appState !== 'IDLE') {
                     if (systemInstruction) { 
                         setState('CONVERSATION');
@@ -572,7 +542,8 @@
             }
         }
         
-        async function speakText(text, lang = 'mr-IN') {
+        // --- INTELLIGENT MALE VOICE SELECTION ---
+        async function speakText(text) {
             if (synth.speaking) synth.cancel();
             lastSpokenText = text;
             speechManuallyStopped = false;
@@ -590,22 +561,51 @@
                 };
                 utterance.onerror = (e) => { 
                     toggleMediaButtons(true);
-                    // Don't reject on simple interruptions
                     if (e.error === 'interrupted') resolve();
                     else reject(e.error); 
                 };
 
-                // Preference for a Marathi voice
-                let marathiVoice = voices.find(voice => voice.lang === 'mr-IN') || voices.find(voice => voice.lang === 'hi-IN');
+                // --- 1. Try to find a Marathi MALE voice ---
+                let selectedVoice = voices.find(v => v.lang === 'mr-IN' && v.name.toLowerCase().includes('male'));
+                let isMale = true;
+
+                // --- 2. Fallback: Try a Hindi MALE voice (Works great for Marathi) ---
+                if (!selectedVoice) {
+                    selectedVoice = voices.find(v => (v.lang === 'hi-IN' || v.lang === 'hi') && v.name.toLowerCase().includes('male'));
+                }
+
+                // --- 3. Fallback: Try "Google Hindi" (Usually better quality than default Marathi) ---
+                if (!selectedVoice) {
+                    selectedVoice = voices.find(v => v.name.includes('Google') && v.lang.includes('hi'));
+                    // We don't know if this is male, so we might need pitch shift
+                    isMale = false; 
+                }
+
+                // --- 4. Final Fallback: Default Marathi ---
+                if (!selectedVoice) {
+                    selectedVoice = voices.find(v => v.lang === 'mr-IN') || voices.find(v => v.lang === 'hi-IN');
+                    isMale = false;
+                }
+
+                if (selectedVoice) {
+                    utterance.voice = selectedVoice;
+                    // If we are borrowing a Hindi voice, we must set lang to Hindi or the browser might ignore the voice
+                    utterance.lang = selectedVoice.lang; 
+                } else {
+                    utterance.lang = 'mr-IN'; // Absolute fallback
+                }
                 
-                if (marathiVoice) utterance.voice = marathiVoice;
-                utterance.lang = 'mr-IN';
+                // --- PITCH & RATE CONTROL ---
+                // Rate: 0.85 = Soft spoken, calm teacher speed
+                utterance.rate = 0.85; 
                 
-                // Adjusted for Male/Soft-spoken Persona
-                // Standard Browser TTS voices often default to female. 
-                // Lowering pitch slightly can make it sound more masculine/calm.
-                utterance.rate = 0.9; 
-                utterance.pitch = 0.8; 
+                if (isMale || (selectedVoice && selectedVoice.name.toLowerCase().includes('male'))) {
+                    // Native male voice: Keep pitch normal
+                    utterance.pitch = 1.0;
+                } else {
+                    // Female/Default voice: DEEP PITCH SHIFT to simulate male
+                    utterance.pitch = 0.4; 
+                }
                 
                 synth.speak(utterance);
             });
@@ -642,7 +642,6 @@
         async function shareChat() {
             const chatText = getChatLogAsText();
             if (!chatText.trim()) { logMessage('Error', 'Chat empty.'); return; }
-            
             const shareData = { title: 'Ninad Chat', text: chatText };
             if (navigator.share) {
                 try { await navigator.share(shareData); } catch (err) {}
@@ -665,28 +664,17 @@
         }
 
         async function endChat() {
-            // 1. FORCE IDLE
             appState = 'IDLE';
             setState('IDLE');
-
-            // 2. Kill Audio
             speechManuallyStopped = true;
             if (synth.speaking) synth.cancel();
-            
-            // 3. Kill Mic
-            if (recognition) {
-                try { recognition.stop(); } catch (e) {}
-            }
-
+            if (recognition) { try { recognition.stop(); } catch (e) {} }
             await releaseWakeLock();
-            
-            // 4. Wipe Data
             userName = ''; userAge = 18; chatHistory = []; systemInstruction = '';
             localStorage.removeItem('ninad_userName');
             localStorage.removeItem('ninad_userAge');
             rememberMeCheckbox.checked = false;
             userIsRemembered = false;
-
             conversationLog.innerHTML = '<div class="text-gray-400 text-center">Chat Ended. Press Start.</div>';
             restartChatButton.disabled = true;
         }
@@ -695,15 +683,10 @@
             if (!systemInstruction) return;
             if (synth.speaking) synth.cancel();
             if (recognition) try { recognition.stop(); } catch(e){}
-            
             appState = 'IDLE';
             setState('IDLE');
-            
             await releaseWakeLock();
             conversationLog.innerHTML = '';
-            
-            // Re-initiate logic immediately if wanted, or just wait for button press
-            // Here we wait for button press to be safe
             logMessage('Info', `Chat restarted for ${userName}. Press Start.`);
         }
     </script>
