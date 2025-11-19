@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="mr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dhwani → Ninad (Marathi Voice Tutor)</title>
+  <style>
+    body{font-family:system-ui, Arial;display:flex;flex-direction:column;align-items:center;padding:18px;background:#f7fafc}
+    #log{width:100%;max-width:720px;height:320px;overflow:auto;background:white;border-radius:8px;padding:12px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+    .line{margin:6px 0}
+    .user{color:#0b69ff}
+    .bot{color:#0b7a3a}
+    #controls{margin-top:12px;display:flex;gap:8px}
+    button{padding:8px 12px;border-radius:6px;border:1px solid #ddd;background:white;cursor:pointer}
+    #status{margin-left:8px;font-size:0.95rem;color:#666}
+  </style>
+</head>
+<body>
+  <h2>निनाद — मराठी शिक्षण सहाय्यक (Ninad)</h2>
+  <div id="log" aria-live="polite"></div>
+
+  <div id="controls">
+    <button id="startBtn">Start Listening</button>
+    <button id="stopBtn">Stop</button>
+    <button id="replayBtn">Replay last</button>
+    <label>
+      <input type="checkbox" id="useOpenAITTS"> Use OpenAI TTS (recommended)
+    </label>
+    <span id="status">stopped</span>
+  </div>
+
+<script>
+const BACKEND_BASE = ''; // If server on same host: '' or 'http://localhost:3000'
+const WAKE_WORD = 'ninad'; // wake on this word (case-insensitive)
+let awakened = false;
+let lastAssistantText = '';
+let userName = null;
+let userAge = null; // capped at 18
+let recognition = null;
+let wakeLock = null;
+
+const logEl = document.getElementById('log');
+const statusEl = document.getElementById('status');
+const startBtn = document.getElementById('startBtn');
+const stopBtn = document.getElementById('stopBtn');
+const replayBtn = document.getElementById('replayBtn');
+const useOpenAITTS = document.getElementById('useOpenAITTS');
+
+function addLine(role, text){
+  const div = document.createElement('div');
+  div.className = 'line ' + (role==='user' ? 'user' : 'bot');
+  div.textContent = (role==='user' ? 'तू: ' : 'निनाद: ') + text;
+  logEl.appendChild(div);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function speakBrowser(text){
+  const ut = new SpeechSynthesisUtterance(text);
+  // choose a Marathi male voice if available
+  const voices = window.speechSynthesis.getVoices();
+  // try to pick a Marathi voice or a male indian voice
+  let chosen = voices.find(v => /marathi|mr-IN/i.test(v.lang) || /male/i.test(v.name));
+  if(!chosen) chosen = voices[0];
+  if(chosen) ut.voice = chosen;
+  ut.lang = 'mr-IN';
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(ut);
+}
+
+async function speakOpenAI(text){
+  // send to backend /tts which returns an audio blob
+  try{
+    const res = await fetch(BACKEND_BASE + '/tts', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({text})
+    });
+    if(!res.ok) throw new Error('TTS failed');
+    const ab = await res.arrayBuffer();
+    const blob = new Blob([ab], {type:'audio/mpeg'});
+    const url = URL.createObjectURL(blob);
+    const a = new Audio(url);
+    a.play();
+  }catch(e){
+    console.error(e);
+    // fallback
+    speakBrowser(text);
+  }
+}
+
+async function speak(text){
+  lastAssistantText = text;
+  if(useOpenAITTS.checked){
+    await speakOpenAI(text);
+  }else{
+    speakBrowser(text);
+  }
+}
+
+function keepScreenAwake(){
+  if('wakeLock' in navigator){
+    try{
+      navigator.wakeLock.request('screen').then(lock => {
+        wakeLock = lock;
+        lock.addEventListener('release', ()=> console.log('wake lock released'));
+        console.log('wake lock acquired');
+      }).catch(e => console.warn('wake lock failed', e));
+    }catch(e){console.warn(e);}
+  } else {
+    console.log('Wake Lock API not supported — screen may sleep');
+  }
+}
+
+function releaseWakeLock(){
+  if(wakeLock) wakeLock.release().catch(()=>{}); wakeLock = null;
+}
+
+// --- Language parsing: name & age from Marathi phrases ---
+function extractName(text){
+  // common patterns: "majhe naav Pramod Shinde aahe", "my name is Pramod", "me Pramod", "majhe naav Pramod aahe"
+  text = text.trim();
+  // lower-case for matching but we'll return the proper-capitalized first token after pattern
+  const patterns = [
+    /majhe naav\s+([A-Za-z\u0900-\u097F\s]+)/i,
+    /माझं? नाव\s+([A-Za-z\u0900-\u097F\s]+)/i,
+    /majhe\s+([A-Za-z\u0900-\u097F\s]+)/i,
+    /me\s+([A-Za-z\u0900-\u097F\s]+)/i
+  ];
+  for(const p of patterns){
+    const m = text.match(p);
+    if(m && m[1]){
+      // take first word as first name
+      const candidate = m[1].trim().split(/\s+/)[0];
+      return capitalizeName(candidate);
+    }
+  }
+  // if user said two words like "pramod shinde", capture first token
+  const twoWord = text.match(/^([A-Za-z\u0900-\u097F]+)\s+([A-Za-z\u0900-\u097F]+)$/i);
+  if(twoWord) return capitalizeName(twoWord[1]);
+  return null;
+}
+
+function capitalizeName(s){
+  if(!s) return s;
+  s = s.trim();
+  // return as-is (Marathi script) or Titlecase for Latin letters
+  return s[0].toUpperCase() + s.slice(1);
+}
+
+function extractAge(text){
+  // handle "majhe vaay 6 aahe", "6 varsha", "6", "सात", etc.
+  // first numbers
+  const numMatch = text.match(/(\d{1,2})/);
+  if(numMatch) return capAge(parseInt(numMatch[1],10));
+  // Marathi/English words for numbers (very small set)
+  const words = {
+    'एक':1,'दोन':2,'तीन':3,'चार':4,'पाच':5,'सहा':6,'सात':7,'आठ':8,'नऊ':9,'दहा':10,
+    'one':1,'two':2,'three':3,'four':4,'five':5,'six':6,'seven':7,'eight':8,'nine':9,'ten':10
+  };
+  for(const w in words) if(text.toLowerCase().includes(w)) return capAge(words[w]);
+  return null;
+}
+
+function capAge(n){
+  if(!n) return null;
+  if(n > 18) return 18;
+  if(n < 1) return 1;
+  return n;
+}
+
+// --- Conversation flow & system prompt ---
+const systemPrompt = `
+तू एक मराठी शाळा शिक्षकासारखा वागशील. सर्व संवाद मराठीत ठेवा, संपूर्ण उत्तरं छोटी, सोपी, आणि एकदम समजण्याजोगी ठेवा — 3 ते 18 वयोगटाच्या मुलांसाठी योग्य. जर वापरकर्त्याने इंग्रजीमध्ये समजून सांगायला म्हटले तर इंग्रजीमध्ये स्पष्ट कर, पण मधे मधे मराठी वापर. जर वापरकर्त्याने वय 18 पेक्षा जास्त दिले तर त्याला 18 समजा. नेहमी नम्र, उत्साही आणि प्रेरणादायी रहा.`;
+
+async function sendToChat(userText){
+  addLine('user', userText);
+  // if we don't yet have name or age, try to extract locally first
+  if(!userName){
+    const n = extractName(userText);
+    if(n){
+      userName = n;
+    }
+  }
+  if(!userAge){
+    const a = extractAge(userText);
+    if(a){
+      userAge = a;
+    }
+  }
+  // build message list for backend: include system prompt and a small memory block
+  const messages = [
+    {role:'system', content: systemPrompt},
+    {role:'system', content: `session.name: ${userName ?? ''}; session.age: ${userAge ?? ''}`},
+    {role:'user', content: userText}
+  ];
+  try{
+    const res = await fetch(BACKEND_BASE + '/chat', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({messages})
+    });
+    if(!res.ok) throw new Error('chat error');
+    const data = await res.json();
+    const assistantText = (data?.text || 'क्षमस्व — त्रुटी आली आहे.');
+    addLine('bot', assistantText);
+    await speak(assistantText);
+    statusEl.textContent = 'listening';
+  }catch(e){
+    console.error(e);
+    addLine('bot','क्षमस्व — सेवा मिळाली नाही.');
+    speak('क्षमस्व, तात्पुरती त्रुटी आढळली.');
+    statusEl.textContent = 'error';
+  }
+}
+
+// --- Recognition setup ---
+function initRecognition(){
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SpeechRecognition) { alert('तुमच्या ब्राउजरमध्ये SpeechRecognition उपलब्ध नाही. Chrome वापरा किंवा backend TTS वापरून शुद्धेने वापरा.'); return; }
+  recognition = new SpeechRecognition();
+  recognition.lang = 'mr-IN';
+  recognition.continuous = true;
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  recognition.onresult = (ev) => {
+    const transcript = Array.from(ev.results)
+      .slice(ev.resultIndex)
+      .map(r => r[0].transcript)
+      .join(' ')
+      .trim();
+    console.log('heard:', transcript);
+    handleSpokenText(transcript);
+  };
+  recognition.onerror = (e) => {
+    console.warn('recognition error', e);
+    statusEl.textContent = 'error';
+  };
+  recognition.onend = () => {
+    // auto-restart for continuous listening
+    if(statusEl.textContent === 'listening') recognition.start();
+  };
+}
+
+async function handleSpokenText(text){
+  const low = text.toLowerCase();
+  // Wake word detection
+  if(!awakened){
+    if(low.includes(WAKE_WORD)){
+      awakened = true;
+      addLine('user', text);
+      userName = null; userAge = null;
+      const greet = 'Namaskar, मी Ninad. तुमचे नाव काय आहे?';
+      addLine('bot', greet);
+      await speak(greet);
+      statusEl.textContent = 'awakened';
+    }
+    return;
+  }
+
+  // If awakened, check for stop phrase
+  if(low.includes('thamba') || low.includes('stop') || low.includes('थांब')){
+    awakened = false;
+    addLine('user', text);
+    const bye = 'ठीक आहे. मी मोकळा होतो — निनाद बंद.';
+    addLine('bot', bye);
+    await speak(bye);
+    statusEl.textContent = 'stopped';
+    return;
+  }
+
+  // If we haven't got name, try to parse name
+  if(!userName){
+    const n = extractName(text);
+    if(n){
+      userName = n;
+      addLine('user', text);
+      const reply = `खूप छान, ${userName}. तुमचे वय किती आहे?`;
+      addLine('bot', reply);
+      await speak(reply);
+      return;
+    }else{
+      // If user said just a single token like "Pramod Shinde", try using that
+      const tryName = text.trim().split(/\s+/)[0];
+      if(tryName.length<=12 && /[A-Za-z\u0900-\u097F]/.test(tryName)){
+        userName = capitalizeName(tryName);
+        addLine('user', text);
+        const reply = `छान, ${userName}. आता वय सांगा.`;
+        addLine('bot', reply);
+        await speak(reply);
+        return;
+      }
+    }
+  }
+
+  // If name known but age not known
+  if(userName && !userAge){
+    const a = extractAge(text);
+    if(a){
+      userAge = a;
+      addLine('user', text);
+      const reply = `${userName}, ठीक आहे. तुमचा वय ${userAge} आहे. आता सांग — काय शिकूया?`;
+      addLine('bot', reply);
+      await speak(reply);
+      return;
+    } else {
+      // maybe user answered something else; ask explicitly
+      addLine('user', text);
+      const reply = `कृपया फक्त वय सांगा — उदा. "माझं वय 6 आहे" किंवा "6".`;
+      addLine('bot', reply);
+      await speak(reply);
+      return;
+    }
+  }
+
+  // At this point, we have name+age -> send utterance to chat backend
+  await sendToChat(text);
+}
+
+// UI controls
+startBtn.onclick = async () => {
+  if(!recognition) initRecognition();
+  try {
+    keepScreenAwake();
+    recognition.start();
+    statusEl.textContent = 'listening';
+  } catch(e){
+    console.warn(e);
+  }
+};
+stopBtn.onclick = () => {
+  if(recognition) recognition.stop();
+  releaseWakeLock();
+  statusEl.textContent = 'stopped';
+};
+replayBtn.onclick = () => {
+  if(lastAssistantText) speak(lastAssistantText);
+};
+
+// init voices (for some browsers voices list populates later)
+window.speechSynthesis.onvoiceschanged = () => {};
+
+initRecognition();
+</script>
+</body>
+</html>
