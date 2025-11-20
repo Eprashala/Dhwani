@@ -24,7 +24,7 @@
                    disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none;
         }
         
-        /* Utility Button Styles (Bottom Row) */
+        /* Utility Button Styles */
         .utility-btn {
             @apply w-full py-3 px-2 rounded-lg text-sm font-semibold transition-colors
                    bg-gray-700 text-white
@@ -38,12 +38,6 @@
             @apply w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-600 focus:ring-2 ring-offset-gray-800;
         }
     </style>
-    
-    <script>
-        window.onerror = function(message, source, lineno, colno, error) {
-            alert("System Error: " + message + "\nLine: " + lineno);
-        };
-    </script>
 </head>
 <body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
 
@@ -122,7 +116,7 @@
         const restartChatButton = document.getElementById('restart-chat-button');
 
         // --- API KEY ---
-        const GEMINI_API_KEY = "AIzaSyDBn-xo4iQrOhlr0ohb07tn_fswYfv4-VM"; 
+        const GEMINI_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
         // -------------------------
 
         // --- 2. State Management ---
@@ -142,12 +136,7 @@
 
         // --- 3. Initialization ---
         window.onload = () => {
-            // Clear any stuck audio on load
             if (synth.speaking) synth.cancel();
-            
-            if (window.location.protocol === 'file:') {
-                console.warn("Warning: Mic permissions often fail on file:// protocol. Use a local server.");
-            }
             loadUserData();
             loadVoices();
         };
@@ -170,9 +159,7 @@
                     
                     talkButton.textContent = `Resume Chat as ${userName}`;
                 }
-            } catch (e) {
-                console.error("Storage Access Error", e);
-            }
+            } catch (e) { console.error(e); }
         }
 
         function saveUserData() {
@@ -186,16 +173,15 @@
                     localStorage.removeItem('dhwani_userAge');
                     userIsRemembered = false;
                 }
-            } catch (e) { console.error("Storage Save Error", e); }
+            } catch (e) { console.error(e); }
         }
 
-        // --- 4. Speech Recognition Setup ---
+        // --- 4. Speech Recognition ---
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         
         if (!SpeechRecognition) {
-            logMessage('Error', 'Your browser does not support Speech Recognition. Try Google Chrome.');
+            logMessage('Error', 'Browser not supported. Use Chrome.');
             talkButton.disabled = true;
-            talkButton.textContent = "Browser Not Supported";
         } else {
             try {
                 recognition = new SpeechRecognition();
@@ -207,114 +193,70 @@
                 recognition.onend = handleSpeechEnd;
                 
                 recognition.onerror = (event) => {
-                    console.log("Speech Error Event:", event.error);
-                    if (event.error === 'no-speech') {
-                        if (appState !== 'IDLE' && appState !== 'BUSY') {
-                            startRecognitionSafe();
-                        }
+                    console.log("Speech Error:", event.error);
+                    if (event.error === 'no-speech' && appState !== 'IDLE' && appState !== 'BUSY') {
+                        startRecognitionSafe();
                     } else if (event.error === 'not-allowed') {
-                        logMessage('Error', 'Microphone blocked. Please allow permission.');
                         setState('IDLE');
-                    } else if (event.error !== 'aborted') {
-                        logMessage('Error', `Mic Error: ${event.error}`);
-                        if (appState !== 'IDLE') setState('IDLE');
                     }
                 };
-            } catch (e) {
-                alert("Failed to initialize Speech Recognition: " + e.message);
-            }
+            } catch (e) { alert("Mic Error: " + e.message); }
         }
 
-        // Safe Start Function
         function startRecognitionSafe() {
             if (!recognition) return;
-            try {
-                recognition.start();
-            } catch (e) {
-                // Ignore 'already started' errors
-                if (e.name !== 'InvalidStateError') {
-                    console.error("Recognition Start Error:", e);
-                }
-            }
+            try { recognition.start(); } catch (e) {}
         }
 
-        // --- 5. Main Interactions ---
+        // --- 5. Interaction Logic ---
         talkButton.addEventListener('click', toggleListening);
-        
-        // Buttons
         pauseResumeButton.addEventListener('click', togglePauseResume);
         stopSpeechButton.addEventListener('click', stopSpeech);
         replayButton.addEventListener('click', replaySpeech);
-        
         shareButton.addEventListener('click', shareChat);
         endChatButton.addEventListener('click', endChat);
         restartChatButton.addEventListener('click', restartChat);
         rememberMeCheckbox.addEventListener('change', saveUserData);
-
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
-
-        // --- 6. Core Logic ---
-
         async function toggleListening() {
-            console.log("Button Clicked. Current State:", appState);
-
             try {
                 if (appState === 'IDLE') {
-                    // 1. Visual Update FIRST
                     talkButton.textContent = "Starting...";
-                    talkButton.disabled = true; // Prevent double clicks
-
+                    talkButton.disabled = true;
                     await acquireWakeLock();
                     
-                    // 2. Logic Branch
                     if (userIsRemembered && userName && userAge) {
-                        // --- Resume Mode ---
                         buildSystemPrompt(); 
-                        
-                        // Ensure chat history has context if empty
                         if (chatHistory.length === 2) {
                              chatHistory.push({ role: 'user', parts: [{ text: "नमस्कार." }] });
                              chatHistory.push({ role: 'model', parts: [{ text: `नमस्कार ${userName}.` }] });
                         }
-
                         const welcomeBackText = `नमस्कार ${userName}, आपण पुन्हा सुरुवात करूया!`;
                         logMessage('Dhwani', welcomeBackText);
-                        
                         setState('BUSY'); 
                         await speakText(welcomeBackText, 'mr-IN');
                         setState('CONVERSATION');
                         startRecognitionSafe();
-
                     } else {
-                        // --- New User Mode ---
                         setState('LISTENING_FOR_WAKEWORD');
                         startRecognitionSafe();
-                        
-                        // Add a hint if the log is empty
-                        if (conversationLog.childElementCount < 3) {
-                            logMessage('Info', 'Listening... Say "Dhwani"');
-                        }
+                        if (conversationLog.childElementCount < 3) logMessage('Info', 'Say "Dhwani"');
                     }
-
                 } else {
-                    // --- Stop Mode ---
                     setState('IDLE');
                     recognition.stop();
                     if (synth.speaking) synth.cancel();
                     await releaseWakeLock();
                 }
             } catch (error) {
-                console.error("Toggle Error:", error);
-                alert("Error starting: " + error.message);
+                console.error(error);
                 setState('IDLE');
             }
         }
 
         function setState(newState) {
             appState = newState;
-            console.log(`State Updated: ${appState}`);
-
             switch (newState) {
                 case 'IDLE':
                     talkButton.textContent = userIsRemembered ? `Resume as ${userName}` : 'Start Listening';
@@ -330,12 +272,11 @@
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-400 transition-colors';
                     endChatButton.disabled = false;
                     break;
-                default: // All "LISTENING" states
+                default:
                     talkButton.textContent = 'Stop Listening';
                     talkButton.disabled = false;
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-blue-500 listening-pulse transition-colors';
                     endChatButton.disabled = false;
-                    // Make button Red to indicate "Stop" action
                     talkButton.classList.remove('bg-blue-600', 'hover:bg-blue-700');
                     talkButton.classList.add('bg-red-600', 'hover:bg-red-700');
                     break;
@@ -343,21 +284,14 @@
         }
 
         function handleSpeechEnd() {
-            // If we are supposedly listening, but mic stopped (timeout), restart it.
-            if (appState !== 'IDLE' && appState !== 'BUSY') {
-                startRecognitionSafe();
-            } else if (appState === 'IDLE') {
-                // Ensure UI matches reality
-                setState('IDLE'); 
-            }
+            if (appState !== 'IDLE' && appState !== 'BUSY') startRecognitionSafe();
+            else if (appState === 'IDLE') setState('IDLE'); 
         }
         
         async function handleSpeechResult(event) {
             const transcript = event.results[event.results.length - 1][0].transcript.trim();
             if (!transcript) return;
-            
             console.log(`Heard: ${transcript}`);
-
             const currentState = appState;
             recognition.stop(); 
             setState('BUSY');
@@ -381,7 +315,7 @@
                         logMessage('You', transcript);
                         userName = await extractNameFromTranscript(transcript);
                         
-                        const agePrompt = `खूप छान, ${userName}, तुमचे वय काय आहे?`;
+                        const agePrompt = `नमस्ते ${userName}, तुमचे वय काय आहे?`;
                         logMessage('Dhwani', agePrompt);
                         await speakText(agePrompt, 'mr-IN');
                         setState('LISTENING_FOR_AGE');
@@ -390,14 +324,19 @@
 
                     case 'LISTENING_FOR_AGE':
                         logMessage('You', transcript);
-                        const age = await extractAgeFromTranscript(transcript);
-                        userAge = Math.min(age, 18);
+                        userAge = await extractAgeFromTranscript(transcript);
                         
                         if (rememberMeCheckbox.checked) saveUserData();
-
                         buildSystemPrompt(); 
-                        
-                        const startPrompt = `धन्यवाद, ${userName}! मी लक्षात ठेवीन की तुझे वय ${userAge} आहे. मी तुमच्या प्रश्नां साठी आहे!`;
+
+                        // SPECIAL LOGIC FOR AGE > 18
+                        if (userAge > 18) {
+                            const adultMsg = "मी तुमचे वय लक्षात ठेवून तुम्हाला तसे उत्तर देईन.";
+                            logMessage('Dhwani', adultMsg);
+                            await speakText(adultMsg, 'mr-IN');
+                        }
+
+                        const startPrompt = `धन्यवाद, ${userName}! मी तयार आहे!`;
                         logMessage('Dhwani', startPrompt);
                         await speakText(startPrompt, 'mr-IN');
                         setState('CONVERSATION');
@@ -426,46 +365,57 @@
                         break;
                 }
             } catch (error) {
-                console.error("Logic Error:", error);
-                logMessage('Error', `Error: ${error.message}`);
-                // Attempt recovery
-                if (systemInstruction) {
-                    setState('CONVERSATION');
-                    startRecognitionSafe();
-                } else {
-                    setState('LISTENING_FOR_WAKEWORD');
-                    startRecognitionSafe();
-                }
+                console.error(error);
+                if (systemInstruction) { setState('CONVERSATION'); startRecognitionSafe(); }
+                else { setState('LISTENING_FOR_WAKEWORD'); startRecognitionSafe(); }
             }
         }
 
         function buildSystemPrompt() {
-            systemInstruction = `
-                You are "Dhwani," a sweet and patient female AI teacher from Maharashtra.
-                You are speaking to ${userName}, who is ${userAge} years old.
-                RULES:
-                1. Speak ONLY in Marathi (Devanagari).
-                2. Keep answers SHORT (2-3 sentences).
-                3. ALWAYS ask a follow-up question.
-                4. Be simple and encouraging.
-            `;
-            
-            if (userAge <= 10) systemInstruction += "\n Use extremely simple language for a child.";
+            // AGE SPECIFIC LOGIC
+            let ageInstruction = "";
+            if (userAge <= 5) {
+                ageInstruction = "User is a TODDLER (3-5 years). Use extremely simple words. Explain like a grandmother telling a story. Maximum 1 sentence.";
+            } else if (userAge <= 10) {
+                ageInstruction = "User is a CHILD (6-10 years). Use simple school-level language. Be encouraging.";
+            } else if (userAge <= 18) {
+                ageInstruction = "User is a TEENAGER. Provide educational and conceptual depth suitable for high school.";
+            } else {
+                ageInstruction = "User is an ADULT. Provide mature, respectful, and detailed answers.";
+            }
 
-            chatHistory = [{ role: 'user', parts: [{ text: 'Instructions received.' }] }];
-            chatHistory.push({ role: 'model', parts: [{ text: `Okay, I am Dhwani.` }] });
+            systemInstruction = `
+                You are "Dhwani," a smart AI teacher from Maharashtra.
+                You are speaking to ${userName}, who is ${userAge} years old.
+                
+                STRICT RULES:
+                1. Speak ONLY in Marathi (Devanagari script).
+                2. ${ageInstruction}
+                3. Adapt the complexity of the concept to exactly ${userAge} years old.
+                4. Keep answers concise (2-3 sentences max usually).
+                5. Always be polite.
+            `;
+
+            chatHistory = [{ role: 'user', parts: [{ text: 'System Prompt Updated.' }] }];
+            chatHistory.push({ role: 'model', parts: [{ text: `Okay.` }] });
             restartChatButton.disabled = false;
         }
 
-        // --- 7. API Utils ---
+        // --- 6. API Calls ---
         async function extractNameFromTranscript(transcript) {
             const processingMsg = document.createElement('div');
-            processingMsg.innerHTML = `<span class="text-gray-500 text-xs italic">...finding name...</span>`;
+            processingMsg.innerHTML = `<span class="text-gray-500 text-xs italic">...ओळखत आहे...</span>`;
             conversationLog.appendChild(processingMsg);
-            conversationLog.scrollTop = conversationLog.scrollHeight;
             
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
-            const extractionPrompt = `Extract First Name from: "${transcript}". If Marathi "माझं नाव राज आहे" -> "Raj". If no name found, return "बाळा ". Return ONLY the name in English alphabet.`;
+            // MODIFIED PROMPT: Return "बाळा" if unclear
+            const extractionPrompt = `
+                Task: Extract the First Name from this Marathi audio transcript: "${transcript}".
+                Rules:
+                1. If a clear name is found, return ONLY that name in Devanagari or English.
+                2. If the name is "complicated", "unclear", or not found, return ONLY "बाळा".
+                3. Do not add any other text.
+            `;
             
             try {
                 const response = await fetch(apiUrl, {
@@ -474,12 +424,18 @@
                     body: JSON.stringify({ contents: [{ parts: [{ text: extractionPrompt }] }] })
                 });
                 const result = await response.json();
-                let name = result.candidates[0].content.parts[0].text.trim().replace(/[^a-zA-Z]/g, '');
                 conversationLog.removeChild(processingMsg);
-                return name || "बाळा ";
+                
+                let name = result.candidates[0].content.parts[0].text.trim();
+                
+                // Clean up accidental punctuation
+                name = name.replace(/['".]/g, '');
+                
+                if (!name || name.length < 2) return "बाळा";
+                return name;
             } catch (error) {
                 conversationLog.removeChild(processingMsg);
-                return "बाळा ";
+                return "बाळा"; // Fallback as requested
             }
         }
 
@@ -492,7 +448,8 @@
                     body: JSON.stringify({ contents: [{ parts: [{ text: `Extract age number from: "${transcript}". Return ONLY digits. Default 18.` }] }] })
                 });
                 const result = await response.json();
-                return parseInt(result.candidates[0].content.parts[0].text.trim()) || 18;
+                let age = parseInt(result.candidates[0].content.parts[0].text.trim());
+                return isNaN(age) ? 18 : age;
             } catch (e) { return 18; }
         }
 
@@ -510,30 +467,25 @@
                 const result = await response.json();
                 return result.candidates[0].content.parts[0].text.trim();
             } catch (error) {
-                return "मला माफ करा, मला एक समस्या आली आहे. कृपया पुन्हा प्रयत्न करा.";
+                return "मला माफ करा, पुन्हा सांगा?";
             }
         }
         
         function cleanTextForTTS(text) {
-            return text.replace(/[\*#`]/g, ' ').replace(/\s+/g, ' ').trim();
+            // Remove brackets and markdown
+            let cleaned = text.replace(/\[.*?\]|\(.*?\)|{.*?}/g, ""); 
+            return cleaned.replace(/[\*#`]/g, ' ').replace(/\s+/g, ' ').trim();
         }
 
-        // --- 8. Audio Utils ---
+        // --- 7. TTS & Media ---
         function loadVoices() {
             voices = synth.getVoices();
-            if (synth.onvoiceschanged !== undefined) {
-                synth.onvoiceschanged = () => { voices = synth.getVoices(); };
-            }
+            if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => { voices = synth.getVoices(); };
         }
 
         function togglePauseResume() {
-            if (synth.paused) { 
-                synth.resume();
-            } else if (synth.speaking) { 
-                synth.pause();
-                recognition.stop(); 
-                setState('BUSY'); 
-            }
+            if (synth.paused) synth.resume();
+            else if (synth.speaking) { synth.pause(); recognition.stop(); setState('BUSY'); }
         }
 
         function stopSpeech() {
@@ -541,38 +493,25 @@
             speechManuallyStopped = true; 
             synth.cancel(); 
             recognition.stop(); 
-            
             toggleMediaButtons(true);
             logMessage('Info', 'Stopped.');
-
             setTimeout(() => {
                 speechManuallyStopped = false;
-                // If we were in conversation, listen again. If IDLE, stay IDLE.
                 if (appState !== 'IDLE') {
-                    if (systemInstruction) { 
-                        setState('CONVERSATION');
-                        startRecognitionSafe();
-                    } else {
-                        setState('LISTENING_FOR_WAKEWORD');
-                        startRecognitionSafe();
-                    }
+                    if (systemInstruction) { setState('CONVERSATION'); startRecognitionSafe(); }
+                    else { setState('LISTENING_FOR_WAKEWORD'); startRecognitionSafe(); }
                 }
             }, 1500);
         }
 
         function replaySpeech() {
-            if (lastSpokenText) {
-                recognition.stop(); 
-                setState('BUSY');   
-                speakText(lastSpokenText); 
-            }
+            if (lastSpokenText) { recognition.stop(); setState('BUSY'); speakText(lastSpokenText); }
         }
         
         async function speakText(text, lang = 'mr-IN') {
             if (synth.speaking) synth.cancel();
             lastSpokenText = text;
             speechManuallyStopped = false;
-
             if (voices.length === 0) voices = synth.getVoices();
 
             return new Promise((resolve, reject) => {
@@ -586,15 +525,22 @@
                 };
                 utterance.onerror = (e) => { 
                     toggleMediaButtons(true);
-                    // Don't reject on simple interruptions
-                    if (e.error === 'interrupted') resolve();
-                    else reject(e.error); 
+                    if (e.error === 'interrupted') resolve(); else reject(e.error); 
                 };
 
                 let marathiVoice = voices.find(voice => voice.lang === 'mr-IN') || voices.find(voice => voice.lang === 'hi-IN');
                 if (marathiVoice) utterance.voice = marathiVoice;
                 utterance.lang = 'mr-IN';
-                utterance.rate = 0.9; // Slightly slower for clarity
+                
+                // --- DYNAMIC SPEED CONTROL BASED ON AGE ---
+                if (userAge <= 6) {
+                    utterance.rate = 0.7; // Very slow for small kids
+                } else if (userAge <= 12) {
+                    utterance.rate = 0.8; // Slower for pre-teens
+                } else {
+                    utterance.rate = 0.95; // Normal/Slightly fast for older teens/adults
+                }
+                // -----------------------------------------
                 
                 synth.speak(utterance);
             });
@@ -606,7 +552,6 @@
             replayButton.disabled = disabled;
         }
         
-        // --- 9. Display Utils ---
         function logMessage(sender, message) {
             const div = document.createElement('div');
             let senderClass = 'text-blue-300 font-semibold';
@@ -615,7 +560,6 @@
             if (sender === 'Dhwani') senderClass = 'text-cyan-300 font-semibold';
             else if (sender === 'Error') { senderClass = 'text-red-400 font-bold'; messageClass = 'text-red-300'; }
             else if (sender === 'You') senderClass = 'text-green-300 font-semibold';
-            else if (sender === 'Info') { senderClass = 'text-yellow-400 font-semibold'; messageClass = 'text-yellow-300'; }
 
             div.innerHTML = `<strong class="${senderClass}">${sender}:</strong> <span class="${messageClass}">${message}</span>`;
             conversationLog.appendChild(div);
@@ -630,21 +574,13 @@
 
         async function shareChat() {
             const chatText = getChatLogAsText();
-            if (!chatText.trim()) { logMessage('Error', 'Chat empty.'); return; }
-            
-            const shareData = { title: 'Dhwani Chat', text: chatText };
-            if (navigator.share) {
-                try { await navigator.share(shareData); } catch (err) {}
-            } else if (navigator.clipboard) {
-                try { await navigator.clipboard.writeText(chatText); logMessage('Info', 'Copied to clipboard'); } catch (e) {}
-            }
+            if (!chatText.trim()) return;
+            try { await navigator.share({ title: 'Dhwani Chat', text: chatText }); } 
+            catch (err) { try { await navigator.clipboard.writeText(chatText); logMessage('Info', 'Copied'); } catch (e) {} }
         }
 
-        // --- 10. System Utils ---
         async function acquireWakeLock() {
-            if ('wakeLock' in navigator) {
-                try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
-            }
+            if ('wakeLock' in navigator) { try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {} }
         }
         async function releaseWakeLock() {
             if (wakeLock) { try { await wakeLock.release(); wakeLock = null; } catch (e) {} }
@@ -654,28 +590,17 @@
         }
 
         async function endChat() {
-            // 1. FORCE IDLE
-            appState = 'IDLE';
-            setState('IDLE');
-
-            // 2. Kill Audio
+            appState = 'IDLE'; setState('IDLE');
             speechManuallyStopped = true;
             if (synth.speaking) synth.cancel();
-            
-            // 3. Kill Mic
-            if (recognition) {
-                try { recognition.stop(); } catch (e) {}
-            }
-
+            if (recognition) try { recognition.stop(); } catch (e) {}
             await releaseWakeLock();
             
-            // 4. Wipe Data
             userName = ''; userAge = 18; chatHistory = []; systemInstruction = '';
             localStorage.removeItem('dhwani_userName');
             localStorage.removeItem('dhwani_userAge');
             rememberMeCheckbox.checked = false;
             userIsRemembered = false;
-
             conversationLog.innerHTML = '<div class="text-gray-400 text-center">Chat Ended. Press Start.</div>';
             restartChatButton.disabled = true;
         }
@@ -684,15 +609,9 @@
             if (!systemInstruction) return;
             if (synth.speaking) synth.cancel();
             if (recognition) try { recognition.stop(); } catch(e){}
-            
-            appState = 'IDLE';
-            setState('IDLE');
-            
+            appState = 'IDLE'; setState('IDLE');
             await releaseWakeLock();
             conversationLog.innerHTML = '';
-            
-            // Re-initiate logic immediately if wanted, or just wait for button press
-            // Here we wait for button press to be safe
             logMessage('Info', `Chat restarted for ${userName}. Press Start.`);
         }
     </script>
