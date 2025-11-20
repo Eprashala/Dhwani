@@ -38,22 +38,22 @@
             @apply w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-600 focus:ring-2 ring-offset-gray-800;
         }
         
-       /* Input Field Styles - High Contrast Fix */
-.custom-input {
-    /* Layout */
-    @apply block w-3/4 mx-auto text-center border border-gray-500 rounded-lg p-3 outline-none transition-all;
-    
-    /* Force Colors with !important to override everything else */
-    background-color: #000000 !important;  /* Black Background */
-    color: #ffffff !important;             /* White Text */
-    caret-color: #ffffff !important;       /* White Typing Cursor */
-}
+        /* Input Field Styles - High Contrast (Black BG / White Text) */
+        .custom-input {
+            /* Layout */
+            @apply block w-3/4 mx-auto text-center border border-gray-500 rounded-lg p-3 outline-none transition-all;
+            
+            /* Force Colors with !important to override browser defaults */
+            background-color: #000000 !important;  /* Black Background */
+            color: #ffffff !important;             /* White Text */
+            caret-color: #ffffff !important;       /* White Typing Cursor */
+        }
 
-/* Ensure Placeholder is visible (Light Gray) */
-.custom-input::placeholder {
-    color: #9ca3af !important;
-    opacity: 1 !important;
-}
+        /* Ensure Placeholder is visible (Light Gray) */
+        .custom-input::placeholder {
+            color: #9ca3af !important;
+            opacity: 1 !important;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
@@ -93,20 +93,45 @@
                 </svg>
             </button>
         </div>
-<div class="flex flex-col gap-4 mb-4 shrink-0 w-full text-center">
-    <div class="w-full">
-        <label class="text-xs text-gray-400 mb-1 block">Name (नाव)</label>
-        <input type="text" id="manual-name" class="custom-input" placeholder="Enter Name">
-    </div>
-    <div class="w-full">
-        <label class="text-xs text-gray-400 mb-1 block">Age (वय)</label>
-        <input type="number" id="manual-age" class="custom-input" placeholder="18">
-    </div>
-</div>        <div class="flex items-center justify-center gap-2 mb-3 shrink-0">
+
+        <div class="flex flex-col gap-4 mb-4 shrink-0 w-full text-center">
+            <div class="w-full">
+                <label class="text-xs text-gray-400 mb-1 block">Name (नाव)</label>
+                <input type="text" id="manual-name" class="custom-input" placeholder="Enter Name">
+            </div>
+            <div class="w-full">
+                <label class="text-xs text-gray-400 mb-1 block">Age (वय)</label>
+                <input type="number" id="manual-age" class="custom-input" placeholder="18">
+            </div>
+        </div>
+
+        <div class="flex items-center justify-center gap-2 mb-2 shrink-0">
             <input type="checkbox" id="remember-me-checkbox" class="custom-checkbox">
             <label for="remember-me-checkbox" class="text-sm text-gray-300 cursor-pointer select-none">
                 Remember my Name & Age
             </label>
+        </div>
+
+        <div class="w-full flex flex-col items-center justify-center mb-4 shrink-0">
+            <button id="advance-toggle-btn" class="text-xs text-blue-400 hover:text-blue-300 underline mb-2 focus:outline-none">
+                ▼ Advance Settings (API Key)
+            </button>
+
+            <div id="advance-container" class="hidden w-full bg-gray-800/80 border border-gray-700 rounded-lg p-4 flex flex-col gap-3 transition-all">
+                
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="use-custom-key-checkbox" class="custom-checkbox">
+                    <label for="use-custom-key-checkbox" class="text-sm text-gray-300 cursor-pointer select-none">
+                        Use your own Gemini API Key (Faster)
+                    </label>
+                </div>
+
+                <input type="text" id="custom-api-key-input" class="custom-input text-xs w-full !w-full" placeholder="Paste your API Key here (AIza...)" disabled>
+                
+                <a href="https://ai.google.dev/gemini-api/docs/api-key" target="_blank" class="text-center w-full py-2 bg-gray-700 hover:bg-gray-600 text-xs text-blue-300 rounded transition-colors border border-gray-600">
+                    Learn how to get your own API key ↗
+                </a>
+            </div>
         </div>
 
         <button id="talk-button" class="w-full py-4 px-6 rounded-lg text-lg font-semibold transition-all duration-300 ease-in-out shrink-0
@@ -144,9 +169,14 @@
         const endChatButton = document.getElementById('end-chat-button');
         const restartChatButton = document.getElementById('restart-chat-button');
 
-        // --- API KEY ---
-        const GEMINI_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
-        // -------------------------
+        // --- API KEY CONFIGURATION ---
+        const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
+        
+        // Advance Settings Elements
+        const advanceToggleBtn = document.getElementById('advance-toggle-btn');
+        const advanceContainer = document.getElementById('advance-container');
+        const useCustomKeyCheckbox = document.getElementById('use-custom-key-checkbox');
+        const customApiKeyInput = document.getElementById('custom-api-key-input');
 
         // --- 2. State Management ---
         let appState = 'IDLE'; 
@@ -169,8 +199,32 @@
             loadVoices();
         };
 
+        // Toggle Logic for Advance Settings
+        advanceToggleBtn.addEventListener('click', () => {
+            advanceContainer.classList.toggle('hidden');
+            advanceContainer.classList.toggle('flex');
+            const isHidden = advanceContainer.classList.contains('hidden');
+            advanceToggleBtn.textContent = isHidden ? "▼ Advance Settings (API Key)" : "▲ Hide Settings";
+        });
+
+        useCustomKeyCheckbox.addEventListener('change', () => {
+            customApiKeyInput.disabled = !useCustomKeyCheckbox.checked;
+            saveUserData(); 
+            if (useCustomKeyCheckbox.checked) customApiKeyInput.focus();
+        });
+
+        customApiKeyInput.addEventListener('input', saveUserData);
+
+        function getEffectiveApiKey() {
+            if (useCustomKeyCheckbox.checked && customApiKeyInput.value.trim().length > 10) {
+                return customApiKeyInput.value.trim();
+            }
+            return DEFAULT_API_KEY;
+        }
+
         function loadUserData() {
             try {
+                // Load Chat Settings
                 const savedName = localStorage.getItem('dhwani_userName');
                 const savedAge = localStorage.getItem('dhwani_userAge');
                 const savedRemember = localStorage.getItem('dhwani_remember');
@@ -179,17 +233,25 @@
                     rememberMeCheckbox.checked = true;
                     if (savedName) manualNameInput.value = savedName;
                     if (savedAge) manualAgeInput.value = savedAge;
-                    
-                    // If we have data, update button text
-                    if (savedName && savedAge) {
-                        talkButton.textContent = `Start as ${savedName}`;
-                    }
+                    if (savedName && savedAge) talkButton.textContent = `Start as ${savedName}`;
                 }
+
+                // Load Advance Settings
+                const savedUseKey = localStorage.getItem('dhwani_useCustomKey');
+                const savedKey = localStorage.getItem('dhwani_customKey');
+
+                if (savedUseKey === 'true') {
+                    useCustomKeyCheckbox.checked = true;
+                    customApiKeyInput.disabled = false;
+                    if (savedKey) customApiKeyInput.value = savedKey;
+                }
+
             } catch (e) { console.error(e); }
         }
 
         function saveUserData() {
             try {
+                // Save Chat Settings
                 if (rememberMeCheckbox.checked) {
                     localStorage.setItem('dhwani_remember', 'true');
                     localStorage.setItem('dhwani_userName', manualNameInput.value.trim());
@@ -199,10 +261,15 @@
                     localStorage.removeItem('dhwani_userName');
                     localStorage.removeItem('dhwani_userAge');
                 }
+
+                // Save Advance Settings (Always save these irrespective of "Remember Me")
+                localStorage.setItem('dhwani_useCustomKey', useCustomKeyCheckbox.checked);
+                if (customApiKeyInput.value) {
+                    localStorage.setItem('dhwani_customKey', customApiKeyInput.value.trim());
+                }
             } catch (e) { console.error(e); }
         }
 
-        // Auto-save when inputs change if remember me is checked
         manualNameInput.addEventListener('input', () => { if(rememberMeCheckbox.checked) saveUserData(); });
         manualAgeInput.addEventListener('input', () => { if(rememberMeCheckbox.checked) saveUserData(); });
 
@@ -264,11 +331,10 @@
                         // --- MODE 1: DATA PROVIDED ---
                         userName = inputName;
                         userAge = parseInt(inputAge);
-                        saveUserData(); // Ensure it's saved
+                        saveUserData(); 
                         
                         buildSystemPrompt(); 
                         
-                        // Initialize chat history context
                         if (chatHistory.length === 0) {
                              chatHistory.push({ role: 'user', parts: [{ text: "Start session." }] });
                              chatHistory.push({ role: 'model', parts: [{ text: `Namaskar ${userName}, I am ready.` }] });
@@ -290,7 +356,6 @@
                     }
 
                 } else {
-                    // Stop logic
                     setState('IDLE');
                     recognition.stop();
                     if (synth.speaking) synth.cancel();
@@ -312,7 +377,6 @@
                     endChatButton.disabled = true;
                     talkButton.classList.remove('bg-red-600', 'hover:bg-red-700');
                     talkButton.classList.add('bg-blue-600', 'hover:bg-blue-700');
-                    // Re-enable inputs
                     manualNameInput.disabled = false;
                     manualAgeInput.disabled = false;
                     break;
@@ -329,7 +393,6 @@
                     endChatButton.disabled = false;
                     talkButton.classList.remove('bg-blue-600', 'hover:bg-blue-700');
                     talkButton.classList.add('bg-red-600', 'hover:bg-red-700');
-                    // Disable inputs during chat
                     manualNameInput.disabled = true;
                     manualAgeInput.disabled = true;
                     break;
@@ -367,7 +430,7 @@
                     case 'LISTENING_FOR_NAME':
                         logMessage('You', transcript);
                         userName = await extractNameFromTranscript(transcript);
-                        manualNameInput.value = userName; // Sync with input
+                        manualNameInput.value = userName; 
                         
                         const agePrompt = `नमस्ते ${userName}, तुमचे वय काय आहे?`;
                         logMessage('Dhwani', agePrompt);
@@ -379,12 +442,11 @@
                     case 'LISTENING_FOR_AGE':
                         logMessage('You', transcript);
                         userAge = await extractAgeFromTranscript(transcript);
-                        manualAgeInput.value = userAge; // Sync with input
+                        manualAgeInput.value = userAge; 
                         
                         saveUserData();
                         buildSystemPrompt(); 
 
-                        // SPECIAL LOGIC FOR AGE > 18
                         if (userAge > 18) {
                             const adultMsg = "मी तुमचे वय लक्षात ठेवून तुम्हाला तसे उत्तर देईन.";
                             logMessage('Dhwani', adultMsg);
@@ -426,7 +488,7 @@
             }
         }
 
-function buildSystemPrompt() {
+        function buildSystemPrompt() {
             // AGE SPECIFIC LOGIC
             let ageInstruction = "";
             if (userAge <= 5) {
@@ -454,7 +516,6 @@ function buildSystemPrompt() {
                 5. Keep answers concise (2-3 sentences max usually).
                 6. Always be polite.
             `;
-
             restartChatButton.disabled = false;
         }
 
@@ -464,7 +525,7 @@ function buildSystemPrompt() {
             processingMsg.innerHTML = `<span class="text-gray-500 text-xs italic">...ओळखत आहे...</span>`;
             conversationLog.appendChild(processingMsg);
             
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
             const extractionPrompt = `
                 Task: Extract the First Name from this Marathi audio transcript: "${transcript}".
                 Rules:
@@ -492,7 +553,7 @@ function buildSystemPrompt() {
         }
 
         async function extractAgeFromTranscript(transcript) {
-             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
+             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
              try {
                 const response = await fetch(apiUrl, {
                     method: 'POST',
@@ -506,7 +567,7 @@ function buildSystemPrompt() {
         }
 
         async function generateTextResponseFromChat() {
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
             try {
                 const response = await fetch(apiUrl, {
                     method: 'POST',
@@ -559,7 +620,7 @@ function buildSystemPrompt() {
             if (lastSpokenText) { recognition.stop(); setState('BUSY'); speakText(lastSpokenText); }
         }
         
-      async function speakText(text, lang = 'mr-IN') {
+        async function speakText(text, lang = 'mr-IN') {
             if (synth.speaking) synth.cancel();
             lastSpokenText = text;
             speechManuallyStopped = false;
@@ -579,23 +640,18 @@ function buildSystemPrompt() {
                     if (e.error === 'interrupted') resolve(); else reject(e.error); 
                 };
 
-                // Try to find a Marathi or Hindi voice (which usually handles Indian English well too)
                 let marathiVoice = voices.find(voice => voice.lang === 'mr-IN') || voices.find(voice => voice.lang === 'hi-IN');
                 if (marathiVoice) utterance.voice = marathiVoice;
-                
-                // Note: Even if teaching English, we keep 'mr-IN' or 'hi-IN' preference 
-                // so the accent remains familiar to the Marathi child.
                 utterance.lang = 'mr-IN';
                 
                 // --- DYNAMIC SPEED CONTROL BASED ON AGE ---
                 if (userAge <= 7) {
-                    utterance.rate = 0.7;  // Slow for toddlers/small kids
+                    utterance.rate = 0.7; 
                 } else if (userAge <= 15) {
-                    utterance.rate = 0.85; // Medium for school kids
+                    utterance.rate = 0.85; 
                 } else {
-                    utterance.rate = 1.0;  // Normal for adults (up to 198 years!)
+                    utterance.rate = 1.0; 
                 }
-                // -----------------------------------------
                 
                 synth.speak(utterance);
             });
@@ -634,45 +690,30 @@ function buildSystemPrompt() {
             catch (err) { try { await navigator.clipboard.writeText(chatText); logMessage('Info', 'Copied'); } catch (e) {} }
         }
 
-       // --- 8. ROBUST WAKE LOCK (PREVENTS SLEEP) ---
+        // --- 8. ROBUST WAKE LOCK (PREVENTS SLEEP) ---
         async function acquireWakeLock() {
-            // Check if feature exists
             if ('wakeLock' in navigator) { 
                 try { 
                     wakeLock = await navigator.wakeLock.request('screen');
                     console.log("Screen Wake Lock Active");
-
-                    // CRITICAL: If the lock drops (system notification, etc.), grab it again immediately
                     wakeLock.addEventListener('release', () => {
                         console.log('Wake Lock Released by system');
-                        // Only re-acquire if the chat is still running and screen is visible
                         if (appState !== 'IDLE' && document.visibilityState === 'visible') {
                             acquireWakeLock();
                         }
                     });
-                } catch (e) { 
-                    console.error("Wake Lock failed:", e); 
-                } 
+                } catch (e) { console.error("Wake Lock failed:", e); } 
             }
         }
 
         async function releaseWakeLock() {
-            if (wakeLock) { 
-                try { 
-                    await wakeLock.release(); 
-                    wakeLock = null; 
-                } catch (e) {} 
-            }
+            if (wakeLock) { try { await wakeLock.release(); wakeLock = null; } catch (e) {} }
         }
 
-        // Re-apply lock instantly if user comes back to the tab
         async function handleVisibilityChange() {
             if (appState !== 'IDLE' && document.visibilityState === 'visible') {
                 await acquireWakeLock();
             }
-        }
-        async function handleVisibilityChange() {
-            if (appState !== 'IDLE' && !wakeLock && document.visibilityState === 'visible') await acquireWakeLock();
         }
 
         async function endChat() {
@@ -684,7 +725,6 @@ function buildSystemPrompt() {
             
             userName = ''; userAge = 18; chatHistory = []; systemInstruction = '';
             
-            // Do NOT clear inputs, just logic
             conversationLog.innerHTML = '<div class="text-gray-400 text-center">Chat Ended. Press Start.</div>';
             restartChatButton.disabled = true;
         }
