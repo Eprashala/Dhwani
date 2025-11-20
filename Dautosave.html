@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eप्रशाला ध्वनी AI शिक्षिका</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Pulse Animation for Mic */
+        .listening-pulse { animation: pulse 1.5s infinite ease-in-out; }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+
+        /* Icon Button Styles */
+        .icon-btn {
+            @apply p-3 rounded-full text-white transition-all duration-200
+                   bg-gray-700 hover:bg-gray-600 shadow-lg
+                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-blue-500
+                   disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none;
+        }
+        
+        /* Utility Button Styles */
+        .utility-btn {
+            @apply w-full py-3 px-2 rounded-lg text-sm font-semibold transition-colors
+                   bg-gray-700 text-white
+                   hover:bg-gray-600
+                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-blue-500
+                   disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed;
+        }
+
+        /* Checkbox Style */
+        .custom-checkbox {
+            @apply w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-600 focus:ring-2 ring-offset-gray-800;
+        }
+        
+        /* Input Field Styles */
+        .custom-input {
+            @apply w-full bg-gray-700 text-white border border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder-gray-400;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
+
+    <div class="bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-2xl flex flex-col h-[95vh] md:h-auto">
+        
+        <div class="flex items-center justify-between mb-4 shrink-0">
+            <h1 class="text-2xl md:text-3xl font-bold text-white">
+                <span class="text-blue-400">Eप्रशाला</span> "ध्वनी <span class="text-pink-500">AI</span> शिक्षिका"
+            </h1>
+            <div id="status-indicator" class="w-4 h-4 rounded-full bg-gray-500 transition-colors" title="Offline"></div>
+        </div>
+
+        <div id="conversation-log" class="flex-grow overflow-y-auto bg-gray-900 rounded-lg p-4 mb-4 border border-gray-700 space-y-4 shadow-inner min-h-[200px]">
+            <div class="text-gray-400 text-center mt-10">
+                Press the button to begin.<br>
+                <span class="text-sm opacity-70">Fill in your details below to skip the introduction.</span>
+            </div>
+        </div>
+
+        <div class="flex justify-center gap-8 mb-4 shrink-0 bg-gray-800/50 p-2 rounded-xl">
+            <button id="pause-resume-button" class="icon-btn bg-blue-900/30 hover:bg-blue-800" title="Pause/Resume" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+                </svg>
+            </button>
+            
+            <button id="stop-speech-button" class="icon-btn bg-red-900/30 hover:bg-red-800" title="Stop Speaking" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z" />
+                </svg>
+            </button>
+
+            <button id="replay-button" class="icon-btn bg-green-900/30 hover:bg-green-800" title="Replay Last Message" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                </svg>
+            </button>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 mb-3 shrink-0">
+            <div class="col-span-2">
+                <label class="text-xs text-gray-400 ml-1">Name (नाव)</label>
+                <input type="text" id="manual-name" class="custom-input" placeholder="Enter Name">
+            </div>
+            <div class="col-span-1">
+                <label class="text-xs text-gray-400 ml-1">Age (वय)</label>
+                <input type="number" id="manual-age" class="custom-input" placeholder="18">
+            </div>
+        </div>
+
+        <div class="flex items-center justify-center gap-2 mb-3 shrink-0">
+            <input type="checkbox" id="remember-me-checkbox" class="custom-checkbox">
+            <label for="remember-me-checkbox" class="text-sm text-gray-300 cursor-pointer select-none">
+                Remember my Name & Age
+            </label>
+        </div>
+
+        <button id="talk-button" class="w-full py-4 px-6 rounded-lg text-lg font-semibold transition-all duration-300 ease-in-out shrink-0
+                       bg-blue-600 text-white shadow-lg shadow-blue-900/50
+                       hover:bg-blue-500 hover:shadow-blue-500/50 hover:-translate-y-0.5
+                       focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50
+                       disabled:bg-gray-600 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-y-0">
+            Start Listening
+        </button>
+
+        <div class="mt-4 grid grid-cols-3 gap-3 shrink-0">
+            <button id="restart-chat-button" class="utility-btn" disabled>Restart</button>
+            <button id="share-button" class="utility-btn bg-indigo-700 hover:bg-indigo-600">Share Chat</button>
+            <button id="end-chat-button" class="utility-btn text-red-200 hover:bg-red-900/40" disabled>End Chat</button>
+        </div>
+
+    </div>
+
+    <script>
+        // --- 1. DOM Elements ---
+        const talkButton = document.getElementById('talk-button');
+        const statusIndicator = document.getElementById('status-indicator');
+        const conversationLog = document.getElementById('conversation-log');
+        const rememberMeCheckbox = document.getElementById('remember-me-checkbox');
+        
+        // Inputs
+        const manualNameInput = document.getElementById('manual-name');
+        const manualAgeInput = document.getElementById('manual-age');
+        
+        const pauseResumeButton = document.getElementById('pause-resume-button');
+        const stopSpeechButton = document.getElementById('stop-speech-button');
+        const replayButton = document.getElementById('replay-button');
+        
+        const shareButton = document.getElementById('share-button');
+        const endChatButton = document.getElementById('end-chat-button');
+        const restartChatButton = document.getElementById('restart-chat-button');
+
+        // --- API KEY ---
+        const GEMINI_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
+        // -------------------------
+
+        // --- 2. State Management ---
+        let appState = 'IDLE'; 
+        let userName = '';
+        let userAge = 18;
+        let chatHistory = [];
+        let systemInstruction = '';
+        let recognition;
+        let lastSpokenText = ''; 
+        let speechManuallyStopped = false; 
+        
+        const synth = window.speechSynthesis;
+        let voices = [];
+        let wakeLock = null;
+
+        // --- 3. Initialization ---
+        window.onload = () => {
+            if (synth.speaking) synth.cancel();
+            loadUserData();
+            loadVoices();
+        };
+
+        function loadUserData() {
+            try {
+                const savedName = localStorage.getItem('dhwani_userName');
+                const savedAge = localStorage.getItem('dhwani_userAge');
+                const savedRemember = localStorage.getItem('dhwani_remember');
+
+                if (savedRemember === 'true') {
+                    rememberMeCheckbox.checked = true;
+                    if (savedName) manualNameInput.value = savedName;
+                    if (savedAge) manualAgeInput.value = savedAge;
+                    
+                    // If we have data, update button text
+                    if (savedName && savedAge) {
+                        talkButton.textContent = `Start as ${savedName}`;
+                    }
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function saveUserData() {
+            try {
+                if (rememberMeCheckbox.checked) {
+                    localStorage.setItem('dhwani_remember', 'true');
+                    localStorage.setItem('dhwani_userName', manualNameInput.value.trim());
+                    localStorage.setItem('dhwani_userAge', manualAgeInput.value.trim());
+                } else {
+                    localStorage.removeItem('dhwani_remember');
+                    localStorage.removeItem('dhwani_userName');
+                    localStorage.removeItem('dhwani_userAge');
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        // Auto-save when inputs change if remember me is checked
+        manualNameInput.addEventListener('input', () => { if(rememberMeCheckbox.checked) saveUserData(); });
+        manualAgeInput.addEventListener('input', () => { if(rememberMeCheckbox.checked) saveUserData(); });
+
+        // --- 4. Speech Recognition ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (!SpeechRecognition) {
+            logMessage('Error', 'Browser not supported. Use Chrome.');
+            talkButton.disabled = true;
+        } else {
+            try {
+                recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                recognition.lang = 'mr-IN';
+
+                recognition.onresult = handleSpeechResult;
+                recognition.onend = handleSpeechEnd;
+                
+                recognition.onerror = (event) => {
+                    console.log("Speech Error:", event.error);
+                    if (event.error === 'no-speech' && appState !== 'IDLE' && appState !== 'BUSY') {
+                        startRecognitionSafe();
+                    } else if (event.error === 'not-allowed') {
+                        setState('IDLE');
+                    }
+                };
+            } catch (e) { alert("Mic Error: " + e.message); }
+        }
+
+        function startRecognitionSafe() {
+            if (!recognition) return;
+            try { recognition.start(); } catch (e) {}
+        }
+
+        // --- 5. Interaction Logic ---
+        talkButton.addEventListener('click', toggleListening);
+        pauseResumeButton.addEventListener('click', togglePauseResume);
+        stopSpeechButton.addEventListener('click', stopSpeech);
+        replayButton.addEventListener('click', replaySpeech);
+        shareButton.addEventListener('click', shareChat);
+        endChatButton.addEventListener('click', endChat);
+        restartChatButton.addEventListener('click', restartChat);
+        rememberMeCheckbox.addEventListener('change', saveUserData);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        async function toggleListening() {
+            try {
+                if (appState === 'IDLE') {
+                    talkButton.textContent = "Initializing...";
+                    talkButton.disabled = true;
+                    await acquireWakeLock();
+                    
+                    // CHECK MANUAL INPUTS
+                    const inputName = manualNameInput.value.trim();
+                    const inputAge = manualAgeInput.value.trim();
+
+                    if (inputName && inputAge) {
+                        // --- MODE 1: DATA PROVIDED ---
+                        userName = inputName;
+                        userAge = parseInt(inputAge);
+                        saveUserData(); // Ensure it's saved
+                        
+                        buildSystemPrompt(); 
+                        
+                        // Initialize chat history context
+                        if (chatHistory.length === 0) {
+                             chatHistory.push({ role: 'user', parts: [{ text: "Start session." }] });
+                             chatHistory.push({ role: 'model', parts: [{ text: `Namaskar ${userName}, I am ready.` }] });
+                        }
+
+                        const welcomeText = `नमस्कार ${userName}, मी तयार आहे. तुमचा प्रश्न विचारा.`;
+                        logMessage('Dhwani', welcomeText);
+                        
+                        setState('BUSY'); 
+                        await speakText(welcomeText, 'mr-IN');
+                        setState('CONVERSATION');
+                        startRecognitionSafe();
+
+                    } else {
+                        // --- MODE 2: NO DATA (ASK QUESTIONS) ---
+                        setState('LISTENING_FOR_WAKEWORD');
+                        startRecognitionSafe();
+                        if (conversationLog.childElementCount < 3) logMessage('Info', 'Say "Dhwani" to start');
+                    }
+
+                } else {
+                    // Stop logic
+                    setState('IDLE');
+                    recognition.stop();
+                    if (synth.speaking) synth.cancel();
+                    await releaseWakeLock();
+                }
+            } catch (error) {
+                console.error(error);
+                setState('IDLE');
+            }
+        }
+
+        function setState(newState) {
+            appState = newState;
+            switch (newState) {
+                case 'IDLE':
+                    talkButton.textContent = 'Start Listening';
+                    talkButton.disabled = false;
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-gray-500 transition-colors';
+                    endChatButton.disabled = true;
+                    talkButton.classList.remove('bg-red-600', 'hover:bg-red-700');
+                    talkButton.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                    // Re-enable inputs
+                    manualNameInput.disabled = false;
+                    manualAgeInput.disabled = false;
+                    break;
+                case 'BUSY':
+                    talkButton.textContent = 'Thinking/Speaking...';
+                    talkButton.disabled = true;
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-400 transition-colors';
+                    endChatButton.disabled = false;
+                    break;
+                default:
+                    talkButton.textContent = 'Stop Listening';
+                    talkButton.disabled = false;
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-blue-500 listening-pulse transition-colors';
+                    endChatButton.disabled = false;
+                    talkButton.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                    talkButton.classList.add('bg-red-600', 'hover:bg-red-700');
+                    // Disable inputs during chat
+                    manualNameInput.disabled = true;
+                    manualAgeInput.disabled = true;
+                    break;
+            }
+        }
+
+        function handleSpeechEnd() {
+            if (appState !== 'IDLE' && appState !== 'BUSY') startRecognitionSafe();
+            else if (appState === 'IDLE') setState('IDLE'); 
+        }
+        
+        async function handleSpeechResult(event) {
+            const transcript = event.results[event.results.length - 1][0].transcript.trim();
+            if (!transcript) return;
+            console.log(`Heard: ${transcript}`);
+            const currentState = appState;
+            recognition.stop(); 
+            setState('BUSY');
+
+            try {
+                switch (currentState) {
+                    case 'LISTENING_FOR_WAKEWORD':
+                        if (transcript.toLowerCase().includes('dhwani') || transcript.toLowerCase().includes('ध्वनी')) {
+                            const greeting = "नमस्कार, मी ध्वनी, तुमचे नाव काय आहे?";
+                            logMessage('Dhwani', greeting);
+                            await speakText(greeting, 'mr-IN');
+                            setState('LISTENING_FOR_NAME');
+                            startRecognitionSafe(); 
+                        } else {
+                            setState('LISTENING_FOR_WAKEWORD');
+                            startRecognitionSafe();
+                        }
+                        break;
+
+                    case 'LISTENING_FOR_NAME':
+                        logMessage('You', transcript);
+                        userName = await extractNameFromTranscript(transcript);
+                        manualNameInput.value = userName; // Sync with input
+                        
+                        const agePrompt = `नमस्ते ${userName}, तुमचे वय काय आहे?`;
+                        logMessage('Dhwani', agePrompt);
+                        await speakText(agePrompt, 'mr-IN');
+                        setState('LISTENING_FOR_AGE');
+                        startRecognitionSafe();
+                        break;
+
+                    case 'LISTENING_FOR_AGE':
+                        logMessage('You', transcript);
+                        userAge = await extractAgeFromTranscript(transcript);
+                        manualAgeInput.value = userAge; // Sync with input
+                        
+                        saveUserData();
+                        buildSystemPrompt(); 
+
+                        // SPECIAL LOGIC FOR AGE > 18
+                        if (userAge > 18) {
+                            const adultMsg = "मी तुमचे वय लक्षात ठेवून तुम्हाला तसे उत्तर देईन.";
+                            logMessage('Dhwani', adultMsg);
+                            await speakText(adultMsg, 'mr-IN');
+                        }
+
+                        const startPrompt = `धन्यवाद, ${userName}! मी तुमच्या प्रश्नां साठी तयार आहे!`;
+                        logMessage('Dhwani', startPrompt);
+                        await speakText(startPrompt, 'mr-IN');
+                        setState('CONVERSATION');
+                        startRecognitionSafe();
+                        break;
+
+                    case 'CONVERSATION':
+                        logMessage(userName || 'You', transcript);
+                        chatHistory.push({ role: 'user', parts: [{ text: transcript }] });
+                        
+                        const aiResponseText = await generateTextResponseFromChat();
+                        const cleanedResponseText = cleanTextForTTS(aiResponseText);
+
+                        chatHistory.push({ role: 'model', parts: [{ text: cleanedResponseText }] });
+                        logMessage('Dhwani', cleanedResponseText);
+                        
+                        try {
+                            await speakText(cleanedResponseText, 'mr-IN');
+                        } catch (error) {
+                            if (error.message === "Speech manually stopped") return;
+                            throw error;
+                        }
+                        
+                        setState('CONVERSATION');
+                        startRecognitionSafe();
+                        break;
+                }
+            } catch (error) {
+                console.error(error);
+                if (systemInstruction) { setState('CONVERSATION'); startRecognitionSafe(); }
+                else { setState('LISTENING_FOR_WAKEWORD'); startRecognitionSafe(); }
+            }
+        }
+
+        function buildSystemPrompt() {
+            // AGE SPECIFIC LOGIC
+            let ageInstruction = "";
+            if (userAge <= 5) {
+                ageInstruction = "User is a TODDLER (3-5 years). Use extremely simple words. Explain like a grandmother telling a story. Maximum 1 sentence.";
+            } else if (userAge <= 10) {
+                ageInstruction = "User is a CHILD (6-10 years). Use simple school-level language. Be encouraging.";
+            } else if (userAge <= 18) {
+                ageInstruction = "User is a TEENAGER. Provide educational and conceptual depth suitable for high school.";
+            } else {
+                ageInstruction = "User is an ADULT. Provide mature, respectful, and detailed answers.";
+            }
+
+            systemInstruction = `
+                You are "Dhwani," a smart AI teacher from Maharashtra.
+                You are speaking to ${userName}, who is ${userAge} years old.
+                
+                STRICT RULES:
+                1. Speak ONLY in Marathi (Devanagari script).
+                2. ${ageInstruction}
+                3. Adapt the complexity of the concept to exactly ${userAge} years old.
+                4. Keep answers concise (2-3 sentences max usually).
+                5. Always be polite.
+            `;
+            restartChatButton.disabled = false;
+        }
+
+        // --- 6. API Calls ---
+        async function extractNameFromTranscript(transcript) {
+            const processingMsg = document.createElement('div');
+            processingMsg.innerHTML = `<span class="text-gray-500 text-xs italic">...ओळखत आहे...</span>`;
+            conversationLog.appendChild(processingMsg);
+            
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
+            const extractionPrompt = `
+                Task: Extract the First Name from this Marathi audio transcript: "${transcript}".
+                Rules:
+                1. If a clear name is found, return ONLY that name in Devanagari or English.
+                2. If the name is "complicated", "unclear", or not found, return ONLY "बाळा".
+                3. Do not add any other text.
+            `;
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: extractionPrompt }] }] })
+                });
+                const result = await response.json();
+                conversationLog.removeChild(processingMsg);
+                let name = result.candidates[0].content.parts[0].text.trim();
+                name = name.replace(/['".]/g, '');
+                if (!name || name.length < 2) return "बाळा";
+                return name;
+            } catch (error) {
+                conversationLog.removeChild(processingMsg);
+                return "बाळा";
+            }
+        }
+
+        async function extractAgeFromTranscript(transcript) {
+             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
+             try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: `Extract age number from: "${transcript}". Return ONLY digits. Default 18.` }] }] })
+                });
+                const result = await response.json();
+                let age = parseInt(result.candidates[0].content.parts[0].text.trim());
+                return isNaN(age) ? 18 : age;
+            } catch (e) { return 18; }
+        }
+
+        async function generateTextResponseFromChat() {
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: chatHistory,
+                        systemInstruction: { parts: [{ text: systemInstruction }] }
+                    })
+                });
+                const result = await response.json();
+                return result.candidates[0].content.parts[0].text.trim();
+            } catch (error) {
+                return "मला माफ करा, पुन्हा सांगा?";
+            }
+        }
+        
+        function cleanTextForTTS(text) {
+            let cleaned = text.replace(/\[.*?\]|\(.*?\)|{.*?}/g, ""); 
+            return cleaned.replace(/[\*#`]/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+
+        // --- 7. TTS & Media ---
+        function loadVoices() {
+            voices = synth.getVoices();
+            if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => { voices = synth.getVoices(); };
+        }
+
+        function togglePauseResume() {
+            if (synth.paused) synth.resume();
+            else if (synth.speaking) { synth.pause(); recognition.stop(); setState('BUSY'); }
+        }
+
+        function stopSpeech() {
+            if (!synth.speaking) return;
+            speechManuallyStopped = true; 
+            synth.cancel(); 
+            recognition.stop(); 
+            toggleMediaButtons(true);
+            logMessage('Info', 'Stopped.');
+            setTimeout(() => {
+                speechManuallyStopped = false;
+                if (appState !== 'IDLE') {
+                    if (systemInstruction) { setState('CONVERSATION'); startRecognitionSafe(); }
+                    else { setState('LISTENING_FOR_WAKEWORD'); startRecognitionSafe(); }
+                }
+            }, 1500);
+        }
+
+        function replaySpeech() {
+            if (lastSpokenText) { recognition.stop(); setState('BUSY'); speakText(lastSpokenText); }
+        }
+        
+        async function speakText(text, lang = 'mr-IN') {
+            if (synth.speaking) synth.cancel();
+            lastSpokenText = text;
+            speechManuallyStopped = false;
+            if (voices.length === 0) voices = synth.getVoices();
+
+            return new Promise((resolve, reject) => {
+                const utterance = new SpeechSynthesisUtterance(text);
+                
+                utterance.onstart = () => { toggleMediaButtons(false); };
+                utterance.onend = () => {
+                    toggleMediaButtons(true);
+                    if (speechManuallyStopped) reject(new Error("Speech manually stopped"));
+                    else resolve();
+                };
+                utterance.onerror = (e) => { 
+                    toggleMediaButtons(true);
+                    if (e.error === 'interrupted') resolve(); else reject(e.error); 
+                };
+
+                let marathiVoice = voices.find(voice => voice.lang === 'mr-IN') || voices.find(voice => voice.lang === 'hi-IN');
+                if (marathiVoice) utterance.voice = marathiVoice;
+                utterance.lang = 'mr-IN';
+                
+                if (userAge <= 6) utterance.rate = 0.7; 
+                else if (userAge <= 12) utterance.rate = 0.8; 
+                else utterance.rate = 0.95; 
+                
+                synth.speak(utterance);
+            });
+        }
+
+        function toggleMediaButtons(disabled) {
+            pauseResumeButton.disabled = disabled;
+            stopSpeechButton.disabled = disabled;
+            replayButton.disabled = disabled;
+        }
+        
+        function logMessage(sender, message) {
+            const div = document.createElement('div');
+            let senderClass = 'text-blue-300 font-semibold';
+            let messageClass = 'text-white';
+
+            if (sender === 'Dhwani') senderClass = 'text-cyan-300 font-semibold';
+            else if (sender === 'Error') { senderClass = 'text-red-400 font-bold'; messageClass = 'text-red-300'; }
+            else if (sender === 'You') senderClass = 'text-green-300 font-semibold';
+
+            div.innerHTML = `<strong class="${senderClass}">${sender}:</strong> <span class="${messageClass}">${message}</span>`;
+            conversationLog.appendChild(div);
+            conversationLog.scrollTop = conversationLog.scrollHeight;
+        }
+
+        function getChatLogAsText() {
+            const messages = [];
+            conversationLog.querySelectorAll('div').forEach(div => { if (div.textContent) messages.push(div.textContent); });
+            return messages.join('\n');
+        }
+
+        async function shareChat() {
+            const chatText = getChatLogAsText();
+            if (!chatText.trim()) return;
+            try { await navigator.share({ title: 'Dhwani Chat', text: chatText }); } 
+            catch (err) { try { await navigator.clipboard.writeText(chatText); logMessage('Info', 'Copied'); } catch (e) {} }
+        }
+
+        async function acquireWakeLock() {
+            if ('wakeLock' in navigator) { try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {} }
+        }
+        async function releaseWakeLock() {
+            if (wakeLock) { try { await wakeLock.release(); wakeLock = null; } catch (e) {} }
+        }
+        async function handleVisibilityChange() {
+            if (appState !== 'IDLE' && !wakeLock && document.visibilityState === 'visible') await acquireWakeLock();
+        }
+
+        async function endChat() {
+            appState = 'IDLE'; setState('IDLE');
+            speechManuallyStopped = true;
+            if (synth.speaking) synth.cancel();
+            if (recognition) try { recognition.stop(); } catch (e) {}
+            await releaseWakeLock();
+            
+            userName = ''; userAge = 18; chatHistory = []; systemInstruction = '';
+            
+            // Do NOT clear inputs, just logic
+            conversationLog.innerHTML = '<div class="text-gray-400 text-center">Chat Ended. Press Start.</div>';
+            restartChatButton.disabled = true;
+        }
+
+        async function restartChat() {
+            if (!systemInstruction) return;
+            if (synth.speaking) synth.cancel();
+            if (recognition) try { recognition.stop(); } catch(e){}
+            appState = 'IDLE'; setState('IDLE');
+            await releaseWakeLock();
+            conversationLog.innerHTML = '';
+            logMessage('Info', `Chat restarted for ${userName}. Press Start.`);
+        }
+    </script>
+</body>
+</html>
