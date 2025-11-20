@@ -619,11 +619,42 @@
             catch (err) { try { await navigator.clipboard.writeText(chatText); logMessage('Info', 'Copied'); } catch (e) {} }
         }
 
+       // --- 8. ROBUST WAKE LOCK (PREVENTS SLEEP) ---
         async function acquireWakeLock() {
-            if ('wakeLock' in navigator) { try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {} }
+            // Check if feature exists
+            if ('wakeLock' in navigator) { 
+                try { 
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log("Screen Wake Lock Active");
+
+                    // CRITICAL: If the lock drops (system notification, etc.), grab it again immediately
+                    wakeLock.addEventListener('release', () => {
+                        console.log('Wake Lock Released by system');
+                        // Only re-acquire if the chat is still running and screen is visible
+                        if (appState !== 'IDLE' && document.visibilityState === 'visible') {
+                            acquireWakeLock();
+                        }
+                    });
+                } catch (e) { 
+                    console.error("Wake Lock failed:", e); 
+                } 
+            }
         }
+
         async function releaseWakeLock() {
-            if (wakeLock) { try { await wakeLock.release(); wakeLock = null; } catch (e) {} }
+            if (wakeLock) { 
+                try { 
+                    await wakeLock.release(); 
+                    wakeLock = null; 
+                } catch (e) {} 
+            }
+        }
+
+        // Re-apply lock instantly if user comes back to the tab
+        async function handleVisibilityChange() {
+            if (appState !== 'IDLE' && document.visibilityState === 'visible') {
+                await acquireWakeLock();
+            }
         }
         async function handleVisibilityChange() {
             if (appState !== 'IDLE' && !wakeLock && document.visibilityState === 'visible') await acquireWakeLock();
