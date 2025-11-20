@@ -426,7 +426,7 @@
             }
         }
 
-        function buildSystemPrompt() {
+function buildSystemPrompt() {
             // AGE SPECIFIC LOGIC
             let ageInstruction = "";
             if (userAge <= 5) {
@@ -442,14 +442,19 @@
             systemInstruction = `
                 You are "Dhwani," a smart AI teacher from Maharashtra.
                 You are speaking to ${userName}, who is ${userAge} years old.
-                
-                STRICT RULES:
-                1. Speak ONLY in Marathi (Devanagari script).
-                2. ${ageInstruction}
-                3. Adapt the complexity of the concept to exactly ${userAge} years old.
-                4. Keep answers concise (2-3 sentences max usually).
-                5. Always be polite.
+                User's Mother Tongue: Marathi.
+
+                STRICT BEHAVIOR RULES:
+                1. DEFAULT MODE: Speak in Marathi (Devanagari script).
+                2. ENGLISH MODE: If the user asks to learn English, speaks in English, or asks you to speak English, you MUST switch to English.
+                   - When teaching English, use simple vocabulary suitable for a Marathi speaker learning the language.
+                   - You can use Marathi to explain difficult English concepts if necessary.
+                3. ${ageInstruction}
+                4. Adapt the complexity of the concept to exactly ${userAge} years old.
+                5. Keep answers concise (2-3 sentences max usually).
+                6. Always be polite.
             `;
+
             restartChatButton.disabled = false;
         }
 
@@ -554,7 +559,7 @@
             if (lastSpokenText) { recognition.stop(); setState('BUSY'); speakText(lastSpokenText); }
         }
         
-        async function speakText(text, lang = 'mr-IN') {
+      async function speakText(text, lang = 'mr-IN') {
             if (synth.speaking) synth.cancel();
             lastSpokenText = text;
             speechManuallyStopped = false;
@@ -574,13 +579,23 @@
                     if (e.error === 'interrupted') resolve(); else reject(e.error); 
                 };
 
+                // Try to find a Marathi or Hindi voice (which usually handles Indian English well too)
                 let marathiVoice = voices.find(voice => voice.lang === 'mr-IN') || voices.find(voice => voice.lang === 'hi-IN');
                 if (marathiVoice) utterance.voice = marathiVoice;
+                
+                // Note: Even if teaching English, we keep 'mr-IN' or 'hi-IN' preference 
+                // so the accent remains familiar to the Marathi child.
                 utterance.lang = 'mr-IN';
                 
-                if (userAge <= 6) utterance.rate = 0.7; 
-                else if (userAge <= 12) utterance.rate = 0.8; 
-                else utterance.rate = 0.95; 
+                // --- DYNAMIC SPEED CONTROL BASED ON AGE ---
+                if (userAge <= 7) {
+                    utterance.rate = 0.7;  // Slow for toddlers/small kids
+                } else if (userAge <= 15) {
+                    utterance.rate = 0.85; // Medium for school kids
+                } else {
+                    utterance.rate = 1.0;  // Normal for adults (up to 198 years!)
+                }
+                // -----------------------------------------
                 
                 synth.speak(utterance);
             });
