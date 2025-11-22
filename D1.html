@@ -56,7 +56,7 @@
         }
     </style>
 </head>
-<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4" oncontextmenu="return false;">
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
 
     <div class="bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-2xl flex flex-col h-[95vh] md:h-auto">
         
@@ -122,19 +122,12 @@
                 <div class="flex items-center gap-2">
                     <input type="checkbox" id="use-custom-key-checkbox" class="custom-checkbox">
                     <label for="use-custom-key-checkbox" class="text-sm text-gray-300 cursor-pointer select-none">
-                        Use your own API Key (Faster & better)
+                        Use your own Gemini API Key (Faster)
                     </label>
                 </div>
 
                 <input type="text" id="custom-api-key-input" class="custom-input text-xs w-full !w-full" placeholder="Paste your API Key here (AIza...)" disabled>
                 
-                <button id="paste-key-btn" type="button" disabled class="w-full py-2 px-4 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
-                    </svg>
-                    Paste API Key from Clipboard
-                </button>
-
                 <a href="https://ai.google.dev/gemini-api/docs/api-key" target="_blank" class="text-center w-full py-2 bg-gray-700 hover:bg-gray-600 text-xs text-blue-300 rounded transition-colors border border-gray-600">
                     Learn how to get your own API key ↗
                 </a>
@@ -158,17 +151,6 @@
     </div>
 
     <script>
-        // --- DISABLE RIGHT CLICK ---
-        document.addEventListener('contextmenu', event => event.preventDefault());
-
-        // --- FULLSCREEN HELPER ---
-        function enterFullScreen() {
-            const elem = document.documentElement;
-            if (elem.requestFullscreen) { elem.requestFullscreen(); } 
-            else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); } 
-            else if (elem.msRequestFullscreen) { elem.msRequestFullscreen(); }
-        }
-
         // --- 1. DOM Elements ---
         const talkButton = document.getElementById('talk-button');
         const statusIndicator = document.getElementById('status-indicator');
@@ -195,9 +177,6 @@
         const advanceContainer = document.getElementById('advance-container');
         const useCustomKeyCheckbox = document.getElementById('use-custom-key-checkbox');
         const customApiKeyInput = document.getElementById('custom-api-key-input');
-        
-        // --- NEW PASTE BUTTON ELEMENT ---
-        const pasteKeyBtn = document.getElementById('paste-key-btn');
 
         // --- 2. State Management ---
         let appState = 'IDLE'; 
@@ -229,35 +208,12 @@
         });
 
         useCustomKeyCheckbox.addEventListener('change', () => {
-            const isChecked = useCustomKeyCheckbox.checked;
-            customApiKeyInput.disabled = !isChecked;
-            pasteKeyBtn.disabled = !isChecked; // Disable paste button if checkbox is off
-            
+            customApiKeyInput.disabled = !useCustomKeyCheckbox.checked;
             saveUserData(); 
-            if (isChecked) customApiKeyInput.focus();
+            if (useCustomKeyCheckbox.checked) customApiKeyInput.focus();
         });
 
         customApiKeyInput.addEventListener('input', saveUserData);
-
-        // --- NEW PASTE FUNCTIONALITY ---
-        pasteKeyBtn.addEventListener('click', async () => {
-            try {
-                const text = await navigator.clipboard.readText();
-                if(text) {
-                    customApiKeyInput.value = text;
-                    saveUserData();
-                    // Visual feedback
-                    const originalText = pasteKeyBtn.innerHTML;
-                    pasteKeyBtn.textContent = "Pasted!";
-                    setTimeout(() => { pasteKeyBtn.innerHTML = originalText; }, 1000);
-                } else {
-                    alert("Clipboard is empty!");
-                }
-            } catch (err) {
-                console.error('Failed to read clipboard contents: ', err);
-                alert('Could not paste. Please allow clipboard permissions or type manually.');
-            }
-        });
 
         function getEffectiveApiKey() {
             if (useCustomKeyCheckbox.checked && customApiKeyInput.value.trim().length > 10) {
@@ -287,7 +243,6 @@
                 if (savedUseKey === 'true') {
                     useCustomKeyCheckbox.checked = true;
                     customApiKeyInput.disabled = false;
-                    pasteKeyBtn.disabled = false; // Enable button on load if needed
                     if (savedKey) customApiKeyInput.value = savedKey;
                 }
 
@@ -307,7 +262,7 @@
                     localStorage.removeItem('dhwani_userAge');
                 }
 
-                // Save Advance Settings
+                // Save Advance Settings (Always save these irrespective of "Remember Me")
                 localStorage.setItem('dhwani_useCustomKey', useCustomKeyCheckbox.checked);
                 if (customApiKeyInput.value) {
                     localStorage.setItem('dhwani_customKey', customApiKeyInput.value.trim());
@@ -362,11 +317,6 @@
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
         async function toggleListening() {
-            // TRIGGER FULLSCREEN ON START
-            if (appState === 'IDLE') {
-                try { enterFullScreen(); } catch(e) { console.log("Fullscreen denied or already active"); }
-            }
-
             try {
                 if (appState === 'IDLE') {
                     talkButton.textContent = "Initializing...";
@@ -539,6 +489,7 @@
         }
 
         function buildSystemPrompt() {
+            // AGE SPECIFIC LOGIC
             let ageInstruction = "";
             if (userAge <= 5) {
                 ageInstruction = "User is a TODDLER (3-5 years). Use extremely simple words. Explain like a grandmother telling a story. Maximum 1 sentence.";
