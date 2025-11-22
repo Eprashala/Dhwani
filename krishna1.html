@@ -68,6 +68,11 @@
         #conversation-log::-webkit-scrollbar { width: 8px; }
         #conversation-log::-webkit-scrollbar-track { background: #2a0a0a; }
         #conversation-log::-webkit-scrollbar-thumb { background: #d97706; rounded: 4px; }
+        
+        /* Live Transcript Overlay */
+        .live-transcript {
+            @apply text-yellow-200 text-sm italic opacity-80 mt-2 min-h-[20px];
+        }
     </style>
 </head>
 
@@ -93,8 +98,13 @@
                 "Wherever there is Krishna, the Master of all mystics,<br> 
                 and wherever there is Arjuna... <br>
                 there will also certainly be opulence, victory, extraordinary power, and morality."<br><br>
-                Press Start or say <strong>"Hare Krishna" or " Jay Shree Krishna"</strong>
+                Press Start or say <strong>"Hare Krishna"</strong>
             </div>
+        </div>
+        
+        <div id="live-text-container" class="text-center mb-2 hidden">
+            <span class="text-orange-300 text-xs uppercase tracking-widest">Listening...</span>
+            <div id="live-transcript" class="live-transcript"></div>
         </div>
 
         <div class="flex justify-center gap-8 mb-4 shrink-0 bg-orange-950/50 p-2 rounded-xl border border-orange-800">
@@ -165,7 +175,7 @@
 
     <script>
         /* ==========================================================================
-           KRISHNA SARTHI LOGIC
+           KRISHNA SARTHI LOGIC v2.0 (Improved Wake Word & Long Listening)
            ========================================================================== */
 
         document.addEventListener('contextmenu', event => event.preventDefault());
@@ -186,6 +196,8 @@
         const replayButton = document.getElementById('replay-button');
         const endChatButton = document.getElementById('end-chat-button');
         const restartChatButton = document.getElementById('restart-chat-button');
+        const liveTextContainer = document.getElementById('live-text-container');
+        const liveTranscript = document.getElementById('live-transcript');
         
         // Advance Settings
         const advanceToggleBtn = document.getElementById('advance-toggle-btn');
@@ -195,7 +207,7 @@
         const pasteKeyBtn = document.getElementById('paste-key-btn');
 
         // --- CONFIGURATION ---
-        const DEFAULT_API_KEY = "AIzaSyDdST0GB_I-3iAHgV-rDwb1r_tIHLbt3r0"; 
+        const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
         let appState = 'IDLE'; 
         let userName = '';
         let userAge = 0;
@@ -207,6 +219,11 @@
         const synth = window.speechSynthesis;
         let voices = [];
         let wakeLock = null;
+        
+        // Variables for "Long Listening" Logic
+        let silenceTimer = null;
+        let finalTranscriptAccumulator = '';
+        const SILENCE_DELAY_MS = 3000; // Wait 3 seconds of silence before processing
 
         // --- INITIALIZATION ---
         window.onload = () => {
@@ -301,15 +318,15 @@
             talkButton.disabled = true;
         } else {
             recognition = new SpeechRecognition();
-            recognition.continuous = false; 
-            recognition.interimResults = false;
-            recognition.lang = 'mr-IN'; // Listen for Marathi/Hindi mixed
+            recognition.continuous = true; // CRITICAL CHANGE: Allows continuous listening
+            recognition.interimResults = true; // Shows results while speaking
+            recognition.lang = 'mr-IN'; 
 
-            recognition.onresult = handleSpeechResult;
+            recognition.onresult = handleSpeechResultStream;
             recognition.onend = handleSpeechEnd;
             recognition.onerror = (event) => {
                 if (event.error === 'no-speech' && appState !== 'IDLE' && appState !== 'BUSY') {
-                    startRecognitionSafe();
+                    // Ignore no-speech errors in continuous mode usually
                 } else if (event.error === 'not-allowed') {
                     setState('IDLE');
                 }
@@ -318,7 +335,17 @@
 
         function startRecognitionSafe() {
             if (!recognition) return;
-            try { recognition.start(); } catch (e) {}
+            try { 
+                finalTranscriptAccumulator = ''; // Reset accumulator
+                recognition.start(); 
+                liveTextContainer.classList.remove('hidden');
+            } catch (e) {}
+        }
+
+        function stopRecognitionSafe() {
+             if (!recognition) return;
+             try { recognition.stop(); } catch(e) {}
+             liveTextContainer.classList.add('hidden');
         }
 
         // --- MAIN FLOW ---
@@ -374,7 +401,7 @@
             } else {
                 // STOP
                 setState('IDLE');
-                recognition.stop();
+                stopRecognitionSafe();
                 if (synth.speaking) synth.cancel();
                 await releaseWakeLock();
             }
@@ -392,12 +419,14 @@
                     talkButton.classList.add('from-orange-600', 'to-red-600');
                     manualNameInput.disabled = false;
                     manualAgeInput.disabled = false;
+                    liveTextContainer.classList.add('hidden');
                     break;
                 case 'BUSY':
                     talkButton.textContent = 'Contemplating...';
                     talkButton.disabled = true;
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-400 border border-white';
                     endChatButton.disabled = false;
+                    liveTextContainer.classList.add('hidden');
                     break;
                 default: // LISTENING
                     talkButton.textContent = 'Listening...';
@@ -408,35 +437,78 @@
                     talkButton.classList.add('from-red-600', 'to-red-800');
                     manualNameInput.disabled = true;
                     manualAgeInput.disabled = true;
+                    liveTextContainer.classList.remove('hidden');
                     break;
             }
         }
 
         function handleSpeechEnd() {
-            if (appState !== 'IDLE' && appState !== 'BUSY') startRecognitionSafe();
-            else if (appState === 'IDLE') setState('IDLE'); 
+            // Only restart if we didn't stop manually and we are still in a listening state
+            if (appState !== 'IDLE' && appState !== 'BUSY') {
+                startRecognitionSafe();
+            } else if (appState === 'IDLE') {
+                setState('IDLE'); 
+            }
         }
 
-        async function handleSpeechResult(event) {
-            const transcript = event.results[event.results.length - 1][0].transcript.trim();
+        // --- NEW: HANDLE CONTINUOUS STREAM (Debounced) ---
+        function handleSpeechResultStream(event) {
+            // Reset silence timer on every result
+            clearTimeout(silenceTimer);
+
+            let interimTranscript = '';
+            let finalChunk = '';
+
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalChunk += event.results[i][0].transcript;
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
+                }
+            }
+
+            finalTranscriptAccumulator += finalChunk;
+            
+            // Show live feedback
+            liveTranscript.textContent = finalTranscriptAccumulator + " " + interimTranscript;
+
+            // Set a timer: If user stops speaking for 3 seconds, we process
+            silenceTimer = setTimeout(() => {
+                if (finalTranscriptAccumulator.trim().length > 0 || interimTranscript.trim().length > 0) {
+                    const fullText = (finalTranscriptAccumulator + " " + interimTranscript).trim();
+                    processFinalInput(fullText);
+                }
+            }, SILENCE_DELAY_MS);
+        }
+
+        async function processFinalInput(transcript) {
             if (!transcript) return;
-            console.log(`Heard: ${transcript}`);
+            console.log(`Final Processing: ${transcript}`);
+            
+            stopRecognitionSafe(); // Stop listening while thinking
             
             const currentState = appState;
-            recognition.stop();
             setState('BUSY');
 
             try {
                 switch (currentState) {
                     case 'LISTENING_FOR_WAKEWORD':
                         const lower = transcript.toLowerCase();
-                        if (lower.includes('krishna') || lower.includes('kru') || lower.includes('hare') || lower.includes('jai') || lower.includes('jay')) {
+                        // CHECK BOTH ENGLISH AND DEVANAGARI SCRIPT FOR ROBUSTNESS
+                        // "Hare" "Krishna" "Jay" "Shree" "Jai" "Shri"
+                        // "हरे" "कृष्ण" "जय" "श्री" "हरी"
+                        const wakeWords = ['krishna', 'kru', 'hare', 'jai', 'jay', 'shree', 'shri', 'हरे', 'कृष्ण', 'जय', 'श्री', 'राधे'];
+                        
+                        const detected = wakeWords.some(word => lower.includes(word));
+
+                        if (detected) {
                             const greeting = "राधे राधे! मी कृष्ण, तुमचा मित्र आणि मार्गदर्शक. तुमचे नाव काय आहे?";
                             logMessage('Krishna', greeting);
                             await speakText(greeting, 'mr-IN');
                             setState('LISTENING_FOR_NAME');
                             startRecognitionSafe(); 
                         } else {
+                            // If not detected, just restart listening without saying anything (passive)
                             setState('LISTENING_FOR_WAKEWORD');
                             startRecognitionSafe();
                         }
@@ -444,7 +516,7 @@
 
                     case 'LISTENING_FOR_NAME':
                         logMessage('You', transcript);
-                        userName = transcript; // Simplified for now
+                        userName = transcript; 
                         manualNameInput.value = userName; 
                         const agePrompt = `नमस्ते ${userName}, तुमचे वय काय आहे?`;
                         logMessage('Krishna', agePrompt);
@@ -552,14 +624,14 @@
 
         function togglePauseResume() {
             if (synth.paused) synth.resume();
-            else if (synth.speaking) { synth.pause(); recognition.stop(); setState('BUSY'); }
+            else if (synth.speaking) { synth.pause(); stopRecognitionSafe(); setState('BUSY'); }
         }
 
         function stopSpeech() {
             if (!synth.speaking) return;
             speechManuallyStopped = true; 
             synth.cancel(); 
-            recognition.stop(); 
+            stopRecognitionSafe();
             toggleMediaButtons(true);
             setTimeout(() => {
                 speechManuallyStopped = false;
@@ -568,7 +640,7 @@
         }
 
         function replaySpeech() {
-            if (lastSpokenText) { recognition.stop(); setState('BUSY'); speakText(lastSpokenText); }
+            if (lastSpokenText) { stopRecognitionSafe(); setState('BUSY'); speakText(lastSpokenText); }
         }
         
         async function speakText(text, lang = 'mr-IN') {
@@ -594,8 +666,6 @@
                 // Get all Marathi voices
                 const marathiVoices = voices.filter(voice => voice.lang === 'mr-IN' || voice.lang === 'hi-IN');
                 
-                // Strategy: On Android Chrome, usually voice[0] is female, voice[1] is male (or vice versa depending on update).
-                // We try to pick the second one if available, assuming it might be the Male voice.
                 if (marathiVoices.length > 1) {
                     utterance.voice = marathiVoices[1]; // Attempting to get the second (often Male) voice
                 } else if (marathiVoices.length === 1) {
@@ -647,7 +717,7 @@
             appState = 'IDLE'; setState('IDLE');
             speechManuallyStopped = true;
             if (synth.speaking) synth.cancel();
-            if (recognition) try { recognition.stop(); } catch (e) {}
+            stopRecognitionSafe();
             await releaseWakeLock();
             userName = ''; userAge = 0; chatHistory = []; 
             conversationLog.innerHTML = '<div class="text-yellow-500 text-center mt-10">Reflection Ended.<br>Say "Hare Krishna" to begin again.</div>';
@@ -656,7 +726,7 @@
 
         async function restartChat() {
             if (synth.speaking) synth.cancel();
-            if (recognition) try { recognition.stop(); } catch(e){}
+            stopRecognitionSafe();
             appState = 'IDLE'; setState('IDLE');
             await releaseWakeLock();
             conversationLog.innerHTML = '';
