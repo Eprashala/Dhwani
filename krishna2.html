@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Krishna Sarthi - AI Gita Guide</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Holy Font */
+        @import url('https://fonts.googleapis.com/css2?family=Martel:wght@300;400;700&family=Yatra+One&display=swap');
+        
+        body { 
+            font-family: 'Martel', serif; 
+            overscroll-behavior: none; 
+            background-color: #1a0505;
+        }
+        h1, button { font-family: 'Yatra One', serif; }
+        
+        /* ANIMATION: Divine Pulse */
+        .listening-pulse { animation: divinePulse 2s infinite ease-in-out; }
+        @keyframes divinePulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 165, 0, 0.7); } 
+            70% { box-shadow: 0 0 0 15px rgba(255, 165, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 165, 0, 0); }
+        }
+
+        /* UI: Peacock Feather */
+        .peacock-feather {
+            position: absolute;
+            top: -30px;
+            right: -30px;
+            width: 120px;
+            height: 120px;
+            background: radial-gradient(circle at center, #1e3a8a 0%, #06b6d4 30%, #10b981 50%, #d97706 70%);
+            border-radius: 50% 0 50% 50%;
+            transform: rotate(45deg);
+            opacity: 0.6;
+            filter: blur(12px);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* UI: Buttons */
+        .icon-btn {
+            @apply p-4 rounded-full text-white transition-all duration-200
+                   bg-orange-800 hover:bg-orange-700 shadow-lg border border-yellow-600/50
+                   active:scale-95 focus:outline-none
+                   disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none;
+        }
+        
+        .utility-btn {
+            @apply w-full py-3 px-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors
+                   bg-orange-900/80 text-yellow-100 border border-orange-800
+                   active:bg-orange-800
+                   focus:outline-none
+                   disabled:opacity-50 disabled:cursor-not-allowed;
+        }
+
+        /* UI: Inputs */
+        .custom-input {
+            @apply block w-full text-center border border-yellow-700/50 rounded-lg p-2 outline-none transition-all text-sm;
+            background-color: rgba(42, 10, 10, 0.8) !important; 
+            color: #fcd34d !important;             
+        }
+        .custom-input::placeholder { color: #b45309 !important; }
+
+        /* Chat Log */
+        #conversation-log {
+            -webkit-overflow-scrolling: touch; 
+            scrollbar-width: thin;
+            scrollbar-color: #d97706 #1a0505;
+        }
+        
+        .live-transcript {
+            @apply text-yellow-200 text-xs italic opacity-80 min-h-[1.5em] truncate px-4;
+        }
+    </style>
+</head>
+
+<body class="h-[100dvh] w-full flex items-center justify-center overflow-hidden relative">
+
+    <div class="absolute top-0 left-0 w-full h-full opacity-20 pointer-events-none" 
+         style="background-image: radial-gradient(#f59e0b 1px, transparent 1px); background-size: 20px 20px;">
+    </div>
+
+    <div class="relative w-full h-full md:h-[90vh] md:max-w-md md:rounded-3xl bg-[#1a0505] shadow-2xl flex flex-col overflow-hidden border-x-0 md:border-4 border-orange-800/50">
+        
+        <div class="peacock-feather"></div>
+
+        <div class="flex items-center justify-between p-4 shrink-0 z-20 bg-gradient-to-b from-orange-900 to-[#1a0505] border-b border-orange-800/30">
+            <div>
+                <h1 class="text-2xl text-yellow-400 drop-shadow-md tracking-wide leading-none">
+                    कृष्ण <span class="text-white text-xl">सारथी</span>
+                </h1>
+                <p class="text-[10px] text-orange-300/80 font-sans">AI Gita Guide</p>
+            </div>
+            <div id="status-indicator" class="w-3 h-3 rounded-full bg-gray-600 border border-white/20" title="Status"></div>
+        </div>
+
+        <div id="conversation-log" class="flex-1 overflow-y-auto p-4 space-y-4 relative scroll-smooth">
+            <div class="text-yellow-200/40 text-center mt-20 font-serif italic text-sm px-6">
+                <p class="mb-4 text-2xl opacity-50">🕉️</p>
+                "Arjuna, establish yourself in Yoga and perform your duties."
+                <br><br>
+                <div id="https-warning" class="hidden text-red-400 text-xs border border-red-900 bg-red-900/20 p-2 rounded mb-2">
+                    ⚠️ Warning: Microphone may be blocked. <br>Use <strong>HTTPS</strong> or <strong>Localhost</strong>.
+                </div>
+                <div class="text-xs text-orange-400/60 border border-orange-900/50 rounded-lg p-2 inline-block bg-black/20">
+                    Tap <strong>Start</strong> or say <br>
+                    <span class="text-yellow-300 font-bold">"Hare Krishna"</span><br>
+                    <span class="text-[10px] opacity-70">(I will wait 8s for you to finish speaking)</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="shrink-0 bg-[#120303] border-t border-orange-800/30 p-4 pb-6 z-30 flex flex-col gap-3">
+            
+            <div id="live-text-container" class="text-center hidden">
+                <span id="listening-status" class="text-orange-400 text-[10px] uppercase tracking-[0.2em] animate-pulse">Listening...</span>
+                <div id="live-transcript" class="live-transcript"></div>
+            </div>
+
+            <div class="flex justify-center gap-6">
+                <button id="pause-resume-button" class="icon-btn bg-gray-800" disabled>
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" /></svg>
+                </button>
+                <button id="stop-speech-button" class="icon-btn bg-red-900/80 text-red-100" disabled>
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z" /></svg>
+                </button>
+                <button id="replay-button" class="icon-btn bg-emerald-900/80 text-emerald-100" disabled>
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+                </button>
+            </div>
+
+            <div class="flex gap-2 w-full">
+                <input type="text" id="manual-name" class="custom-input flex-[2]" placeholder="Name (नाव)">
+                <input type="number" id="manual-age" class="custom-input flex-[1]" placeholder="Age">
+            </div>
+
+            <div class="flex flex-col items-center">
+                <button id="advance-toggle-btn" class="text-[10px] text-orange-500/70 uppercase tracking-wider mb-2">
+                    ▼ API Key Settings
+                </button>
+                <div id="advance-container" class="hidden w-full bg-orange-950/50 rounded-lg p-2 flex-col gap-2 mb-2">
+                    <div class="flex items-center gap-2 justify-center">
+                        <input type="checkbox" id="use-custom-key-checkbox" class="accent-orange-600">
+                        <label for="use-custom-key-checkbox" class="text-xs text-yellow-200/80">Use Custom Key</label>
+                    </div>
+                    <input type="text" id="custom-api-key-input" class="custom-input text-[10px] !p-1" placeholder="Paste Key Here" disabled>
+                    <button id="paste-key-btn" disabled class="w-full py-1 bg-orange-800 text-[10px] text-white rounded opacity-50 disabled:opacity-20">Paste</button>
+                </div>
+            </div>
+
+            <button id="talk-button" class="w-full py-4 rounded-xl text-lg font-bold tracking-widest text-white shadow-lg
+                       bg-gradient-to-r from-orange-700 via-red-600 to-orange-700 border-t border-orange-400/30
+                       active:scale-[0.98] transition-transform duration-150
+                       disabled:from-gray-800 disabled:to-gray-700 disabled:text-gray-500">
+                START
+            </button>
+
+            <div class="grid grid-cols-2 gap-2 mt-1">
+                <button id="restart-chat-button" class="utility-btn" disabled>New Session</button>
+                <button id="end-chat-button" class="utility-btn text-red-300 border-red-900/50 bg-red-900/20" disabled>End</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* ==========================================================================
+           KRISHNA SARTHI - ANDROID OPTIMIZED (v4.0)
+           ========================================================================== */
+
+        document.addEventListener('contextmenu', event => event.preventDefault());
+        
+        // Mobile Height Fix
+        function setAppHeight() { document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`); }
+        window.addEventListener('resize', setAppHeight);
+        setAppHeight();
+
+        // Check HTTPS (Crucial for Android Mic)
+        if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+            document.getElementById('https-warning').classList.remove('hidden');
+        }
+
+        // --- DOM ELEMENTS ---
+        const talkButton = document.getElementById('talk-button');
+        const statusIndicator = document.getElementById('status-indicator');
+        const conversationLog = document.getElementById('conversation-log');
+        const manualNameInput = document.getElementById('manual-name');
+        const manualAgeInput = document.getElementById('manual-age');
+        const pauseResumeButton = document.getElementById('pause-resume-button');
+        const stopSpeechButton = document.getElementById('stop-speech-button');
+        const replayButton = document.getElementById('replay-button');
+        const endChatButton = document.getElementById('end-chat-button');
+        const restartChatButton = document.getElementById('restart-chat-button');
+        const liveTextContainer = document.getElementById('live-text-container');
+        const liveTranscript = document.getElementById('live-transcript');
+        const listeningStatus = document.getElementById('listening-status');
+
+        // Settings DOM
+        const advanceToggleBtn = document.getElementById('advance-toggle-btn');
+        const advanceContainer = document.getElementById('advance-container');
+        const useCustomKeyCheckbox = document.getElementById('use-custom-key-checkbox');
+        const customApiKeyInput = document.getElementById('custom-api-key-input');
+        const pasteKeyBtn = document.getElementById('paste-key-btn');
+
+        // --- CONFIGURATION ---
+        const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
+        let appState = 'IDLE'; 
+        let userName = '';
+        let userAge = 0;
+        let chatHistory = []; 
+        let systemInstruction = '';
+        let recognition;
+        let lastSpokenText = ''; 
+        let speechManuallyStopped = false; 
+        const synth = window.speechSynthesis;
+        let voices = [];
+        let wakeLock = null;
+        
+        // --- TIMING LOGIC (Android Fix) ---
+        // We use a longer delay, and we must persist transcript across "false" stops
+        let silenceTimer = null;
+        let accumulatedTranscript = ''; 
+        const SILENCE_DELAY_MS = 8000; // 8 SECONDS WAIT
+
+        // --- INITIALIZATION ---
+        window.onload = () => {
+            if (synth.speaking) synth.cancel();
+            loadUserData(); 
+            loadVoices();   
+        };
+
+        // --- UI HANDLERS ---
+        advanceToggleBtn.addEventListener('click', () => {
+            advanceContainer.classList.toggle('hidden');
+            advanceContainer.classList.toggle('flex');
+        });
+
+        useCustomKeyCheckbox.addEventListener('change', () => {
+            const isChecked = useCustomKeyCheckbox.checked;
+            customApiKeyInput.disabled = !isChecked;
+            pasteKeyBtn.disabled = !isChecked;
+            saveUserData(); 
+        });
+        customApiKeyInput.addEventListener('input', saveUserData);
+        pasteKeyBtn.addEventListener('click', async () => {
+            try {
+                const text = await navigator.clipboard.readText();
+                if(text) { customApiKeyInput.value = text; saveUserData(); }
+            } catch (err) { alert('Manual Paste Required'); }
+        });
+
+        function getEffectiveApiKey() {
+            return (useCustomKeyCheckbox.checked && customApiKeyInput.value.trim().length > 10) 
+                ? customApiKeyInput.value.trim() : DEFAULT_API_KEY;
+        }
+
+        // --- MEMORY & STORAGE ---
+        function loadUserData() {
+            try {
+                manualNameInput.value = localStorage.getItem('krishna_userName') || '';
+                manualAgeInput.value = localStorage.getItem('krishna_userAge') || '';
+                if (localStorage.getItem('krishna_useCustomKey') === 'true') {
+                    useCustomKeyCheckbox.checked = true;
+                    customApiKeyInput.disabled = false;
+                    pasteKeyBtn.disabled = false;
+                    customApiKeyInput.value = localStorage.getItem('krishna_customKey') || '';
+                }
+            } catch (e) {}
+        }
+
+        function saveUserData() {
+            try {
+                localStorage.setItem('krishna_userName', manualNameInput.value.trim());
+                localStorage.setItem('krishna_userAge', manualAgeInput.value.trim());
+                localStorage.setItem('krishna_useCustomKey', useCustomKeyCheckbox.checked);
+                if (customApiKeyInput.value) localStorage.setItem('krishna_customKey', customApiKeyInput.value.trim());
+            } catch (e) {}
+        }
+
+        // --- SPEECH RECOGNITION SETUP ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (!SpeechRecognition) {
+            logMessage('System', 'Browser not supported. Use Chrome/Edge.');
+            talkButton.disabled = true;
+        } else {
+            recognition = new SpeechRecognition();
+            recognition.continuous = true; // Essential for Android
+            recognition.interimResults = true; 
+            recognition.lang = 'mr-IN'; 
+
+            recognition.onresult = handleSpeechResultStream;
+            recognition.onend = handleSpeechEnd;
+            recognition.onerror = (event) => {
+                console.log("Speech Error", event.error);
+                if (event.error === 'not-allowed') setState('IDLE');
+            };
+        }
+
+        // --- CORE STATE MACHINE ---
+        talkButton.addEventListener('click', toggleListening);
+        pauseResumeButton.addEventListener('click', togglePauseResume);
+        stopSpeechButton.addEventListener('click', stopSpeech);
+        replayButton.addEventListener('click', replaySpeech);
+        endChatButton.addEventListener('click', endChat);
+        restartChatButton.addEventListener('click', restartChat);
+
+        async function toggleListening() {
+            if (appState === 'IDLE') {
+                // START UP
+                const inputName = manualNameInput.value.trim();
+                const inputAge = manualAgeInput.value.trim();
+                
+                talkButton.textContent = "Connecting...";
+                talkButton.disabled = true;
+                await acquireWakeLock();
+
+                if (inputName && inputAge) {
+                    // KNOWN USER
+                    userName = inputName;
+                    userAge = parseInt(inputAge) || 20;
+                    saveUserData(); 
+                    buildSystemPrompt(); 
+                    
+                    // Restore or Welcome
+                    if (chatHistory.length === 0) {
+                        const prompt = `राधे राधे ${userName}. मी कृष्ण.`;
+                        logMessage('Krishna', prompt);
+                        setState('BUSY');
+                        await speakText(prompt, 'mr-IN');
+                    } else {
+                        logMessage('Krishna', `Radhe Radhe ${userName}.`);
+                    }
+                    
+                    setState('CONVERSATION');
+                    startRecognitionSafe();
+                } else {
+                    // UNKNOWN USER -> Wake Word
+                    setState('LISTENING_FOR_WAKEWORD');
+                    startRecognitionSafe();
+                    if (conversationLog.childElementCount < 3) logMessage('System', 'Say "Hare Krishna"');
+                }
+            } else {
+                // SHUT DOWN
+                setState('IDLE');
+                stopRecognitionSafe();
+                if (synth.speaking) synth.cancel();
+                await releaseWakeLock();
+            }
+        }
+
+        function setState(newState) {
+            appState = newState;
+            switch (newState) {
+                case 'IDLE':
+                    talkButton.textContent = 'START';
+                    talkButton.disabled = false;
+                    statusIndicator.className = 'w-3 h-3 rounded-full bg-gray-600';
+                    talkButton.className = "w-full py-4 rounded-xl text-lg font-bold text-white shadow-lg bg-gradient-to-r from-orange-700 via-red-600 to-orange-700";
+                    manualNameInput.disabled = false;
+                    manualAgeInput.disabled = false;
+                    liveTextContainer.classList.add('hidden');
+                    break;
+                case 'BUSY':
+                    talkButton.textContent = 'THINKING...';
+                    talkButton.disabled = true;
+                    statusIndicator.className = 'w-3 h-3 rounded-full bg-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.5)]';
+                    liveTextContainer.classList.add('hidden');
+                    break;
+                default: // LISTENING STATES
+                    talkButton.textContent = 'LISTENING...';
+                    talkButton.disabled = false;
+                    statusIndicator.className = 'w-3 h-3 rounded-full bg-orange-500 listening-pulse';
+                    talkButton.className = "w-full py-4 rounded-xl text-lg font-bold text-white shadow-lg bg-red-800 border-2 border-red-600";
+                    manualNameInput.disabled = true;
+                    manualAgeInput.disabled = true;
+                    liveTextContainer.classList.remove('hidden');
+                    listeningStatus.textContent = "Waiting for 8s silence...";
+                    break;
+            }
+            // Media Buttons State
+            const mediaDisabled = (newState === 'IDLE');
+            pauseResumeButton.disabled = mediaDisabled;
+            stopSpeechButton.disabled = mediaDisabled;
+            replayButton.disabled = mediaDisabled;
+            endChatButton.disabled = mediaDisabled;
+        }
+
+        // --- SPEECH LOGIC (ANDROID FIXED) ---
+
+        function startRecognitionSafe() {
+            if (!recognition) return;
+            try {
+                // We DO NOT clear accumulatedTranscript here. 
+                // We only clear it when we process a final thought.
+                recognition.start();
+            } catch (e) { /* Already started */ }
+        }
+
+        function stopRecognitionSafe() {
+            if (!recognition) return;
+            try { recognition.stop(); } catch(e) {}
+        }
+
+        // CRITICAL: Android stops listening automatically. We must restart it if we are still "Listening".
+        function handleSpeechEnd() {
+            if ((appState !== 'IDLE' && appState !== 'BUSY') && !speechManuallyStopped) {
+                console.log("Android stopped mic. Restarting...");
+                startRecognitionSafe();
+            } else if (appState === 'IDLE') {
+                setState('IDLE');
+            }
+        }
+
+        function handleSpeechResultStream(event) {
+            clearTimeout(silenceTimer);
+
+            let interim = '';
+            let finalChunk = '';
+
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalChunk += event.results[i][0].transcript;
+                } else {
+                    interim += event.results[i][0].transcript;
+                }
+            }
+
+            // Add final chunks to our master accumulator
+            if (finalChunk) accumulatedTranscript += ' ' + finalChunk;
+            
+            // Display Feedback
+            liveTranscript.textContent = (accumulatedTranscript + " " + interim).slice(-50); // Show last 50 chars
+            listeningStatus.textContent = "Hearing you...";
+            listeningStatus.classList.remove("animate-pulse");
+
+            // THE 8-SECOND RULE
+            silenceTimer = setTimeout(() => {
+                const fullThought = (accumulatedTranscript + " " + interim).trim();
+                if (fullThought.length > 0) {
+                    processFinalInput(fullThought);
+                } else {
+                    listeningStatus.textContent = "Waiting for input...";
+                    listeningStatus.classList.add("animate-pulse");
+                }
+            }, SILENCE_DELAY_MS);
+        }
+
+        async function processFinalInput(text) {
+            console.log("Processing:", text);
+            // 1. Reset Accumulator for next turn
+            accumulatedTranscript = ''; 
+            
+            // 2. Stop Mic & State Change
+            speechManuallyStopped = true; // Prevent auto-restart logic for a moment
+            stopRecognitionSafe();
+            
+            const currentState = appState;
+            setState('BUSY');
+
+            try {
+                // 3. Routing Logic
+                if (currentState === 'LISTENING_FOR_WAKEWORD') {
+                    const lower = text.toLowerCase();
+                    const wakeWords = ['krishna', 'hare', 'jai', 'jay', 'shree', 'हरे', 'कृष्ण'];
+                    if (wakeWords.some(w => lower.includes(w))) {
+                        const msg = "राधे राधे! तुमचे नाव काय आहे?";
+                        logMessage('Krishna', msg);
+                        await speakText(msg);
+                        setState('LISTENING_FOR_NAME');
+                        speechManuallyStopped = false; startRecognitionSafe();
+                    } else {
+                        speechManuallyStopped = false; setState('LISTENING_FOR_WAKEWORD'); startRecognitionSafe();
+                    }
+                }
+                else if (currentState === 'LISTENING_FOR_NAME') {
+                    userName = text.split(' ').slice(0,2).join(' ');
+                    manualNameInput.value = userName;
+                    const msg = `नमस्ते ${userName}, वय सांगा?`;
+                    logMessage('Krishna', msg);
+                    await speakText(msg);
+                    setState('LISTENING_FOR_AGE');
+                    speechManuallyStopped = false; startRecognitionSafe();
+                }
+                else if (currentState === 'LISTENING_FOR_AGE') {
+                    userAge = parseInt(text.replace(/\D/g,'')) || 20;
+                    manualAgeInput.value = userAge;
+                    saveUserData();
+                    buildSystemPrompt();
+                    const msg = "अर्जुना, मी तयार आहे.";
+                    logMessage('Krishna', msg);
+                    await speakText(msg);
+                    setState('CONVERSATION');
+                    speechManuallyStopped = false; startRecognitionSafe();
+                }
+                else if (currentState === 'CONVERSATION') {
+                    logMessage(userName, text);
+                    chatHistory.push({ role: 'user', parts: [{ text: text }] });
+                    
+                    const aiText = await getAIResponse(chatHistory);
+                    const cleanAI = cleanTextForTTS(aiText);
+                    
+                    chatHistory.push({ role: 'model', parts: [{ text: cleanAI }] });
+                    logMessage('Krishna', cleanAI);
+                    
+                    await speakText(cleanAI);
+                    
+                    setState('CONVERSATION');
+                    speechManuallyStopped = false; startRecognitionSafe();
+                }
+            } catch (e) {
+                console.error(e);
+                setState('CONVERSATION');
+                speechManuallyStopped = false; startRecognitionSafe();
+            }
+        }
+
+        // --- BRAIN (GEMINI) ---
+        function buildSystemPrompt() {
+            const tone = (userAge <= 12) ? "Child mode: Short, simple stories." : "Adult mode: Deep philosophy, Gita verses.";
+            systemInstruction = `You are Lord Krishna. User is Arjuna. Lang: Marathi. ${tone} Give HOPE. End with 'Radhe Radhe'.`;
+        }
+
+        async function getAIResponse(history) {
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ contents: history, systemInstruction: { parts: [{ text: systemInstruction }] } })
+                });
+                const data = await res.json();
+                return data.candidates[0].content.parts[0].text.trim();
+            } catch (e) { return "पुन्हा सांगा?"; }
+        }
+
+        function cleanTextForTTS(txt) {
+            return txt.replace(/\[.*?\]|\(.*?\)|[\*#`]/g, '').trim();
+        }
+
+        // --- MOUTH (TTS) ---
+        function loadVoices() {
+            voices = synth.getVoices();
+            if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => voices = synth.getVoices();
+        }
+
+        async function speakText(text) {
+            if (synth.speaking) synth.cancel();
+            lastSpokenText = text;
+            if (voices.length === 0) voices = synth.getVoices();
+
+            return new Promise((resolve) => {
+                const utt = new SpeechSynthesisUtterance(text);
+                utt.onend = resolve;
+                utt.onerror = resolve; // Proceed even on error
+                
+                // Android often has "Hindi India" or "Marathi India". 
+                // We prefer Google's network voices if available.
+                const preferred = voices.find(v => v.lang === 'mr-IN' || v.lang === 'hi-IN');
+                if (preferred) utt.voice = preferred;
+                
+                utt.lang = 'mr-IN';
+                utt.rate = 0.9; 
+                synth.speak(utt);
+            });
+        }
+
+        // --- UTILS ---
+        function togglePauseResume() {
+            if (synth.paused) synth.resume();
+            else if (synth.speaking) { synth.pause(); stopRecognitionSafe(); setState('BUSY'); }
+        }
+        function stopSpeech() { 
+            synth.cancel(); stopRecognitionSafe(); speechManuallyStopped = true;
+            setTimeout(() => { speechManuallyStopped = false; if(appState !== 'IDLE') { setState('CONVERSATION'); startRecognitionSafe(); }}, 1500);
+        }
+        function replaySpeech() { if(lastSpokenText) { stopRecognitionSafe(); setState('BUSY'); speakText(lastSpokenText).then(() => { setState('CONVERSATION'); startRecognitionSafe(); }); } }
+        
+        function logMessage(sender, msg) {
+            const div = document.createElement('div');
+            if (sender === 'Krishna') {
+                div.innerHTML = `<div class="bg-orange-900/40 border-l-2 border-orange-500 p-2 rounded-r-lg rounded-bl-lg text-yellow-50 text-sm"><span class="text-orange-400 font-bold block text-xs mb-1">KRISHNA</span>${msg}</div>`;
+            } else if (sender === 'System') {
+                 div.innerHTML = `<div class="text-center text-xs text-gray-500 my-2">${msg}</div>`;
+            } else {
+                div.innerHTML = `<div class="bg-gray-800/40 p-2 rounded-l-lg rounded-br-lg text-right text-white text-sm ml-auto max-w-[85%]"><span class="text-green-400 font-bold block text-xs mb-1">YOU</span>${msg}</div>`;
+            }
+            conversationLog.appendChild(div);
+            conversationLog.scrollTop = conversationLog.scrollHeight;
+        }
+
+        async function endChat() {
+            appState = 'IDLE'; setState('IDLE');
+            synth.cancel(); stopRecognitionSafe();
+            await releaseWakeLock();
+            chatHistory = []; conversationLog.innerHTML = '<div class="text-center text-xs text-gray-500 mt-10">Ended</div>';
+        }
+        
+        async function restartChat() { endChat(); }
+
+        async function acquireWakeLock() {
+            if ('wakeLock' in navigator) { try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {} }
+        }
+        async function releaseWakeLock() {
+            if (wakeLock) { try { wakeLock.release(); wakeLock = null; } catch (e) {} }
+        }
+    </script>
+</body>
+</html>
