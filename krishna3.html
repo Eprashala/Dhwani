@@ -6,13 +6,12 @@
     <title>ई-प्रशाळा: गीता सारथी (AI कृष्ण)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Use generic sans-serif for Marathi support */
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         
         /* ANIMATION: Golden Divine Pulse */
         .listening-pulse { animation: pulse 2s infinite ease-in-out; }
         @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7); } /* Gold */
+            0% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7); } 
             70% { box-shadow: 0 0 0 20px rgba(255, 215, 0, 0); }
             100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); }
         }
@@ -46,14 +45,33 @@
             color: #ffffff !important;             
             caret-color: #ffd700 !important;       
         }
-        .custom-input::placeholder {
-            color: #9ca3af !important;
-            opacity: 1 !important;
-        }
+        .custom-input::placeholder { color: #9ca3af !important; opacity: 1 !important; }
     </style>
 </head>
 
 <body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4" oncontextmenu="return false;">
+
+    <div id="api-modal" class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center hidden backdrop-blur-sm p-4">
+        <div class="bg-gray-800 border-2 border-yellow-500 rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
+            <div class="text-4xl mb-4">🔑</div>
+            <h2 class="text-xl font-bold text-yellow-400 mb-2">API Key आवश्यक आहे</h2>
+            <p class="text-gray-300 text-sm mb-6">
+                उत्कृष्ट आणि जलद निकालांसाठी कृपया तुमची स्वतःची Google Gemini API Key वापरा. हे मोफत आहे.
+                <br><span class="text-xs text-gray-500">(For best results, use your own API Key)</span>
+            </p>
+            
+            <div class="flex flex-col gap-3">
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" 
+                   class="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition-colors">
+                   मोफत मिळवा (Get Free Here) ↗
+                </a>
+                <button id="modal-continue-btn" 
+                        class="w-full py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-semibold transition-colors border border-gray-600">
+                    आत्ता पुढे चला (Continue)
+                </button>
+            </div>
+        </div>
+    </div>
 
     <div class="bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-2xl flex flex-col h-[95vh] md:h-auto border-t-4 border-yellow-500 border-b-4 border-cyan-600">
         
@@ -149,20 +167,12 @@
 
     <script>
         /* ==========================================================================
-           CODE: GEETA SARATHI (STRICT MARATHI EDITION)
+           GEETA SARATHI: CORE LOGIC
            ==========================================================================
         */
 
         // --- UTILITY: PREVENT RIGHT CLICK ---
         document.addEventListener('contextmenu', event => event.preventDefault());
-
-        // --- UTILITY: FULLSCREEN MODE ---
-        function enterFullScreen() {
-            const elem = document.documentElement;
-            if (elem.requestFullscreen) { elem.requestFullscreen(); } 
-            else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); } 
-            else if (elem.msRequestFullscreen) { elem.msRequestFullscreen(); }
-        }
 
         // --- DOM ELEMENTS ---
         const talkButton = document.getElementById('talk-button');
@@ -178,7 +188,9 @@
         const endChatButton = document.getElementById('end-chat-button');
         const restartChatButton = document.getElementById('restart-chat-button');
         
-        // Advance Settings
+        // Modal & Advance Settings
+        const apiModal = document.getElementById('api-modal');
+        const modalContinueBtn = document.getElementById('modal-continue-btn');
         const advanceToggleBtn = document.getElementById('advance-toggle-btn');
         const advanceContainer = document.getElementById('advance-container');
         const useCustomKeyCheckbox = document.getElementById('use-custom-key-checkbox');
@@ -186,7 +198,7 @@
         const pasteKeyBtn = document.getElementById('paste-key-btn');
 
         // --- CONFIGURATION & STATE ---
-        const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; // Keep default for demo
+        const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
         let appState = 'IDLE'; 
         let userName = '';
         let userAge = 18;
@@ -195,6 +207,7 @@
         let recognition;
         let lastSpokenText = ''; 
         let speechManuallyStopped = false; 
+        let isAiSpeaking = false; // Flag to prevent self-hearing
         const synth = window.speechSynthesis;
         let voices = [];
         let wakeLock = null;
@@ -204,7 +217,20 @@
             if (synth.speaking) synth.cancel();
             loadUserData();
             loadVoices();
+            checkAndShowModal();
         };
+
+        // --- MODAL LOGIC ---
+        function checkAndShowModal() {
+            const hasCustomKey = localStorage.getItem('krishna_mr_useCustomKey') === 'true';
+            if (!hasCustomKey) {
+                apiModal.classList.remove('hidden');
+            }
+        }
+        
+        modalContinueBtn.addEventListener('click', () => {
+            apiModal.classList.add('hidden');
+        });
 
         // --- UI HANDLERS ---
         advanceToggleBtn.addEventListener('click', () => {
@@ -217,7 +243,10 @@
             customApiKeyInput.disabled = !isChecked;
             pasteKeyBtn.disabled = !isChecked;
             saveUserData(); 
-            if (isChecked) customApiKeyInput.focus();
+            if (isChecked) {
+                customApiKeyInput.focus();
+                apiModal.classList.add('hidden'); // Hide modal if they enable this manually
+            }
         });
 
         customApiKeyInput.addEventListener('input', saveUserData);
@@ -297,12 +326,12 @@
             recognition = new SpeechRecognition();
             recognition.continuous = false; 
             recognition.interimResults = false;
-            recognition.lang = 'mr-IN'; // Strictly Marathi
+            recognition.lang = 'mr-IN'; 
 
             recognition.onresult = handleSpeechResult;
             recognition.onend = handleSpeechEnd;
             recognition.onerror = (event) => {
-                if (event.error === 'no-speech' && appState !== 'IDLE' && appState !== 'BUSY') {
+                if (event.error === 'no-speech' && appState !== 'IDLE' && appState !== 'BUSY' && !isAiSpeaking) {
                     startRecognitionSafe();
                 } else if (event.error === 'not-allowed') {
                     setState('IDLE');
@@ -311,7 +340,7 @@
         }
 
         function startRecognitionSafe() {
-            if (!recognition) return;
+            if (!recognition || isAiSpeaking) return; // STRICT CHECK: Don't listen if speaking
             try { recognition.start(); } catch (e) {}
         }
 
@@ -323,6 +352,12 @@
         shareButton.addEventListener('click', shareChat);
         endChatButton.addEventListener('click', endChat);
         restartChatButton.addEventListener('click', restartChat);
+
+        function enterFullScreen() {
+            const elem = document.documentElement;
+            if (elem.requestFullscreen) { elem.requestFullscreen(); } 
+            else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); } 
+        }
 
         async function toggleListening() {
             if (appState === 'IDLE') {
@@ -357,7 +392,7 @@
                         setState('BUSY'); 
                         await speakText(welcomeText, 'mr-IN');
                         setState('CONVERSATION');
-                        startRecognitionSafe();
+                        // Recognition starts in speakText onend
                     }
 
                 } else {
@@ -407,6 +442,9 @@
         }
 
         function handleSpeechEnd() {
+            // CRITICAL FIX: Do NOT restart listening if AI is currently speaking
+            if (isAiSpeaking) return;
+
             if (appState !== 'IDLE' && appState !== 'BUSY') startRecognitionSafe();
             else if (appState === 'IDLE') setState('IDLE'); 
         }
@@ -426,13 +464,12 @@
             try {
                 switch (currentState) {
                     case 'LISTENING_FOR_WAKEWORD':
-                        // CHECK FOR KRISHNA WAKE WORDS
                         if (lowerTranscript.includes('krishna') || lowerTranscript.includes('hare') || lowerTranscript.includes('jai') || lowerTranscript.includes('कृष्ण')) {
                             const greeting = "राधे राधे! सखा, तुझे नाव काय आहे?";
                             logMessage('Krishna', greeting);
                             await speakText(greeting, 'mr-IN');
                             setState('LISTENING_FOR_NAME');
-                            startRecognitionSafe(); 
+                            // startRecognitionSafe happens in speakText onend
                         } else {
                             setState('LISTENING_FOR_WAKEWORD');
                             startRecognitionSafe();
@@ -448,7 +485,6 @@
                         logMessage('Krishna', agePrompt);
                         await speakText(agePrompt, 'mr-IN');
                         setState('LISTENING_FOR_AGE');
-                        startRecognitionSafe();
                         break;
 
                     case 'LISTENING_FOR_AGE':
@@ -462,7 +498,6 @@
                         logMessage('Krishna', startPrompt);
                         await speakText(startPrompt, 'mr-IN');
                         setState('CONVERSATION');
-                        startRecognitionSafe();
                         break;
 
                     case 'CONVERSATION':
@@ -472,7 +507,7 @@
 
                         const aiResponseText = await generateTextResponseFromChat();
                         
-                        // CRITICAL: CLEANING TEXT BEFORE SPEAKING/SHOWING
+                        // Clean Text
                         const cleanedResponseText = cleanTextForTTS(aiResponseText);
 
                         chatHistory.push({ role: 'model', parts: [{ text: cleanedResponseText }] });
@@ -484,7 +519,6 @@
                         catch (error) { if (error.message === "Speech manually stopped") return; }
                         
                         setState('CONVERSATION');
-                        startRecognitionSafe();
                         break;
                 }
             } catch (error) {
@@ -493,7 +527,7 @@
             }
         }
 
-        // --- THE BRAIN: LORD KRISHNA PERSONA (STRICT MARATHI) ---
+        // --- BRAIN ---
         function buildSystemPrompt() {
             let complexityInstruction = "";
             if (userAge <= 12) {
@@ -507,7 +541,7 @@
                 You are speaking to ${userName}, age ${userAge}.
                 
                 CRITICAL RULES:
-                1. **LANGUAGE:** YOU MUST SPEAK ONLY IN MARATHI (Devanagari script). NEVER use English sentences. If you must use a technical term, write it in Marathi script (e.g., 'Stress' -> 'ताण').
+                1. **LANGUAGE:** YOU MUST SPEAK ONLY IN MARATHI (Devanagari script). NEVER use English sentences.
                 2. **FORMATTING:** Do NOT use Markdown. Do NOT use asterisks (*), hashes (#), or brackets ([]). Write plain text only.
                 3. **TONE:** Compassionate, Soft, Divine, like a Best Friend (Sakha).
                 4. **CONTENT:**
@@ -548,7 +582,6 @@
         }
 
         async function extractNameFromTranscript(transcript) {
-            // Ask AI to return just the name text
             try {
                 const prompt = { contents: [{ parts: [{ text: `Extract Name from: "${transcript}". Return ONLY the name text in Marathi script if possible.` }] }] };
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
@@ -570,19 +603,20 @@
             } catch (e) { return 18; }
         }
 
-        // --- CLEANER ENGINE: REMOVES < > [ ] { } ^ ---
+        // --- CLEANER ENGINE: FIXED SPACING ISSUE ---
         function cleanTextForTTS(text) {
-            // 1. Remove specific characters requested: < > [ ] { } ^
+            // FIXED REGEX: removed space from character class so spaces are PRESERVED
+            // Removed: space inside []
             let cleaned = text.replace(/[<>[\]{}\^]/g, ""); 
             
-            // 2. Remove Markdown symbols (*, #, `) just in case AI slips
+            // Remove Markdown symbols
             cleaned = cleaned.replace(/[\*#`]/g, '');
             
-            // 3. Clean extra spaces
+            // Clean extra spaces (normalize)
             return cleaned.replace(/\s+/g, ' ').trim();
         }
 
-        // --- THE MOUTH: VOICE SELECTION (MALE MARATHI) ---
+        // --- VOICE & MIC CONTROL ---
         function loadVoices() {
             voices = synth.getVoices();
             if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => { voices = synth.getVoices(); };
@@ -597,7 +631,10 @@
             if (!synth.speaking) return;
             speechManuallyStopped = true; 
             synth.cancel(); 
+            // Reset Mic State
+            isAiSpeaking = false;
             recognition.stop(); 
+            
             toggleMediaButtons(true);
             setTimeout(() => {
                 speechManuallyStopped = false;
@@ -611,36 +648,51 @@
         
         async function speakText(text, lang = 'mr-IN') {
             if (synth.speaking) synth.cancel();
+            
+            // CRITICAL: STOP LISTENING IMMEDIATELY
+            if (recognition) recognition.stop();
+            isAiSpeaking = true; // Set flag to lock mic
+
             lastSpokenText = text;
             speechManuallyStopped = false;
             if (voices.length === 0) voices = synth.getVoices();
 
             return new Promise((resolve, reject) => {
                 const utterance = new SpeechSynthesisUtterance(text);
+                
                 utterance.onstart = () => { toggleMediaButtons(false); };
+                
+                // CRITICAL: RESTART LISTENING ONLY AFTER SPEAKING ENDS
                 utterance.onend = () => {
                     toggleMediaButtons(true);
-                    if (speechManuallyStopped) reject(new Error("Speech manually stopped"));
-                    else resolve();
+                    isAiSpeaking = false; // Unlock mic
+                    
+                    if (speechManuallyStopped) {
+                        reject(new Error("Speech manually stopped"));
+                    } else {
+                        // Only auto-restart mic if we are in active mode
+                        if (appState === 'CONVERSATION' || appState === 'LISTENING_FOR_NAME' || appState === 'LISTENING_FOR_AGE') {
+                            startRecognitionSafe();
+                        }
+                        resolve();
+                    }
                 };
-                utterance.onerror = (e) => { toggleMediaButtons(true); resolve(); };
+                
+                utterance.onerror = (e) => { 
+                    toggleMediaButtons(true); 
+                    isAiSpeaking = false; // Unlock mic on error
+                    resolve(); 
+                };
 
-                // --- LOGIC: FIND MALE VOICE (INDIA) ---
-                // Priority 1: Marathi Male
                 let preferredVoice = voices.find(v => v.lang === 'mr-IN' && (v.name.toLowerCase().includes('male') || v.name.includes('Voice 2')));
-                // Priority 2: Any Marathi
                 if (!preferredVoice) preferredVoice = voices.find(v => v.lang === 'mr-IN');
-                // Priority 3: Hindi Male (often sounds good for Marathi)
                 if (!preferredVoice) preferredVoice = voices.find(v => v.lang === 'hi-IN' && v.name.toLowerCase().includes('male'));
-                // Priority 4: Any Hindi
                 if (!preferredVoice) preferredVoice = voices.find(v => v.lang === 'hi-IN');
 
                 if (preferredVoice) utterance.voice = preferredVoice;
                 utterance.lang = 'mr-IN';
-                
-                // Speech Rate Adjustment for gravitas
                 utterance.rate = 0.9; 
-                utterance.pitch = 0.7; // Slightly deeper
+                utterance.pitch = 0.7; 
                 
                 synth.speak(utterance);
             });
@@ -652,7 +704,7 @@
             replayButton.disabled = disabled;
         }
         
-        // --- LOGGING & EXTRAS ---
+        // --- LOGGING ---
         function logMessage(sender, message) {
             const div = document.createElement('div');
             let senderClass = 'text-cyan-300 font-semibold';
@@ -696,6 +748,7 @@
             speechManuallyStopped = true;
             if (synth.speaking) synth.cancel();
             if (recognition) try { recognition.stop(); } catch (e) {}
+            isAiSpeaking = false;
             await releaseWakeLock();
             
             userName = ''; userAge = 18; chatHistory = [];
@@ -708,6 +761,7 @@
             if (synth.speaking) synth.cancel();
             if (recognition) try { recognition.stop(); } catch(e){}
             appState = 'IDLE'; setState('IDLE');
+            isAiSpeaking = false;
             await releaseWakeLock();
             conversationLog.innerHTML = '';
             if(userName) {
