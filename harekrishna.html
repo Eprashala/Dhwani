@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ई-प्रशाळा: गीता सारथी (AI कृष्ण)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Modern Font Stack for clear Marathi text */
+        body { font-family: 'Nirmala UI', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        /* Message Formatting: Preserves spaces and newlines */
+        .chat-message { white-space: pre-wrap; word-wrap: break-word; }
+
+        /* ANIMATION: Golden Divine Pulse */
+        .listening-pulse { animation: pulse 2s infinite ease-in-out; }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7); } 
+            70% { box-shadow: 0 0 0 20px rgba(255, 215, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); }
+        }
+
+        /* UI: Icon Button Styles */
+        .icon-btn {
+            @apply p-3 rounded-full text-white transition-all duration-200
+                   bg-gray-700 hover:bg-yellow-600 shadow-lg
+                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-yellow-500
+                   disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none;
+        }
+        
+        /* UI: General Buttons */
+        .utility-btn {
+            @apply w-full py-3 px-2 rounded-lg text-sm font-semibold transition-colors
+                   bg-gray-700 text-white
+                   hover:bg-gray-600
+                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-yellow-500
+                   disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed;
+        }
+
+        /* UI: Custom Checkbox */
+        .custom-checkbox {
+            @apply w-4 h-4 text-yellow-500 bg-gray-700 border-gray-600 rounded focus:ring-yellow-500 focus:ring-2 ring-offset-gray-800;
+        }
+        
+        /* UI: High Contrast Inputs */
+        .custom-input {
+            @apply block w-3/4 mx-auto text-center border border-gray-500 rounded-lg p-3 outline-none transition-all;
+            background-color: #000000 !important; 
+            color: #ffffff !important;             
+            caret-color: #ffd700 !important;       
+        }
+        .custom-input::placeholder { color: #9ca3af !important; opacity: 1 !important; }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4" oncontextmenu="return false;">
+
+    <div id="api-modal" class="fixed inset-0 bg-black/95 z-50 flex items-center justify-center hidden backdrop-blur-md p-4">
+        <div class="bg-gray-800 border-2 border-yellow-500 rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl transform transition-all scale-100">
+            <div class="text-5xl mb-4">🕉️</div>
+            <h2 class="text-xl font-bold text-yellow-400 mb-2">API Key आवश्यक आहे</h2>
+            <p class="text-gray-300 text-sm mb-6 leading-relaxed">
+                कृपया तुमची स्वतःची Google Gemini API Key वापरा. हे पूर्णपणे मोफत आहे.
+            </p>
+            
+            <div class="flex flex-col gap-3">
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" 
+                   class="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white rounded-lg font-semibold transition-all shadow-lg flex items-center justify-center gap-2">
+                   <span>🔑</span> मोफत मिळवा (Get Free Key) ↗
+                </a>
+                <button id="modal-continue-btn" 
+                        class="w-full py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-semibold transition-colors border border-gray-600">
+                    की (Key) नंतर टाकेन (Continue)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-2xl flex flex-col h-[95vh] md:h-auto border-t-4 border-yellow-500 border-b-4 border-cyan-600 relative overflow-hidden">
+        
+        <div class="absolute top-0 right-0 p-4 opacity-5 pointer-events-none text-9xl">🕉️</div>
+
+        <div class="flex items-center justify-between mb-4 shrink-0 z-10">
+            <h1 class="text-2xl md:text-3xl font-bold text-white">
+                <span class="text-yellow-500">ई-प्रशाळा</span> "गीता <span class="text-cyan-400">सारथी</span>"
+            </h1>
+            <div id="status-indicator" class="w-4 h-4 rounded-full bg-gray-500 transition-colors shadow-[0_0_10px_rgba(255,255,255,0.3)]" title="Status"></div>
+        </div>
+
+        <div id="conversation-log" class="flex-grow overflow-y-auto bg-gray-900/80 rounded-lg p-4 mb-4 border border-gray-700 space-y-4 shadow-inner min-h-[200px] text-lg leading-relaxed">
+            <div class="text-gray-400 text-center mt-10">
+                सुरुवात करण्यासाठी <strong>"हरे कृष्ण"</strong> किंवा <strong>"जय श्री कृष्ण"</strong> म्हणा.<br>
+                <span class="text-xs text-yellow-600 mt-2 block">"मी तुमचा सखा, तुमच्या पाठीशी आहे."</span>
+            </div>
+        </div>
+
+        <div class="flex justify-center gap-8 mb-4 shrink-0 bg-gray-800/50 p-2 rounded-xl border border-gray-700">
+            <button id="pause-resume-button" class="icon-btn bg-blue-900/30 hover:bg-blue-800" title="विश्रांती / सुरू करा" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+                </svg>
+            </button>
+            
+            <button id="stop-speech-button" class="icon-btn bg-red-900/30 hover:bg-red-800" title="थांबवा" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z" />
+                </svg>
+            </button>
+
+            <button id="replay
