@@ -70,7 +70,7 @@
                 </a>
                 <button id="modal-continue-btn" 
                         class="w-full py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-semibold transition-colors border border-gray-600">
-                    की (Key) नंतर टाकेन (Continue)
+                    की (Key) सेटिंग्ज मध्ये टाका
                 </button>
             </div>
         </div>
@@ -133,23 +133,14 @@
         </div>
 
         <div class="w-full flex flex-col items-center justify-center mb-4 shrink-0">
-            <button id="advance-toggle-btn" class="text-xs text-yellow-500 hover:text-yellow-400 underline mb-2 focus:outline-none">
-                ▼ प्रगत सेटिंग्ज (API Key)
-            </button>
-
-            <div id="advance-container" class="hidden w-full bg-gray-800/80 border border-gray-700 rounded-lg p-4 flex flex-col gap-3 transition-all">
+            <div id="advance-container" class="w-full bg-gray-800/80 border border-yellow-500/30 rounded-lg p-4 flex flex-col gap-3 transition-all">
+                <label class="text-xs text-yellow-500 font-bold block text-center">
+                    YOUR GOOGLE API KEY (REQUIRED)
+                </label>
+                <input type="text" id="custom-api-key-input" class="custom-input text-xs w-full !w-full !border-yellow-500" placeholder="Paste Key Here (AIza...)">
                 
-                <div class="flex items-center gap-2">
-                    <input type="checkbox" id="use-custom-key-checkbox" class="custom-checkbox">
-                    <label for="use-custom-key-checkbox" class="text-sm text-gray-300 cursor-pointer select-none">
-                        स्वतःची API Key वापरा (Recommended)
-                    </label>
-                </div>
-
-                <input type="text" id="custom-api-key-input" class="custom-input text-xs w-full !w-full" placeholder="Paste API Key here (AIza...)" disabled>
-                
-                <button id="paste-key-btn" type="button" disabled class="w-full py-2 px-4 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                    📋 API Key पेस्ट करा
+                <button id="paste-key-btn" type="button" class="w-full py-2 px-4 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded transition-colors flex items-center justify-center gap-2">
+                    📋 Paste Key
                 </button>
             </div>
         </div>
@@ -172,7 +163,7 @@
 
     <script>
         /* ==========================================================================
-           GEETA SARATHI: CODEBASE (FIXED MODEL VERSION)
+           GEETA SARATHI: CODEBASE (FINAL STABLE)
            ==========================================================================
         */
 
@@ -193,19 +184,14 @@
         const endChatButton = document.getElementById('end-chat-button');
         const restartChatButton = document.getElementById('restart-chat-button');
         
-        // Modal & Advance Settings
+        // Modal & Settings
         const apiModal = document.getElementById('api-modal');
         const modalContinueBtn = document.getElementById('modal-continue-btn');
-        const advanceToggleBtn = document.getElementById('advance-toggle-btn');
-        const advanceContainer = document.getElementById('advance-container');
-        const useCustomKeyCheckbox = document.getElementById('use-custom-key-checkbox');
         const customApiKeyInput = document.getElementById('custom-api-key-input');
         const pasteKeyBtn = document.getElementById('paste-key-btn');
 
         // --- CONFIGURATION & STATE ---
-        // FALLBACK KEY (Often rate limited)
-        const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
-        
+        // REMOVED DEFAULT KEY TO FORCE USER KEY
         let appState = 'IDLE'; 
         let userName = '';
         let userAge = 18;
@@ -229,51 +215,42 @@
 
         // --- MODAL LOGIC ---
         function checkAndShowModal() {
-            // Show modal if user hasn't explicitly set a custom key
-            const hasCustomKey = localStorage.getItem('krishna_mr_useCustomKey') === 'true';
-            if (!hasCustomKey) {
+            // If no key is saved, show modal
+            const savedKey = localStorage.getItem('krishna_mr_customKey');
+            if (!savedKey || savedKey.length < 10) {
                 apiModal.classList.remove('hidden');
             }
         }
         
         modalContinueBtn.addEventListener('click', () => {
             apiModal.classList.add('hidden');
+            customApiKeyInput.focus();
         });
 
-        // --- UI HANDLERS ---
-        advanceToggleBtn.addEventListener('click', () => {
-            advanceContainer.classList.toggle('hidden');
-            advanceContainer.classList.toggle('flex');
-        });
-
-        useCustomKeyCheckbox.addEventListener('change', () => {
-            const isChecked = useCustomKeyCheckbox.checked;
-            customApiKeyInput.disabled = !isChecked;
-            pasteKeyBtn.disabled = !isChecked;
-            saveUserData(); 
-            if (isChecked) {
-                customApiKeyInput.focus();
-                apiModal.classList.add('hidden'); 
+        // --- KEY MANAGEMENT ---
+        customApiKeyInput.addEventListener('input', () => {
+            saveUserData();
+            if(customApiKeyInput.value.length > 10) {
+                apiModal.classList.add('hidden');
             }
         });
-
-        customApiKeyInput.addEventListener('input', saveUserData);
 
         pasteKeyBtn.addEventListener('click', async () => {
             try {
                 const text = await navigator.clipboard.readText();
                 if(text) {
-                    customApiKeyInput.value = text;
+                    customApiKeyInput.value = text.trim();
                     saveUserData();
+                    apiModal.classList.add('hidden');
                 }
-            } catch (err) { alert('पेस्ट करता आले नाही (Clipboard permission needed).'); }
+            } catch (err) { alert('पेस्ट करता आले नाही. कृपया टाईप करा.'); }
         });
 
         function getEffectiveApiKey() {
-            if (useCustomKeyCheckbox.checked && customApiKeyInput.value.trim().length > 10) {
-                return customApiKeyInput.value.trim();
-            }
-            return DEFAULT_API_KEY;
+            // STRICT: Must have a key
+            const key = customApiKeyInput.value.trim();
+            if (key.length > 10) return key;
+            return ""; // No fallback
         }
 
         // --- MEMORY LOGIC ---
@@ -284,14 +261,10 @@
                 manualNameInput.value = localStorage.getItem('krishna_mr_userName') || '';
                 manualAgeInput.value = localStorage.getItem('krishna_mr_userAge') || '';
             }
-            const savedUseKey = localStorage.getItem('krishna_mr_useCustomKey');
+            
+            // Always try to load key
             const savedKey = localStorage.getItem('krishna_mr_customKey');
-            if (savedUseKey === 'true') {
-                useCustomKeyCheckbox.checked = true;
-                customApiKeyInput.disabled = false;
-                pasteKeyBtn.disabled = false;
-                if (savedKey) customApiKeyInput.value = savedKey;
-            }
+            if (savedKey) customApiKeyInput.value = savedKey;
         }
 
         function saveUserData() {
@@ -304,7 +277,7 @@
                 localStorage.removeItem('krishna_mr_userName');
                 localStorage.removeItem('krishna_mr_userAge');
             }
-            localStorage.setItem('krishna_mr_useCustomKey', useCustomKeyCheckbox.checked);
+            // Always save key if present
             if (customApiKeyInput.value) localStorage.setItem('krishna_mr_customKey', customApiKeyInput.value.trim());
         }
 
@@ -368,6 +341,14 @@
         }
 
         async function toggleListening() {
+            const apiKey = getEffectiveApiKey();
+            if (!apiKey) {
+                alert("कृपया आधी API Key टाका (Please Enter API Key first)");
+                customApiKeyInput.focus();
+                apiModal.classList.remove('hidden');
+                return;
+            }
+
             if (appState === 'IDLE') {
                 try { enterFullScreen(); } catch(e) {} 
                 
@@ -448,9 +429,7 @@
         }
 
         function handleSpeechEnd() {
-            // STRICTLY ignore restart if AI is speaking
             if (isAiSpeaking) return;
-
             if (appState !== 'IDLE' && appState !== 'BUSY') startRecognitionSafe();
             else if (appState === 'IDLE') setState('IDLE'); 
         }
@@ -511,8 +490,7 @@
                         saveChatContext();
 
                         const aiResponseText = await generateTextResponseFromChat();
-                        
-                        // FIX: Ensure this returns a string, never undefined
+                        // NO FILTER, just pass text
                         const cleanedResponseText = cleanTextForTTS(aiResponseText);
 
                         chatHistory.push({ role: 'model', parts: [{ text: cleanedResponseText }] });
@@ -532,7 +510,7 @@
             }
         }
 
-        // --- BRAIN: GEMINI ---
+        // --- BRAIN: GEMINI (STABLE) ---
         function buildSystemPrompt() {
             let complexityInstruction = "";
             if (userAge <= 12) {
@@ -568,10 +546,14 @@
             return await fetchGemini(chatHistory);
         }
 
-        // --- CORE API FUNCTION (FIXED URL) ---
+        // --- CORE API FUNCTION (STABLE MODEL) ---
         async function fetchGemini(contents) {
-            // FIXED: CHANGED MODEL TO STANDARD 'gemini-1.5-flash'
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${getEffectiveApiKey()}`;
+            const apiKey = getEffectiveApiKey();
+            if(!apiKey) return "API Key नाही. कृपया Key टाका.";
+
+            // Use Standard Flash model
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+            
             try {
                 const response = await fetch(apiUrl, {
                     method: 'POST',
@@ -584,28 +566,27 @@
                 
                 const result = await response.json();
                 
-                // Detailed Error Handling
+                // --- ROBUST ERROR HANDLING ---
                 if (result.error) {
                     console.error("Gemini API Error:", result.error);
-                    return "क्षमस्व सखा, API मध्ये त्रुटी आली आहे. कृपया तुमची की (Key) तपासा.";
+                    // RETURN THE ACTUAL ERROR MESSAGE TO THE USER
+                    return `Error: ${result.error.message}`;
                 }
                 
                 if (!result.candidates || !result.candidates[0].content) {
-                    console.error("No content in response:", result);
-                    return "सखा, मला पुन्हा एकदा सांग.";
+                    return "क्षमस्व, काहीतरी चूक झाली.";
                 }
                 
                 return result.candidates[0].content.parts[0].text.trim();
             } catch (error) {
                 console.error("Network Error:", error);
-                return "सखा, इंटरनेट जोडणी तपासा.";
+                return "इंटरनेट त्रुटी.";
             }
         }
 
         async function extractNameFromTranscript(transcript) {
             try {
-                const prompt = { contents: [{ parts: [{ text: `Extract Name from: "${transcript}". Return ONLY the name text in Marathi script if possible.` }] }] };
-                // Using Flash 1.5 here too
+                const prompt = { contents: [{ parts: [{ text: `Extract Name from: "${transcript}". Return ONLY the name text in Marathi script.` }] }] };
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${getEffectiveApiKey()}`;
                 const res = await fetch(apiUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(prompt)});
                 const data = await res.json();
@@ -617,7 +598,6 @@
         async function extractAgeFromTranscript(transcript) {
             try {
                 const prompt = { contents: [{ parts: [{ text: `Extract age number from: "${transcript}". Return ONLY digits.` }] }] };
-                // Using Flash 1.5 here too
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${getEffectiveApiKey()}`;
                 const res = await fetch(apiUrl, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(prompt)});
                 const data = await res.json();
@@ -626,7 +606,7 @@
             } catch (e) { return 18; }
         }
 
-        // --- CLEANER ENGINE: PASS-THROUGH ---
+        // --- CLEANER ENGINE: PASS-THROUGH (NO CHANGES) ---
         function cleanTextForTTS(text) {
             if (!text) return "";
             return text; 
@@ -649,7 +629,6 @@
             synth.cancel(); 
             isAiSpeaking = false;
             recognition.stop(); 
-            
             toggleMediaButtons(true);
             setTimeout(() => {
                 speechManuallyStopped = false;
@@ -662,28 +641,21 @@
         }
         
         async function speakText(text, lang = 'mr-IN') {
-            if (!text || text === "undefined") return;
+            if (!text || text === "undefined" || text.startsWith("Error:")) return;
 
             if (synth.speaking) synth.cancel();
-            
-            // CRITICAL: KILL MIC WHILE SPEAKING
             if (recognition) recognition.abort(); 
             isAiSpeaking = true; 
-
             lastSpokenText = text;
             speechManuallyStopped = false;
             if (voices.length === 0) voices = synth.getVoices();
 
             return new Promise((resolve, reject) => {
                 const utterance = new SpeechSynthesisUtterance(text);
-                
                 utterance.onstart = () => { toggleMediaButtons(false); };
-                
-                // CRITICAL: RE-ENABLE MIC ONLY AFTER SPEECH ENDS
                 utterance.onend = () => {
                     toggleMediaButtons(true);
                     isAiSpeaking = false; 
-                    
                     if (speechManuallyStopped) {
                         reject(new Error("Speech manually stopped"));
                     } else {
@@ -693,12 +665,7 @@
                         resolve();
                     }
                 };
-                
-                utterance.onerror = (e) => { 
-                    toggleMediaButtons(true); 
-                    isAiSpeaking = false; 
-                    resolve(); 
-                };
+                utterance.onerror = (e) => { toggleMediaButtons(true); isAiSpeaking = false; resolve(); };
 
                 let preferredVoice = voices.find(v => v.lang === 'mr-IN' && (v.name.toLowerCase().includes('male') || v.name.includes('Voice 2')));
                 if (!preferredVoice) preferredVoice = voices.find(v => v.lang === 'mr-IN');
@@ -709,7 +676,6 @@
                 utterance.lang = 'mr-IN';
                 utterance.rate = 0.9; 
                 utterance.pitch = 0.7; 
-                
                 synth.speak(utterance);
             });
         }
@@ -724,11 +690,9 @@
         function logMessage(sender, message) {
             const div = document.createElement('div');
             div.className = "chat-message"; 
-            
             let senderClass = 'text-cyan-300 font-semibold';
             if (sender === 'Krishna') senderClass = 'text-yellow-400 font-bold';
             else if (sender === 'You') senderClass = 'text-green-300 font-semibold';
-
             div.innerHTML = `<strong class="${senderClass}">${sender}:</strong> <span class="text-white">${message}</span>`;
             conversationLog.appendChild(div);
             conversationLog.scrollTop = conversationLog.scrollHeight;
@@ -768,7 +732,6 @@
             if (recognition) try { recognition.abort(); } catch (e) {}
             isAiSpeaking = false;
             await releaseWakeLock();
-            
             userName = ''; userAge = 18; chatHistory = [];
             conversationLog.innerHTML = '<div class="text-gray-400 text-center">संवाद थांबवला आहे.</div>';
             restartChatButton.disabled = true;
