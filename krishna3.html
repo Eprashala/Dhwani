@@ -9,6 +9,9 @@
         /* Modern Font Stack for clear Marathi text */
         body { font-family: 'Nirmala UI', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         
+        /* Message Formatting: Preserves spaces and newlines */
+        .chat-message { white-space: pre-wrap; word-wrap: break-word; }
+
         /* ANIMATION: Golden Divine Pulse */
         .listening-pulse { animation: pulse 2s infinite ease-in-out; }
         @keyframes pulse {
@@ -506,6 +509,8 @@
                         saveChatContext();
 
                         const aiResponseText = await generateTextResponseFromChat();
+                        
+                        // FIX: Ensure this returns a string, never undefined
                         const cleanedResponseText = cleanTextForTTS(aiResponseText);
 
                         chatHistory.push({ role: 'model', parts: [{ text: cleanedResponseText }] });
@@ -561,6 +566,7 @@
             return await fetchGemini(chatHistory);
         }
 
+        // FIX: ROBUST ERROR HANDLING TO PREVENT "UNDEFINED"
         async function fetchGemini(contents) {
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
             try {
@@ -572,9 +578,18 @@
                         systemInstruction: { parts: [{ text: systemInstruction }] }
                     })
                 });
+                
                 const result = await response.json();
+                
+                // Safety check: if API returns error or blocks content, return fallback
+                if (result.error || !result.candidates || !result.candidates[0].content) {
+                    console.error("Gemini API Error:", result);
+                    return "क्षमस्व सखा, तांत्रिक अडचण आली आहे. कृपया पुन्हा प्रयत्न करा.";
+                }
+                
                 return result.candidates[0].content.parts[0].text.trim();
             } catch (error) {
+                console.error("Network Error:", error);
                 return "माफ करा सखा, मला पुन्हा सांगा.";
             }
         }
@@ -601,17 +616,14 @@
             } catch (e) { return 18; }
         }
 
-        // --- CLEANER ENGINE: THE FIX FOR SPACING ---
-        // function cleanTextForTTS(text) {
-            // 1. Replace symbols with a SPACE (Not empty string) to prevent word merging
-            // Replaces: *, #, `, [, ], {, }, <, >, ^
-           // let cleaned = text.replace(/[\*#`\[\]{}<>\^]/g, '  '); 
+        // --- CLEANER ENGINE: FIX FOR UNDEFINED & SPACES ---
+        function cleanTextForTTS(text) {
+            // FIX: If text is somehow null/undefined, return empty string to prevent crash
+            if (!text) return "";
             
-            // 2. Collapse multiple spaces into one and trim edges
-         //   return cleaned.replace(/\s+/g, ' ').trim();
-// --- CLEANER ENGINE: FILTER REMOVED ---
-function cleanTextForTTS(text) {
-    return text; 
+            // FIX: Return text EXACTLY as is. Do NOT remove symbols or spaces.
+            // This ensures "Space" issues are gone.
+            return text; 
         }
 
         // --- VOICE & MIC CONTROL ---
@@ -644,6 +656,9 @@ function cleanTextForTTS(text) {
         }
         
         async function speakText(text, lang = 'mr-IN') {
+            // Safety check for undefined text
+            if (!text || text === "undefined") return;
+
             if (synth.speaking) synth.cancel();
             
             // CRITICAL: KILL MIC WHILE SPEAKING
@@ -705,6 +720,9 @@ function cleanTextForTTS(text) {
         // --- LOGGING ---
         function logMessage(sender, message) {
             const div = document.createElement('div');
+            // Added class 'chat-message' to preserve whitespace/newlines
+            div.className = "chat-message"; 
+            
             let senderClass = 'text-cyan-300 font-semibold';
             if (sender === 'Krishna') senderClass = 'text-yellow-400 font-bold';
             else if (sender === 'You') senderClass = 'text-green-300 font-semibold';
