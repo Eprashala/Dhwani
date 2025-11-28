@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gurudev Datta - AI Spiritual Guide</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Mukta:wght@300;400;600&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .marathi-font { font-family: 'Mukta', sans-serif; }
+        
+        /* Pulse Animation - Green when waiting for Wake Word, Amber when processing */
+        .listening-pulse { animation: pulse 1.5s infinite ease-in-out; }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7); } /* Green-600 */
+            70% { box-shadow: 0 0 0 15px rgba(22, 163, 74, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
+        }
+
+        .processing-pulse { animation: pulseAmber 1.5s infinite ease-in-out; }
+        @keyframes pulseAmber {
+            0% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.7); } /* Amber-600 */
+            70% { box-shadow: 0 0 0 15px rgba(217, 119, 6, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0); }
+        }
+
+        /* UI: Icon Button Styles */
+        .icon-btn {
+            @apply p-3 rounded-full text-white transition-all duration-200
+                   bg-gray-700 hover:bg-yellow-600 shadow-lg
+                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-yellow-500
+                   disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none;
+        }
+        
+        /* UI: General Buttons */
+        .utility-btn {
+            @apply w-full py-3 px-2 rounded-lg text-sm font-semibold transition-colors
+                   bg-gray-700 text-white
+                   hover:bg-yellow-700
+                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-yellow-500
+                   disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed;
+        }
+
+        /* UI: Custom Checkbox */
+        .custom-checkbox {
+            @apply w-4 h-4 text-yellow-600 bg-gray-700 border-gray-600 rounded focus:ring-yellow-600 focus:ring-2 ring-offset-gray-800;
+        }
+        
+        /* UI: High Contrast Inputs */
+        .custom-input {
+            @apply block w-3/4 mx-auto text-center border border-gray-500 rounded-lg p-3 outline-none transition-all;
+            background-color: #000000 !important; 
+            color: #ffffff !important;             
+            caret-color: #ffffff !important;       
+        }
+
+        /* Scrollbar customization */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #d97706; }
+    </style>
+</head>
+
+<body class="bg-gray-950 text-white flex items-center justify-center min-h-screen p-4" oncontextmenu="return false;">
+
+    <div class="bg-gray-900 rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-2xl flex flex-col h-[95vh] md:h-auto border-t-4 border-yellow-500">
+        
+        <div class="flex items-center justify-between mb-4 shrink-0">
+            <h1 class="text-2xl md:text-3xl font-bold text-white flex items-center gap-2">
+                <span class="text-yellow-500 text-3xl">ॐ</span>
+                <span>Gurudev <span class="text-yellow-500">Datta</span></span>
+            </h1>
+            <div id="status-indicator" class="w-4 h-4 rounded-full bg-gray-600 transition-colors" title="Offline"></div>
+        </div>
+
+        <div id="conversation-log" class="flex-grow overflow-y-auto bg-gray-950 rounded-lg p-4 mb-4 border border-gray-800 space-y-4 shadow-inner min-h-[200px] marathi-font text-lg">
+            <div class="text-gray-400 text-center mt-10 font-sans">
+                Say only: <br>
+                <span class="text-xl text-white font-bold">"जय गुरुदेव दत्त"</span><br>
+                or<br>
+                <span class="text-xl text-white font-bold">"श्री गुरुदेव दत्त"</span><br>
+                <span class="text-sm opacity-70 text-yellow-300 mt-2 block">Microphone must be active.</span>
+            </div>
+        </div>
+
+        <div class="flex justify-center gap-8 mb-4 shrink-0 bg-gray-800/50 p-2 rounded-xl">
+            <button id="pause-resume-button" class="icon-btn bg-blue-900/30 hover:bg-blue-800" title="Pause/Resume" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+                </svg>
+            </button>
+            
+            <button id="stop-speech-button" class="icon-btn bg-red-900/30 hover:bg-red-800" title="Stop Speaking" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z" />
+                </svg>
+            </button>
+
+            <button id="replay-button" class="icon-btn bg-green-900/30 hover:bg-green-800" title="Replay Last Message" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                </svg>
+            </button>
+        </div>
+
+        <div class="flex flex-col gap-4 mb-4 shrink-0 w-full text-center">
+            <div class="w-full">
+                <label class="text-xs text-gray-400 mb-1 block">Student Name (शिष्य नाव)</label>
+                <input type="text" id="manual-name" class="custom-input" placeholder="Enter Name">
+            </div>
+            <div class="w-full">
+                <label class="text-xs text-gray-400 mb-1 block">Age (वय)</label>
+                <input type="number" id="manual-age" class="custom-input" placeholder="25">
+            </div>
+        </div>
+
+        <div class="flex items-center justify-center gap-2 mb-2 shrink-0">
+            <input type="checkbox" id="remember-me-checkbox" class="custom-checkbox">
+            <label for="remember-me-checkbox" class="text-sm text-gray-300 cursor-pointer select-none">
+                Remember Me
+            </label>
+        </div>
+
+        <div class="w-full flex flex-col items-center justify-center mb-4 shrink-0">
+            <button id="advance-toggle-btn" class="text-xs text-yellow-500 hover:text-yellow-400 underline mb-2 focus:outline-none">
+                ▼ Advance Settings (API Key)
+            </button>
+
+            <div id="advance-container" class="hidden w-full bg-gray-800/80 border border-gray-700 rounded-lg p-4 flex flex-col gap-3 transition-all">
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="use-custom-key-checkbox" class="custom-checkbox">
+                    <label for="use-custom-key-checkbox" class="text-sm text-gray-300 cursor-pointer select-none">Use Custom API Key</label>
+                </div>
+                <input type="text" id="custom-api-key-input" class="custom-input text-xs w-full !w-full" placeholder="Paste API Key" disabled>
+                <button id="paste-key-btn" type="button" disabled class="w-full py-2 bg-gray-600 text-white text-xs rounded">Paste</button>
+            </div>
+        </div>
+
+        <button id="talk-button" class="w-full py-4 px-6 rounded-lg text-lg font-semibold transition-all duration-300 ease-in-out shrink-0
+                       bg-yellow-600 text-white shadow-lg shadow-yellow-900/50
+                       hover:bg-yellow-500 hover:shadow-yellow-500/50 hover:-translate-y-0.5
+                       focus:outline-none focus:ring-4 focus:ring-yellow-500 focus:ring-opacity-50">
+            Invoke Gurudev
+        </button>
+
+        <div class="mt-4 grid grid-cols-3 gap-3 shrink-0">
+            <button id="restart-chat-button" class="utility-btn" disabled>Restart</button>
+            <button id="share-button" class="utility-btn bg-indigo-900 hover:bg-indigo-800">Share</button>
+            <button id="end-chat-button" class="utility-btn text-red-200 hover:bg-red-900/40" disabled>End</button>
+        </div>
+
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
+        
+        // --- STATE VARIABLES ---
+	    let appState = 'IDLE'; 
+        let userName = '';
+        let userAge = 25; 
+        let chatHistory = [];
+        let systemInstruction = '';
+        let recognition;
+        let lastSpokenText = ''; 
+        let speechManuallyStopped = false; 
+        const synth = window.speechSynthesis;
+        let voices = [];
+        let wakeLock = null;
+
+        // --- DOM ELEMENTS ---
+        const talkButton = document.getElementById('talk-button');
+        const statusIndicator = document.getElementById('status-indicator');
+        const conversationLog = document.getElementById('conversation-log');
+        const manualNameInput = document.getElementById('manual-name');
+        const manualAgeInput = document.getElementById('manual-age');
+        
+        // --- INITIALIZATION ---
+        window.onload = () => {
+            if (synth.speaking) synth.cancel();
+            loadUserData(); 
+            loadVoices();   
+        };
+
+        // --- SPEECH RECOGNITION SETUP ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (!SpeechRecognition) {
+            logMessage('Error', 'Use Chrome browser for Speech features.');
+            talkButton.disabled = true;
+        } else {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false; 
+            recognition.interimResults = false;
+            // CRITICAL: Set to Marathi so it hears Devanagari "जय गुरुदेव दत्त"
+            recognition.lang = 'mr-IN'; 
+
+            recognition.onresult = handleSpeechResult;
+            recognition.onend = handleSpeechEnd;
+            recognition.onerror = (event) => {
+                console.log("Mic Error:", event.error);
+                if (event.error === 'not-allowed') setState('IDLE');
+            };
+        }
+
+        function startRecognitionSafe() {
+            if (!recognition) return;
+            // Small delay to prevent browser "rapid start" errors
+            setTimeout(() => {
+                if (appState !== 'IDLE' && appState !== 'BUSY') {
+                    try { recognition.start(); } catch (e) { console.log("Restarting mic..."); }
+                }
+            }, 100);
+        }
+
+        // --- MAIN BUTTON LOGIC ---
+        talkButton.addEventListener('click', async () => {
+            if (appState === 'IDLE') {
+                // STARTING
+                await acquireWakeLock();
+                const inputName = manualNameInput.value.trim();
+                const inputAge = manualAgeInput.value.trim();
+
+                if (inputName && inputAge) {
+                    userName = inputName;
+                    userAge = parseInt(inputAge);
+                    saveUserData();
+                    buildSystemPrompt();
+                    
+                    // If returning user
+                    const history = loadChatContext(userName);
+                    if (history.length > 0) {
+                        chatHistory = history;
+                        logMessage('System', 'Welcome back.');
+                    }
+                    
+                    // Go directly to waiting for wake word
+                    setState('LISTENING_FOR_WAKEWORD');
+                    startRecognitionSafe();
+                    logMessage('Info', 'Listening... Say "जय गुरुदेव दत्त"');
+                } else {
+                    alert("Please enter Name and Age first.");
+                }
+            } else {
+                // STOPPING
+                setState('IDLE');
+                recognition.stop();
+                if (synth.speaking) synth.cancel();
+                releaseWakeLock();
+            }
+        });
+
+        // --- STATE MANAGEMENT ---
+        function setState(newState) {
+            appState = newState;
+            switch (newState) {
+                case 'IDLE':
+                    talkButton.textContent = 'Invoke Gurudev';
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-gray-500';
+                    talkButton.classList.replace('bg-red-600', 'bg-yellow-600');
+                    manualNameInput.disabled = false;
+                    manualAgeInput.disabled = false;
+                    break;
+                case 'LISTENING_FOR_WAKEWORD':
+                    talkButton.textContent = 'Waiting for Wake Word...';
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-green-500 listening-pulse';
+                    talkButton.classList.replace('bg-yellow-600', 'bg-red-600');
+                    manualNameInput.disabled = true;
+                    manualAgeInput.disabled = true;
+                    break;
+                case 'CONVERSATION':
+                    talkButton.textContent = 'Listening (Say Stop to end)';
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-green-500 listening-pulse';
+                    break;
+                case 'BUSY':
+                    talkButton.textContent = 'Gurudev is speaking...';
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-500 processing-pulse';
+                    break;
+            }
+        }
+
+        // --- SPEECH HANDLING ---
+        function handleSpeechEnd() {
+            // THE LOOP: If we are not IDLE, and not BUSY (speaking), we must listen again.
+            if (appState === 'LISTENING_FOR_WAKEWORD' || appState === 'CONVERSATION') {
+                startRecognitionSafe();
+            }
+        }
+
+        async function handleSpeechResult(event) {
+            const transcript = event.results[event.results.length - 1][0].transcript.trim();
+            if (!transcript) return;
+            console.log(`Heard: ${transcript}`);
+
+            // Stop temporarily to process
+            recognition.stop();
+
+            if (appState === 'LISTENING_FOR_WAKEWORD') {
+                // *** WAKE WORD LOGIC (DEVANAGARI) ***
+                const t = transcript.toLowerCase(); // normalization
+                
+                // Matches: "जय गुरुदेव दत्त", "श्री गुरुदेव दत्त", "गुरुदेव दत्त"
+                // The 'mr-IN' engine outputs Devanagari, so we check Devanagari.
+                if (t.includes('गुरुदेव दत्त') || t.includes('गुरूदेव दत्त')) {
+                    
+                    setState('BUSY');
+                    const greeting = `दिगंबरा दिगंबरा श्रीपाद वल्लभ दिगंबरा! वत्स ${userName}, मी तुझा गुरू दत्त आहे. तुला काय चिंता आहे?`;
+                    logMessage('Gurudev', greeting);
+                    await speakText(greeting);
+                    setState('CONVERSATION'); // Switch to main chat mode
+                    startRecognitionSafe();
+                    
+                } else {
+                    // Wrong word: Log it but don't respond. Loop will restart via onend.
+                    console.log("Ignored: Not wake word");
+                }
+            } 
+            else if (appState === 'CONVERSATION') {
+                // MAIN CHAT LOGIC
+                setState('BUSY');
+                logMessage('You', transcript);
+                
+                chatHistory.push({ role: 'user', parts: [{ text: transcript }] });
+                saveChatContext();
+
+                const responseText = await getAIResponse(chatHistory);
+                const cleanText = cleanTextForTTS(responseText);
+
+                chatHistory.push({ role: 'model', parts: [{ text: cleanText }] });
+                saveChatContext();
+
+                logMessage('Gurudev', cleanText);
+                await speakText(cleanText);
+                
+                setState('CONVERSATION');
+                startRecognitionSafe();
+            }
+        }
+
+        // --- GEMINI AI INTEGRATION ---
+        function buildSystemPrompt() {
+            systemInstruction = `
+                You are Lord Dattatreya (श्री गुरुदेव दत्त).
+                User: ${userName} (Age: ${userAge}).
+                Reference: 'Shree Gurucharitra'.
+                Language: Marathi Only.
+                Tone: Compassionate, Guru-like. Address user as 'Vatsa' or 'Shishya'.
+                Wake Words established: "Jay Gurudev Datta", "Shree Gurudev Datta".
+                If user shares a problem, cite specific Adhyay (Chapter) from Gurucharitra if applicable.
+                Keep responses concise for speech.
+            `;
+        }
+
+        function getEffectiveApiKey() {
+            const useCustom = document.getElementById('use-custom-key-checkbox').checked;
+            const customKey = document.getElementById('custom-api-key-input').value.trim();
+            return (useCustom && customKey) ? customKey : DEFAULT_API_KEY;
+        }
+
+        async function getAIResponse(history) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: history,
+                        systemInstruction: { parts: [{ text: systemInstruction }] }
+                    })
+                });
+                const data = await res.json();
+                return data.candidates[0].content.parts[0].text;
+            } catch (e) { return "वत्सा, नेटवर्कमध्ये अडथळा आहे. (Error)"; }
+        }
+
+        // --- TTS (TEXT TO SPEECH) ---
+        function loadVoices() { voices = synth.getVoices(); if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => { voices = synth.getVoices(); }; }
+
+        async function speakText(text) {
+            if (synth.speaking) synth.cancel();
+            return new Promise((resolve) => {
+                const utter = new SpeechSynthesisUtterance(text);
+                utter.onend = resolve;
+                utter.onerror = resolve; // Continue even on error
+                
+                // Try to find Marathi/Hindi voice
+                let voice = voices.find(v => v.lang === 'mr-IN') || voices.find(v => v.lang === 'hi-IN');
+                if (voice) utter.voice = voice;
+                utter.lang = 'mr-IN';
+                utter.rate = 0.8; // Slower, Guru-like
+                utter.pitch = 0.8; // Deeper
+                
+                synth.speak(utter);
+            });
+        }
+
+        function cleanTextForTTS(text) {
+            return text.replace(/[*#_`]/g, '').replace(/\(.*?\)/g, '').trim();
+        }
+
+        // --- UTILITIES ---
+        function logMessage(sender, text) {
+            const div = document.createElement('div');
+            const color = sender === 'Gurudev' ? 'text-yellow-400' : (sender === 'You' ? 'text-green-300' : 'text-gray-400');
+            div.innerHTML = `<strong class="${color}">${sender}:</strong> <span class="text-white">${text}</span>`;
+            conversationLog.appendChild(div);
+            conversationLog.scrollTop = conversationLog.scrollHeight;
+        }
+        
+        // --- STORAGE & SETTINGS ---
+        // (Simplified for brevity, but functional)
+        const rememberMeCheckbox = document.getElementById('remember-me-checkbox');
+        const useCustomKeyCheckbox = document.getElementById('use-custom-key-checkbox');
+        const customApiKeyInput = document.getElementById('custom-api-key-input');
+        
+        function loadUserData() {
+            if (localStorage.getItem('datta_remember') === 'true') {
+                rememberMeCheckbox.checked = true;
+                manualNameInput.value = localStorage.getItem('datta_userName') || '';
+                manualAgeInput.value = localStorage.getItem('datta_userAge') || '';
+            }
+        }
+        function saveUserData() {
+            if (rememberMeCheckbox.checked) {
+                localStorage.setItem('datta_remember', 'true');
+                localStorage.setItem('datta_userName', userName);
+                localStorage.setItem('datta_userAge', userAge);
+            }
+        }
+        function loadChatContext(name) {
+            try { return JSON.parse(localStorage.getItem(`datta_chat_${name}`)) || []; } catch(e){ return []; }
+        }
+        function saveChatContext() {
+            localStorage.setItem(`datta_chat_${userName}`, JSON.stringify(chatHistory.slice(-15)));
+        }
+
+        // Settings Toggle
+        document.getElementById('advance-toggle-btn').onclick = () => {
+            document.getElementById('advance-container').classList.toggle('hidden');
+        };
+        useCustomKeyCheckbox.onchange = () => {
+            customApiKeyInput.disabled = !useCustomKeyCheckbox.checked;
+            document.getElementById('paste-key-btn').disabled = !useCustomKeyCheckbox.checked;
+        };
+        document.getElementById('paste-key-btn').onclick = async () => {
+            try { customApiKeyInput.value = await navigator.clipboard.readText(); } catch(e){}
+        };
+
+        // --- WAKE LOCK (PREVENT SLEEP) ---
+        async function acquireWakeLock() { if ('wakeLock' in navigator) { try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {} } }
+        async function releaseWakeLock() { if (wakeLock) { await wakeLock.release(); wakeLock = null; } }
+        
+        // Control Buttons
+        document.getElementById('stop-speech-button').onclick = () => { synth.cancel(); };
+        document.getElementById('restart-chat-button').onclick = () => { chatHistory = []; conversationLog.innerHTML = ''; logMessage('System', 'Chat Reset.'); };
+    </script>
+</body>
+</html>
