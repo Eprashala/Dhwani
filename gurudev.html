@@ -10,22 +10,22 @@
         body { font-family: 'Inter', sans-serif; }
         .marathi-font { font-family: 'Mukta', sans-serif; }
         
-        /* Animations */
+        /* Pulse Animation - Green when waiting for Wake Word, Amber when processing */
         .listening-pulse { animation: pulse 1.5s infinite ease-in-out; }
         @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7); }
+            0% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7); } /* Green-600 */
             70% { box-shadow: 0 0 0 15px rgba(22, 163, 74, 0); }
             100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
         }
 
         .processing-pulse { animation: pulseAmber 1.5s infinite ease-in-out; }
         @keyframes pulseAmber {
-            0% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.7); }
+            0% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.7); } /* Amber-600 */
             70% { box-shadow: 0 0 0 15px rgba(217, 119, 6, 0); }
             100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0); }
         }
 
-        /* UI Styles */
+        /* UI: Icon Button Styles */
         .icon-btn {
             @apply p-3 rounded-full text-white transition-all duration-200
                    bg-gray-700 hover:bg-yellow-600 shadow-lg
@@ -33,6 +33,7 @@
                    disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none;
         }
         
+        /* UI: General Buttons */
         .utility-btn {
             @apply w-full py-3 px-2 rounded-lg text-sm font-semibold transition-colors
                    bg-gray-700 text-white
@@ -41,19 +42,24 @@
                    disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed;
         }
 
+        /* UI: Custom Checkbox */
         .custom-checkbox {
             @apply w-4 h-4 text-yellow-600 bg-gray-700 border-gray-600 rounded focus:ring-yellow-600 focus:ring-2 ring-offset-gray-800;
         }
         
+        /* UI: High Contrast Inputs */
         .custom-input {
             @apply block w-3/4 mx-auto text-center border border-gray-500 rounded-lg p-3 outline-none transition-all;
             background-color: #000000 !important; 
             color: #ffffff !important;             
+            caret-color: #ffffff !important;       
         }
 
+        /* Scrollbar customization */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #1f2937; }
         ::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #d97706; }
     </style>
 </head>
 
@@ -66,24 +72,23 @@
                 <span class="text-yellow-500 text-3xl">ॐ</span>
                 <span>Gurudev <span class="text-yellow-500">Datta</span></span>
             </h1>
-            <div id="status-indicator" class="w-4 h-4 rounded-full bg-gray-600 transition-colors" title="Status"></div>
+            <div id="status-indicator" class="w-4 h-4 rounded-full bg-gray-600 transition-colors" title="Offline"></div>
         </div>
 
         <div id="conversation-log" class="flex-grow overflow-y-auto bg-gray-950 rounded-lg p-4 mb-4 border border-gray-800 space-y-4 shadow-inner min-h-[200px] marathi-font text-lg">
             <div class="text-gray-400 text-center mt-10 font-sans">
                 Say only: <br>
                 <span class="text-xl text-white font-bold">"जय गुरुदेव दत्त"</span><br>
-                <span class="text-sm opacity-70 text-yellow-300 mt-2 block">Ensure Volume is UP.</span>
+                or<br>
+                <span class="text-xl text-white font-bold">"श्री गुरुदेव दत्त"</span><br>
+                <span class="text-sm opacity-70 text-yellow-300 mt-2 block">Microphone must be active.</span>
             </div>
         </div>
 
         <div class="flex justify-center gap-8 mb-4 shrink-0 bg-gray-800/50 p-2 rounded-xl">
             <button id="pause-resume-button" class="icon-btn bg-blue-900/30 hover:bg-blue-800" title="Pause/Resume" disabled>
-                <svg id="icon-pause" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
-                </svg>
-                <svg id="icon-play" class="hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
                 </svg>
             </button>
             
@@ -93,7 +98,7 @@
                 </svg>
             </button>
 
-            <button id="replay-button" class="icon-btn bg-green-900/30 hover:bg-green-800" title="Repeat Last Message" disabled>
+            <button id="replay-button" class="icon-btn bg-green-900/30 hover:bg-green-800" title="Replay Last Message" disabled>
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
                 </svg>
@@ -113,11 +118,16 @@
 
         <div class="flex items-center justify-center gap-2 mb-2 shrink-0">
             <input type="checkbox" id="remember-me-checkbox" class="custom-checkbox">
-            <label for="remember-me-checkbox" class="text-sm text-gray-300 cursor-pointer select-none">Remember Me</label>
+            <label for="remember-me-checkbox" class="text-sm text-gray-300 cursor-pointer select-none">
+                Remember Me
+            </label>
         </div>
 
         <div class="w-full flex flex-col items-center justify-center mb-4 shrink-0">
-            <button id="advance-toggle-btn" class="text-xs text-yellow-500 hover:text-yellow-400 underline mb-2 focus:outline-none">▼ Advance Settings (API Key)</button>
+            <button id="advance-toggle-btn" class="text-xs text-yellow-500 hover:text-yellow-400 underline mb-2 focus:outline-none">
+                ▼ Advance Settings (API Key)
+            </button>
+
             <div id="advance-container" class="hidden w-full bg-gray-800/80 border border-gray-700 rounded-lg p-4 flex flex-col gap-3 transition-all">
                 <div class="flex items-center gap-2">
                     <input type="checkbox" id="use-custom-key-checkbox" class="custom-checkbox">
@@ -148,14 +158,14 @@
         const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
         
         // --- STATE VARIABLES ---
-        let appState = 'IDLE'; // IDLE, LISTENING, SPEAKING, PAUSED
+        let appState = 'IDLE'; // States: IDLE, LISTENING_FOR_WAKEWORD, CONVERSATION, BUSY, PAUSED
+        let previousState = 'IDLE'; // To remember where to resume from
         let userName = '';
         let userAge = 25; 
         let chatHistory = [];
         let systemInstruction = '';
         let recognition;
         let lastSpokenText = ''; 
-        let isSystemPaused = false; // Tracks if we paused due to phone call/tab switch
         const synth = window.speechSynthesis;
         let voices = [];
         let wakeLock = null;
@@ -166,148 +176,75 @@
         const conversationLog = document.getElementById('conversation-log');
         const manualNameInput = document.getElementById('manual-name');
         const manualAgeInput = document.getElementById('manual-age');
+        const pauseResumeButton = document.getElementById('pause-resume-button');
+        const stopSpeechButton = document.getElementById('stop-speech-button');
+        const replayButton = document.getElementById('replay-button');
         
-        // Media Buttons
-        const pauseResumeBtn = document.getElementById('pause-resume-button');
-        const stopSpeechBtn = document.getElementById('stop-speech-button');
-        const replayBtn = document.getElementById('replay-button');
-        const iconPause = document.getElementById('icon-pause');
-        const iconPlay = document.getElementById('icon-play');
+        // --- ICONS (SVG) ---
+        const PAUSE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" /></svg>`;
+        const PLAY_ICON = `<svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" class="w-8 h-8 text-white"><path d="M8 5v14l11-7z" /></svg>`; // White Triangle
 
         // --- INITIALIZATION ---
         window.onload = () => {
             if (synth.speaking) synth.cancel();
             loadUserData(); 
             loadVoices();   
+            setupVisibilityHandler(); // CRITICAL: Handles phone calls/sleep
         };
 
-        // --- VISIBILITY & INTERRUPTION HANDLING (CRITICAL FIX) ---
-        // Handles: Phone Calls, Screen Lock, Tab Switching
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                // APP WENT TO BACKGROUND
-                if (appState !== 'IDLE') {
-                    console.log("Interruption detected: Pausing...");
-                    handleInterruption();
+        // --- VISIBILITY HANDLER (The Fix for Calls/Sleep) ---
+        function setupVisibilityHandler() {
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    // App went to background (Phone call, Sleep, Home screen)
+                    if (appState !== 'IDLE' && appState !== 'PAUSED') {
+                        pauseApp(); 
+                    }
+                    releaseWakeLock();
+                } else {
+                    // App came back to foreground
+                    // We DO NOT auto-resume. We wait for user to press Play, as requested.
                 }
-            }
-        });
-
-        // Handles: Window Minimizing/Unloading
-        window.addEventListener('pagehide', () => {
-            if (appState !== 'IDLE') handleInterruption();
-        });
-
-        function handleInterruption() {
-            // 1. Stop Microphone immediately
-            if (recognition) try { recognition.stop(); } catch(e){}
-
-            // 2. Pause/Cancel Speech
-            if (synth.speaking) {
-                synth.pause(); // Pause TTS
-                isSystemPaused = true; // Mark that system paused it
-            }
-
-            // 3. Force UI to "Paused" State (Show Play Button)
-            updateMediaUI(true); // true = show Play button
-        }
-
-        // --- BUTTON LOGIC REWRITE ---
-
-        // 1. Pause / Resume Click
-        pauseResumeBtn.onclick = () => {
-            if (synth.paused || isSystemPaused) {
-                // USER WANTS TO RESUME (PLAY)
-                console.log("Resuming...");
-                isSystemPaused = false;
-                
-                // If TTS was paused, resume it
-                if (synth.paused) {
-                    synth.resume();
-                } 
-                // If TTS wasn't paused but we were interrupted, we might need to restart listening
-                else if (appState === 'LISTENING') {
-                    startRecognitionSafe();
-                }
-
-                updateMediaUI(false); // Show Pause Icon
-            } else {
-                // USER WANTS TO PAUSE
-                console.log("Pausing...");
-                synth.pause();
-                if(recognition) recognition.stop();
-                isSystemPaused = true;
-                updateMediaUI(true); // Show Play Icon
-            }
-        };
-
-        // 2. Stop Click
-        stopSpeechBtn.onclick = () => {
-            synth.cancel();
-            if(recognition) recognition.stop();
-            isSystemPaused = false;
-            // Go back to listening loop or idle? 
-            // Let's keep listening loop active but stop current speech
-            if (appState !== 'IDLE') {
-                updateMediaUI(false);
-                startRecognitionSafe();
-            }
-        };
-
-        // 3. Repeat Click
-        replayBtn.onclick = () => {
-            if (lastSpokenText) {
-                synth.cancel(); // Stop current
-                speakText(lastSpokenText); // Speak again
-            }
-        };
-
-        function updateMediaUI(isPausedState) {
-            // If PausedState is true, we show the PLAY button (Triangle)
-            // If PausedState is false, we show the PAUSE button (Bars)
-            if (isPausedState) {
-                iconPause.classList.add('hidden');
-                iconPlay.classList.remove('hidden');
-                statusIndicator.className = 'w-4 h-4 rounded-full bg-orange-500'; // Orange = Paused
-                pauseResumeBtn.classList.add('bg-orange-600');
-                pauseResumeBtn.classList.remove('bg-blue-900/30');
-            } else {
-                iconPlay.classList.add('hidden');
-                iconPause.classList.remove('hidden');
-                // Color depends on state
-                if (synth.speaking) statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-500 processing-pulse';
-                else statusIndicator.className = 'w-4 h-4 rounded-full bg-green-500 listening-pulse';
-                pauseResumeBtn.classList.remove('bg-orange-600');
-                pauseResumeBtn.classList.add('bg-blue-900/30');
-            }
+            });
         }
 
         // --- SPEECH RECOGNITION SETUP ---
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         
         if (!SpeechRecognition) {
-            logMessage('Error', 'Use Chrome browser.');
+            logMessage('Error', 'Use Chrome browser for Speech features.');
             talkButton.disabled = true;
         } else {
             recognition = new SpeechRecognition();
             recognition.continuous = false; 
             recognition.interimResults = false;
-            recognition.lang = 'mr-IN'; // Devanagari
+            recognition.lang = 'mr-IN'; 
 
             recognition.onresult = handleSpeechResult;
             recognition.onend = handleSpeechEnd;
+            recognition.onerror = (event) => {
+                console.log("Mic Error:", event.error);
+                if (event.error === 'not-allowed') setState('IDLE');
+            };
         }
 
         function startRecognitionSafe() {
-            if (!recognition || isSystemPaused || appState === 'IDLE') return;
-            
-            // Prevent overlapping start calls
-            try { recognition.start(); } catch (e) { 
-                // Ignore "already started" errors
-            }
+            if (!recognition) return;
+            if (appState === 'PAUSED' || appState === 'IDLE') return; // Don't start if paused
+
+            setTimeout(() => {
+                try { 
+                    // Only start if not already active
+                    recognition.start(); 
+                } catch (e) { 
+                    // Already started or busy, ignore
+                }
+            }, 100);
         }
 
-        // --- MAIN WORKFLOW ---
+        // --- MAIN CONTROLS ---
+
+        // 1. INVOKE / START BUTTON
         talkButton.addEventListener('click', async () => {
             if (appState === 'IDLE') {
                 // STARTING
@@ -321,38 +258,151 @@
                     saveUserData();
                     buildSystemPrompt();
                     
-                    // Enable Controls
-                    pauseResumeBtn.disabled = false;
-                    stopSpeechBtn.disabled = false;
-                    replayBtn.disabled = false;
-
-                    // State Transition
-                    appState = 'LISTENING'; 
-                    startRecognitionSafe();
+                    // Recover history
+                    const history = loadChatContext(userName);
+                    if (history.length > 0) {
+                        chatHistory = history;
+                        logMessage('System', 'Welcome back.');
+                    }
                     
-                    setStateVisuals('LISTENING');
+                    setState('LISTENING_FOR_WAKEWORD');
+                    startRecognitionSafe();
                     logMessage('Info', 'Listening... Say "जय गुरुदेव दत्त"');
+                    toggleMediaButtons(false); // Enable Pause/Stop
                 } else {
-                    alert("Please enter Name and Age.");
+                    alert("Please enter Name and Age first.");
                 }
             } else {
                 // STOPPING COMPLETELY
-                appState = 'IDLE';
-                recognition.stop();
-                synth.cancel();
-                releaseWakeLock();
-                
-                pauseResumeBtn.disabled = true;
-                stopSpeechBtn.disabled = true;
-                replayBtn.disabled = true;
-                setStateVisuals('IDLE');
+                stopApp();
             }
         });
 
+        // 2. PAUSE / RESUME BUTTON
+        pauseResumeButton.addEventListener('click', () => {
+            if (appState === 'PAUSED') {
+                resumeApp();
+            } else {
+                pauseApp();
+            }
+        });
+
+        // 3. STOP BUTTON
+        stopSpeechButton.addEventListener('click', stopApp);
+
+        // 4. REPLAY BUTTON
+        replayButton.addEventListener('click', () => {
+            if (lastSpokenText) {
+                // Force pause first to clear current audio, then speak
+                synth.cancel();
+                recognition.stop();
+                setState('BUSY'); // Temporary state while speaking
+                speakText(lastSpokenText).then(() => {
+                    // After replay, go back to listening based on previous context
+                    setState('CONVERSATION');
+                    startRecognitionSafe();
+                });
+            }
+        });
+
+        // --- LOGIC FUNCTIONS ---
+
+        function pauseApp() {
+            if (appState === 'IDLE') return;
+
+            // Save the state we were in so we can resume later
+            if (appState !== 'PAUSED') {
+                previousState = appState;
+            }
+
+            // 1. Stop Audio
+            if (synth.speaking) synth.cancel();
+            
+            // 2. Stop Mic
+            try { recognition.stop(); } catch(e){}
+
+            // 3. Update UI & State
+            appState = 'PAUSED';
+            pauseResumeButton.innerHTML = PLAY_ICON; // Show White Triangle
+            pauseResumeButton.title = "Resume";
+            statusIndicator.className = 'w-4 h-4 rounded-full bg-orange-500 blink'; // Orange blink for paused
+            logMessage('System', 'Paused. Press Play to resume.');
+        }
+
+        function resumeApp() {
+            if (appState !== 'PAUSED') return;
+
+            // 1. Update UI
+            pauseResumeButton.innerHTML = PAUSE_ICON;
+            pauseResumeButton.title = "Pause";
+            
+            // 2. Restore State
+            // If we were speaking, we should re-speak the last text because mobile killed it
+            if (lastSpokenText && previousState === 'CONVERSATION') {
+                logMessage('System', 'Resuming...');
+                setState('BUSY');
+                speakText(lastSpokenText).then(() => {
+                    setState('CONVERSATION');
+                    startRecognitionSafe();
+                });
+            } 
+            else if (previousState === 'LISTENING_FOR_WAKEWORD') {
+                setState('LISTENING_FOR_WAKEWORD');
+                startRecognitionSafe();
+            } 
+            else {
+                // Default fallback
+                setState('CONVERSATION');
+                startRecognitionSafe();
+            }
+            
+            // Re-acquire lock
+            acquireWakeLock();
+        }
+
+        function stopApp() {
+            appState = 'IDLE';
+            setState('IDLE');
+            recognition.stop();
+            synth.cancel();
+            releaseWakeLock();
+            toggleMediaButtons(true); // Disable buttons
+            logMessage('System', 'Stopped.');
+        }
+
+        // --- STATE MANAGEMENT ---
+        function setState(newState) {
+            appState = newState;
+            switch (newState) {
+                case 'IDLE':
+                    talkButton.textContent = 'Invoke Gurudev';
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-gray-500';
+                    talkButton.classList.replace('bg-red-600', 'bg-yellow-600');
+                    manualNameInput.disabled = false;
+                    manualAgeInput.disabled = false;
+                    break;
+                case 'LISTENING_FOR_WAKEWORD':
+                    talkButton.textContent = 'Waiting for Wake Word...';
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-green-500 listening-pulse';
+                    talkButton.classList.replace('bg-yellow-600', 'bg-red-600');
+                    manualNameInput.disabled = true;
+                    manualAgeInput.disabled = true;
+                    break;
+                case 'CONVERSATION':
+                    talkButton.textContent = 'Listening...';
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-green-500 listening-pulse';
+                    break;
+                case 'BUSY':
+                    talkButton.textContent = 'Gurudev is speaking...';
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-500 processing-pulse';
+                    break;
+            }
+        }
+
         // --- SPEECH HANDLING ---
         function handleSpeechEnd() {
-            // Loop logic: If not Idle and Not Paused and Not Speaking, Listen.
-            if (appState === 'LISTENING' && !isSystemPaused && !synth.speaking) {
+            // Only restart if we are NOT paused and NOT idle
+            if (appState === 'LISTENING_FOR_WAKEWORD' || appState === 'CONVERSATION') {
                 startRecognitionSafe();
             }
         }
@@ -360,60 +410,66 @@
         async function handleSpeechResult(event) {
             const transcript = event.results[event.results.length - 1][0].transcript.trim();
             if (!transcript) return;
-            
-            recognition.stop(); // Stop mic while processing
+            console.log(`Heard: ${transcript}`);
 
-            // 1. WAKE WORD CHECK
-            if (!chatHistory.length || appState === 'LISTENING') {
+            recognition.stop(); // Brief stop to process
+
+            if (appState === 'LISTENING_FOR_WAKEWORD') {
                 const t = transcript.toLowerCase();
-                // Check Devanagari Wake Words
                 if (t.includes('गुरुदेव दत्त') || t.includes('गुरूदेव दत्त')) {
-                    const greeting = `दिगंबरा दिगंबरा श्रीपाद वल्लभ दिगंबरा! वत्स ${userName}, मी तुझा गुरू दत्त आहे.`;
+                    setState('BUSY');
+                    const greeting = `दिगंबरा दिगंबरा श्रीपाद वल्लभ दिगंबरा! वत्स ${userName}, मी तुझा गुरू दत्त आहे. तुला काय चिंता आहे?`;
                     logMessage('Gurudev', greeting);
                     await speakText(greeting);
-                    // After speaking, we loop back to LISTENING via onend
-                } else if (chatHistory.length > 0) {
-                    // Normal Conversation Flow
-                    processUserMessage(transcript);
+                    setState('CONVERSATION');
+                    startRecognitionSafe();
                 } else {
-                    console.log("Waiting for wake word...");
+                    // Not wake word, loop handles restart
                 }
+            } 
+            else if (appState === 'CONVERSATION') {
+                setState('BUSY');
+                logMessage('You', transcript);
+                
+                chatHistory.push({ role: 'user', parts: [{ text: transcript }] });
+                saveChatContext();
+
+                const responseText = await getAIResponse(chatHistory);
+                const cleanText = cleanTextForTTS(responseText);
+
+                chatHistory.push({ role: 'model', parts: [{ text: cleanText }] });
+                saveChatContext();
+
+                logMessage('Gurudev', cleanText);
+                await speakText(cleanText);
+                
+                setState('CONVERSATION');
+                startRecognitionSafe();
             }
         }
 
-        async function processUserMessage(text) {
-            logMessage('You', text);
-            
-            // Gemini Call
-            chatHistory.push({ role: 'user', parts: [{ text: text }] });
-            const responseText = await getAIResponse(chatHistory);
-            const cleanText = cleanTextForTTS(responseText);
-            
-            chatHistory.push({ role: 'model', parts: [{ text: cleanText }] });
-            
-            logMessage('Gurudev', cleanText);
-            await speakText(cleanText);
-        }
-
-        // --- GEMINI AI INTEGRATION ---
+        // --- GEMINI AI & TTS ---
         function buildSystemPrompt() {
             systemInstruction = `
                 You are Lord Dattatreya (श्री गुरुदेव दत्त).
                 User: ${userName} (Age: ${userAge}).
                 Reference: 'Shree Gurucharitra'.
                 Language: Marathi Only.
-                Tone: Compassionate, Guru-like.
-                Wake Words: "Jay Gurudev Datta".
-                Keep responses concise.
+                Tone: Compassionate, Guru-like. Address user as 'Vatsa' or 'Shishya'.
+                Wake Words established: "Jay Gurudev Datta", "Shree Gurudev Datta".
+                If user shares a problem, cite specific Adhyay (Chapter) from Gurucharitra if applicable.
+                Keep responses concise for speech.
             `;
         }
 
-        async function getAIResponse(history) {
-            // Use custom key if checked, else default
+        function getEffectiveApiKey() {
+            const useCustom = document.getElementById('use-custom-key-checkbox').checked;
             const customKey = document.getElementById('custom-api-key-input').value.trim();
-            const useKey = document.getElementById('use-custom-key-checkbox').checked && customKey ? customKey : DEFAULT_API_KEY;
-            
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${useKey}`;
+            return (useCustom && customKey) ? customKey : DEFAULT_API_KEY;
+        }
+
+        async function getAIResponse(history) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
             try {
                 const res = await fetch(url, {
                     method: 'POST',
@@ -425,37 +481,28 @@
                 });
                 const data = await res.json();
                 return data.candidates[0].content.parts[0].text;
-            } catch (e) { return "वत्सा, नेटवर्कमध्ये अडथळा आहे."; }
+            } catch (e) { return "वत्सा, नेटवर्कमध्ये अडथळा आहे. (Error)"; }
         }
 
-        // --- TTS (TEXT TO SPEECH) ---
         function loadVoices() { voices = synth.getVoices(); if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => { voices = synth.getVoices(); }; }
 
         async function speakText(text) {
             if (synth.speaking) synth.cancel();
+            lastSpokenText = text; // Save for Replay/Resume
             
-            lastSpokenText = text; // SAVE FOR REPEAT BUTTON
-            isSystemPaused = false;
-            updateMediaUI(false); // Show Pause Icon
-
             return new Promise((resolve) => {
                 const utter = new SpeechSynthesisUtterance(text);
-                
-                utter.onend = () => {
-                    updateMediaUI(false); // Ensure correct UI state
-                    resolve();
-                };
+                utter.onend = resolve;
                 utter.onerror = (e) => {
-                    console.error("TTS Error", e);
-                    resolve(); // Resolve anyway to keep loop alive
+                    // If error is "interrupted" (paused), we resolve anyway so logic doesn't hang
+                    resolve(); 
                 };
                 
-                // Voice Selection
                 let voice = voices.find(v => v.lang === 'mr-IN') || voices.find(v => v.lang === 'hi-IN');
                 if (voice) utter.voice = voice;
                 utter.lang = 'mr-IN';
-                utter.rate = 0.85; 
-                utter.pitch = 0.8;
+                utter.rate = 0.8; 
+                utter.pitch = 0.8; 
                 
                 synth.speak(utter);
             });
@@ -466,28 +513,18 @@
         }
 
         // --- UTILITIES ---
+        function toggleMediaButtons(disabled) {
+            pauseResumeButton.disabled = disabled;
+            stopSpeechButton.disabled = disabled;
+            replayButton.disabled = disabled;
+        }
+
         function logMessage(sender, text) {
             const div = document.createElement('div');
             const color = sender === 'Gurudev' ? 'text-yellow-400' : (sender === 'You' ? 'text-green-300' : 'text-gray-400');
             div.innerHTML = `<strong class="${color}">${sender}:</strong> <span class="text-white">${text}</span>`;
             conversationLog.appendChild(div);
             conversationLog.scrollTop = conversationLog.scrollHeight;
-        }
-
-        function setStateVisuals(state) {
-            if (state === 'IDLE') {
-                talkButton.textContent = 'Invoke Gurudev';
-                talkButton.classList.replace('bg-red-600', 'bg-yellow-600');
-                statusIndicator.className = 'w-4 h-4 rounded-full bg-gray-500';
-                manualNameInput.disabled = false;
-                manualAgeInput.disabled = false;
-            } else {
-                talkButton.textContent = 'End Session';
-                talkButton.classList.replace('bg-yellow-600', 'bg-red-600');
-                statusIndicator.className = 'w-4 h-4 rounded-full bg-green-500 listening-pulse';
-                manualNameInput.disabled = true;
-                manualAgeInput.disabled = true;
-            }
         }
         
         // --- STORAGE & SETTINGS ---
@@ -509,7 +546,14 @@
                 localStorage.setItem('datta_userAge', userAge);
             }
         }
+        function loadChatContext(name) {
+            try { return JSON.parse(localStorage.getItem(`datta_chat_${name}`)) || []; } catch(e){ return []; }
+        }
+        function saveChatContext() {
+            localStorage.setItem(`datta_chat_${userName}`, JSON.stringify(chatHistory.slice(-15)));
+        }
 
+        // Settings Toggle
         document.getElementById('advance-toggle-btn').onclick = () => {
             document.getElementById('advance-container').classList.toggle('hidden');
         };
@@ -521,12 +565,11 @@
             try { customApiKeyInput.value = await navigator.clipboard.readText(); } catch(e){}
         };
 
-        // --- WAKE LOCK ---
+        // --- WAKE LOCK (PREVENT SLEEP) ---
         async function acquireWakeLock() { if ('wakeLock' in navigator) { try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {} } }
         async function releaseWakeLock() { if (wakeLock) { await wakeLock.release(); wakeLock = null; } }
         
-        // Footer Controls
-        document.getElementById('end-chat-button').onclick = () => { talkButton.click(); }; // Trigger main stop
+        // Control Buttons
         document.getElementById('restart-chat-button').onclick = () => { chatHistory = []; conversationLog.innerHTML = ''; logMessage('System', 'Chat Reset.'); };
     </script>
 </body>
