@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rupali - AI Ayurvedic Beauty Expert</title>
+    <title>Rupali Tai - AI Ayurvedic Beauty Expert</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         
-        /* Pulse Animation - Soft Purple/Pink for Beauty */
+        /* Pulse Animation for Mic - Gold/Rose for Beauty Expert */
         .listening-pulse { animation: pulse 1.5s infinite ease-in-out; }
         @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(219, 39, 119, 0.7); } /* Pink-600 */
-            70% { box-shadow: 0 0 0 15px rgba(219, 39, 119, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(219, 39, 119, 0); }
+            0% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.7); } /* Pink-500 base */
+            70% { box-shadow: 0 0 0 15px rgba(236, 72, 153, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0); }
         }
 
         /* UI: Icon Button Styles */
@@ -58,15 +58,15 @@
         
         <div class="flex items-center justify-between mb-4 shrink-0">
             <h1 class="text-2xl md:text-3xl font-bold text-white">
-                <span class="text-pink-400">सौंदर्य</span> "Expert <span class="text-pink-500">Rupali</span>"
+                <span class="text-pink-400">Eप्रशाला</span> "Rupali <span class="text-pink-500">Tai</span>"
             </h1>
             <div id="status-indicator" class="w-4 h-4 rounded-full bg-gray-500 transition-colors" title="Offline"></div>
         </div>
 
         <div id="conversation-log" class="flex-grow overflow-y-auto bg-gray-900 rounded-lg p-4 mb-4 border border-gray-700 space-y-4 shadow-inner min-h-[200px]">
             <div class="text-gray-400 text-center mt-10">
-                Say "Namaskar Rupali" or "Hello Expert" to begin.<br>
-                <span class="text-sm opacity-70 text-pink-300">Ayurvedic Skincare & Natural Beauty Secrets.</span>
+                Say "Rupali Tai", "Tai" or "Namaskar Rupali" to begin.<br>
+                <span class="text-sm opacity-70 text-pink-300">Expert Ayurvedic Beauty & Skin Care Guidance.</span>
             </div>
         </div>
 
@@ -96,7 +96,7 @@
                 <input type="text" id="manual-name" class="custom-input" placeholder="Enter Name">
             </div>
             <div class="w-full">
-                <label class="text-xs text-gray-400 mb-1 block">Age (वय)</label>
+                <label class="text-xs text-gray-400 mb-1 block">Age (वय) - Start from 12</label>
                 <input type="number" id="manual-age" class="custom-input" placeholder="18">
             </div>
         </div>
@@ -187,12 +187,11 @@
         const pasteKeyBtn = document.getElementById('paste-key-btn');
 
         // --- CONFIGURATION ---
-        // PLEASE REPLACE WITH YOUR VALID API KEY IF THIS QUOTA EXHAUSTS
         const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
-        const SILENCE_TIMEOUT = 4000; 
+        const SILENCE_TIMEOUT = 4000; // 4000 milliseconds = 4 Seconds
 	    let appState = 'IDLE'; 
         let userName = '';
-        let userAge = 18; 
+        let userAge = 18; // Default age for this module
         let chatHistory = [];
         let systemInstruction = '';
         let recognition;
@@ -245,7 +244,7 @@
             return DEFAULT_API_KEY;
         }
 
-        // --- MEMORY LOGIC (UPDATED FOR RUPALI) ---
+        // --- MEMORY LOGIC ---
         function loadUserData() {
             try {
                 const savedName = localStorage.getItem('rupali_userName');
@@ -373,15 +372,15 @@
                         
                         if (previousHistory.length > 0) {
                             chatHistory = previousHistory;
-                            logMessage('System', 'Welcome back to Rupali\'s Salon...');
+                            logMessage('System', 'Welcome back to Rupali\'s Beauty Clinic...');
                             
                             setState('BUSY');
-                            const welcomeBackPrompt = "The user has returned. Greet them in Marathi as Rupali. Say 'Namaskar [Name], welcome back to your Ayurvedic beauty session'.";
+                            const welcomeBackPrompt = "The user has returned. Greet them in Marathi as Rupali Tai. Say 'Namaskar [Name], welcome back for your skincare session. What shall we discuss?'.";
                             
                             const tempHistory = [...chatHistory, { role: 'user', parts: [{ text: welcomeBackPrompt }] }];
                             const welcomeText = await getAIResponse(tempHistory);
                             
-                            logMessage('Rupali', welcomeText);
+                            logMessage('Rupali Tai', welcomeText);
                             await speakText(welcomeText, 'mr-IN');
                             setState('CONVERSATION');
                             startRecognitionSafe();
@@ -391,8 +390,8 @@
                                 chatHistory.push({ role: 'user', parts: [{ text: "Start session." }] });
                                 chatHistory.push({ role: 'model', parts: [{ text: `Namaskar ${userName}, I am Rupali.` }] });
                             }
-                            const welcomeText = `नमस्कार ${userName}, मी रूपाली. तुमची आयुर्वेदिक सौंदर्य तज्ञ. तुम्हाला त्वचेबद्दल किंवा केसांबद्दल काय जाणून घ्यायचे आहे?`;
-                            logMessage('Rupali', welcomeText);
+                            const welcomeText = `नमस्कार ${userName}, मी रुपाली ताई. मी तुमची सौंदर्य तज्ञ आहे. आज आपण तुमच्या त्वचेची किंवा केसांची काळजी कशी घ्यायची यावर बोलूया?`;
+                            logMessage('Rupali Tai', welcomeText);
                             
                             setState('BUSY'); 
                             await speakText(welcomeText, 'mr-IN');
@@ -403,7 +402,7 @@
                     } else {
                         setState('LISTENING_FOR_WAKEWORD');
                         startRecognitionSafe();
-                        if (conversationLog.childElementCount < 3) logMessage('Info', 'Say "Rupali" to start');
+                        if (conversationLog.childElementCount < 3) logMessage('Info', 'Say "Rupali Tai" or "Tai" to start');
                     }
 
                 } else {
@@ -465,12 +464,12 @@
 
             try {
                 switch (currentState) {
-                    // WAKE WORD: Rupali, Beauty, Expert
+                    // WAKE WORD: Check for Rupali / Tai
                     case 'LISTENING_FOR_WAKEWORD':
                         const t = transcript.toLowerCase();
-                        if (t.includes('rupali') || t.includes('beauty') || t.includes('रूपाली') || t.includes('तज्ञ') || t.includes('madam')) {
-                            const greeting = "नमस्कार, मी रूपाली. तुमचे नाव काय आहे?";
-                            logMessage('Rupali', greeting);
+                        if (t.includes('rupali') || t.includes('tai') || t.includes('रुपाली') || t.includes('ताई')) {
+                            const greeting = "नमस्कार, मी रुपाली ताई. तुमचे नाव काय आहे?";
+                            logMessage('Rupali Tai', greeting);
                             await speakText(greeting, 'mr-IN');
                             setState('LISTENING_FOR_NAME');
                             startRecognitionSafe(); 
@@ -486,7 +485,7 @@
                         manualNameInput.value = userName; 
                         
                         const agePrompt = `नमस्ते ${userName}, तुमचे वय काय आहे?`;
-                        logMessage('Rupali', agePrompt);
+                        logMessage('Rupali Tai', agePrompt);
                         await speakText(agePrompt, 'mr-IN');
                         setState('LISTENING_FOR_AGE');
                         startRecognitionSafe();
@@ -504,8 +503,8 @@
                         const history = loadChatContext(userName);
                         if(history.length > 0) chatHistory = history;
 
-                        const startPrompt = `धन्यवाद, ${userName}! तुमची त्वचा, केस किंवा सौंदर्याबद्दल काय समस्या आहे?`;
-                        logMessage('Rupali', startPrompt);
+                        const startPrompt = `धन्यवाद, ${userName}! मला सांगा, तुमच्या त्वचेबद्दल किंवा सौंदर्याबद्दल तुम्हाला काय विचारायचे आहे?`;
+                        logMessage('Rupali Tai', startPrompt);
                         await speakText(startPrompt, 'mr-IN');
                         setState('CONVERSATION');
                         startRecognitionSafe();
@@ -522,7 +521,7 @@
                         chatHistory.push({ role: 'model', parts: [{ text: cleanedResponseText }] });
                         saveChatContext();
 
-                        logMessage('Rupali', cleanedResponseText);
+                        logMessage('Rupali Tai', cleanedResponseText);
                         
                         try {
                             await speakText(cleanedResponseText, 'mr-IN');
@@ -541,53 +540,52 @@
             }
         }
 
-        // --- THE BRAIN: RUPALI'S EXPERTISE ---
+        // --- THE BRAIN: RUPALI'S LOGIC ---
         function buildSystemPrompt() {
-            let ageContext = "";
+            let ageTone = "";
             if (userAge <= 18) {
-                ageContext = "User is a TEENAGER. Focus on: Acne, Pimples, Oily skin, Puberty changes, Natural glow, Face wash alternatives. Use simple language. Warn against chemical makeup.";
-            } else if (userAge <= 40) {
-                ageContext = "User is an ADULT WOMAN. Focus on: Skin maintenance, Pigmentation, Hair fall, Post-pregnancy skin (if relevant), Stress-related skin issues, Office-wear makeup alternatives (natural).";
+                ageTone = "User is a TEENAGER/YOUNG GIRL. Focus on puberty-related skin issues (acne/pimples). Tone: Caring elder sister ('Tai'). Suggest VERY simple kitchen remedies (Haldi, Besan, Aloe Vera). Warn strictly against chemical cosmetics.";
             } else {
-                ageContext = "User is MATURE (40+). Focus on: Anti-aging (Rasayana), Wrinkles, Dry skin, Menopause related skin changes, Hair dye alternatives (Indigo/Henna).";
+                ageTone = "User is an ADULT. Tone: Professional Expert Beautician & Dermatologist. Explain causes (pitta dosha, stress). Suggest complex masks (lepas) and anti-aging/glow remedies.";
             }
 
-            const referenceBooks = `
-                1. Charaka Samhita (General Medicine & Rasayana for anti-aging)
-                2. Sushruta Samhita (Surgery & Skin diseases/Kustha)
-                3. Ashtanga Hridaya (General essence)
-                4. Bhela Samhita
-                5. Vagbhata’s Ashtanga Sangraha
-                6. Kamasutra by Vatsyayana (Specifically the 64 arts involving Angaraga/perfumery/adornment)
-                7. Gandhahastividhi (Science of Perfumes & Cosmetics)
-                8. Brihat Samhita by Varahamihira (Perfumes section)
-                9. Kautilya’s Arthashastra (References to beautification)
-                10. Nighantus: Bhavaprakasha, Dhanvantari, Raja, Madanapala (For Herb properties).
+            // THE BEAUTY CURRICULUM
+            const curriculum = `
+            MODULES TO TEACH (Beauty & Dermatology):
+            1. Tridosha Analysis: Identify if problem is Vata (dry), Pitta (sensitive/red), or Kapha (oily) related.
+            2. Skin Care: Acne (Mukhadushika), Pigmentation (Vyanga), Dark Circles, Natural Glow (Kanti).
+            3. Hair Care: Hair fall (Khalitya), Greying (Palitya), Dandruff (Darunaka).
+            4. Daily Routine (Dinacharya): Oil massage (Abhyanga), Bathing powders (Ubtan/Snana Churna).
+            5. Seasonal Care (Ritucharya): Adjusting skincare for Summer/Winter/Monsoon.
+            6. Natural Cosmetics: Making Kajal, Lip balm, Face packs at home.
             `;
 
             systemInstruction = `
-                You are "Rupali" (रूपाली), an expert Ayurvedic Beautician, Dermatologist, and Skin Care Specialist.
+                You are "Rupali Tai" (रुपाली ताई), an expert Ayurvedic Beautician and Dermatologist.
                 User: ${userName}, Age: ${userAge}. Language: Marathi.
 
-                YOUR SOURCE MATERIAL:
-                Study deeply from these texts to provide answers: ${referenceBooks}
+                CORE KNOWLEDGE BASE (Deep Study):
+                1. Charaka Samhita (Sutrasthana, Chikitsasthana)
+                2. Sushruta Samhita (Chikitsasthana - Skin diseases)
+                3. Ashtanga Hridaya (Uttarasthana - Cosmetics)
+                4. Bhela Samhita
+                5. Vagbhata’s Ashtanga Sangraha
+                6. Kamasutra by Vatsyayana (Angaraga - Body adornment)
+                7. Gandhahastividhi (Art of perfumes)
+                8. Brihat Samhita by Varahamihira (Perfumes & Cosmetics)
+                9. Kautilya’s Arthashastra
+                10. Nighantus: Bhavaprakasha, Dhanvantari, Raja, Madanapala.
 
                 STRICT RULES:
-                1. DOMAIN EXPERTISE: You are a BEAUTY expert. If the user asks about fever, heart issues, broken bones, or general medical non-beauty topics, politely say: "मी फक्त सौंदर्य आणि त्वचेची तज्ञ आहे, कृपया डॉक्टरांचा सल्ला घ्या." (I am only a beauty expert, please consult a general doctor).
-                2. METHODOLOGY:
-                   - ONLY prescribe Herbal, Ayurvedic, and Home remedies (Gharelu Upay).
-                   - NO chemical cosmetics/modern medicines.
-                   - Thinking Process: First, mentally analyze the user's Dosha (Vata/Pitta/Kapha) based on the query. Then suggest remedies.
-                3. DEPTH: 
-                   - Provide in-depth answers suitable for age ${userAge}.
-                   - Cite your sources if possible (e.g., "According to Sushruta Samhita...").
-                   - Explain *why* a herb works (e.g., "Turmeric is anti-inflammatory").
-                4. TONE: Professional yet friendly. Like a wise elder sister or an expert consultant.
-                5. REMEDIES: Suggest specific pastes (Lepa), oils (Taila), and Ubtans. Mention ingredients like Saffron (Keshar), Sandalwood (Chandan), Turmeric (Haldi), Aloe Vera (Kumari), Neem, Manjistha, etc.
-                
-                ${ageContext}
-                
-                Goal: Make the user feel confident and beautiful naturally.
+                1. DOMAIN RESTRICTION: You are a BEAUTY & SKIN EXPERT. If the user asks about Politics, Math, General History, or unrelated Gynecology issues, politely decline: "क्षमस्व, मी फक्त सौंदर्य आणि त्वचेची काळजी यावर मार्गदर्शन करू शकते." (Sorry, I only guide on beauty and skin).
+                2. TONE: ${ageTone}
+                3. NO CHEMICALS: Do not suggest store-bought chemical creams. Only herbal/home remedies.
+                4. RESPONSE STRUCTURE:
+                   - Analyze the root cause (Ayurvedic view - e.g., "This is due to excess Pitta heat...").
+                   - Provide a Home Remedy (Gharelu Upay) using ingredients like Turmeric, Saffron, Sandalwood, Neem, Amalaki, etc.
+                   - Dietary Advice (Pathya) for skin glow (e.g., drink water, eat amla).
+                5. CURRICULUM: ${curriculum}
+                6. Keep answers deep, informative but easy to understand in Marathi.
             `;
             restartChatButton.disabled = false;
         }
@@ -698,9 +696,8 @@
                 if (marathiVoice) utterance.voice = marathiVoice;
                 utterance.lang = 'mr-IN';
                 
-                // Slightly slower/softer for Beauty expert persona
+                // Gentle pace for beauty expert persona
                 utterance.rate = 0.9; 
-                utterance.pitch = 1.1; 
                 
                 synth.speak(utterance);
             });
@@ -717,7 +714,7 @@
             let senderClass = 'text-blue-300 font-semibold';
             let messageClass = 'text-white';
 
-            if (sender === 'Rupali') { senderClass = 'text-pink-300 font-semibold'; }
+            if (sender === 'Rupali Tai') { senderClass = 'text-pink-300 font-semibold'; }
             else if (sender === 'You') { senderClass = 'text-green-300 font-semibold'; }
 
             div.innerHTML = `<strong class="${senderClass}">${sender}:</strong> <span class="${messageClass}">${message}</span>`;
