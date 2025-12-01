@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Gotu&family=Yatra+One&family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
-        .marathi-font { font-family: 'Gotu', sans-serif; } /* Gotu looks more like historical calligraphy */
+        .marathi-font { font-family: 'Gotu', sans-serif; } 
         .royal-font { font-family: 'Yatra One', cursive; }
         
         /* Pulse Animation - Saffron when waiting, Red when processing */
@@ -113,7 +113,10 @@
                 <label class="text-xs text-stone-400 mb-1 block">Mavala Name (मावळ्याचे नाव)</label>
                 <input type="text" id="manual-name" class="custom-input" placeholder="Enter Name">
             </div>
-            <input type="hidden" id="manual-age" value="25">
+            <div class="w-full">
+                <label class="text-xs text-stone-400 mb-1 block">Age (वय)</label>
+                <input type="number" id="manual-age" class="custom-input" placeholder="25">
+            </div>
         </div>
 
         <div class="flex items-center justify-center gap-2 mb-2 shrink-0">
@@ -155,12 +158,12 @@
 
     <script>
         // --- CONFIGURATION ---
-        // REPLACE WITH YOUR VALID API KEY IF NEEDED
         const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
         
         // --- STATE VARIABLES ---
 	    let appState = 'IDLE'; 
         let userName = '';
+        let userAge = 25; // Default Age
         let chatHistory = [];
         let systemInstruction = '';
         let recognition;
@@ -173,6 +176,7 @@
         const statusIndicator = document.getElementById('status-indicator');
         const conversationLog = document.getElementById('conversation-log');
         const manualNameInput = document.getElementById('manual-name');
+        const manualAgeInput = document.getElementById('manual-age'); // Age Input
         
         // --- INITIALIZATION ---
         window.onload = () => {
@@ -217,11 +221,13 @@
                 // STARTING
                 await acquireWakeLock();
                 const inputName = manualNameInput.value.trim();
+                const inputAge = manualAgeInput.value.trim();
 
-                if (inputName) {
+                if (inputName && inputAge) {
                     userName = inputName;
+                    userAge = parseInt(inputAge); // Capture Age
                     saveUserData();
-                    buildSystemPrompt();
+                    buildSystemPrompt(); // Build prompt using Age
                     
                     const history = loadChatContext(userName);
                     if (history.length > 0) {
@@ -233,7 +239,7 @@
                     startRecognitionSafe();
                     logMessage('Info', 'Listening... Say "जय शिवराय" (Jay Shivrai)');
                 } else {
-                    alert("Please enter your Name first.");
+                    alert("Please enter Name and Age first.");
                 }
             } else {
                 // STOPPING
@@ -253,17 +259,19 @@
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-stone-500';
                     talkButton.classList.replace('bg-red-700', 'bg-orange-700');
                     manualNameInput.disabled = false;
+                    manualAgeInput.disabled = false;
                     break;
                 case 'LISTENING_FOR_WAKEWORD':
                     talkButton.textContent = 'Waiting for "जय शिवराय"...';
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-orange-500 listening-pulse';
                     talkButton.classList.replace('bg-orange-700', 'bg-stone-600');
                     manualNameInput.disabled = true;
+                    manualAgeInput.disabled = true;
                     break;
                 case 'CONVERSATION':
                     talkButton.textContent = 'Listening...';
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-orange-500 listening-pulse';
-                    talkButton.classList.replace('bg-stone-600', 'bg-orange-700'); // Active state
+                    talkButton.classList.replace('bg-stone-600', 'bg-orange-700'); 
                     break;
                 case 'BUSY':
                     talkButton.textContent = 'Poet is Reciting...';
@@ -314,15 +322,12 @@
                 saveChatContext();
 
                 const responseText = await getAIResponse(chatHistory);
-                // Remove formatting for TTS reading
                 const cleanText = cleanTextForTTS(responseText);
 
-                chatHistory.push({ role: 'model', parts: [{ text: responseText }] }); // Save formatted text to history
+                chatHistory.push({ role: 'model', parts: [{ text: responseText }] }); 
                 saveChatContext();
 
-                // Display formatting in UI
                 logMessage('Kavi', responseText, true); 
-                
                 await speakText(cleanText);
                 
                 setState('CONVERSATION');
@@ -335,29 +340,27 @@
             systemInstruction = `
                 You are a fusion of the great poets Kavi Bhushan and Kavi Paramanand from the court of Chhatrapati Shivaji Maharaj.
                 
+                **User Profile:**
+                - Name: ${userName}
+                - **Age: ${userAge}**
+                
                 **Your Goal:** Answer user questions about Shivaji Maharaj's history by quoting relevant poems and then explaining them.
                 
+                **IMPORTANT - ADAPT TO AGE (${userAge}):**
+                - If Age < 12: Explain the meaning in very simple, story-like Marathi (Balmitra style). Keep the Sanskrit/Braj verse but simplify the explanation greatly.
+                - If Age > 12: Use mature, standard Marathi with historical depth and inspiration.
+
                 **Sources to Use:**
                 1. 'Shivbavani' (by Kavi Bhushan - Braj Bhasha/Hindi)
-                2. 'Shivraj Bhushan' (by Kavi Bhushan)
-                3. 'Shivabharat' (by Kavi Paramanand - Sanskrit)
+                2. 'Shivabharat' (by Kavi Paramanand - Sanskrit)
                 
                 **Response Structure (Strictly follow this):**
                 1. Start with a relevant verse/stanza from the poems in Devanagari script.
-                2. Explicitly state the source. Use phrases like:
-                   - "ह्या प्रसंगावर कवी भूषण 'शिवबावनी' मध्ये म्हणतात..." 
-                   - "कवी परमानंद 'शिवभारत' ग्रंथात लिहितात..."
-                3. Provide the explanation/meaning in clear **Marathi**.
+                2. Explicitly state the source (e.g., "ह्या प्रसंगावर कवी भूषण 'शिवबावनी' मध्ये म्हणतात...").
+                3. Provide the explanation in **Marathi** (Adapted to user's age).
                 4. End with "जय शिवराय".
 
-                **Tone:** - Veer Ras (Heroic), Energetic, Devotional toward Maharaj.
-                - Address the user as 'Mavala' (मावळ्या).
-                
-                **Language:**
-                - Input: Marathi (User).
-                - Output: Verse (Braj/Sanskrit) + Explanation (Marathi).
-                
-                Keep answers concise (max 3-4 sentences of explanation) to keep the conversation flowing naturally.
+                **Tone:** Veer Ras (Heroic), Energetic, Devotional toward Maharaj.
             `;
         }
 
@@ -398,28 +401,24 @@
                 if (voice) utter.voice = voice;
                 
                 utter.lang = 'mr-IN';
-                utter.rate = 1.0; // Normal speed (Energetic/Veer Ras)
-                utter.pitch = 1.0; // Strong pitch
+                utter.rate = 1.0; 
+                utter.pitch = 1.0; 
                 
                 synth.speak(utter);
             });
         }
 
         function cleanTextForTTS(text) {
-            // Remove markdown symbols for smoother speech
             return text.replace(/[*#_`]/g, '').trim();
         }
 
         // --- UTILITIES ---
         function logMessage(sender, text, isMarkdown = false) {
             const div = document.createElement('div');
-            // Colors: Kavi = Orange, User = White, System = Gray
             const color = sender === 'Kavi' ? 'text-orange-400' : (sender === 'You' ? 'text-white' : 'text-stone-500');
             
-            // formatting for poem display
             let content = text;
             if(isMarkdown) {
-                // simple bold replacement for display
                 content = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
             }
 
@@ -437,12 +436,14 @@
             if (localStorage.getItem('shivkavi_remember') === 'true') {
                 rememberMeCheckbox.checked = true;
                 manualNameInput.value = localStorage.getItem('shivkavi_userName') || '';
+                manualAgeInput.value = localStorage.getItem('shivkavi_userAge') || ''; // Load Age
             }
         }
         function saveUserData() {
             if (rememberMeCheckbox.checked) {
                 localStorage.setItem('shivkavi_remember', 'true');
                 localStorage.setItem('shivkavi_userName', userName);
+                localStorage.setItem('shivkavi_userAge', userAge); // Save Age
             }
         }
         function loadChatContext(name) {
