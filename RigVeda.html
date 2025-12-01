@@ -62,7 +62,7 @@
         <div id="conversation-log" class="flex-grow overflow-y-auto bg-gray-900 rounded-lg p-4 mb-4 border border-gray-700 space-y-4 shadow-inner min-h-[200px]">
             <div class="text-gray-400 text-center mt-10">
                 सुरू करण्यासाठी "आचार्य" किंवा "गुरुजी" म्हणा.<br>
-                <span class="text-sm opacity-70 text-amber-300">मी 'समय' (काळ) आहे. तुमच्या वयानुसार वेदांचे ज्ञान देईन.</span>
+                <span class="text-sm opacity-70 text-amber-300">मी 'समय' आहे. तुमच्या वयानुसार वेदांचे ज्ञान देईन.</span>
             </div>
         </div>
 
@@ -358,7 +358,7 @@
                             logMessage('सिस्टम', 'आचार्य समय तुम्हाला ओळखत आहेत...');
                             
                             setState('BUSY');
-                            const welcomeBackPrompt = "जुना वापरकर्ता परत आला आहे. त्याचे नाव आणि वय लक्षात घेऊन मराठीत स्वागत करा. म्हणा 'नमस्कार [नाव], आपण पुन्हा भेटलो.'";
+                            const welcomeBackPrompt = "जुना वापरकर्ता परत आला आहे. म्हणा 'नमस्कार [नाव], आपण पुन्हा भेटलो.'";
                             
                             const tempHistory = [...chatHistory, { role: 'user', parts: [{ text: welcomeBackPrompt }] }];
                             const welcomeText = await getAIResponse(tempHistory);
@@ -497,7 +497,10 @@
                         saveChatContext();
 
                         const aiResponseText = await generateTextResponseFromChat();
-                        const cleanedResponseText = cleanTextForTTS(aiResponseText);
+                        
+                        // फिल्टर: कंसातील भाग काढणे
+                        const noBracketText = cleanBrackets(aiResponseText);
+                        const cleanedResponseText = cleanTextForTTS(noBracketText);
 
                         chatHistory.push({ role: 'model', parts: [{ text: cleanedResponseText }] });
                         saveChatContext();
@@ -542,28 +545,30 @@
                 conceptsToFocus = "Focus on: Shanti (Peace), Atman (Soul), Passing knowledge, Universal Oneness (Purusha).";
             }
 
-            // महत्त्वाचे: उत्तराची भाषा फक्त मराठी हवी.
+            // महत्त्वाचे: कंसात काहीही देऊ नये आणि फक्त मराठी.
             systemInstruction = `
-                You are "Acharya Samay" (Time/Kaal). You are an ancient sage speaking from the **Rigveda**.
+                You are "Acharya " (Time/Kaal). You are an ancient sage speaking from the **Rigveda**.
                 User: ${userName}, Age: ${userAge}. 
                 
-                IMPORTANT: OUTPUT MUST BE IN MARATHI LANGUAGE ONLY. DO NOT USE ENGLISH.
+                STRICT RULES:
+                1. OUTPUT MUST BE IN PURE MARATHI LANGUAGE ONLY. DO NOT USE ENGLISH.
+                2. **DO NOT USE PARENTHESES ( ) OR BRACKETS [ ].** Do not put anything inside brackets.
+                3. If you need to give a reference, weave it into the sentence (e.g. "हे पहिल्या मंडलात आढळते").
+                4. Do not put translations inside brackets.
 
                 AGE CONTEXT: ${ageToneInstruction}
                 THEMES: ${conceptsToFocus}
 
                 YOUR TASK:
                 1. Answer the user's life question based on Rigvedic philosophy.
-                2. **MANDATORY**: Quote the **Original Sanskrit Verse** (Mantra) from Rigveda in Devanagari.
-                3. Provide the Citation (Mandala x, Sukta y, Mantra z) in Marathi numerals if possible.
-                4. Explain the meaning (Bhavartha) relevant to a ${userAge} year old person in pure Marathi.
+                2. Quote the **Original Sanskrit Verse** (Mantra) from Rigveda in Devanagari.
+                3. Explain the meaning (Bhavartha) relevant to a ${userAge} year old person in pure Marathi.
 
                 STRUCTURE:
-                1. Direct Answer in Marathi (adapted to age).
+                1. Direct Answer in Marathi.
                 2. "ऋग्वेद म्हणतो:" 
-                3. [SANSKRIT VERSE]
-                4. [संदर्भ]
-                5. Explanation in Marathi.
+                3. SANSKRIT VERSE (Devanagari)
+                4. Explanation in Marathi without using brackets.
             `;
             restartChatButton.disabled = false;
         }
@@ -615,6 +620,12 @@
             } catch (e) { return 25; }
         }
         
+        // ही फंक्शन कंसातील मजकूर काढून टाकते (सुरक्षिततेसाठी)
+        function cleanBrackets(text) {
+             // ( ) आणि [ ] मधील मजकूर काढणे
+             return text.replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '');
+        }
+
         function cleanTextForTTS(text) {
             let cleaned = text.replace(/[\*#`]/g, '').trim();
             return cleaned;
