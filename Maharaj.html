@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shiv-Kavi Samvad | AI Maratha History</title>
+    <title>Shiv-Kavi Samvad | Veer Ras AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Gotu&family=Yatra+One&family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <style>
@@ -51,9 +51,9 @@
         /* UI: High Contrast Inputs */
         .custom-input {
             @apply block w-3/4 mx-auto text-center border border-stone-500 rounded-lg p-3 outline-none transition-all;
-            background-color: #1c1917 !important; /* Stone-900 */
+            background-color: #1c1917 !important; 
             color: #ffffff !important;             
-            caret-color: #f97316 !important; /* Orange-500 */      
+            caret-color: #f97316 !important;    
         }
 
         /* Scrollbar customization */
@@ -75,13 +75,13 @@
         <div class="flex items-center justify-between mb-4 shrink-0">
             <h1 class="text-2xl md:text-3xl font-bold text-white flex items-center gap-2 royal-font tracking-wide">
                 <span class="text-orange-500 text-4xl">🚩</span>
-                <span>महाराजांचाही <span class="text-orange-500">शौर्य गाथा🚩</span></span>
+                <span>महाराजांची  <span class="text-orange-500"> शौर्य गाथा</span></span>
             </h1>
             <div id="status-indicator" class="w-4 h-4 rounded-full bg-stone-600 transition-colors" title="Offline"></div>
         </div>
 
         <div id="conversation-log" class="flex-grow overflow-y-auto bg-stone-900/80 rounded-lg p-4 mb-4 border border-stone-700 space-y-4 shadow-inner min-h-[200px] marathi-font text-lg">
-            <div class="text-stone-400 text-center mt-10 font-sans">
+            <div id="welcome-message" class="text-stone-400 text-center mt-10 font-sans">
                 To Start, Say: <br>
                 <span class="text-2xl text-orange-500 font-bold royal-font mt-2 block">"जय शिवराय"</span><br>
                 <span class="text-sm opacity-70 text-orange-200/50 mt-2 block">Microphone must be active.</span>
@@ -119,13 +119,6 @@
             </div>
         </div>
 
-        <div class="flex items-center justify-center gap-2 mb-2 shrink-0">
-            <input type="checkbox" id="remember-me-checkbox" class="custom-checkbox">
-            <label for="remember-me-checkbox" class="text-sm text-stone-300 cursor-pointer select-none">
-                Remember Me
-            </label>
-        </div>
-
         <div class="w-full flex flex-col items-center justify-center mb-4 shrink-0">
             <button id="advance-toggle-btn" class="text-xs text-orange-500 hover:text-orange-400 underline mb-2 focus:outline-none">
                 ▼ Advance Settings (API Key)
@@ -137,7 +130,7 @@
                     <label for="use-custom-key-checkbox" class="text-sm text-stone-300 cursor-pointer select-none">Use Custom API Key</label>
                 </div>
                 <input type="text" id="custom-api-key-input" class="custom-input text-xs w-full !w-full" placeholder="Paste API Key" disabled>
-                <button id="paste-key-btn" type="button" disabled class="w-full py-2 bg-stone-600 text-white text-xs rounded">Paste</button>
+                <button id="clear-history-btn" type="button" class="w-full py-2 bg-red-900/50 text-red-200 text-xs rounded hover:bg-red-800">Clear Saved History</button>
             </div>
         </div>
 
@@ -163,7 +156,7 @@
         // --- STATE VARIABLES ---
 	    let appState = 'IDLE'; 
         let userName = '';
-        let userAge = 25; // Default Age
+        let userAge = 25; 
         let chatHistory = [];
         let systemInstruction = '';
         let recognition;
@@ -176,12 +169,14 @@
         const statusIndicator = document.getElementById('status-indicator');
         const conversationLog = document.getElementById('conversation-log');
         const manualNameInput = document.getElementById('manual-name');
-        const manualAgeInput = document.getElementById('manual-age'); // Age Input
-        
+        const manualAgeInput = document.getElementById('manual-age');
+        const customApiKeyInput = document.getElementById('custom-api-key-input');
+        const useCustomKeyCheckbox = document.getElementById('use-custom-key-checkbox');
+
         // --- INITIALIZATION ---
         window.onload = () => {
             if (synth.speaking) synth.cancel();
-            loadUserData(); 
+            loadSettings(); 
             loadVoices();   
         };
 
@@ -195,7 +190,6 @@
             recognition = new SpeechRecognition();
             recognition.continuous = false; 
             recognition.interimResults = false;
-            // CRITICAL: Marathi Language
             recognition.lang = 'mr-IN'; 
 
             recognition.onresult = handleSpeechResult;
@@ -219,20 +213,25 @@
         talkButton.addEventListener('click', async () => {
             if (appState === 'IDLE') {
                 // STARTING
-                await acquireWakeLock();
+                enableNoSleepVideo(); // Trigger video hack on user gesture
+                requestWakeLock();    // Trigger API lock on user gesture
+
                 const inputName = manualNameInput.value.trim();
                 const inputAge = manualAgeInput.value.trim();
 
                 if (inputName && inputAge) {
                     userName = inputName;
-                    userAge = parseInt(inputAge); // Capture Age
-                    saveUserData();
-                    buildSystemPrompt(); // Build prompt using Age
+                    userAge = parseInt(inputAge);
                     
-                    const history = loadChatContext(userName);
+                    saveSettings(); // Save inputs to LocalStorage
+                    buildSystemPrompt();
+                    
+                    // Restore chat history if exists
+                    const history = loadChatHistory(userName);
                     if (history.length > 0) {
                         chatHistory = history;
-                        logMessage('System', 'Welcome back, brave Mavala.');
+                        renderHistoryToLog(chatHistory); // Visual Restore
+                        logMessage('System', 'Previous chronicles restored.');
                     }
                     
                     setState('LISTENING_FOR_WAKEWORD');
@@ -246,7 +245,6 @@
                 setState('IDLE');
                 recognition.stop();
                 if (synth.speaking) synth.cancel();
-                releaseWakeLock();
             }
         });
 
@@ -296,36 +294,28 @@
             recognition.stop();
 
             if (appState === 'LISTENING_FOR_WAKEWORD') {
-                // *** WAKE WORD LOGIC ***
                 const t = transcript.toLowerCase(); 
-                
-                // Matches: Jay Shivrai, Jay Bhavani, Jai Shivaji
                 if (t.includes('शिवराय') || t.includes('शिवाजी') || t.includes('भवानी')) {
-                    
                     setState('BUSY');
                     const greeting = `जय भवानी, जय शिवाजी! ये मावळ्या ${userName}, आज तुला राजांच्या कोणत्या पराक्रमाची गाथा ऐकायची आहे?`;
                     logMessage('Kavi', greeting);
                     await speakText(greeting);
                     setState('CONVERSATION'); 
                     startRecognitionSafe();
-                    
-                } else {
-                    console.log("Ignored: Not wake word");
-                }
+                } 
             } 
             else if (appState === 'CONVERSATION') {
-                // MAIN CHAT LOGIC
                 setState('BUSY');
                 logMessage('You', transcript);
                 
                 chatHistory.push({ role: 'user', parts: [{ text: transcript }] });
-                saveChatContext();
+                saveChatHistory(); // Persist
 
                 const responseText = await getAIResponse(chatHistory);
                 const cleanText = cleanTextForTTS(responseText);
 
                 chatHistory.push({ role: 'model', parts: [{ text: responseText }] }); 
-                saveChatContext();
+                saveChatHistory(); // Persist
 
                 logMessage('Kavi', responseText, true); 
                 await speakText(cleanText);
@@ -335,38 +325,28 @@
             }
         }
 
-        // --- GEMINI AI INTEGRATION (HISTORIAN LOGIC) ---
+        // --- GEMINI AI INTEGRATION ---
         function buildSystemPrompt() {
             systemInstruction = `
-                You are a fusion of the great poets Kavi Bhushan and Kavi Paramanand from the court of Chhatrapati Shivaji Maharaj.
+                You are a fusion of the great poets Kavi Bhushan and Kavi Paramanand.
+                User: ${userName}, Age: ${userAge}.
+                Goal: Answer questions about Shivaji Maharaj.
                 
-                **User Profile:**
-                - Name: ${userName}
-                - **Age: ${userAge}**
-                
-                **Your Goal:** Answer user questions about Shivaji Maharaj's history by quoting relevant poems and then explaining them.
-                
-                **IMPORTANT - ADAPT TO AGE (${userAge}):**
-                - If Age < 12: Explain the meaning in very simple, story-like Marathi (Balmitra style). Keep the Sanskrit/Braj verse but simplify the explanation greatly.
-                - If Age > 12: Use mature, standard Marathi with historical depth and inspiration.
+                Adaptation for Age ${userAge}:
+                ${userAge < 15 ? '- Use simple, storytelling Marathi. Focus on bravery and emotion.' : '- Use formal, historical Marathi with references.'}
 
-                **Sources to Use:**
-                1. 'Shivbavani' (by Kavi Bhushan - Braj Bhasha/Hindi)
-                2. 'Shivabharat' (by Kavi Paramanand - Sanskrit)
-                
-                **Response Structure (Strictly follow this):**
-                1. Start with a relevant verse/stanza from the poems in Devanagari script.
-                2. Explicitly state the source (e.g., "ह्या प्रसंगावर कवी भूषण 'शिवबावनी' मध्ये म्हणतात...").
-                3. Provide the explanation in **Marathi** (Adapted to user's age).
+                Sources: 'Shivbavani', 'Shivabharat'.
+                Strict Format:
+                1. Verse (Devanagari)
+                2. Source Name
+                3. Explanation (Marathi)
                 4. End with "जय शिवराय".
-
-                **Tone:** Veer Ras (Heroic), Energetic, Devotional toward Maharaj.
             `;
         }
 
         function getEffectiveApiKey() {
-            const useCustom = document.getElementById('use-custom-key-checkbox').checked;
-            const customKey = document.getElementById('custom-api-key-input').value.trim();
+            const useCustom = useCustomKeyCheckbox.checked;
+            const customKey = customApiKeyInput.value.trim();
             return (useCustom && customKey) ? customKey : DEFAULT_API_KEY;
         }
 
@@ -383,10 +363,10 @@
                 });
                 const data = await res.json();
                 return data.candidates[0].content.parts[0].text;
-            } catch (e) { return "मावळ्या, संपर्कात अडथळा आला आहे. पुन्हा प्रयत्न कर. (API Error)"; }
+            } catch (e) { return "मावळ्या, संपर्कात अडथळा आला आहे. (API Error)"; }
         }
 
-        // --- TTS (TEXT TO SPEECH) ---
+        // --- TTS ---
         function loadVoices() { voices = synth.getVoices(); if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => { voices = synth.getVoices(); }; }
 
         async function speakText(text) {
@@ -395,89 +375,138 @@
                 const utter = new SpeechSynthesisUtterance(text);
                 utter.onend = resolve;
                 utter.onerror = resolve; 
-                
-                // Try to find Marathi/Hindi voice
                 let voice = voices.find(v => v.lang === 'mr-IN') || voices.find(v => v.lang === 'hi-IN');
                 if (voice) utter.voice = voice;
-                
                 utter.lang = 'mr-IN';
                 utter.rate = 1.0; 
-                utter.pitch = 1.0; 
-                
                 synth.speak(utter);
             });
         }
 
-        function cleanTextForTTS(text) {
-            return text.replace(/[*#_`]/g, '').trim();
-        }
+        function cleanTextForTTS(text) { return text.replace(/[*#_`]/g, '').trim(); }
 
-        // --- UTILITIES ---
+        // --- UI UTILS ---
         function logMessage(sender, text, isMarkdown = false) {
             const div = document.createElement('div');
             const color = sender === 'Kavi' ? 'text-orange-400' : (sender === 'You' ? 'text-white' : 'text-stone-500');
-            
             let content = text;
-            if(isMarkdown) {
-                content = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
-            }
-
+            if(isMarkdown) content = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
             div.innerHTML = `<strong class="${color} font-bold">${sender}:</strong> <span class="text-stone-200">${content}</span>`;
             conversationLog.appendChild(div);
             conversationLog.scrollTop = conversationLog.scrollHeight;
         }
-        
-        // --- STORAGE & SETTINGS ---
-        const rememberMeCheckbox = document.getElementById('remember-me-checkbox');
-        const useCustomKeyCheckbox = document.getElementById('use-custom-key-checkbox');
-        const customApiKeyInput = document.getElementById('custom-api-key-input');
-        
-        function loadUserData() {
-            if (localStorage.getItem('shivkavi_remember') === 'true') {
-                rememberMeCheckbox.checked = true;
-                manualNameInput.value = localStorage.getItem('shivkavi_userName') || '';
-                manualAgeInput.value = localStorage.getItem('shivkavi_userAge') || ''; // Load Age
-            }
-        }
-        function saveUserData() {
-            if (rememberMeCheckbox.checked) {
-                localStorage.setItem('shivkavi_remember', 'true');
-                localStorage.setItem('shivkavi_userName', userName);
-                localStorage.setItem('shivkavi_userAge', userAge); // Save Age
-            }
-        }
-        function loadChatContext(name) {
-            try { return JSON.parse(localStorage.getItem(`shivkavi_chat_${name}`)) || []; } catch(e){ return []; }
-        }
-        function saveChatContext() {
-            localStorage.setItem(`shivkavi_chat_${userName}`, JSON.stringify(chatHistory.slice(-15)));
+
+        function renderHistoryToLog(history) {
+            document.getElementById('welcome-message').style.display = 'none';
+            history.forEach(msg => {
+                const sender = msg.role === 'user' ? 'You' : 'Kavi';
+                logMessage(sender, msg.parts[0].text, msg.role === 'model');
+            });
         }
 
-        // Settings Toggle
+        // --- LOCAL STORAGE MANAGER ---
+        function saveSettings() {
+            localStorage.setItem('shivkavi_name', userName);
+            localStorage.setItem('shivkavi_age', userAge);
+            if(useCustomKeyCheckbox.checked) {
+                localStorage.setItem('shivkavi_apikey', customApiKeyInput.value.trim());
+                localStorage.setItem('shivkavi_usecustom', 'true');
+            } else {
+                localStorage.setItem('shivkavi_usecustom', 'false');
+            }
+        }
+
+        function loadSettings() {
+            if (localStorage.getItem('shivkavi_name')) {
+                manualNameInput.value = localStorage.getItem('shivkavi_name');
+                manualAgeInput.value = localStorage.getItem('shivkavi_age');
+            }
+            if (localStorage.getItem('shivkavi_usecustom') === 'true') {
+                useCustomKeyCheckbox.checked = true;
+                customApiKeyInput.disabled = false;
+                customApiKeyInput.value = localStorage.getItem('shivkavi_apikey') || '';
+            }
+        }
+
+        function saveChatHistory() {
+            if(!userName) return;
+            // Limit to last 30 messages to prevent storage overflow
+            const trimmedHistory = chatHistory.slice(-30);
+            localStorage.setItem(`shivkavi_chat_${userName}`, JSON.stringify(trimmedHistory));
+        }
+
+        function loadChatHistory(name) {
+            try { return JSON.parse(localStorage.getItem(`shivkavi_chat_${name}`)) || []; } catch(e){ return []; }
+        }
+
+        // Clear History Button
+        document.getElementById('clear-history-btn').onclick = () => {
+            if(confirm("Are you sure you want to delete the chat history for this user?")) {
+                localStorage.removeItem(`shivkavi_chat_${manualNameInput.value}`);
+                chatHistory = [];
+                conversationLog.innerHTML = '';
+                alert("History cleared.");
+            }
+        };
+
+        // --- ROBUST WAKE LOCK (PREVENT SLEEP) ---
+        // 1. Screen Wake Lock API
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('Wake Lock active');
+                    wakeLock.addEventListener('release', () => {
+                        console.log('Wake Lock released, re-acquiring...');
+                        if(appState !== 'IDLE') requestWakeLock(); // Auto re-acquire
+                    });
+                }
+            } catch (err) { console.log("WakeLock Error:", err); }
+        }
+
+        // 2. Re-acquire on Visibility Change
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible' && appState !== 'IDLE') {
+                await requestWakeLock();
+            }
+        });
+
+        // 3. The "Video Hack" - Fallback for Safari/Old Android
+        // Creates an invisible looped video. Browsers won't sleep if video is playing.
+        function enableNoSleepVideo() {
+            // Check if already exists
+            if(document.getElementById('no-sleep-video')) return;
+
+            const video = document.createElement('video');
+            video.id = 'no-sleep-video';
+            video.setAttribute('playsinline', '');
+            video.setAttribute('loop', '');
+            video.setAttribute('muted', '');
+            // Tiny 1x1 pixel black video (Base64)
+            video.src = "data:video/mp4;base64,AAAAHGZ0eXBNNEVAAAAAAAEAAQAAAABtZGF0AAAAAAAAAAAAAA=="; 
+            video.style.display = 'none';
+            document.body.appendChild(video);
+            
+            video.play().then(() => console.log("NoSleep Video Playing"))
+                        .catch(e => console.log("NoSleep Video Failed:", e));
+        }
+
+        // Settings Toggle UI
         document.getElementById('advance-toggle-btn').onclick = () => {
             document.getElementById('advance-container').classList.toggle('hidden');
         };
         useCustomKeyCheckbox.onchange = () => {
             customApiKeyInput.disabled = !useCustomKeyCheckbox.checked;
-            document.getElementById('paste-key-btn').disabled = !useCustomKeyCheckbox.checked;
-        };
-        document.getElementById('paste-key-btn').onclick = async () => {
-            try { customApiKeyInput.value = await navigator.clipboard.readText(); } catch(e){}
         };
 
-        // --- WAKE LOCK ---
-        async function acquireWakeLock() { if ('wakeLock' in navigator) { try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {} } }
-        async function releaseWakeLock() { if (wakeLock) { await wakeLock.release(); wakeLock = null; } }
-        
-        // Control Buttons
+        // Standard Control Buttons
         document.getElementById('stop-speech-button').onclick = () => { synth.cancel(); };
-        document.getElementById('restart-chat-button').onclick = () => { chatHistory = []; conversationLog.innerHTML = ''; logMessage('System', 'Chat Reset.'); };
+        document.getElementById('restart-chat-button').onclick = () => { 
+            chatHistory = []; 
+            conversationLog.innerHTML = ''; 
+            logMessage('System', 'Chronicles reset.'); 
+        };
 
-document.addEventListener('visibilitychange', async () => {
-            if (document.visibilityState === 'visible' && appState !== 'IDLE') {
-                await acquireWakeLock();    
-
-
-</script>
+    </script>
 </body>
 </html>
