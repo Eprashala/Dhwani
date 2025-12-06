@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Marathi TTS Selector — Eprashala</title>
+  <style>
+    :root{
+      --bg:#0f1724; --card:#0b1220; --muted:#94a3b8; --accent:#06b6d4;
+      color-scheme: dark;
+    }
+    body{font-family: Inter, Roboto, Arial; margin:0; background:linear-gradient(180deg,#071020,#021018); color:#e6eef6; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:12px; padding:20px; width:100%; max-width:820px; box-shadow:0 8px 30px rgba(2,6,23,0.6);}
+    h1{margin:0 0 8px 0; font-size:20px;}
+    p.small{margin:6px 0 16px 0; color:var(--muted); font-size:13px;}
+    .row{display:flex; gap:12px; flex-wrap:wrap; align-items:center;}
+    label{font-size:13px; color:var(--muted); display:block; margin-bottom:6px;}
+    textarea{width:100%; min-height:120px; padding:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02); color:inherit; resize:vertical;}
+    select, input[type="text"], button{padding:8px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.04); background:rgba(255,255,255,0.02); color:inherit; font-size:14px;}
+    .controls{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;}
+    .muted{color:var(--muted); font-size:13px;}
+    .warning{background:#3a1b00; color:#ffd6a5; padding:8px 10px; border-radius:8px; margin-top:10px; font-size:13px;}
+    .small-btn{padding:6px 8px; font-size:13px;}
+    .flex-col{display:flex; flex-direction:column; gap:6px;}
+    .footer{margin-top:14px; color:var(--muted); font-size:13px;}
+    @media (max-width:560px){ .row{flex-direction:column; align-items:stretch} .controls{justify-content:stretch} }
+  </style>
+</head>
+<body>
+  <div class="card" role="main">
+    <h1>Marathi Text-to-Speech voice selector</h1>
+    <p class="small">Choose one of the Marathi voices available on your Android phone (Google TTS / device voices). The selection is saved and used automatically when you press <strong>Speak</strong>.</p>
+
+    <div class="flex-col" style="margin-bottom:12px;">
+      <div>
+        <label for="mr-voice-select">Marathi TTS Voice</label>
+        <select id="mr-voice-select" aria-label="Marathi voice selector">
+          <option>Detecting voices…</option>
+        </select>
+        <div class="muted" style="margin-top:6px;">If you don't see Marathi voices here, open <strong>Settings → Accessibility → Text-to-speech output</strong> on your Android and enable/download Marathi voices for the selected engine.</div>
+      </div>
+
+      <div id="mr-warning" class="warning" style="display:none;">
+        No Marathi voices detected. Browser will use default voice. (Enable Marathi voices in Android settings: <em>Text-to-speech output</em>.)
+      </div>
+    </div>
+
+    <div style="margin-top:6px;">
+      <label for="tts-text">Text to speak (Marathi)</label>
+      <textarea id="tts-text" placeholder="नमस्कार — हा वॉइस प्रिव्ह्यू साठी आहे."></textarea>
+    </div>
+
+    <div class="controls" role="toolbar" aria-label="TTS controls">
+      <button id="btn-speak" title="Speak">🔊 Speak</button>
+      <button id="btn-stop" class="small-btn" title="Stop speaking">⏹ Stop</button>
+      <button id="btn-preview" class="small-btn" title="Preview voice">▶ Preview</button>
+      <button id="btn-refresh" class="small-btn" title="Refresh voice list">↻ Refresh voices</button>
+
+      <div style="margin-left:auto; display:flex; gap:8px; align-items:center;">
+        <label style="margin:0; font-size:13px; color:var(--muted);">Rate</label>
+        <input id="rate" type="range" min="0.5" max="1.4" step="0.05" value="0.9" />
+        <label style="margin:0 0 0 6px; font-size:13px; color:var(--muted);">Pitch</label>
+        <input id="pitch" type="range" min="0.5" max="1.6" step="0.05" value="1.0" />
+      </div>
+    </div>
+
+    <div class="footer">
+      Saved voice key: <code id="saved-key">—</code> &nbsp; · &nbsp; Browser voices detected: <span id="voice-count">0</span>
+    </div>
+  </div>
+
+<script>
+  // Robust Marathi voice selector and TTS player
+  (function(){
+    const synth = window.speechSynthesis;
+    const select = document.getElementById('mr-voice-select');
+    const btnSpeak = document.getElementById('btn-speak');
+    const btnStop = document.getElementById('btn-stop');
+    const btnPreview = document.getElementById('btn-preview');
+    const btnRefresh = document.getElementById('btn-refresh');
+    const txt = document.getElementById('tts-text');
+    const rateRange = document.getElementById('rate');
+    const pitchRange = document.getElementById('pitch');
+    const mrWarning = document.getElementById('mr-warning');
+    const savedKeyEl = document.getElementById('saved-key');
+    const voiceCountEl = document.getElementById('voice-count');
+
+    const STORAGE_KEY = 'ganesha_mr_voice';
+
+    function getAllVoices(){
+      return synth.getVoices() || [];
+    }
+
+    function voiceIdFor(v){ return `${v.name}|${v.lang}`; }
+
+    function populateVoices(){
+      const all = getAllVoices();
+      voiceCountEl.textContent = all.length;
+      // find Marathi by language tag or name
+      let marathi = all.filter(v => (v.lang && v.lang.toLowerCase().startsWith('mr')) || (v.name && v.name.toLowerCase().includes('marathi')));
+      // Some devices may label 'mr-IN' or 'mr' - include those
+      if (marathi.length === 0) {
+        marathi = all.filter(v => v.lang && (v.lang.toLowerCase() === 'mr-in' || v.lang.toLowerCase() === 'mr'));
+      }
+
+      // Clear select
+      select.innerHTML = '';
+
+      if (marathi.length > 0) {
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = '-- Choose Marathi voice --';
+        select.appendChild(placeholder);
+        marathi.forEach(v => {
+          const opt = document.createElement('option');
+          opt.value = voiceIdFor(v);
+          opt.textContent = `${v.name} — ${v.lang} ${v.default ? '(default)' : ''}`;
+          select.appendChild(opt);
+        });
+        mrWarning.style.display = 'none';
+      } else {
+        // show helpful fallback and also list all voices so user can experiment
+        mrWarning.style.display = 'block';
+        const fallback = document.createElement('option');
+        fallback.value = '';
+        fallback.textContent = '(No Marathi voice found — using default)';
+        select.appendChild(fallback);
+        // list all voices as options to allow manual choice
+        all.forEach(v => {
+          const opt = document.createElement('option');
+          opt.value = voiceIdFor(v);
+          opt.textContent = `${v.name} — ${v.lang} ${v.default ? '(default)': ''}`;
+          select.appendChild(opt);
+        });
+      }
+
+      // restore saved value
+      const saved = localStorage.getItem(STORAGE_KEY) || '';
+      if (saved) {
+        const found = Array.from(select.options).find(o => o.value === saved);
+        if (found) select.value = saved;
+      }
+      savedKeyEl.textContent = localStorage.getItem(STORAGE_KEY) || '—';
+    }
+
+    // Save on change
+    select.addEventListener('change', ()=>{
+      const v = select.value;
+      if (v) localStorage.setItem(STORAGE_KEY, v);
+      else localStorage.removeItem(STORAGE_KEY);
+      savedKeyEl.textContent = localStorage.getItem(STORAGE_KEY) || '—';
+      console.log('Saved preferred Marathi voice:', v);
+    });
+
+    btnRefresh.addEventListener('click', ()=>{
+      // Force synchronous repopulation
+      populateVoices();
+    });
+
+    // A helper to choose voice given stored choice or best candidate
+    function chooseVoice(){
+      const all = getAllVoices();
+      const saved = localStorage.getItem(STORAGE_KEY) || '';
+      if (saved) {
+        const found = all.find(v => voiceIdFor(v) === saved);
+        if (found) return found;
+        // saved not found: fallthrough to detect fresh candidate
+      }
+      // try Marathi candidates
+      let marathi = all.filter(v => (v.lang && v.lang.toLowerCase().startsWith('mr')) || (v.name && v.name.toLowerCase().includes('marathi')));
+      if (marathi.length > 0) return marathi[0];
+      // try exact 'mr-IN'
+      const exact = all.find(v => v.lang && (v.lang.toLowerCase() === 'mr-in' || v.lang.toLowerCase() === 'mr'));
+      if (exact) return exact;
+      // last fallback: default voice
+      return all.find(v => v.default) || all[0] || null;
+    }
+
+    function speakText(text){
+      if (!text || !text.trim()) return;
+      if (synth.speaking) {
+        console.warn('speechSynthesis.speaking — cancelling and restarting');
+        synth.cancel();
+      }
+      const utter = new SpeechSynthesisUtterance(text);
+      // choose voice robustly
+      const chosen = chooseVoice();
+      if (chosen) {
+        try { utter.voice = chosen; console.log('Using voice:', chosen.name, chosen.lang); }
+        catch(e){ console.warn('Could not set voice on utterance', e); }
+      } else {
+        console.warn('No speech synthesis voice available.');
+      }
+      // set language for better pronunciation
+      utter.lang = 'mr-IN';
+      // user-tweakable rate/pitch
+      utter.rate = parseFloat(rateRange.value) || 0.9;
+      utter.pitch = parseFloat(pitchRange.value) || 1.0;
+
+      // safe event logging
+      utter.onstart = ()=>console.log('TTS started');
+      utter.onend = ()=>console.log('TTS ended');
+      utter.onerror = (ev)=>console.error('TTS error', ev);
+
+      synth.speak(utter);
+    }
+
+    btnSpeak.addEventListener('click', ()=>{
+      speakText(txt.value || txt.placeholder);
+    });
+
+    btnStop.addEventListener('click', ()=>{
+      if (synth.speaking) synth.cancel();
+    });
+
+    btnPreview.addEventListener('click', ()=>{
+      const sample = 'नमस्कार. ही एक आवाज परीक्षण आहे.';
+      speakText(sample);
+    });
+
+    // populate voices when available
+    function initVoices(){
+      // getVoices may be empty on first call
+      populateVoices();
+      // if still empty, try again after a tick
+      setTimeout(()=>{ if (getAllVoices().length === 0) populateVoices(); }, 300);
+    }
+
+    // hook voiceschanged
+    if ('onvoiceschanged' in synth) {
+      synth.onvoiceschanged = () => {
+        console.log('voiceschanged event fired');
+        populateVoices();
+      };
+    }
+
+    // initial load (some browsers voice list may be ready synchronously)
+    initVoices();
+
+    // show saved key on startup
+    savedKeyEl.textContent = localStorage.getItem(STORAGE_KEY) || '—';
+
+    // Expose small API to console for debugging
+    window.__ttsDebug = {
+      voices: ()=>getAllVoices(),
+      choose: chooseVoice,
+      speak: speakText,
+      storageKey: STORAGE_KEY
+    };
+  })();
+</script>
+</body>
+</html>
