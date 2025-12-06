@@ -1,0 +1,252 @@
+<script>
+    // --- UTILITY: PREVENT RIGHT CLICK ---
+    document.addEventListener('contextmenu', event => event.preventDefault());
+
+    // --- UTILITY: FULLSCREEN ---
+    function enterFullScreen() { const e = document.documentElement; if(e.requestFullscreen) e.requestFullscreen(); }
+
+    // --- DOM ELEMENTS ---
+    const talkButton = document.getElementById('talk-button');
+    const statusIndicator = document.getElementById('status-indicator');
+    const conversationLog = document.getElementById('conversation-log');
+    const rememberMeCheckbox = document.getElementById('remember-me-checkbox');
+    const manualNameInput = document.getElementById('manual-name');
+    const manualAgeInput = document.getElementById('manual-age');
+    const pauseResumeButton = document.getElementById('pause-resume-button');
+    const stopSpeechButton = document.getElementById('stop-speech-button');
+    const replayButton = document.getElementById('replay-button');
+    const shareButton = document.getElementById('share-button');
+    const endChatButton = document.getElementById('end-chat-button');
+    const restartChatButton = document.getElementById('restart-chat-button');
+    
+    // Advance Settings
+    const advanceToggleBtn = document.getElementById('advance-toggle-btn');
+    const advanceContainer = document.getElementById('advance-container');
+    const useCustomKeyCheckbox = document.getElementById('use-custom-key-checkbox');
+    const customApiKeyInput = document.getElementById('custom-api-key-input');
+    const pasteKeyBtn = document.getElementById('paste-key-btn');
+
+    // --- CONFIGURATION ---
+    const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
+    let appState = 'IDLE'; 
+    let userName = ''; let userAge = 12; let chatHistory = []; let systemInstruction = '';
+    let recognition; let lastSpokenText = ''; let speechManuallyStopped = false; 
+    const synth = window.speechSynthesis;
+    let voices = []; let wakeLock = null;
+
+    // --- INITIALIZATION ---
+    window.onload = () => {
+        if (synth.speaking) synth.cancel();
+        loadUserData();
+        // Force load voices
+        voices = synth.getVoices();
+        if (synth.onvoiceschanged !== undefined) {
+            synth.onvoiceschanged = () => { voices = synth.getVoices(); };
+        }
+    };
+
+    // --- UI LOGIC ---
+    advanceToggleBtn.addEventListener('click', () => { advanceContainer.classList.toggle('hidden'); advanceContainer.classList.toggle('flex'); });
+    useCustomKeyCheckbox.addEventListener('change', () => {
+        const isChecked = useCustomKeyCheckbox.checked;
+        customApiKeyInput.disabled = !isChecked; pasteKeyBtn.disabled = !isChecked;
+        saveUserData(); if (isChecked) customApiKeyInput.focus();
+    });
+    customApiKeyInput.addEventListener('input', saveUserData);
+    pasteKeyBtn.addEventListener('click', async () => {
+        try { const text = await navigator.clipboard.readText(); if(text) { customApiKeyInput.value = text; saveUserData(); pasteKeyBtn.textContent = "Pasted!"; setTimeout(() => { pasteKeyBtn.textContent = "Paste API Key"; }, 1000); } } catch (err) {}
+    });
+    function getEffectiveApiKey() { return (useCustomKeyCheckbox.checked && customApiKeyInput.value.trim().length > 10) ? customApiKeyInput.value.trim() : DEFAULT_API_KEY; }
+
+    // --- MEMORY ---
+    function loadUserData() {
+        try {
+            if (localStorage.getItem('ganesha_remember') === 'true') {
+                rememberMeCheckbox.checked = true;
+                manualNameInput.value = localStorage.getItem('ganesha_userName') || '';
+                manualAgeInput.value = localStorage.getItem('ganesha_userAge') || '';
+                if (manualNameInput.value) talkButton.textContent = `Start as ${manualNameInput.value}`;
+            }
+            if (localStorage.getItem('ganesha_useCustomKey') === 'true') {
+                useCustomKeyCheckbox.checked = true; customApiKeyInput.disabled = false;
+                customApiKeyInput.value = localStorage.getItem('ganesha_customKey') || '';
+            }
+        } catch (e) {}
+    }
+    function saveUserData() {
+        try {
+            if (rememberMeCheckbox.checked) {
+                localStorage.setItem('ganesha_remember', 'true');
+                localStorage.setItem('ganesha_userName', manualNameInput.value.trim());
+                localStorage.setItem('ganesha_userAge', manualAgeInput.value.trim());
+            } else {
+                localStorage.removeItem('ganesha_remember'); localStorage.removeItem('ganesha_userName'); localStorage.removeItem('ganesha_userAge');
+            }
+            localStorage.setItem('ganesha_useCustomKey', useCustomKeyCheckbox.checked);
+            if (customApiKeyInput.value) localStorage.setItem('ganesha_customKey', customApiKeyInput.value.trim());
+        } catch (e) {}
+    }
+    function loadChatContext(name) { try { const h = localStorage.getItem(`ganesha_history_${name.toLowerCase()}`); return h ? JSON.parse(h) : []; } catch (e) { return []; } }
+    function saveChatContext() { if (!userName) return; localStorage.setItem(`ganesha_history_${userName.toLowerCase()}`, JSON.stringify(chatHistory.slice(-20))); }
+    manualNameInput.addEventListener('input', () => { if(rememberMeCheckbox.checked) saveUserData(); });
+    manualAgeInput.addEventListener('input', () => { if(rememberMeCheckbox.checked) saveUserData(); });
+
+    // --- SPEECH RECOGNITION ---
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) { logMessage('Error', 'Browser not supported.'); talkButton.disabled = true; } 
+    else {
+        try {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false; recognition.interimResults = false; recognition.lang = 'mr-IN';
+            recognition.onresult = handleSpeechResult;
+            recognition.onend = handleSpeechEnd;
+            recognition.onerror = (event) => { if (event.error === 'no-speech' && (appState === 'LISTENING_FOR_WAKEWORD' || appState === 'CONVERSATION')) startRecognitionSafe(); else if (event.error === 'not-allowed') setState('IDLE'); };
+        } catch (e) { alert("Mic Error: " + e.message); }
+    }
+    function startRecognitionSafe() { if (recognition && appState !== 'IDLE' && !synth.speaking) try { recognition.start(); } catch (e) {} }
+
+    // --- MAIN FLOW ---
+    talkButton.addEventListener('click', toggleListening);
+    pauseResumeButton.addEventListener('click', togglePauseResume);
+    stopSpeechButton.addEventListener('click', stopSpeech);
+    replayButton.addEventListener('click', replaySpeech);
+    shareButton.addEventListener('click', shareChat);
+    endChatButton.addEventListener('click', endChat);
+    restartChatButton.addEventListener('click', restartChat);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    async function toggleListening() {
+        if (appState === 'IDLE') { try { enterFullScreen(); } catch(e) {} }
+        if (appState === 'IDLE') {
+            talkButton.textContent = "Initializing..."; talkButton.disabled = true;
+            await acquireWakeLock();
+            const inputName = manualNameInput.value.trim(); const inputAge = manualAgeInput.value.trim();
+            if (inputName && inputAge) {
+                userName = inputName; userAge = parseInt(inputAge); saveUserData(); buildSystemPrompt();
+                const previousHistory = loadChatContext(userName);
+                if (previousHistory.length > 0) {
+                    chatHistory = previousHistory; logMessage('System', 'Welcome back...');
+                    setState('BUSY');
+                    const welcomeText = await getAIResponse([...chatHistory, { role: 'user', parts: [{ text: "Greet me back in Marathi." }] }]);
+                    logMessage('Ganesha', welcomeText); await speakText(welcomeText); setState('CONVERSATION'); startRecognitionSafe();
+                } else {
+                    if (chatHistory.length === 0) { chatHistory.push({ role: 'user', parts: [{ text: "Start session." }] }); chatHistory.push({ role: 'model', parts: [{ text: `Namaskar ${userName}, I am your Sakha Ganesha.` }] }); }
+                    const welcomeText = `नमस्कार सखा ${userName}, मी तुझा मित्र गणेश आहे.`;
+                    logMessage('Ganesha', welcomeText); setState('BUSY'); await speakText(welcomeText); setState('CONVERSATION'); startRecognitionSafe();
+                }
+            } else { setState('LISTENING_FOR_WAKEWORD'); startRecognitionSafe(); if (conversationLog.childElementCount < 3) logMessage('Info', 'Say "Ganpati Bappa" or "Ganesha"'); }
+        } else { setState('IDLE'); recognition.stop(); synth.cancel(); await releaseWakeLock(); }
+    }
+
+    function setState(newState) {
+        appState = newState;
+        if(newState === 'IDLE') { talkButton.textContent = 'Start Listening'; talkButton.disabled = false; statusIndicator.className = 'w-4 h-4 rounded-full bg-gray-500'; endChatButton.disabled = true; talkButton.classList.replace('bg-red-600', 'bg-orange-600'); manualNameInput.disabled = false; manualAgeInput.disabled = false; }
+        else if(newState === 'BUSY') { talkButton.textContent = 'Consulting...'; talkButton.disabled = true; statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-400'; endChatButton.disabled = false; }
+        else { talkButton.textContent = 'Stop Listening'; talkButton.disabled = false; statusIndicator.className = 'w-4 h-4 rounded-full bg-orange-500 listening-pulse'; endChatButton.disabled = false; talkButton.classList.replace('bg-orange-600', 'bg-red-600'); manualNameInput.disabled = true; manualAgeInput.disabled = true; }
+    }
+    
+    function handleSpeechEnd() { if (appState !== 'IDLE' && appState !== 'BUSY') startRecognitionSafe(); else if (appState === 'IDLE') setState('IDLE'); }
+
+    async function handleSpeechResult(event) {
+        const transcript = event.results[event.results.length - 1][0].transcript.trim(); if (!transcript) return;
+        const currentState = appState; recognition.stop(); setState('BUSY');
+        try {
+            if (currentState === 'LISTENING_FOR_WAKEWORD') {
+                if (transcript.toLowerCase().match(/ganesha|bappa|ganpati|vinayaka|नमस्कार/)) {
+                    const msg = "नमस्कार, मी तुझा सखा गणेश. तुझे नाव काय आहे?"; logMessage('Ganesha', msg); await speakText(msg); setState('LISTENING_FOR_NAME'); startRecognitionSafe();
+                } else { setState('LISTENING_FOR_WAKEWORD'); startRecognitionSafe(); }
+            } else if (currentState === 'LISTENING_FOR_NAME') {
+                logMessage('You', transcript); userName = await extractNameFromTranscript(transcript); manualNameInput.value = userName;
+                const msg = `नमस्ते ${userName}, तुझे वय काय आहे?`; logMessage('Ganesha', msg); await speakText(msg); setState('LISTENING_FOR_AGE'); startRecognitionSafe();
+            } else if (currentState === 'LISTENING_FOR_AGE') {
+                logMessage('You', transcript); userAge = await extractAgeFromTranscript(transcript); manualAgeInput.value = userAge; saveUserData(); buildSystemPrompt();
+                const h = loadChatContext(userName); if(h.length > 0) chatHistory = h;
+                const msg = `छान ${userName}! मी ऐकत आहे.`; logMessage('Ganesha', msg); await speakText(msg); setState('CONVERSATION'); startRecognitionSafe();
+            } else if (currentState === 'CONVERSATION') {
+                logMessage(userName||'You', transcript); chatHistory.push({ role: 'user', parts: [{ text: transcript }] }); saveChatContext();
+                const aiResponse = await generateTextResponseFromChat(); const cleanAI = cleanTextForTTS(aiResponse);
+                chatHistory.push({ role: 'model', parts: [{ text: cleanAI }] }); saveChatContext();
+                logMessage('Ganesha', cleanAI); await speakText(cleanAI); setState('CONVERSATION'); startRecognitionSafe();
+            }
+        } catch (e) { if(systemInstruction) { setState('CONVERSATION'); startRecognitionSafe(); } else { setState('LISTENING_FOR_WAKEWORD'); startRecognitionSafe(); } }
+    }
+
+    function buildSystemPrompt() {
+        let tone = (userAge <= 13) ? "Speak simply to a CHILD. Use stories of Mushak and Modak." : "Speak as a wise Spiritual Guide/Psychologist to an ADULT using Atharvashirsa references.";
+        systemInstruction = `You are Lord Ganesha. User: ${userName}, Age: ${userAge}. LANGUAGE: MARATHI ONLY. FORMAT: Plain text only (no markdown). TONE: Compassionate. ${tone} Keep answers concise.`;
+        restartChatButton.disabled = false;
+    }
+
+    async function getAIResponse(history) {
+        try { const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: history, systemInstruction: { parts: [{ text: systemInstruction }] } }) }); const j = await r.json(); return j.candidates[0].content.parts[0].text.trim(); } catch (e) { return "Network Error."; }
+    }
+    async function generateTextResponseFromChat() { return await getAIResponse(chatHistory); }
+    async function extractNameFromTranscript(t) { try { const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: `Extract Name from Marathi: "${t}". If unclear return "मित्रा".` }] }] }) }); const j = await r.json(); return j.candidates[0].content.parts[0].text.trim().replace(/['".]/g, ''); } catch (e) { return "मित्रा"; } }
+    async function extractAgeFromTranscript(t) { try { const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: `Extract age number from "${t}". Return ONLY digits. Default 12.` }] }] }) }); const j = await r.json(); return parseInt(j.candidates[0].content.parts[0].text.trim()) || 12; } catch (e) { return 12; } }
+    function cleanTextForTTS(t) { return t.replace(/\[.*?\]|\(.*?\)|{.*?}/g, "").replace(/[\*#`_]/g, '').replace(/\s+/g, ' ').trim(); }
+
+    // --- SPEECH SYNTHESIS (THE HACK) ---
+    function togglePauseResume() { if (synth.paused) synth.resume(); else if (synth.speaking) { synth.pause(); recognition.stop(); setState('BUSY'); } }
+    function stopSpeech() { if (!synth.speaking) return; speechManuallyStopped = true; synth.cancel(); recognition.stop(); toggleMediaButtons(true); logMessage('Info', 'Stopped.'); setTimeout(() => { speechManuallyStopped = false; if (appState !== 'IDLE') { if (systemInstruction) { setState('CONVERSATION'); startRecognitionSafe(); } else { setState('LISTENING_FOR_WAKEWORD'); startRecognitionSafe(); } } }, 1500); }
+    function replaySpeech() { if (lastSpokenText) { recognition.stop(); setState('BUSY'); speakText(lastSpokenText); } }
+
+    async function speakText(text) {
+        if (synth.speaking) synth.cancel();
+        lastSpokenText = text; speechManuallyStopped = false;
+        voices = synth.getVoices();
+
+        return new Promise((resolve, reject) => {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.onstart = () => toggleMediaButtons(false);
+            utterance.onend = () => { toggleMediaButtons(true); if (speechManuallyStopped) reject(new Error("Stopped")); else resolve(); };
+            utterance.onerror = (e) => { toggleMediaButtons(true); if (e.error === 'interrupted') resolve(); else reject(e.error); };
+
+            // --- THE EXPERT LOGIC ---
+            // 1. First, assume we are on Android Chrome where Marathi voices are hidden.
+            //    We try to find HINDI (hi-IN) because it's usually a deeper, male-sounding voice on Google TTS
+            //    and it can read Marathi text perfectly (Devanagari script).
+            let hindiVoice = voices.find(v => v.lang === 'hi-IN');
+            
+            // 2. Try to find an explicit Male Marathi voice (rarely exposed, but good to check)
+            let marathiMale = voices.find(v => v.lang === 'mr-IN' && (v.name.includes('Male') || v.name.includes('Voice II')));
+            
+            // 3. Fallback to any Marathi voice
+            let marathiDefault = voices.find(v => v.lang === 'mr-IN');
+
+            if (marathiMale) {
+                utterance.voice = marathiMale;
+                utterance.lang = 'mr-IN';
+                console.log("Using Explicit Marathi Male Voice");
+            } else if (hindiVoice) {
+                // THE HACK: Use Hindi Voice for Marathi Text
+                utterance.voice = hindiVoice;
+                utterance.lang = 'hi-IN'; // Set lang to Hindi so it uses that voice
+                console.log("Using Hindi Voice Hack for Male Tone");
+            } else if (marathiDefault) {
+                utterance.voice = marathiDefault;
+                utterance.lang = 'mr-IN';
+            }
+
+            // Make it sound divine (Slow and Deep)
+            utterance.rate = 0.8; 
+            utterance.pitch = 0.8; 
+            
+            synth.speak(utterance);
+        });
+    }
+
+    function toggleMediaButtons(disabled) { pauseResumeButton.disabled = disabled; stopSpeechButton.disabled = disabled; replayButton.disabled = disabled; }
+    function logMessage(sender, message) {
+        const div = document.createElement('div');
+        let c = (sender === 'Ganesha') ? 'text-orange-300' : (sender === 'You') ? 'text-green-300' : 'text-blue-300';
+        div.innerHTML = `<strong class="${c} font-semibold">${sender}:</strong> <span class="text-white">${message}</span>`;
+        conversationLog.appendChild(div); conversationLog.scrollTop = conversationLog.scrollHeight;
+    }
+    function getChatLogAsText() { const m = []; conversationLog.querySelectorAll('div').forEach(d => { if (d.textContent) m.push(d.textContent); }); return m.join('\n'); }
+    async function shareChat() { const t = getChatLogAsText(); if (!t.trim()) return; try { await navigator.share({ title: 'Ganesha Chat', text: t }); } catch (e) { try { await navigator.clipboard.writeText(t); logMessage('Info', 'Copied'); } catch (x) {} } }
+    async function acquireWakeLock() { if ('wakeLock' in navigator) try { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { if (appState !== 'IDLE' && document.visibilityState === 'visible') acquireWakeLock(); }); } catch (e) {} }
+    async function releaseWakeLock() { if (wakeLock) try { await wakeLock.release(); wakeLock = null; } catch (e) {} }
+    async function handleVisibilityChange() { if (appState !== 'IDLE' && document.visibilityState === 'visible') await acquireWakeLock(); }
+    async function endChat() { appState = 'IDLE'; setState('IDLE'); speechManuallyStopped = true; if (synth.speaking) synth.cancel(); if (recognition) try { recognition.stop(); } catch (e) {} await releaseWakeLock(); userName = ''; userAge = 12; chatHistory = []; systemInstruction = ''; conversationLog.innerHTML = '<div class="text-gray-400 text-center">Chat Ended.</div>'; restartChatButton.disabled = true; }
+    async function restartChat() { if (!systemInstruction) return; if (synth.speaking) synth.cancel(); if (recognition) try { recognition.stop(); } catch(e){} appState = 'IDLE'; setState('IDLE'); await releaseWakeLock(); conversationLog.innerHTML = ''; if(userName) { localStorage.removeItem(`ganesha_history_${userName.toLowerCase()}`); chatHistory = []; } logMessage('Info', `Chat restarted.`); }
+</script>
