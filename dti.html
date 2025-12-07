@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dhwani - Ultimate Auto Translator</title>
+    <title>Dhwani - Smart AI Translator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
     
@@ -11,24 +11,22 @@
         body { font-family: 'Outfit', sans-serif; background-color: #0f172a; color: #e2e8f0; }
         .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); transition: all 0.3s ease; }
         
-        /* Active User Highlight */
+        /* Active User Animation - Gold Border Pulse */
         .active-turn { 
             border-color: #facc15 !important; 
-            box-shadow: 0 0 20px rgba(250, 204, 21, 0.2); 
+            box-shadow: 0 0 15px rgba(250, 204, 21, 0.3); 
             transform: scale(1.02); 
             opacity: 1 !important;
-            z-index: 10;
         }
         
-        /* Inactive User Dimmed */
+        /* Inactive User - Dimmed */
         .inactive-turn {
-            opacity: 0.5;
-            filter: grayscale(0.8);
+            opacity: 0.4;
             pointer-events: none;
-            transform: scale(0.98);
+            filter: grayscale(0.8);
         }
 
-        /* Microphone Animation */
+        /* Mic Listening Animation - Red Pulse */
         .mic-listening { 
             animation: pulse-red 1.5s infinite; 
             background-color: #ef4444 !important; 
@@ -41,20 +39,15 @@
             100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } 
         }
 
-        /* Speaking Animation */
-        .speaking-now { border-color: #8b5cf6 !important; box-shadow: 0 0 30px rgba(139, 92, 246, 0.5); }
+        /* System Speaking Animation - Purple Glow */
+        .speaking-now { border-color: #8b5cf6 !important; box-shadow: 0 0 30px rgba(139, 92, 246, 0.6); }
 
-        select { background-color: #334155; color: white; border: 1px solid #475569; padding: 12px; border-radius: 8px; width: 100%; outline: none; }
+        select { background-color: #334155; color: white; border: 1px solid #475569; padding: 12px; border-radius: 8px; width: 100%; outline: none; font-size: 14px; }
         
+        /* Chat Bubble Animation */
         .msg-enter { animation: slideIn 0.3s ease-out forwards; }
         @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         
-        /* Live Text Preview */
-        .live-preview {
-            font-size: 0.9rem; color: #fbbf24; font-style: italic; 
-            min-height: 24px; margin-top: 8px; word-wrap: break-word;
-        }
-
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
     </style>
@@ -65,15 +58,15 @@
     <header class="w-full max-w-4xl flex justify-between items-center mb-4 p-4 glass-panel rounded-2xl shadow-lg shrink-0">
         <div class="flex items-center gap-3">
             <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400">
-                Dhwani <span class="text-xs text-green-400 font-mono border border-green-500/30 px-2 py-1 rounded">ULTIMATE</span>
+                Dhwani <span class="text-xs text-yellow-400 font-mono border border-yellow-500/30 px-2 py-1 rounded">Smart Ai Translator</span>
             </h1>
         </div>
         <div>
             <button id="start-btn" class="bg-green-600 hover:bg-green-500 text-white px-6 py-2 rounded-full font-bold shadow-lg transition transform hover:scale-105">
-                START
+                START CONVERSATION
             </button>
             <button id="stop-btn" class="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-full font-bold shadow-lg transition hidden">
-                STOP
+                END CONVERSATION
             </button>
         </div>
     </header>
@@ -82,18 +75,20 @@
         
         <div id="chat-container" class="flex-grow bg-slate-900/50 rounded-2xl border border-slate-800 p-4 overflow-y-auto min-h-[300px] flex flex-col gap-3 shadow-inner relative">
             <div id="welcome-msg" class="text-center text-slate-500 mt-10 text-sm">
-                1. Select Languages.<br>
-                2. Click START.<br>
-                3. Speak freely. System detects 5s pause -> Translates -> Speaks -> Switches User.
+                Select languages below.<br>
+                Click <b>START</b> to begin the auto-loop.<br>
+                <span class="text-xs text-gray-600">The system detects 5-second pauses automatically.</span>
             </div>
         </div>
 
         <div class="flex justify-center gap-4 shrink-0">
             <button id="repeat-btn" class="text-indigo-400 hover:text-white text-xs flex items-center gap-1 disabled:opacity-30" disabled>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg> Repeat
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+                Repeat Last Audio
             </button>
             <button id="share-btn" class="text-emerald-400 hover:text-white text-xs flex items-center gap-1">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" /></svg> Share
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" /></svg>
+                Share Chat
             </button>
         </div>
 
@@ -106,14 +101,19 @@
                     </span>
                     <div id="status-u1" class="text-xs font-mono text-gray-400 font-bold">READY</div>
                 </div>
+                
                 <select id="lang-u1"></select>
-                <div id="live-u1" class="live-preview"></div> <div class="relative flex items-center gap-4">
+
+                <div class="relative flex items-center gap-4">
                     <div id="mic-icon-u1" class="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center transition-all border border-slate-600 shadow-md">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-white"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" /></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-white">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                        </svg>
                     </div>
+                    
                     <div class="flex-grow flex flex-col justify-center h-12">
-                        <div id="timer-u1" class="hidden text-xs text-indigo-300 font-mono">Silence: <span id="countdown-u1">0</span>s</div>
-                        <button id="manual-send-u1" class="hidden bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-1 rounded w-fit mt-1">Finish</button>
+                        <div id="timer-u1" class="hidden text-xs text-indigo-300 font-mono animate-pulse">Wait... 5s</div>
+                        <button id="manual-send-u1" class="hidden bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-1 rounded w-fit mt-1">Finish & Send</button>
                     </div>
                 </div>
             </div>
@@ -125,20 +125,27 @@
                     </span>
                     <div id="status-u2" class="text-xs font-mono text-gray-400 font-bold">READY</div>
                 </div>
+
                 <select id="lang-u2"></select>
-                <div id="live-u2" class="live-preview"></div> <div class="relative flex items-center gap-4">
+
+                <div class="relative flex items-center gap-4">
                     <div id="mic-icon-u2" class="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center transition-all border border-slate-600 shadow-md">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-white"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" /></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-white">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                        </svg>
                     </div>
+
                     <div class="flex-grow flex flex-col justify-center h-12">
-                        <div id="timer-u2" class="hidden text-xs text-emerald-300 font-mono">Silence: <span id="countdown-u2">0</span>s</div>
-                        <button id="manual-send-u2" class="hidden bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1 rounded w-fit mt-1">Finish</button>
+                        <div id="timer-u2" class="hidden text-xs text-emerald-300 font-mono animate-pulse">Wait... 5s</div>
+                        <button id="manual-send-u2" class="hidden bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1 rounded w-fit mt-1">Finish & Send</button>
                     </div>
                 </div>
             </div>
 
         </div>
+
         <div id="global-status" class="w-full text-center py-1 text-[10px] text-gray-500 font-mono uppercase tracking-widest">System Idle</div>
+
     </main>
 
     <script>
@@ -151,21 +158,18 @@
             { code: "ml-IN", name: "Malayalam (മലയാളം)" }, { code: "es-ES", name: "Spanish (Español)" },
             { code: "fr-FR", name: "French (Français)" }, { code: "de-DE", name: "German (Deutsch)" },
             { code: "ja-JP", name: "Japanese (日本語)" }, { code: "ru-RU", name: "Russian (Pусский)" },
-            { code: "zh-CN", name: "Chinese (Mandarin)" }, { code: "ar-SA", name: "Arabic (العربية)" }
+            { code: "ar-SA", name: "Arabic (العربية)" }
         ];
 
         // --- GLOBAL VARIABLES ---
         let recognition;
         let isConversationActive = false;
         let activeTurn = 0; // 0=None, 1=User1, 2=User2
-        
-        let silenceTimer = null, pauseSeconds = 0, pauseInterval = null;
-        
-        // **KEY FIX FOR ANDROID REPETITION**
-        // We accumulate FINAL results separately from INTERIM
-        let final_transcript = "";
-        
-        let lastSpokenText = "", lastSpokenLang = "";
+        let silenceTimer = null;
+        let countdownInterval = null;
+        let currentTranscript = "";
+        let lastSpokenText = ""; // For Repeat
+        let lastSpokenLang = "";
         let synth = window.speechSynthesis;
         let voices = [];
 
@@ -175,219 +179,245 @@
             shareBtn: document.getElementById('share-btn'), repeatBtn: document.getElementById('repeat-btn'),
             chat: document.getElementById('chat-container'), welcome: document.getElementById('welcome-msg'),
             status: document.getElementById('global-status'),
-            u1: { 
-                panel: document.getElementById('panel-u1'), lang: document.getElementById('lang-u1'), 
-                status: document.getElementById('status-u1'), mic: document.getElementById('mic-icon-u1'), 
-                timer: document.getElementById('timer-u1'), countdown: document.getElementById('countdown-u1'), 
-                btn: document.getElementById('manual-send-u1'), live: document.getElementById('live-u1') 
+            u1: {
+                panel: document.getElementById('panel-u1'), lang: document.getElementById('lang-u1'),
+                status: document.getElementById('status-u1'), mic: document.getElementById('mic-icon-u1'),
+                timer: document.getElementById('timer-u1'), btn: document.getElementById('manual-send-u1')
             },
-            u2: { 
-                panel: document.getElementById('panel-u2'), lang: document.getElementById('lang-u2'), 
-                status: document.getElementById('status-u2'), mic: document.getElementById('mic-icon-u2'), 
-                timer: document.getElementById('timer-u2'), countdown: document.getElementById('countdown-u2'), 
-                btn: document.getElementById('manual-send-u2'), live: document.getElementById('live-u2') 
+            u2: {
+                panel: document.getElementById('panel-u2'), lang: document.getElementById('lang-u2'),
+                status: document.getElementById('status-u2'), mic: document.getElementById('mic-icon-u2'),
+                timer: document.getElementById('timer-u2'), btn: document.getElementById('manual-send-u2')
             }
         };
 
         // --- INITIALIZATION ---
         window.onload = () => {
-            languages.forEach(l => { els.u1.lang.add(new Option(l.name, l.code)); els.u2.lang.add(new Option(l.name, l.code)); });
+            // Load Languages
+            languages.forEach(l => {
+                els.u1.lang.add(new Option(l.name, l.code));
+                els.u2.lang.add(new Option(l.name, l.code));
+            });
             els.u1.lang.value = "en-IN"; els.u2.lang.value = "hi-IN";
-            
+
+            // Load Voices
             const loadVoices = () => { voices = synth.getVoices(); };
-            if (speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = loadVoices;
+            if (speechSynthesis.onvoiceschanged !== undefined) { speechSynthesis.onvoiceschanged = loadVoices; }
             loadVoices();
 
-            if (!('webkitSpeechRecognition' in window)) { alert("Chrome Required"); els.startBtn.disabled = true; } 
-            else { setupRecognition(); }
+            // Setup Speech Rec
+            if (!('webkitSpeechRecognition' in window)) {
+                alert("Speech Recognition not supported. Use Chrome.");
+                els.startBtn.disabled = true;
+            } else {
+                setupRecognition();
+            }
         };
 
         function setupRecognition() {
             const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
             recognition = new SpeechRec();
-            recognition.continuous = true; // Required for silence detection logic
-            recognition.interimResults = true; // Required for Android Fix
+            recognition.continuous = true; // Key for "Talk as long as you want"
+            recognition.interimResults = true;
 
             recognition.onstart = () => {
                 if (!isConversationActive) return;
                 const u = activeTurn === 1 ? els.u1 : els.u2;
                 u.status.textContent = "LISTENING...";
                 u.mic.classList.add('mic-listening');
-                startSilenceWatcher();
+                startSilenceTimer(); // Start 5s countdown immediately
             };
 
             recognition.onend = () => {
-                // If loop is active but mic died (network glitch), restart it
-                if (isConversationActive && activeTurn !== 0) { 
-                    try { recognition.start(); } catch(e){} 
-                }
-            };
-
-            // **ANDROID REPETITION FIX LOGIC**
-            recognition.onresult = (event) => {
-                resetSilenceWatcher();
-                
-                let interim_transcript = "";
-                
-                // Rebuild the transcript from the current event
-                // But only append to our global 'final_transcript' when isFinal is true
-                // This prevents the buffer from accumulating duplicates
-                
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) {
-                        final_transcript += event.results[i][0].transcript + " ";
+                // If conversation is on, but mic stopped (maybe silence or manual stop)
+                // If we have text, process it. If not, and still active, restart mic.
+                if (isConversationActive && activeTurn !== 0) {
+                    if (currentTranscript.trim()) {
+                        processTranslation();
                     } else {
-                        interim_transcript += event.results[i][0].transcript;
+                        // Restart if silence without text (keep loop alive)
+                        try { recognition.start(); } catch(e){} 
                     }
                 }
+            };
 
-                // Show Live Preview (Final + Interim)
-                const displayText = final_transcript + interim_transcript;
-                const u = activeTurn === 1 ? els.u1 : els.u2;
-                u.live.textContent = displayText.substring(Math.max(0, displayText.length - 60)); // Show tail
-                u.status.textContent = "HEARING...";
+            recognition.onresult = (event) => {
+                let final = "";
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) final += event.results[i][0].transcript;
+                }
+                
+                if (final) {
+                    currentTranscript += final;
+                    startSilenceTimer(); // Reset timer because user spoke
+                    const u = activeTurn === 1 ? els.u1 : els.u2;
+                    u.status.textContent = "Hearing...";
+                }
             };
             
-            recognition.onerror = (e) => { 
-                if(e.error === 'not-allowed') toggleStop(); 
-                else console.log("Mic Error:", e.error);
+            recognition.onerror = (e) => {
+                if(e.error === 'not-allowed') toggleStop();
             };
+        }
+
+        // --- FLOW CONTROLLER ---
+        els.startBtn.onclick = () => {
+            isConversationActive = true;
+            els.startBtn.classList.add('hidden');
+            els.stopBtn.classList.remove('hidden');
+            els.welcome.style.display = 'none';
+            els.status.textContent = "CONVERSATION STARTED";
+            activateUser(1); // Start with User 1
+        };
+
+        els.stopBtn.onclick = toggleStop;
+
+        function toggleStop() {
+            isConversationActive = false;
+            activeTurn = 0;
+            if(recognition) recognition.stop();
+            if(synth) synth.cancel();
+            clearTimers();
+            resetUI();
+            els.startBtn.classList.remove('hidden');
+            els.stopBtn.classList.add('hidden');
+            els.status.textContent = "CONVERSATION ENDED";
+        }
+
+        function activateUser(userNum) {
+            if (!isConversationActive) return;
+            activeTurn = userNum;
+            currentTranscript = "";
+            
+            // UI Update
+            const active = userNum === 1 ? els.u1 : els.u2;
+            const inactive = userNum === 1 ? els.u2 : els.u1;
+            
+            active.panel.classList.remove('inactive-turn');
+            active.panel.classList.add('active-turn');
+            active.btn.classList.remove('hidden'); // Show manual done button
+            active.timer.classList.remove('hidden');
+            
+            inactive.panel.classList.add('inactive-turn');
+            inactive.panel.classList.remove('active-turn');
+            inactive.btn.classList.add('hidden');
+            inactive.timer.classList.add('hidden');
+            inactive.mic.classList.remove('mic-listening');
+            inactive.status.textContent = "WAITING";
+
+            // Start Mic
+            recognition.lang = active.lang.value;
+            try { recognition.start(); } catch(e) {}
         }
 
         // --- SILENCE DETECTION (5 Seconds) ---
-        function startSilenceWatcher() {
-            clearInterval(pauseInterval); pauseSeconds = 0; updateTimerUI(0);
-            pauseInterval = setInterval(() => {
-                pauseSeconds++; updateTimerUI(pauseSeconds);
-                if (pauseSeconds >= 5) {
-                    // Check if we actually have text
-                    if (final_transcript.trim().length > 0) processTurn();
-                    else pauseSeconds = 0; // Reset if silence but empty buffer
-                }
+        function startSilenceTimer() {
+            clearTimers();
+            let timeLeft = 5;
+            updateTimerUI(timeLeft);
+
+            countdownInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerUI(timeLeft);
+                if (timeLeft <= 0) clearInterval(countdownInterval);
             }, 1000);
+
+            silenceTimer = setTimeout(() => {
+                // Pause Limit Reached -> Process
+                if(recognition) recognition.stop(); // This triggers onend -> processTranslation
+            }, 5000);
         }
 
-        function resetSilenceWatcher() { pauseSeconds = 0; updateTimerUI(0); }
-        function stopSilenceWatcher() { clearInterval(pauseInterval); pauseSeconds = 0; els.u1.timer.classList.add('hidden'); els.u2.timer.classList.add('hidden'); }
         function updateTimerUI(sec) {
-            const u = activeTurn === 1 ? els.u1 : els.u2;
-            u.timer.classList.remove('hidden'); u.countdown.textContent = sec;
+            if (activeTurn === 1) els.u1.timer.textContent = `Auto-send: ${sec}s`;
+            if (activeTurn === 2) els.u2.timer.textContent = `Auto-send: ${sec}s`;
         }
 
-        // --- FLOW CONTROL ---
-        els.startBtn.onclick = () => { 
-            isConversationActive = true; 
-            els.startBtn.classList.add('hidden'); els.stopBtn.classList.remove('hidden'); 
-            els.welcome.style.display='none'; 
-            activateUser(1); 
-        };
-        els.stopBtn.onclick = toggleStop;
-
-        function toggleStop() { 
-            isConversationActive = false; activeTurn = 0; 
-            if(recognition) recognition.stop(); 
-            if(synth) synth.cancel(); 
-            stopSilenceWatcher(); resetUI(); 
-            els.startBtn.classList.remove('hidden'); els.stopBtn.classList.add('hidden'); 
-            els.status.textContent = "STOPPED"; 
+        function clearTimers() {
+            clearTimeout(silenceTimer);
+            clearInterval(countdownInterval);
         }
 
-        function activateUser(num) {
-            if (!isConversationActive) return;
-            activeTurn = num; 
-            
-            // **RESET BUFFER FOR NEW TURN**
-            final_transcript = ""; 
-            els.u1.live.textContent = ""; els.u2.live.textContent = "";
+        // Manual Trigger
+        els.u1.btn.onclick = () => { if(recognition) recognition.stop(); };
+        els.u2.btn.onclick = () => { if(recognition) recognition.stop(); };
 
-            resetUIStyles();
-            const active = num === 1 ? els.u1 : els.u2;
-            const inactive = num === 1 ? els.u2 : els.u1;
+        // --- TRANSLATION CORE ---
+        async function processTranslation() {
+            if (!isConversationActive || !currentTranscript.trim()) return;
             
-            active.panel.classList.replace('inactive-turn', 'active-turn');
-            active.btn.classList.remove('hidden');
-            inactive.panel.classList.replace('active-turn', 'inactive-turn');
-            
-            els.status.textContent = `USER ${num} SPEAKING`;
-            recognition.lang = active.lang.value;
-            try { recognition.start(); } catch(e){}
-        }
+            clearTimers();
+            const srcUser = activeTurn;
+            const targetUser = srcUser === 1 ? 2 : 1;
+            const text = currentTranscript;
 
-        els.u1.btn.onclick = () => processTurn(); els.u2.btn.onclick = () => processTurn();
-
-        // --- PROCESSING ---
-        async function processTurn() {
-            if (!isConversationActive) return;
-            
-            stopSilenceWatcher(); 
-            if(recognition) recognition.stop();
-            
-            const src = activeTurn, tgt = src === 1 ? 2 : 1;
-            const text = final_transcript.trim();
-            
-            if (!text) { activateUser(src); return; } // Nothing said, restart
-
-            // Lock UI
-            activeTurn = 0; resetUIStyles();
-            els.status.textContent = "TRANSLATING..."; 
+            // Lock UI during processing
+            activeTurn = 0; 
+            resetUI(); 
             els.chat.classList.add('speaking-now');
-            
-            addChatBubble(src, text, false);
+            els.status.textContent = `TRANSLATING USER ${srcUser}...`;
 
-            const sLang = src === 1 ? els.u1.lang.value : els.u2.lang.value;
-            const tLang = tgt === 1 ? els.u1.lang.value : els.u2.lang.value;
+            // MyMemory API
+            const sLang = srcUser === 1 ? els.u1.lang.value : els.u2.lang.value;
+            const tLang = targetUser === 1 ? els.u1.lang.value : els.u2.lang.value;
             const pair = `${sLang}|${tLang}`;
 
             try {
-                // Free Translation API
                 const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${pair}`);
                 const data = await res.json();
                 
                 if (data.responseData) {
-                    const trans = data.responseData.translatedText;
-                    addChatBubble(tgt, trans, true);
+                    const transText = data.responseData.translatedText;
                     
-                    // Blocking TTS
-                    await speakText(trans, tLang);
+                    // Show in Console (Left/Right)
+                    addChatBubble(srcUser, text, transText);
                     
-                    // NEXT TURN
-                    if (isConversationActive) { 
-                        els.chat.classList.remove('speaking-now'); 
-                        activateUser(tgt); 
+                    // TTS - Critical: Wait for completion before next turn
+                    await speakText(transText, tLang);
+                    
+                    // Loop continues
+                    if (isConversationActive) {
+                        els.chat.classList.remove('speaking-now');
+                        activateUser(targetUser);
                     }
-                } else throw new Error("API Error");
+                } else {
+                    throw new Error("API Limit/Error");
+                }
             } catch (e) {
-                addChatBubble(src, "Translation Failed", true, true);
-                // Continue loop anyway
-                if (isConversationActive) activateUser(tgt);
+                console.error(e);
+                addChatBubble(srcUser, text, "Translation Error", true);
+                if (isConversationActive) activateUser(targetUser); // Skip turn on error
             }
         }
 
-        // --- TTS ---
+        // --- TTS ENGINE ---
         function speakText(text, lang) {
             return new Promise((resolve) => {
                 if (!text) { resolve(); return; }
                 if (synth.speaking) synth.cancel();
-                
-                lastSpokenText = text; lastSpokenLang = lang; els.repeatBtn.disabled = false;
-                
-                const utt = new SpeechSynthesisUtterance(text);
-                utt.lang = lang; 
-                utt.rate = 0.9; // Slower speed request
-                
-                if(voices.length===0) voices = synth.getVoices();
-                // Try Google Voice -> Exact Lang -> Partial Lang
-                let v = voices.find(v => v.lang === lang && v.name.includes("Google"));
-                if(!v) v = voices.find(v => v.lang === lang);
-                if(!v) v = voices.find(v => v.lang.startsWith(lang.split('-')[0]));
-                if(v) utt.voice = v;
 
-                utt.onend = resolve; 
-                utt.onerror = resolve; 
-                
-                // Chrome Android Resume Hack
-                const wake = setInterval(() => {
-                    if (!synth.speaking) clearInterval(wake);
+                // Store for repeat button
+                lastSpokenText = text;
+                lastSpokenLang = lang;
+                els.repeatBtn.disabled = false;
+
+                const utt = new SpeechSynthesisUtterance(text);
+                utt.lang = lang;
+                utt.rate = 0.9; // Slower speed request
+
+                // Better Voice Matching for Android/Chrome
+                if (voices.length === 0) voices = synth.getVoices();
+                let v = voices.find(v => v.lang === lang && v.name.includes("Google")); // Prefer Google
+                if (!v) v = voices.find(v => v.lang === lang); // Fallback exact lang
+                if (!v) v = voices.find(v => v.lang.startsWith(lang.split('-')[0])); // Fallback generic lang
+                if (v) utt.voice = v;
+
+                utt.onend = () => { resolve(); };
+                utt.onerror = () => { resolve(); }; // Proceed even if TTS fails
+
+                // Android Chrome Resume Hack (Keeps TTS alive for long text)
+                const resumeHack = setInterval(() => {
+                    if (!synth.speaking) clearInterval(resumeHack);
                     else { synth.pause(); synth.resume(); }
                 }, 14000);
 
@@ -395,28 +425,50 @@
             });
         }
 
-        // --- UTILS ---
-        els.repeatBtn.onclick = () => { if(lastSpokenText) { const u = new SpeechSynthesisUtterance(lastSpokenText); u.lang = lastSpokenLang; u.rate = 0.9; synth.speak(u); } };
-        els.shareBtn.onclick = async () => { try { await navigator.clipboard.writeText(els.chat.innerText); alert("Copied!"); } catch(e){} };
+        // --- UTILITIES ---
+        els.repeatBtn.onclick = () => {
+            if (lastSpokenText && !synth.speaking) {
+                const utt = new SpeechSynthesisUtterance(lastSpokenText);
+                utt.lang = lastSpokenLang;
+                utt.rate = 0.9;
+                synth.speak(utt);
+            }
+        };
 
-        function resetUIStyles() {
-            els.u1.panel.classList.remove('active-turn'); els.u2.panel.classList.remove('active-turn');
-            els.u1.panel.classList.add('inactive-turn'); els.u2.panel.classList.add('inactive-turn');
+        els.shareBtn.onclick = async () => {
+            const text = Array.from(document.querySelectorAll('#chat-container div'))
+                .map(d => d.innerText).join('\n');
+            try {
+                await navigator.clipboard.writeText(text);
+                alert("Chat copied to clipboard!");
+            } catch (err) { alert("Could not copy."); }
+        };
+
+        function resetUI() {
+            els.u1.panel.classList.remove('active-turn', 'inactive-turn');
+            els.u2.panel.classList.remove('active-turn', 'inactive-turn');
+            els.u1.mic.classList.remove('mic-listening');
+            els.u2.mic.classList.remove('mic-listening');
             els.u1.btn.classList.add('hidden'); els.u2.btn.classList.add('hidden');
-            els.u1.mic.classList.remove('mic-listening'); els.u2.mic.classList.remove('mic-listening');
-            els.u1.status.textContent = "WAITING"; els.u2.status.textContent = "WAITING";
+            els.u1.timer.classList.add('hidden'); els.u2.timer.classList.add('hidden');
+            els.u1.status.textContent = "IDLE"; els.u2.status.textContent = "IDLE";
         }
-        function resetUI() { resetUIStyles(); els.chat.classList.remove('speaking-now'); }
 
-        function addChatBubble(u, txt, isTrans, isErr=false) {
-            if(els.welcome) els.welcome.style.display = 'none';
+        function addChatBubble(user, original, translated, isErr=false) {
             const d = document.createElement('div');
-            const align = u === 1 ? 'self-start text-left' : 'self-end text-right';
-            let bg = u === 1 ? 'bg-indigo-900/80 border-indigo-700' : 'bg-emerald-900/80 border-emerald-700';
+            const align = user === 1 ? 'self-start text-left' : 'self-end text-right';
+            // User 1 = Indigo, User 2 = Emerald
+            let bg = user === 1 ? 'bg-indigo-900/80 border-indigo-700' : 'bg-emerald-900/80 border-emerald-700';
             if (isErr) bg = 'bg-red-900/80 border-red-700';
-            d.className = `max-w-[85%] ${align} p-3 rounded-xl border ${bg} mb-2 shadow-lg msg-enter`;
-            d.innerHTML = `<div class="text-[10px] uppercase text-gray-400 font-bold mb-1">User ${u} ${isTrans?'(Trans)':''}</div><div class="text-white text-lg">${txt}</div>`;
-            els.chat.appendChild(d); els.chat.scrollTop = els.chat.scrollHeight;
+
+            d.className = `max-w-[85%] ${align} p-4 rounded-xl border ${bg} mb-3 shadow-lg msg-enter`;
+            d.innerHTML = `
+                <div class="text-[10px] uppercase text-gray-400 font-bold mb-1">User ${user}</div>
+                <div class="text-gray-300 text-sm italic mb-2">"${original}"</div>
+                <div class="text-white text-lg font-medium">${translated}</div>
+            `;
+            els.chat.appendChild(d);
+            els.chat.scrollTop = els.chat.scrollHeight;
         }
     </script>
 </body>
