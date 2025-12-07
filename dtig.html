@@ -174,26 +174,35 @@
 
             // **ANDROID FIX LOGIC HERE**
             recognition.onresult = (event) => {
-                resetSilenceWatcher();
-                interimTranscript = ""; // Clear interim every time
+    resetSilenceWatcher();
 
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) {
-                        finalTranscript += event.results[i][0].transcript + " ";
-                    } else {
-                        interimTranscript += event.results[i][0].transcript;
-                    }
-                }
+    // 🔴 IMPORTANT: Rebuild from scratch every time
+    let tempFinal = "";
+    let tempInterim = "";
 
-                // Display Logic: Show Final + Interim (No Repetition)
-                const displayText = finalTranscript + interimTranscript;
-                const u = activeTurn === 1 ? els.u1 : els.u2;
-                
-                if (displayText.trim()) {
-                    u.live.textContent = displayText.substring(displayText.length - 50); // Show last 50 chars
-                    u.status.textContent = "HEARING...";
-                }
-            };
+    for (let i = 0; i < event.results.length; ++i) {
+        const res = event.results[i];
+        if (res.isFinal) {
+            tempFinal += res[0].transcript + " ";
+        } else {
+            tempInterim += res[0].transcript;
+        }
+    }
+
+    // ✅ Now finalTranscript is always the clean full text (no doubling)
+    finalTranscript = tempFinal;
+    interimTranscript = tempInterim;
+
+    const displayText = (finalTranscript + interimTranscript).trim();
+    const u = activeTurn === 1 ? els.u1 : els.u2;
+
+    if (displayText) {
+        // Just show last 50 characters in the yellow live line
+        u.live.textContent = displayText.slice(-50);
+        u.status.textContent = "HEARING...";
+    }
+};
+
             
             recognition.onerror = (e) => { if(e.error === 'not-allowed') toggleStop(); };
         }
