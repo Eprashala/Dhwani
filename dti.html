@@ -27,7 +27,7 @@
                 Dhwani <span class="text-xs text-green-400 font-mono border border-green-500/30 px-2 py-1 rounded">INSTANT</span>
             </h1>
         </div>
-        <div class="text-xs text-gray-400">No API Key Required</div>
+        <div class="text-xs text-gray-400">Fixed for Android</div>
     </header>
 
     <main class="w-full max-w-4xl flex-grow flex flex-col gap-4">
@@ -109,7 +109,8 @@
         let activeUser = 0; // 1 or 2
         let silenceTimer = null;
         let countdownInterval = null;
-        let currentTranscript = "";
+        let fullAccumulatedText = ""; // New: Stores text across restarts
+        let wakeLock = null; // New: To keep screen on
         const synth = window.speechSynthesis;
 
         // --- ELEMENTS ---
@@ -141,72 +142,106 @@
         function initMic() {
             const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
             recognition = new SpeechRec();
-            recognition.continuous = true;
-            recognition.interimResults = true;
+            
+            // --- CRITICAL FIX FOR ANDROID ---
+            recognition.continuous = false; // Must be FALSE to prevent repetition bug
+            recognition.interimResults = false; // Must be FALSE for stability on Android
 
             recognition.onstart = () => {
-                isListening = true;
-                els.status.textContent = `Listening to User ${activeUser}...`;
-                updateUIState('LISTENING');
-                startSilenceTimer();
+                // Only update UI if we are officially starting a session
+                if(isListening) {
+                    els.status.textContent = `Listening to User ${activeUser}...`;
+                    updateUIState('LISTENING');
+                }
             };
 
             recognition.onend = () => {
-                isListening = false;
-                if (activeUser !== 0 && currentTranscript.trim() !== "") {
-                    // Stop pressed or silence detected
-                    processTranslation();
+                // --- RESTART LOGIC (Manual Continuous) ---
+                if (isListening) {
+                    // If we are still in "Listening" mode (Done not clicked, Timer not expired)
+                    // We immediately restart the mic to catch the next phrase.
+                    try {
+                        recognition.start();
+                    } catch (e) {
+                        console.log("Restart prevented or overlap");
+                    }
                 } else {
-                    resetUI();
+                    // Truly finished
+                    processTranslation();
                 }
             };
 
             recognition.onresult = (event) => {
-                let final = "";
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) {
-                        final += event.results[i][0].transcript;
-                    }
-                }
-
-                if (final) {
-                    currentTranscript += final;
-                    // Reset timer because user spoke again
+                // --- SIMPLIFIED RESULT LOGIC ---
+                // Since continuous=false, we only ever get one result at [0][0]
+                const transcript = event.results[0][0].transcript;
+                
+                if (transcript && isListening) {
+                    // Append new phrase to our accumulator with a space
+                    fullAccumulatedText += transcript + " ";
+                    
+                    // Reset silence timer (Debounce)
                     startSilenceTimer();
-                    els.status.textContent = "Hearing: " + final.substring(0, 20) + "...";
+                    
+                    els.status.textContent = "Heard: " + transcript;
                 }
             };
 
             recognition.onerror = (event) => {
-                if (event.error === 'no-speech') return;
+                if (event.error === 'no-speech') {
+                    // If no speech, just restart if we are supposed to be listening
+                    if (isListening) return; 
+                }
                 console.error("Mic Error:", event.error);
-                resetUI();
-                els.status.textContent = "Mic Error. Try again.";
+                if(event.error === 'not-allowed') {
+                    resetUI();
+                    alert("Microphone permission denied.");
+                }
             };
+        }
+
+        // --- WAKELOCK (Borrowed from Tantra) ---
+        async function acquireWakeLock() {
+            if ('wakeLock' in navigator) { 
+                try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {} 
+            }
+        }
+        async function releaseWakeLock() {
+            if (wakeLock) { try { await wakeLock.release(); wakeLock = null; } catch (e) {} }
         }
 
         // --- INTERACTION ---
         els.btn1.onclick = () => startListening(1);
         els.btn2.onclick = () => startListening(2);
-        els.done1.onclick = () => stopListening();
-        els.done2.onclick = () => stopListening();
+        
+        // "Done" button manually triggers the stop
+        els.done1.onclick = () => manualStop();
+        els.done2.onclick = () => manualStop();
 
-        function startListening(user) {
+        async function startListening(user) {
             if (isListening || synth.speaking) return;
-            activeUser = user;
-            currentTranscript = "";
             
-            // Set Language for STT
+            activeUser = user;
+            fullAccumulatedText = ""; // Clear buffer
+            isListening = true; // Set flag
+            
+            // Set Language
             const langCode = (user === 1) ? els.lang1.value : els.lang2.value;
             recognition.lang = langCode;
 
+            await acquireWakeLock(); // Keep screen on
+
             try {
                 recognition.start();
-            } catch (e) { console.error(e); }
+                startSilenceTimer(); // Start the countdown immediately
+            } catch (e) { console.error(e); isListening = false; }
         }
 
-        function stopListening() {
-            if (recognition) recognition.stop();
+        function manualStop() {
+            // User clicked DONE. Stop immediately.
+            isListening = false; // This prevents onend from restarting
+            recognition.stop();
+            // onend will fire, see isListening is false, and call processTranslation
         }
 
         // --- TIMER LOGIC (5 Seconds) ---
@@ -224,7 +259,8 @@
             }, 1000);
 
             silenceTimer = setTimeout(() => {
-                stopListening(); // Trigger processing
+                // Timeout reached
+                manualStop();
             }, 5000);
         }
 
@@ -237,35 +273,29 @@
             }
         }
 
-        // --- TRANSLATION LOGIC (MyMemory API - Free/No Key) ---
+        // --- TRANSLATION LOGIC ---
         async function processTranslation() {
-            // Hide timers
             clearTimeout(silenceTimer);
             clearInterval(countdownInterval);
             els.timer1.classList.add('hidden');
             els.timer2.classList.add('hidden');
+            await releaseWakeLock();
 
-            const text = currentTranscript.trim();
+            const text = fullAccumulatedText.trim();
             if (!text) { resetUI(); return; }
 
             const uSource = activeUser;
             const uTarget = (activeUser === 1) ? 2 : 1;
             
-            // Lock UI
             activeUser = 0; 
             updateUIState('PROCESSING');
             
-            // Display Original Text
             addMessage(uSource, text, false);
 
-            // Get Lang Codes
             const sLangFull = (uSource === 1) ? els.lang1.value : els.lang2.value;
             const tLangFull = (uTarget === 1) ? els.lang1.value : els.lang2.value;
             
-            // Extract simplified codes for API (en-IN -> en|hi)
-            // MyMemory works best with pairs like "en|hi" or "en-IN|hi-IN"
             const pair = `${sLangFull}|${tLangFull}`;
-
             els.status.textContent = "Translating...";
 
             try {
@@ -283,7 +313,7 @@
 
             } catch (error) {
                 console.error(error);
-                addMessage(uTarget, "Translation Failed (Network Error)", true, true);
+                addMessage(uTarget, "Translation Failed", true, true);
                 resetUI();
             }
         }
@@ -295,7 +325,6 @@
             const u = new SpeechSynthesisUtterance(text);
             u.lang = lang;
             
-            // Try to pick a Google voice if available (sounds better)
             const voices = synth.getVoices();
             const preferredVoice = voices.find(v => v.lang === lang && v.name.includes("Google"));
             if (preferredVoice) u.voice = preferredVoice;
@@ -336,7 +365,7 @@
         function resetUI() {
             isListening = false;
             activeUser = 0;
-            currentTranscript = "";
+            fullAccumulatedText = "";
             clearTimeout(silenceTimer);
             clearInterval(countdownInterval);
 
