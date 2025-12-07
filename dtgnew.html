@@ -2,550 +2,492 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dhwani Smart AI Translator (MyMemory)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dhwani AI Translator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
         body { font-family: 'Inter', sans-serif; }
 
+        /* Smooth Scrolling */
+        html { scroll-behavior: smooth; }
+
         /* Purple Theme Animations */
-        .pulse-ring {
-            animation: pulse-purple 2s infinite;
-        }
+        .pulse-ring { animation: pulse-purple 2s infinite; }
         @keyframes pulse-purple {
             0% { box-shadow: 0 0 0 0 rgba(147, 51, 234, 0.7); }
-            70% { box-shadow: 0 0 0 15px rgba(147, 51, 234, 0); }
+            70% { box-shadow: 0 0 0 10px rgba(147, 51, 234, 0); }
             100% { box-shadow: 0 0 0 0 rgba(147, 51, 234, 0); }
         }
 
+        /* Mic Animation */
         .mic-active {
-            background-color: #ef4444 !important; /* Red when recording */
+            background: #ef4444 !important; /* Red */
             animation: pulse-red 1.5s infinite;
         }
         @keyframes pulse-red {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
         }
 
-        /* Scrollbar for chat */
+        /* Hide Scrollbar but keep functionality */
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
+        /* Chat Bubbles */
         .chat-bubble-u1 {
-            background: linear-gradient(135deg, #6b21a8 0%, #9333ea 100%);
+            background: linear-gradient(135deg, #7c3aed 0%, #9333ea 100%);
             color: white;
-            border-bottom-left-radius: 0;
+            border-bottom-left-radius: 2px;
         }
         .chat-bubble-u2 {
             background: linear-gradient(135deg, #db2777 0%, #ec4899 100%);
             color: white;
-            border-bottom-right-radius: 0;
+            border-bottom-right-radius: 2px;
         }
         .translation-text {
-            font-size: 0.9em;
-            opacity: 0.9;
-            font-style: italic;
-            margin-top: 4px;
-            padding-top: 4px;
+            font-size: 0.95em;
+            opacity: 0.95;
+            font-weight: 500;
+            margin-top: 6px;
+            padding-top: 6px;
             border-top: 1px solid rgba(255,255,255,0.3);
+            color: #fff;
         }
+
+        /* Button Press Effect */
+        .btn-press:active { transform: scale(0.95); }
     </style>
 </head>
-<body class="bg-gradient-to-br from-purple-100 via-purple-50 to-pink-100 h-screen flex flex-col overflow-hidden">
+<body class="bg-gray-50 h-[100dvh] flex flex-col overflow-hidden">
 
-    <header class="bg-white/80 backdrop-blur-md border-b border-purple-200 p-4 shadow-sm z-10 shrink-0">
-        <div class="max-w-4xl mx-auto flex items-center justify-between">
+    <header class="bg-white/95 backdrop-blur shadow-sm z-20 shrink-0">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-purple-100">
             <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center text-white font-bold text-lg">D</div>
-                <h1 class="text-xl font-bold text-gray-800 tracking-tight">Dhwani <span class="text-purple-600 text-sm font-normal">MyMemory API</span></h1>
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">D</div>
+                <h1 class="text-lg font-bold text-gray-800">Dhwani <span class="text-purple-600 font-normal text-xs ml-1">AI</span></h1>
             </div>
-            
-            <button id="api-settings-btn" class="text-xs text-purple-600 hover:bg-purple-50 px-3 py-1.5 rounded-full border border-purple-200 transition-colors">
-                Translation Settings
+            <button id="api-settings-btn" class="text-gray-400 hover:text-purple-600">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
             </button>
         </div>
 
-        <div id="api-panel" class="hidden max-w-4xl mx-auto mt-3 p-3 bg-purple-50 rounded-lg border border-purple-200 text-sm">
-            <p class="text-gray-500 text-xs mb-2">MyMemory is free. Enter your email for higher limits (optional).</p>
-            <input type="email" id="user-email-input" placeholder="your-email@example.com (Optional)" class="w-full p-2 rounded border border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500">
-            <div class="mt-2 flex gap-2">
-                <button id="save-api-btn" class="px-4 py-1 bg-purple-600 text-white rounded hover:bg-purple-700">Save Email</button>
-                <button id="close-api-btn" class="px-4 py-1 text-gray-500 hover:text-gray-700">Close</button>
+        <div class="grid grid-cols-2 gap-2 px-2 py-2 bg-purple-50/50">
+            <div class="bg-white p-1.5 rounded-lg border border-purple-100 shadow-sm transition-all" id="u1-box">
+                <label class="text-[10px] font-bold text-purple-600 block px-1 uppercase">User 1 (You)</label>
+                <select id="lang-u1" class="w-full text-sm font-semibold text-gray-700 bg-transparent border-none outline-none">
+                    </select>
             </div>
+            <div class="bg-white p-1.5 rounded-lg border border-pink-100 shadow-sm transition-all text-right" id="u2-box">
+                <label class="text-[10px] font-bold text-pink-600 block px-1 uppercase">User 2 (Guest)</label>
+                <select id="lang-u2" class="w-full text-sm font-semibold text-gray-700 bg-transparent border-none outline-none text-right" dir="rtl">
+                    </select>
+            </div>
+        </div>
+
+        <div id="api-panel" class="hidden px-4 py-2 bg-gray-50 border-b border-gray-200">
+             <p class="text-[10px] text-gray-500 mb-1">Enter Email for MyMemory API (Optional/Higher Limit):</p>
+             <div class="flex gap-2">
+                <input type="email" id="user-email-input" class="flex-grow p-2 text-xs border rounded" placeholder="email@example.com">
+                <button id="save-api-btn" class="bg-purple-600 text-white text-xs px-3 rounded">Save</button>
+             </div>
         </div>
     </header>
 
-    <div class="bg-white/60 border-b border-purple-100 p-3 shrink-0">
-        <div class="max-w-4xl mx-auto grid grid-cols-2 gap-4 md:gap-8">
-            <div class="flex flex-col gap-1">
-                <label class="text-xs font-bold text-purple-800 uppercase tracking-wider">User 1 (Host)</label>
-                <select id="lang-u1" class="w-full p-2 rounded-lg border-2 border-purple-200 bg-white text-gray-700 font-medium focus:border-purple-500 outline-none text-sm shadow-sm transition-all">
-                    </select>
+    <main id="chat-container" class="flex-grow overflow-y-auto p-4 space-y-4 bg-gray-50 scrollbar-hide pb-24">
+        <div class="text-center mt-20 opacity-40">
+            <div class="inline-block p-4 rounded-full bg-purple-100 mb-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
             </div>
-
-            <div class="flex flex-col gap-1 text-right">
-                <label class="text-xs font-bold text-pink-700 uppercase tracking-wider">User 2 (Guest)</label>
-                <select id="lang-u2" class="w-full p-2 rounded-lg border-2 border-pink-200 bg-white text-gray-700 font-medium focus:border-pink-500 outline-none text-sm shadow-sm transition-all text-right" dir="rtl">
-                    </select>
-            </div>
+            <p class="text-sm font-medium text-gray-500">Tap the mic to start</p>
         </div>
-    </div>
+    </main>
 
-    <main id="chat-container" class="flex-grow overflow-y-auto p-4 space-y-6 scrollbar-hide scroll-smooth relative">
-        <div class="text-center text-gray-400 text-sm mt-10">
-            <p>Select languages above and tap "Start Conversation"</p>
-            <p class="text-xs mt-2 opacity-60">System auto-detects silence (5s) to translate.</p>
-        </div>
-        </main>
-
-    <div id="status-bar" class="fixed top-24 left-1/2 transform -translate-x-1/2 bg-black/75 text-white text-xs px-4 py-1.5 rounded-full backdrop-blur-sm hidden transition-all z-20">
+    <div id="status-pill" class="fixed bottom-24 left-1/2 -translate-x-1/2 bg-black/80 text-white text-xs px-4 py-2 rounded-full backdrop-blur-md hidden z-30 shadow-lg whitespace-nowrap">
         Ready
     </div>
+    
+    <div class="fixed bottom-[88px] left-0 right-0 h-1 bg-gray-200 z-30" id="timer-bar-bg" style="display:none;">
+        <div id="timer-bar-fill" class="h-full bg-purple-500 w-0 transition-all duration-100 ease-linear"></div>
+    </div>
 
-    <footer class="bg-white p-4 border-t border-purple-100 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-        <div class="max-w-2xl mx-auto flex flex-col gap-4">
+
+    <footer class="bg-white border-t border-gray-100 p-4 shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-40">
+        <div class="flex items-center justify-between gap-4 max-w-lg mx-auto">
             
-            <div class="flex items-center gap-3 h-8">
-                 <div id="silence-timer-container" class="flex-grow bg-gray-200 h-1.5 rounded-full overflow-hidden opacity-0 transition-opacity">
-                    <div id="silence-progress" class="bg-purple-500 h-full w-0 transition-all duration-100 ease-linear"></div>
-                 </div>
-                 <button id="manual-send-btn" class="opacity-0 disabled:opacity-0 transition-opacity px-4 py-1 text-xs font-bold bg-purple-100 text-purple-700 rounded-full hover:bg-purple-200 border border-purple-200">
-                    SEND NOW ↵
-                 </button>
-            </div>
-
-            <div class="flex justify-center items-center gap-4">
-                <button id="start-btn" class="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-2xl shadow-lg shadow-purple-500/30 font-bold text-lg transition-all transform hover:-translate-y-0.5 active:scale-95 flex items-center justify-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+            <button id="share-btn" class="flex flex-col items-center gap-1 text-gray-400 hover:text-purple-600 btn-press p-2">
+                <div class="w-10 h-10 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                     </svg>
-                    <span>Start Conversation</span>
-                </button>
+                </div>
+                <span class="text-[10px] font-medium">Share</span>
+            </button>
 
-                <button id="stop-btn" class="hidden px-4 py-4 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 font-semibold border border-gray-300">
-                    Stop
-                </button>
-            </div>
+            <button id="main-mic-btn" class="relative -top-4 w-20 h-20 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-xl shadow-purple-400/40 flex items-center justify-center btn-press transition-all">
+                <svg id="icon-play" xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <svg id="icon-stop" xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+                </svg>
+            </button>
+
+            <button id="repeat-btn" class="flex flex-col items-center gap-1 text-gray-400 hover:text-pink-600 btn-press p-2" disabled>
+                <div class="w-10 h-10 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center group-hover:border-pink-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                </div>
+                <span class="text-[10px] font-medium">Repeat</span>
+            </button>
+
         </div>
+        <button id="manual-send-btn" class="hidden"></button>
     </footer>
 
     <script>
-        // --- CONFIGURATION & DATA ---
-        // MyMemory supports many languages. These common ones usually work well.
+        // --- DATA ---
         const LANGUAGES = [
-            { code: 'en-IN', name: 'English (India)' },
+            { code: 'en-IN', name: 'English (IN)' },
             { code: 'hi-IN', name: 'Hindi (हिंदी)' },
             { code: 'mr-IN', name: 'Marathi (मराठी)' },
-            { code: 'gu-IN', name: 'Gujarati (ગુજરાતી)' },
-            { code: 'ta-IN', name: 'Tamil (தமிழ்)' },
-            { code: 'te-IN', name: 'Telugu (తెలుగు)' },
-            { code: 'bn-IN', name: 'Bengali (বাংলা)' },
-            { code: 'kn-IN', name: 'Kannada (कन्नड)' },
-            { code: 'ml-IN', name: 'Malayalam (മലയാളം)' },
+            { code: 'gu-IN', name: 'Gujarati' },
+            { code: 'ta-IN', name: 'Tamil' },
+            { code: 'te-IN', name: 'Telugu' },
+            { code: 'bn-IN', name: 'Bengali' },
+            { code: 'kn-IN', name: 'Kannada' },
+            { code: 'ml-IN', name: 'Malayalam' },
             { code: 'en-US', name: 'English (US)' },
-            { code: 'es-ES', name: 'Spanish (Español)' },
-            { code: 'fr-FR', name: 'French (Français)' },
-            { code: 'de-DE', name: 'German (Deutsch)' },
-            { code: 'ja-JP', name: 'Japanese (日本語)' },
-            { code: 'zh-CN', name: 'Chinese (Simplified)' },
-            { code: 'ru-RU', name: 'Russian (Русский)' },
-            { code: 'ar-SA', name: 'Arabic (العربية)' }
+            { code: 'es-ES', name: 'Spanish' },
+            { code: 'fr-FR', name: 'French' },
+            { code: 'de-DE', name: 'German' },
+            { code: 'ja-JP', name: 'Japanese' },
+            { code: 'zh-CN', name: 'Chinese' },
+            { code: 'ru-RU', name: 'Russian' },
+            { code: 'ar-SA', name: 'Arabic' }
         ];
 
-        let USER_EMAIL = ""; // For MyMemory API (optional but recommended)
+        let USER_EMAIL = "";
         
-        // --- DOM ELEMENTS ---
-        const startBtn = document.getElementById('start-btn');
-        const stopBtn = document.getElementById('stop-btn');
+        // --- DOM ---
+        const mainMicBtn = document.getElementById('main-mic-btn');
+        const iconPlay = document.getElementById('icon-play');
+        const iconStop = document.getElementById('icon-stop');
+        const shareBtn = document.getElementById('share-btn');
+        const repeatBtn = document.getElementById('repeat-btn');
         const chatContainer = document.getElementById('chat-container');
-        const statusBar = document.getElementById('status-bar');
-        const manualSendBtn = document.getElementById('manual-send-btn');
-        const silenceBarContainer = document.getElementById('silence-timer-container');
-        const silenceProgress = document.getElementById('silence-progress');
-        const langU1Select = document.getElementById('lang-u1');
-        const langU2Select = document.getElementById('lang-u2');
-        
-        // Settings Elements
-        const apiPanel = document.getElementById('api-panel');
-        const apiSettingsBtn = document.getElementById('api-settings-btn');
-        const userEmailInput = document.getElementById('user-email-input');
-        const saveApiBtn = document.getElementById('save-api-btn');
-        const closeApiBtn = document.getElementById('close-api-btn');
+        const statusPill = document.getElementById('status-pill');
+        const timerBarBg = document.getElementById('timer-bar-bg');
+        const timerBarFill = document.getElementById('timer-bar-fill');
+        const langU1 = document.getElementById('lang-u1');
+        const langU2 = document.getElementById('lang-u2');
+        const boxU1 = document.getElementById('u1-box');
+        const boxU2 = document.getElementById('u2-box');
 
-        // --- STATE MANAGEMENT ---
-        let state = 'IDLE'; // IDLE, LISTENING_U1, LISTENING_U2, PROCESSING, SPEAKING
+        // Settings
+        const apiBtn = document.getElementById('api-settings-btn');
+        const apiPanel = document.getElementById('api-panel');
+        const emailInput = document.getElementById('user-email-input');
+        const saveApiBtn = document.getElementById('save-api-btn');
+
+        // --- STATE ---
+        let state = 'IDLE'; 
         let recognition;
         let synth = window.speechSynthesis;
         let finalTranscript = '';
         let silenceTimer = null;
-        let silenceInterval = null;
-        const SILENCE_TIMEOUT_MS = 5000;
-        let silenceTimeElapsed = 0;
+        const SILENCE_MS = 5000;
+        let elapsed = 0;
+        
+        // Audio Replay Data
+        let lastSpokenText = '';
+        let lastSpokenLang = '';
 
-        // --- INITIALIZATION ---
-        function initLanguages() {
-            LANGUAGES.forEach((lang, index) => {
-                const opt1 = new Option(lang.name, lang.code);
-                const opt2 = new Option(lang.name, lang.code);
-                langU1Select.add(opt1);
-                langU2Select.add(opt2);
+        // --- INIT ---
+        window.onload = () => {
+            // Populate Langs
+            LANGUAGES.forEach(l => {
+                langU1.add(new Option(l.name, l.code));
+                langU2.add(new Option(l.name, l.code));
             });
-            // Defaults
-            langU1Select.value = 'en-IN';
-            langU2Select.value = 'hi-IN';
-            
-            // Load saved email
-            const savedEmail = localStorage.getItem('dhwani_user_email');
-            if (savedEmail) {
-                USER_EMAIL = savedEmail;
-                userEmailInput.value = savedEmail;
-            }
-        }
+            langU1.value = 'en-IN';
+            langU2.value = 'hi-IN';
 
-        // --- SPEECH RECOGNITION SETUP ---
-        function setupRecognition() {
+            // Load Email
+            const saved = localStorage.getItem('dhwani_email');
+            if(saved) { USER_EMAIL = saved; emailInput.value = saved; }
+
+            // Speech Setup
+            initSpeech();
+        };
+
+        function initSpeech() {
             if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-                alert("Speech Recognition not supported. Please use Chrome.");
-                return null;
+                alert("Browser not supported. Use Chrome.");
+                return;
             }
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            const rec = new SpeechRecognition();
-            rec.continuous = true; // Keep listening until we stop manually
-            rec.interimResults = true;
-            
-            rec.onstart = () => {
-                updateStatus(state === 'LISTENING_U1' ? "User 1 Listening..." : "User 2 Listening...");
-                startSilenceTimer();
-                toggleSilenceUI(true);
+            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SR();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+
+            recognition.onstart = () => {
+                if(state.includes('LISTENING')) {
+                    startSilenceTimer();
+                    updateUIState(true);
+                }
             };
 
-            rec.onresult = (event) => {
-                let interimTranscript = '';
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) {
-                        finalTranscript += event.results[i][0].transcript;
-                    } else {
-                        interimTranscript += event.results[i][0].transcript;
-                    }
+            recognition.onresult = (e) => {
+                let interim = '';
+                for (let i = e.resultIndex; i < e.results.length; ++i) {
+                    if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript;
+                    else interim += e.results[i][0].transcript;
                 }
                 
-                // If speech is detected, reset timer
-                if (interimTranscript.length > 0 || finalTranscript.length > 0) {
+                if (interim || finalTranscript) {
                     resetSilenceTimer();
-                    updateStatus("Hearing: " + (finalTranscript || interimTranscript).slice(-20) + "...");
+                    showStatus((finalTranscript || interim).slice(-25));
                 }
             };
-
-            rec.onerror = (event) => {
-                // Ignore no-speech errors which happen frequently
-                if (event.error === 'no-speech') return; 
-                console.error("Speech Error:", event.error);
-            };
             
-            return rec;
+            recognition.onerror = (e) => { if(e.error !== 'no-speech') console.error(e); };
         }
 
-        recognition = setupRecognition();
+        // --- CONTROLS ---
 
-        // --- MAIN LOGIC FLOW ---
-
-        startBtn.addEventListener('click', () => {
-            if (synth.speaking) synth.cancel();
-            
-            // UI Update
-            startBtn.classList.add('hidden');
-            stopBtn.classList.remove('hidden');
-            chatContainer.innerHTML = ''; // Clear chat
-            addSystemMessage("Conversation Started. User 1, please speak.");
-            
-            startTurn('U1');
-        });
-
-        stopBtn.addEventListener('click', () => {
-            stopAll();
-        });
-
-        manualSendBtn.addEventListener('click', () => {
-            if (state.includes('LISTENING')) {
-                finishTurn();
+        mainMicBtn.addEventListener('click', () => {
+            if (state === 'IDLE') {
+                // START
+                chatContainer.innerHTML = '';
+                addSystemMsg("Conversation Started");
+                startTurn('U1');
+            } else {
+                // STOP (Check if we need to force send or just stop)
+                if (state.includes('LISTENING') && finalTranscript.trim().length > 0) {
+                     finishTurn(); // Treat as manual send
+                } else {
+                    stopAll();
+                }
             }
         });
 
-        function stopAll() {
-            state = 'IDLE';
-            if (recognition) recognition.stop();
-            if (synth) synth.cancel();
-            stopSilenceTimer();
-            toggleSilenceUI(false);
-            
-            startBtn.classList.remove('hidden');
-            stopBtn.classList.add('hidden');
-            updateStatus("Stopped", true);
-        }
+        // Manual Send via Timer Bar Click (Hidden feature or double tap mic)
+        // For this UI, the "Mic" button acts as "Send" if currently listening.
+
+        shareBtn.addEventListener('click', async () => {
+            // Collect text
+            let text = "Dhwani Chat Log:\n\n";
+            document.querySelectorAll('#chat-container > div').forEach(div => {
+                // Heuristic to extract text
+                if (div.innerText) text += div.innerText + "\n\n";
+            });
+
+            try {
+                if (navigator.share) {
+                    await navigator.share({ title: 'Dhwani Chat', text: text });
+                } else {
+                    await navigator.clipboard.writeText(text);
+                    showStatus("Copied to Clipboard!", 2000);
+                }
+            } catch (err) { console.log("Share failed", err); }
+        });
+
+        repeatBtn.addEventListener('click', () => {
+            if (lastSpokenText && lastSpokenLang) {
+                speakText(lastSpokenText, lastSpokenLang, () => {});
+            }
+        });
+
+        // --- LOGIC ---
 
         function startTurn(user) {
             state = user === 'U1' ? 'LISTENING_U1' : 'LISTENING_U2';
-            finalTranscript = ''; // Reset buffer
+            finalTranscript = '';
             
-            // Set Language for Recognition
-            const langCode = user === 'U1' ? langU1Select.value : langU2Select.value;
-            recognition.lang = langCode;
+            // Visuals
+            boxU1.classList.toggle('ring-2', user === 'U1');
+            boxU1.classList.toggle('ring-purple-500', user === 'U1');
+            boxU2.classList.toggle('ring-2', user === 'U2');
+            boxU2.classList.toggle('ring-pink-500', user === 'U2');
+            
+            iconPlay.classList.add('hidden');
+            iconStop.classList.remove('hidden');
+            mainMicBtn.classList.add('mic-active');
+            
+            showStatus(user === 'U1' ? "User 1 Listening..." : "User 2 Listening...");
 
-            try {
-                recognition.start();
-                updateUIForActiveUser(user);
-            } catch (e) {
-                console.log("Recognition already started or error", e);
-                // Hard reset if stuck
-                recognition.stop();
-                setTimeout(() => recognition.start(), 200);
-            }
+            // Logic
+            recognition.lang = user === 'U1' ? langU1.value : langU2.value;
+            try { recognition.start(); } catch(e) { recognition.stop(); setTimeout(() => recognition.start(), 200); }
         }
 
         function finishTurn() {
-            if (!recognition) return;
-            recognition.stop(); // Stop mic
-            stopSilenceTimer();
-            toggleSilenceUI(false);
+            recognition.stop();
+            clearInterval(silenceTimer);
+            timerBarBg.style.display = 'none';
 
             if (!finalTranscript.trim()) {
-                // If nothing heard, just restart the same turn
-                addSystemMessage("Didn't hear anything. Listening again...");
-                setTimeout(() => startTurn(state === 'LISTENING_U1' ? 'U1' : 'U2'), 1000);
+                setTimeout(() => startTurn(state === 'LISTENING_U1' ? 'U1' : 'U2'), 800);
                 return;
             }
 
             processTranslation(finalTranscript);
         }
 
+        function stopAll() {
+            state = 'IDLE';
+            recognition.stop();
+            synth.cancel();
+            clearInterval(silenceTimer);
+            
+            mainMicBtn.classList.remove('mic-active');
+            iconPlay.classList.remove('hidden');
+            iconStop.classList.add('hidden');
+            timerBarBg.style.display = 'none';
+            boxU1.classList.remove('ring-2', 'ring-purple-500');
+            boxU2.classList.remove('ring-2', 'ring-pink-500');
+            showStatus("Stopped", 2000);
+        }
+
         async function processTranslation(text) {
-            const currentUser = state === 'LISTENING_U1' ? 'U1' : 'U2';
+            const user = state === 'LISTENING_U1' ? 'U1' : 'U2';
             state = 'PROCESSING';
-            updateStatus("Translating...", false, true);
+            mainMicBtn.classList.remove('mic-active'); // Stop pulsing
+            showStatus("Translating...");
 
-            // 1. Display Original Text
-            addMessage(currentUser, text, "...");
+            // Add original
+            addBubble(user, text, "...");
 
-            // 2. Determine Langs for API (MyMemory format: source|target)
-            // Note: MyMemory often works best with just language codes (en) or full (en-IN).
-            // We send the full code first; if it fails, one might strip it, but usually it's fine.
-            const sourceCode = currentUser === 'U1' ? langU1Select.value : langU2Select.value;
-            const targetCode = currentUser === 'U1' ? langU2Select.value : langU1Select.value;
+            const sLang = user === 'U1' ? langU1.value : langU2.value;
+            const tLang = user === 'U1' ? langU2.value : langU1.value;
 
-            // 3. Call MyMemory API
             try {
-                const translation = await translateWithMyMemory(text, sourceCode, targetCode);
-                
-                // 4. Update Chat with Translation
-                updateLastMessageTranslation(translation);
+                // MyMemory API
+                const pair = `${sLang}|${tLang}`;
+                let url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${pair}`;
+                if(USER_EMAIL) url += `&de=${USER_EMAIL}`;
 
-                // 5. Speak
-                speakTranslation(translation, targetCode, () => {
-                    // 6. On End, Switch Turn
-                    const nextUser = currentUser === 'U1' ? 'U2' : 'U1';
-                    setTimeout(() => startTurn(nextUser), 500); // Small buffer
+                const res = await fetch(url);
+                const data = await res.json();
+                
+                let translated = "Error";
+                if(data.responseStatus === 200 || data.responseStatus === '200') {
+                    translated = data.responseData.translatedText;
+                } else {
+                    translated = data.responseData.translatedText || "Translation Limit/Error";
+                }
+
+                updateLastBubble(translated);
+                
+                // Store for repeat
+                lastSpokenText = translated;
+                lastSpokenLang = tLang;
+                repeatBtn.disabled = false;
+                repeatBtn.classList.remove('text-gray-400');
+                repeatBtn.classList.add('text-purple-600');
+
+                // Speak
+                speakText(translated, tLang, () => {
+                    // Next Turn
+                    setTimeout(() => startTurn(user === 'U1' ? 'U2' : 'U1'), 500);
                 });
 
-            } catch (err) {
-                console.error(err);
-                addSystemMessage("Translation Error: " + err.message);
-                // Fallback: switch turn anyway
-                setTimeout(() => startTurn(currentUser === 'U1' ? 'U2' : 'U1'), 2000);
+            } catch (e) {
+                updateLastBubble("Connection Error");
+                setTimeout(() => startTurn(user === 'U1' ? 'U2' : 'U1'), 2000);
             }
         }
 
-        // --- MYMEMORY API INTEGRATION ---
-        async function translateWithMyMemory(text, sourceLangCode, targetLangCode) {
-            // MyMemory expects query param 'q' and 'langpair' (e.g., 'en|it')
-            const langPair = `${sourceLangCode}|${targetLangCode}`;
-            
-            // Build URL
-            let url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langPair}`;
-            
-            // Add email if provided (increases limit)
-            if (USER_EMAIL && USER_EMAIL.includes('@')) {
-                url += `&de=${encodeURIComponent(USER_EMAIL)}`;
-            }
-
-            const response = await fetch(url);
-            const data = await response.json();
-
-            // MyMemory Response Structure:
-            // data.responseData.translatedText
-            // data.responseStatus (200 is OK)
-
-            if (data.responseStatus === 200 || data.responseStatus === '200') {
-                return data.responseData.translatedText;
-            } else {
-                // Sometimes returns 403 if quota exceeded without email
-                throw new Error(data.responseDetails || "API Error");
-            }
-        }
-
-        // --- SPEECH SYNTHESIS (TTS) ---
-        function speakTranslation(text, langCode, onComplete) {
+        function speakText(text, lang, onEnd) {
             state = 'SPEAKING';
-            updateStatus("Speaking...");
-            
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = langCode;
-            utterance.rate = 0.9; // Requested 0.9x speed
-
-            // Voice selection logic
-            const voices = synth.getVoices();
-            // Try to find an exact match first
-            let preferredVoice = voices.find(v => v.lang === langCode);
-            // If not found, try to find a match by the language part only (e.g. 'hi' in 'hi-IN')
-            if (!preferredVoice) {
-                const shortLang = langCode.split('-')[0];
-                preferredVoice = voices.find(v => v.lang.startsWith(shortLang));
-            }
-            
-            if (preferredVoice) utterance.voice = preferredVoice;
-
-            utterance.onend = () => {
-                onComplete();
-            };
-
-            utterance.onerror = (e) => {
-                console.warn("TTS Error:", e);
-                onComplete(); // Proceed anyway
-            };
-
-            synth.speak(utterance);
+            showStatus("Speaking...");
+            const u = new SpeechSynthesisUtterance(text);
+            u.lang = lang;
+            u.rate = 0.9;
+            u.onend = onEnd;
+            u.onerror = onEnd;
+            synth.speak(u);
         }
 
-        // --- SILENCE TIMER LOGIC ---
+        // --- UI HELPERS ---
+
+        function addBubble(user, text, trans) {
+            const isU1 = user === 'U1';
+            const div = document.createElement('div');
+            div.className = `flex flex-col max-w-[85%] ${isU1 ? 'mr-auto items-start' : 'ml-auto items-end'}`;
+            div.innerHTML = `
+                <div class="p-3 shadow-sm ${isU1 ? 'chat-bubble-u1' : 'chat-bubble-u2'} rounded-2xl text-sm">
+                    <div class="font-medium leading-relaxed">${text}</div>
+                    <div class="translation-text" id="last-trans">${trans}</div>
+                </div>
+                <span class="text-[10px] text-gray-400 mt-1 px-1">${isU1 ? 'User 1' : 'User 2'}</span>
+            `;
+            chatContainer.appendChild(div);
+            window.lastTransRef = div.querySelector('#last-trans');
+            scrollToBottom();
+        }
+
+        function updateLastBubble(text) {
+            if(window.lastTransRef) {
+                window.lastTransRef.textContent = text;
+                window.lastTransRef.id = ''; // clear id
+            }
+        }
+
+        function addSystemMsg(txt) {
+            const d = document.createElement('div');
+            d.className = "text-center text-[10px] text-gray-400 uppercase tracking-widest my-4";
+            d.innerText = `- ${txt} -`;
+            chatContainer.appendChild(d);
+            scrollToBottom();
+        }
+
+        function scrollToBottom() {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function showStatus(msg, duration) {
+            statusPill.innerText = msg;
+            statusPill.classList.remove('hidden');
+            if(duration) setTimeout(() => statusPill.classList.add('hidden'), duration);
+        }
+
         function startSilenceTimer() {
-            silenceTimeElapsed = 0;
-            updateSilenceBar();
-            manualSendBtn.disabled = false;
-            manualSendBtn.classList.remove('opacity-0');
-            
-            clearInterval(silenceInterval);
-            silenceInterval = setInterval(() => {
-                silenceTimeElapsed += 100; // 100ms ticks
-                updateSilenceBar();
-                
-                if (silenceTimeElapsed >= SILENCE_TIMEOUT_MS) {
-                    // Timeout Reached
-                    finishTurn();
-                }
+            timerBarBg.style.display = 'block';
+            elapsed = 0;
+            clearInterval(silenceTimer);
+            silenceTimer = setInterval(() => {
+                elapsed += 100;
+                timerBarFill.style.width = (elapsed / SILENCE_MS * 100) + '%';
+                if (elapsed >= SILENCE_MS) finishTurn();
             }, 100);
         }
 
         function resetSilenceTimer() {
-            silenceTimeElapsed = 0;
-            updateSilenceBar();
+            elapsed = 0;
+            timerBarFill.style.width = '0%';
+        }
+        
+        function updateUIState(active) {
+            // Helper to manage miscellaneous UI states if needed
         }
 
-        function stopSilenceTimer() {
-            clearInterval(silenceInterval);
-            manualSendBtn.disabled = true;
-            manualSendBtn.classList.add('opacity-0');
-        }
-
-        function updateSilenceBar() {
-            const percentage = (silenceTimeElapsed / SILENCE_TIMEOUT_MS) * 100;
-            silenceProgress.style.width = `${percentage}%`;
-        }
-
-        function toggleSilenceUI(show) {
-            silenceBarContainer.style.opacity = show ? '1' : '0';
-        }
-
-        // --- UI HELPER FUNCTIONS ---
-        function updateStatus(msg, hide = false, pulse = false) {
-            statusBar.innerText = msg;
-            statusBar.classList.remove('hidden');
-            if(pulse) statusBar.classList.add('animate-pulse');
-            else statusBar.classList.remove('animate-pulse');
-            
-            if(hide) setTimeout(() => statusBar.classList.add('hidden'), 2000);
-        }
-
-        function updateUIForActiveUser(user) {
-            // Visual cue for who is talking
-            if (user === 'U1') {
-                langU1Select.parentElement.classList.add('pulse-ring');
-                langU2Select.parentElement.classList.remove('pulse-ring');
-            } else {
-                langU1Select.parentElement.classList.remove('pulse-ring');
-                langU2Select.parentElement.classList.add('pulse-ring');
-            }
-        }
-
-        function addMessage(user, text, translationPlaceholder) {
-            const div = document.createElement('div');
-            const isU1 = user === 'U1';
-            
-            div.className = `flex flex-col max-w-[85%] ${isU1 ? 'mr-auto items-start' : 'ml-auto items-end'}`;
-            
-            const bubble = document.createElement('div');
-            bubble.className = `p-4 rounded-2xl shadow-md text-lg relative ${isU1 ? 'chat-bubble-u1' : 'chat-bubble-u2'}`;
-            
-            // Original Text
-            const originalSpan = document.createElement('div');
-            originalSpan.textContent = text;
-            originalSpan.className = "font-medium";
-            
-            // Translation Text
-            const transSpan = document.createElement('div');
-            transSpan.textContent = translationPlaceholder;
-            transSpan.className = "translation-text";
-            transSpan.id = `last-trans-${Date.now()}`; // Unique ID to update later
-
-            bubble.appendChild(originalSpan);
-            bubble.appendChild(transSpan);
-            
-            // Label
-            const label = document.createElement('span');
-            label.className = "text-xs text-gray-500 mt-1 px-1";
-            label.textContent = isU1 ? "User 1" : "User 2";
-
-            div.appendChild(bubble);
-            div.appendChild(label);
-            
-            chatContainer.appendChild(div);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-            
-            // Store reference to update translation
-            window.lastTransElement = transSpan;
-        }
-
-        function updateLastMessageTranslation(text) {
-            if (window.lastTransElement) {
-                window.lastTransElement.textContent = text;
-            }
-        }
-
-        function addSystemMessage(text) {
-            const div = document.createElement('div');
-            div.className = "text-center text-xs text-gray-400 my-2";
-            div.textContent = text;
-            chatContainer.appendChild(div);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-
-        // --- SETTINGS HANDLING ---
-        apiSettingsBtn.addEventListener('click', () => apiPanel.classList.toggle('hidden'));
-        closeApiBtn.addEventListener('click', () => apiPanel.classList.add('hidden'));
+        // Settings Toggle
+        apiBtn.addEventListener('click', () => apiPanel.classList.toggle('hidden'));
         saveApiBtn.addEventListener('click', () => {
-            const val = userEmailInput.value.trim();
-            if(val) {
-                USER_EMAIL = val;
-                localStorage.setItem('dhwani_user_email', val);
-                alert("Email Saved! Limit increased.");
-                apiPanel.classList.add('hidden');
-            } else {
-                alert("Please enter a valid email.");
-            }
+            const v = emailInput.value.trim();
+            if(v) { localStorage.setItem('dhwani_email', v); USER_EMAIL = v; apiPanel.classList.add('hidden'); }
         });
-
-        // Initialize
-        initLanguages();
 
     </script>
 </body>
