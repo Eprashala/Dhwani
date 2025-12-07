@@ -1,376 +1,552 @@
-<script>
-    // --- CONFIGURATION ---
-    const languages = [
-        { code: "en-IN", name: "English (India)" }, 
-        { code: "hi-IN", name: "Hindi (हिंदी)" },
-        { code: "mr-IN", name: "Marathi (मराठी)" }, 
-        { code: "gu-IN", name: "Gujarati (ગુજરાતી)" },
-        { code: "bn-IN", name: "Bengali (বাংলা)" }, 
-        { code: "ta-IN", name: "Tamil (தமிழ்)" },
-        { code: "te-IN", name: "Telugu (తెలుగు)" }, 
-        { code: "kn-IN", name: "Kannada (ಕನ್ನಡ)" },
-        { code: "ml-IN", name: "Malayalam (മലയാളം)" },
-        { code: "zh-CN", name: "Chinese (Mandarin/中文)" },
-        { code: "ja-JP", name: "Japanese (日本語)" },
-        { code: "es-ES", name: "Spanish (Español)" },
-        { code: "fr-FR", name: "French (Français)" }, 
-        { code: "de-DE", name: "German (Deutsch)" },
-        { code: "ru-RU", name: "Russian (Pусский)" },
-        { code: "ar-SA", name: "Arabic (العربية)" }
-    ];
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dhwani Smart AI Translator (MyMemory)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
+        body { font-family: 'Inter', sans-serif; }
 
-    // --- GLOBAL VARIABLES ---
-    let recognition;
-    let isConversationActive = false;
-    let activeTurn = 0; // 0=None, 1=User1, 2=User2
-    let silenceTimer = null;
-    let countdownInterval = null;
-    let currentTranscript = "";
-    let lastSpokenText = "";
-    let lastSpokenLang = "";
-    let synth = window.speechSynthesis;
-    let voices = [];
-    let isRestarting = false; // Prevents race conditions on Android
-
-    // --- DOM REFERENCES ---
-    const els = {
-        startBtn: document.getElementById('start-btn'), stopBtn: document.getElementById('stop-btn'),
-        shareBtn: document.getElementById('share-btn'), repeatBtn: document.getElementById('repeat-btn'),
-        chat: document.getElementById('chat-container'), welcome: document.getElementById('welcome-msg'),
-        status: document.getElementById('global-status'),
-        u1: {
-            panel: document.getElementById('panel-u1'), lang: document.getElementById('lang-u1'),
-            status: document.getElementById('status-u1'), mic: document.getElementById('mic-icon-u1'),
-            timer: document.getElementById('timer-u1'), btn: document.getElementById('manual-send-u1')
-        },
-        u2: {
-            panel: document.getElementById('panel-u2'), lang: document.getElementById('lang-u2'),
-            status: document.getElementById('status-u2'), mic: document.getElementById('mic-icon-u2'),
-            timer: document.getElementById('timer-u2'), btn: document.getElementById('manual-send-u2')
+        /* Purple Theme Animations */
+        .pulse-ring {
+            animation: pulse-purple 2s infinite;
         }
-    };
-
-    // --- INITIALIZATION ---
-    window.onload = () => {
-        // Load Languages
-        languages.forEach(l => {
-            els.u1.lang.add(new Option(l.name, l.code));
-            els.u2.lang.add(new Option(l.name, l.code));
-        });
-        els.u1.lang.value = "en-IN"; els.u2.lang.value = "zh-CN";
-
-        // Load Voices
-        const loadVoices = () => { voices = synth.getVoices(); };
-        if (speechSynthesis.onvoiceschanged !== undefined) { speechSynthesis.onvoiceschanged = loadVoices; }
-        loadVoices();
-
-        // Check for HTTPS (Critical for Android)
-        if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
-            alert("WARNING: Android requires HTTPS for microphone access. This may not work on HTTP.");
+        @keyframes pulse-purple {
+            0% { box-shadow: 0 0 0 0 rgba(147, 51, 234, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(147, 51, 234, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(147, 51, 234, 0); }
         }
 
-        // Setup Speech Rec
-        if (!('webkitSpeechRecognition' in window)) {
-            alert("Speech Recognition not supported. Use Chrome.");
-            els.startBtn.disabled = true;
-        } else {
-            setupRecognition();
+        .mic-active {
+            background-color: #ef4444 !important; /* Red when recording */
+            animation: pulse-red 1.5s infinite;
         }
-    };
+        @keyframes pulse-red {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
 
-    function setupRecognition() {
-        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-        recognition = new SpeechRec();
-        // ANDROID FIX: continuous true is buggy, but we use it with aggressive restarts
-        recognition.continuous = true; 
-        recognition.interimResults = true;
-        recognition.maxAlternatives = 1;
+        /* Scrollbar for chat */
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-        recognition.onstart = () => {
-            isRestarting = false;
-            if (!isConversationActive) return;
-            const u = activeTurn === 1 ? els.u1 : els.u2;
-            u.status.textContent = "LISTENING...";
-            u.mic.classList.add('mic-listening');
-            startSilenceTimer(); 
-        };
+        .chat-bubble-u1 {
+            background: linear-gradient(135deg, #6b21a8 0%, #9333ea 100%);
+            color: white;
+            border-bottom-left-radius: 0;
+        }
+        .chat-bubble-u2 {
+            background: linear-gradient(135deg, #db2777 0%, #ec4899 100%);
+            color: white;
+            border-bottom-right-radius: 0;
+        }
+        .translation-text {
+            font-size: 0.9em;
+            opacity: 0.9;
+            font-style: italic;
+            margin-top: 4px;
+            padding-top: 4px;
+            border-top: 1px solid rgba(255,255,255,0.3);
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-purple-100 via-purple-50 to-pink-100 h-screen flex flex-col overflow-hidden">
 
-        recognition.onend = () => {
-            // ANDROID FIX: The mic died on its own. 
-            // If we are still in a conversation and haven't processed text, restart it.
-            if (isConversationActive && activeTurn !== 0 && !isRestarting) {
-                if (currentTranscript.trim()) {
-                    // We have text, so the silence timer will catch it and process it.
-                    // But if the user stopped speaking and the mic cut, we might want to process immediately?
-                    // For now, let's restart listening to catch more speech until timer runs out.
-                    restartMic();
-                } else {
-                    // No text, just silence/noise. Restart immediately.
-                    restartMic();
-                }
-            }
-        };
-
-        recognition.onresult = (event) => {
-            let final = "";
-            let interim = "";
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-                if (event.results[i].isFinal) {
-                    final += event.results[i][0].transcript;
-                } else {
-                    interim += event.results[i][0].transcript;
-                }
-            }
+    <header class="bg-white/80 backdrop-blur-md border-b border-purple-200 p-4 shadow-sm z-10 shrink-0">
+        <div class="max-w-4xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center text-white font-bold text-lg">D</div>
+                <h1 class="text-xl font-bold text-gray-800 tracking-tight">Dhwani <span class="text-purple-600 text-sm font-normal">MyMemory API</span></h1>
+            </div>
             
-            // ANDROID FIX: Android sometimes sends same text twice
-            if (final && !currentTranscript.includes(final)) {
-                currentTranscript += " " + final;
-                startSilenceTimer(); // Reset timer
-                const u = activeTurn === 1 ? els.u1 : els.u2;
-                u.status.textContent = "Captured: " + final.substring(0, 15) + "...";
-            }
-        };
-        
-        recognition.onerror = (e) => {
-            console.log("Speech Error:", e.error);
-            // ANDROID FIX: Ignore 'no-speech' and 'network' errors and try to keep going
-            if(e.error === 'no-speech' || e.error === 'network') {
-                if (isConversationActive) restartMic();
-            } else if (e.error === 'not-allowed') {
-                toggleStop();
-                alert("Microphone blocked. Please check permissions.");
-            }
-        };
-    }
+            <button id="api-settings-btn" class="text-xs text-purple-600 hover:bg-purple-50 px-3 py-1.5 rounded-full border border-purple-200 transition-colors">
+                Translation Settings
+            </button>
+        </div>
 
-    // --- ANDROID SPECIFIC RESTART LOGIC ---
-    function restartMic() {
-        if (isRestarting || !isConversationActive) return;
-        isRestarting = true;
-        
-        const u = activeTurn === 1 ? els.u1 : els.u2;
-        recognition.lang = u.lang.value; // Ensure lang is set
+        <div id="api-panel" class="hidden max-w-4xl mx-auto mt-3 p-3 bg-purple-50 rounded-lg border border-purple-200 text-sm">
+            <p class="text-gray-500 text-xs mb-2">MyMemory is free. Enter your email for higher limits (optional).</p>
+            <input type="email" id="user-email-input" placeholder="your-email@example.com (Optional)" class="w-full p-2 rounded border border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500">
+            <div class="mt-2 flex gap-2">
+                <button id="save-api-btn" class="px-4 py-1 bg-purple-600 text-white rounded hover:bg-purple-700">Save Email</button>
+                <button id="close-api-btn" class="px-4 py-1 text-gray-500 hover:text-gray-700">Close</button>
+            </div>
+        </div>
+    </header>
 
-        // DELAY IS CRITICAL FOR ANDROID
-        setTimeout(() => {
+    <div class="bg-white/60 border-b border-purple-100 p-3 shrink-0">
+        <div class="max-w-4xl mx-auto grid grid-cols-2 gap-4 md:gap-8">
+            <div class="flex flex-col gap-1">
+                <label class="text-xs font-bold text-purple-800 uppercase tracking-wider">User 1 (Host)</label>
+                <select id="lang-u1" class="w-full p-2 rounded-lg border-2 border-purple-200 bg-white text-gray-700 font-medium focus:border-purple-500 outline-none text-sm shadow-sm transition-all">
+                    </select>
+            </div>
+
+            <div class="flex flex-col gap-1 text-right">
+                <label class="text-xs font-bold text-pink-700 uppercase tracking-wider">User 2 (Guest)</label>
+                <select id="lang-u2" class="w-full p-2 rounded-lg border-2 border-pink-200 bg-white text-gray-700 font-medium focus:border-pink-500 outline-none text-sm shadow-sm transition-all text-right" dir="rtl">
+                    </select>
+            </div>
+        </div>
+    </div>
+
+    <main id="chat-container" class="flex-grow overflow-y-auto p-4 space-y-6 scrollbar-hide scroll-smooth relative">
+        <div class="text-center text-gray-400 text-sm mt-10">
+            <p>Select languages above and tap "Start Conversation"</p>
+            <p class="text-xs mt-2 opacity-60">System auto-detects silence (5s) to translate.</p>
+        </div>
+        </main>
+
+    <div id="status-bar" class="fixed top-24 left-1/2 transform -translate-x-1/2 bg-black/75 text-white text-xs px-4 py-1.5 rounded-full backdrop-blur-sm hidden transition-all z-20">
+        Ready
+    </div>
+
+    <footer class="bg-white p-4 border-t border-purple-100 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+        <div class="max-w-2xl mx-auto flex flex-col gap-4">
+            
+            <div class="flex items-center gap-3 h-8">
+                 <div id="silence-timer-container" class="flex-grow bg-gray-200 h-1.5 rounded-full overflow-hidden opacity-0 transition-opacity">
+                    <div id="silence-progress" class="bg-purple-500 h-full w-0 transition-all duration-100 ease-linear"></div>
+                 </div>
+                 <button id="manual-send-btn" class="opacity-0 disabled:opacity-0 transition-opacity px-4 py-1 text-xs font-bold bg-purple-100 text-purple-700 rounded-full hover:bg-purple-200 border border-purple-200">
+                    SEND NOW ↵
+                 </button>
+            </div>
+
+            <div class="flex justify-center items-center gap-4">
+                <button id="start-btn" class="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-2xl shadow-lg shadow-purple-500/30 font-bold text-lg transition-all transform hover:-translate-y-0.5 active:scale-95 flex items-center justify-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    </svg>
+                    <span>Start Conversation</span>
+                </button>
+
+                <button id="stop-btn" class="hidden px-4 py-4 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 font-semibold border border-gray-300">
+                    Stop
+                </button>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // --- CONFIGURATION & DATA ---
+        // MyMemory supports many languages. These common ones usually work well.
+        const LANGUAGES = [
+            { code: 'en-IN', name: 'English (India)' },
+            { code: 'hi-IN', name: 'Hindi (हिंदी)' },
+            { code: 'mr-IN', name: 'Marathi (मराठी)' },
+            { code: 'gu-IN', name: 'Gujarati (ગુજરાતી)' },
+            { code: 'ta-IN', name: 'Tamil (தமிழ்)' },
+            { code: 'te-IN', name: 'Telugu (తెలుగు)' },
+            { code: 'bn-IN', name: 'Bengali (বাংলা)' },
+            { code: 'kn-IN', name: 'Kannada (कन्नड)' },
+            { code: 'ml-IN', name: 'Malayalam (മലയാളം)' },
+            { code: 'en-US', name: 'English (US)' },
+            { code: 'es-ES', name: 'Spanish (Español)' },
+            { code: 'fr-FR', name: 'French (Français)' },
+            { code: 'de-DE', name: 'German (Deutsch)' },
+            { code: 'ja-JP', name: 'Japanese (日本語)' },
+            { code: 'zh-CN', name: 'Chinese (Simplified)' },
+            { code: 'ru-RU', name: 'Russian (Русский)' },
+            { code: 'ar-SA', name: 'Arabic (العربية)' }
+        ];
+
+        let USER_EMAIL = ""; // For MyMemory API (optional but recommended)
+        
+        // --- DOM ELEMENTS ---
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const chatContainer = document.getElementById('chat-container');
+        const statusBar = document.getElementById('status-bar');
+        const manualSendBtn = document.getElementById('manual-send-btn');
+        const silenceBarContainer = document.getElementById('silence-timer-container');
+        const silenceProgress = document.getElementById('silence-progress');
+        const langU1Select = document.getElementById('lang-u1');
+        const langU2Select = document.getElementById('lang-u2');
+        
+        // Settings Elements
+        const apiPanel = document.getElementById('api-panel');
+        const apiSettingsBtn = document.getElementById('api-settings-btn');
+        const userEmailInput = document.getElementById('user-email-input');
+        const saveApiBtn = document.getElementById('save-api-btn');
+        const closeApiBtn = document.getElementById('close-api-btn');
+
+        // --- STATE MANAGEMENT ---
+        let state = 'IDLE'; // IDLE, LISTENING_U1, LISTENING_U2, PROCESSING, SPEAKING
+        let recognition;
+        let synth = window.speechSynthesis;
+        let finalTranscript = '';
+        let silenceTimer = null;
+        let silenceInterval = null;
+        const SILENCE_TIMEOUT_MS = 5000;
+        let silenceTimeElapsed = 0;
+
+        // --- INITIALIZATION ---
+        function initLanguages() {
+            LANGUAGES.forEach((lang, index) => {
+                const opt1 = new Option(lang.name, lang.code);
+                const opt2 = new Option(lang.name, lang.code);
+                langU1Select.add(opt1);
+                langU2Select.add(opt2);
+            });
+            // Defaults
+            langU1Select.value = 'en-IN';
+            langU2Select.value = 'hi-IN';
+            
+            // Load saved email
+            const savedEmail = localStorage.getItem('dhwani_user_email');
+            if (savedEmail) {
+                USER_EMAIL = savedEmail;
+                userEmailInput.value = savedEmail;
+            }
+        }
+
+        // --- SPEECH RECOGNITION SETUP ---
+        function setupRecognition() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert("Speech Recognition not supported. Please use Chrome.");
+                return null;
+            }
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const rec = new SpeechRecognition();
+            rec.continuous = true; // Keep listening until we stop manually
+            rec.interimResults = true;
+            
+            rec.onstart = () => {
+                updateStatus(state === 'LISTENING_U1' ? "User 1 Listening..." : "User 2 Listening...");
+                startSilenceTimer();
+                toggleSilenceUI(true);
+            };
+
+            rec.onresult = (event) => {
+                let interimTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                    }
+                }
+                
+                // If speech is detected, reset timer
+                if (interimTranscript.length > 0 || finalTranscript.length > 0) {
+                    resetSilenceTimer();
+                    updateStatus("Hearing: " + (finalTranscript || interimTranscript).slice(-20) + "...");
+                }
+            };
+
+            rec.onerror = (event) => {
+                // Ignore no-speech errors which happen frequently
+                if (event.error === 'no-speech') return; 
+                console.error("Speech Error:", event.error);
+            };
+            
+            return rec;
+        }
+
+        recognition = setupRecognition();
+
+        // --- MAIN LOGIC FLOW ---
+
+        startBtn.addEventListener('click', () => {
+            if (synth.speaking) synth.cancel();
+            
+            // UI Update
+            startBtn.classList.add('hidden');
+            stopBtn.classList.remove('hidden');
+            chatContainer.innerHTML = ''; // Clear chat
+            addSystemMessage("Conversation Started. User 1, please speak.");
+            
+            startTurn('U1');
+        });
+
+        stopBtn.addEventListener('click', () => {
+            stopAll();
+        });
+
+        manualSendBtn.addEventListener('click', () => {
+            if (state.includes('LISTENING')) {
+                finishTurn();
+            }
+        });
+
+        function stopAll() {
+            state = 'IDLE';
+            if (recognition) recognition.stop();
+            if (synth) synth.cancel();
+            stopSilenceTimer();
+            toggleSilenceUI(false);
+            
+            startBtn.classList.remove('hidden');
+            stopBtn.classList.add('hidden');
+            updateStatus("Stopped", true);
+        }
+
+        function startTurn(user) {
+            state = user === 'U1' ? 'LISTENING_U1' : 'LISTENING_U2';
+            finalTranscript = ''; // Reset buffer
+            
+            // Set Language for Recognition
+            const langCode = user === 'U1' ? langU1Select.value : langU2Select.value;
+            recognition.lang = langCode;
+
             try {
                 recognition.start();
-            } catch(e) {
-                console.warn("Mic start overlap", e);
-                isRestarting = false;
+                updateUIForActiveUser(user);
+            } catch (e) {
+                console.log("Recognition already started or error", e);
+                // Hard reset if stuck
+                recognition.stop();
+                setTimeout(() => recognition.start(), 200);
             }
-        }, 200); // 200ms delay allows the audio engine to clear up
-    }
-
-    // --- FLOW CONTROLLER ---
-    els.startBtn.onclick = () => {
-        isConversationActive = true;
-        els.startBtn.classList.add('hidden');
-        els.stopBtn.classList.remove('hidden');
-        els.welcome.style.display = 'none';
-        els.status.textContent = "CONVERSATION STARTED";
-        activateUser(1); 
-    };
-
-    els.stopBtn.onclick = toggleStop;
-
-    function toggleStop() {
-        isConversationActive = false;
-        activeTurn = 0;
-        if(recognition) recognition.stop();
-        if(synth) synth.cancel();
-        clearTimers();
-        resetUI();
-        els.startBtn.classList.remove('hidden');
-        els.stopBtn.classList.add('hidden');
-        els.status.textContent = "CONVERSATION ENDED";
-    }
-
-    function activateUser(userNum) {
-        if (!isConversationActive) return;
-        activeTurn = userNum;
-        currentTranscript = "";
-        
-        // UI Update
-        const active = userNum === 1 ? els.u1 : els.u2;
-        const inactive = userNum === 1 ? els.u2 : els.u1;
-        
-        active.panel.classList.remove('inactive-turn');
-        active.panel.classList.add('active-turn');
-        active.btn.classList.remove('hidden'); 
-        active.timer.classList.remove('hidden');
-        
-        inactive.panel.classList.add('inactive-turn');
-        inactive.panel.classList.remove('active-turn');
-        inactive.btn.classList.add('hidden');
-        inactive.timer.classList.add('hidden');
-        inactive.mic.classList.remove('mic-listening');
-        inactive.status.textContent = "WAITING";
-
-        // Start Mic with Android safety
-        restartMic();
-    }
-
-    // --- SILENCE DETECTION (5 Seconds) ---
-    function startSilenceTimer() {
-        clearTimers();
-        let timeLeft = 5;
-        updateTimerUI(timeLeft);
-
-        countdownInterval = setInterval(() => {
-            timeLeft--;
-            updateTimerUI(timeLeft);
-            if (timeLeft <= 0) clearInterval(countdownInterval);
-        }, 1000);
-
-        silenceTimer = setTimeout(() => {
-            // Pause Limit Reached -> Process
-            // On Android, we must manually stop so the onend event knows we are DONE, not just restarting
-            isRestarting = true; // Lock restart logic
-            if(recognition) recognition.stop(); 
-            processTranslation();
-        }, 5000);
-    }
-
-    function updateTimerUI(sec) {
-        const text = `Auto-send: ${sec}s`;
-        if (activeTurn === 1) els.u1.timer.textContent = text;
-        if (activeTurn === 2) els.u2.timer.textContent = text;
-    }
-
-    function clearTimers() {
-        clearTimeout(silenceTimer);
-        clearInterval(countdownInterval);
-    }
-
-    // Manual Trigger
-    els.u1.btn.onclick = () => { triggerManualProcess(); };
-    els.u2.btn.onclick = () => { triggerManualProcess(); };
-
-    function triggerManualProcess() {
-        clearTimers();
-        isRestarting = true; // Prevent auto-restart
-        if(recognition) recognition.stop();
-        processTranslation();
-    }
-
-    // --- TRANSLATION CORE ---
-    async function processTranslation() {
-        if (!isConversationActive) return;
-        
-        // If no text was captured, just switch turns (or restart same user?)
-        // Let's restart same user if empty to avoid endless looping of silence
-        if (!currentTranscript.trim()) {
-            isRestarting = false;
-            restartMic(); // Give them another chance
-            return;
         }
-        
-        const srcUser = activeTurn;
-        const targetUser = srcUser === 1 ? 2 : 1;
-        const text = currentTranscript.trim();
 
-        // Lock UI
-        activeTurn = 0; 
-        resetUI(); 
-        els.chat.classList.add('speaking-now');
-        els.status.textContent = `TRANSLATING USER ${srcUser}...`;
+        function finishTurn() {
+            if (!recognition) return;
+            recognition.stop(); // Stop mic
+            stopSilenceTimer();
+            toggleSilenceUI(false);
 
-        const sLang = srcUser === 1 ? els.u1.lang.value : els.u2.lang.value;
-        const tLang = targetUser === 1 ? els.u1.lang.value : els.u2.lang.value;
-        const pair = `${sLang}|${tLang}`;
+            if (!finalTranscript.trim()) {
+                // If nothing heard, just restart the same turn
+                addSystemMessage("Didn't hear anything. Listening again...");
+                setTimeout(() => startTurn(state === 'LISTENING_U1' ? 'U1' : 'U2'), 1000);
+                return;
+            }
 
-        try {
-            const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${pair}`);
-            const data = await res.json();
-            
-            if (data.responseData) {
-                const transText = data.responseData.translatedText;
-                addChatBubble(srcUser, text, transText);
-                await speakText(transText, tLang);
+            processTranslation(finalTranscript);
+        }
+
+        async function processTranslation(text) {
+            const currentUser = state === 'LISTENING_U1' ? 'U1' : 'U2';
+            state = 'PROCESSING';
+            updateStatus("Translating...", false, true);
+
+            // 1. Display Original Text
+            addMessage(currentUser, text, "...");
+
+            // 2. Determine Langs for API (MyMemory format: source|target)
+            // Note: MyMemory often works best with just language codes (en) or full (en-IN).
+            // We send the full code first; if it fails, one might strip it, but usually it's fine.
+            const sourceCode = currentUser === 'U1' ? langU1Select.value : langU2Select.value;
+            const targetCode = currentUser === 'U1' ? langU2Select.value : langU1Select.value;
+
+            // 3. Call MyMemory API
+            try {
+                const translation = await translateWithMyMemory(text, sourceCode, targetCode);
                 
-                if (isConversationActive) {
-                    els.chat.classList.remove('speaking-now');
-                    activateUser(targetUser);
-                }
-            } else {
-                throw new Error("API Error");
+                // 4. Update Chat with Translation
+                updateLastMessageTranslation(translation);
+
+                // 5. Speak
+                speakTranslation(translation, targetCode, () => {
+                    // 6. On End, Switch Turn
+                    const nextUser = currentUser === 'U1' ? 'U2' : 'U1';
+                    setTimeout(() => startTurn(nextUser), 500); // Small buffer
+                });
+
+            } catch (err) {
+                console.error(err);
+                addSystemMessage("Translation Error: " + err.message);
+                // Fallback: switch turn anyway
+                setTimeout(() => startTurn(currentUser === 'U1' ? 'U2' : 'U1'), 2000);
             }
-        } catch (e) {
-            console.error(e);
-            addChatBubble(srcUser, text, "Translation Error", true);
-            if (isConversationActive) activateUser(targetUser);
         }
-    }
 
-    // --- TTS ENGINE ---
-    function speakText(text, lang) {
-        return new Promise((resolve) => {
-            if (!text) { resolve(); return; }
-            if (synth.speaking) synth.cancel();
+        // --- MYMEMORY API INTEGRATION ---
+        async function translateWithMyMemory(text, sourceLangCode, targetLangCode) {
+            // MyMemory expects query param 'q' and 'langpair' (e.g., 'en|it')
+            const langPair = `${sourceLangCode}|${targetLangCode}`;
+            
+            // Build URL
+            let url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langPair}`;
+            
+            // Add email if provided (increases limit)
+            if (USER_EMAIL && USER_EMAIL.includes('@')) {
+                url += `&de=${encodeURIComponent(USER_EMAIL)}`;
+            }
 
-            lastSpokenText = text;
-            lastSpokenLang = lang;
-            els.repeatBtn.disabled = false;
+            const response = await fetch(url);
+            const data = await response.json();
 
-            const utt = new SpeechSynthesisUtterance(text);
-            utt.lang = lang;
-            utt.rate = 0.9;
+            // MyMemory Response Structure:
+            // data.responseData.translatedText
+            // data.responseStatus (200 is OK)
 
-            // Voice Logic
-            if (voices.length === 0) voices = synth.getVoices();
-            let v = voices.find(v => v.lang === lang);
-            if (!v) v = voices.find(v => v.lang.startsWith(lang.split('-')[0]));
-            if (v) utt.voice = v;
+            if (data.responseStatus === 200 || data.responseStatus === '200') {
+                return data.responseData.translatedText;
+            } else {
+                // Sometimes returns 403 if quota exceeded without email
+                throw new Error(data.responseDetails || "API Error");
+            }
+        }
 
-            utt.onend = () => { resolve(); };
-            utt.onerror = () => { resolve(); }; 
+        // --- SPEECH SYNTHESIS (TTS) ---
+        function speakTranslation(text, langCode, onComplete) {
+            state = 'SPEAKING';
+            updateStatus("Speaking...");
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = langCode;
+            utterance.rate = 0.9; // Requested 0.9x speed
 
-            synth.speak(utt);
+            // Voice selection logic
+            const voices = synth.getVoices();
+            // Try to find an exact match first
+            let preferredVoice = voices.find(v => v.lang === langCode);
+            // If not found, try to find a match by the language part only (e.g. 'hi' in 'hi-IN')
+            if (!preferredVoice) {
+                const shortLang = langCode.split('-')[0];
+                preferredVoice = voices.find(v => v.lang.startsWith(shortLang));
+            }
+            
+            if (preferredVoice) utterance.voice = preferredVoice;
+
+            utterance.onend = () => {
+                onComplete();
+            };
+
+            utterance.onerror = (e) => {
+                console.warn("TTS Error:", e);
+                onComplete(); // Proceed anyway
+            };
+
+            synth.speak(utterance);
+        }
+
+        // --- SILENCE TIMER LOGIC ---
+        function startSilenceTimer() {
+            silenceTimeElapsed = 0;
+            updateSilenceBar();
+            manualSendBtn.disabled = false;
+            manualSendBtn.classList.remove('opacity-0');
+            
+            clearInterval(silenceInterval);
+            silenceInterval = setInterval(() => {
+                silenceTimeElapsed += 100; // 100ms ticks
+                updateSilenceBar();
+                
+                if (silenceTimeElapsed >= SILENCE_TIMEOUT_MS) {
+                    // Timeout Reached
+                    finishTurn();
+                }
+            }, 100);
+        }
+
+        function resetSilenceTimer() {
+            silenceTimeElapsed = 0;
+            updateSilenceBar();
+        }
+
+        function stopSilenceTimer() {
+            clearInterval(silenceInterval);
+            manualSendBtn.disabled = true;
+            manualSendBtn.classList.add('opacity-0');
+        }
+
+        function updateSilenceBar() {
+            const percentage = (silenceTimeElapsed / SILENCE_TIMEOUT_MS) * 100;
+            silenceProgress.style.width = `${percentage}%`;
+        }
+
+        function toggleSilenceUI(show) {
+            silenceBarContainer.style.opacity = show ? '1' : '0';
+        }
+
+        // --- UI HELPER FUNCTIONS ---
+        function updateStatus(msg, hide = false, pulse = false) {
+            statusBar.innerText = msg;
+            statusBar.classList.remove('hidden');
+            if(pulse) statusBar.classList.add('animate-pulse');
+            else statusBar.classList.remove('animate-pulse');
+            
+            if(hide) setTimeout(() => statusBar.classList.add('hidden'), 2000);
+        }
+
+        function updateUIForActiveUser(user) {
+            // Visual cue for who is talking
+            if (user === 'U1') {
+                langU1Select.parentElement.classList.add('pulse-ring');
+                langU2Select.parentElement.classList.remove('pulse-ring');
+            } else {
+                langU1Select.parentElement.classList.remove('pulse-ring');
+                langU2Select.parentElement.classList.add('pulse-ring');
+            }
+        }
+
+        function addMessage(user, text, translationPlaceholder) {
+            const div = document.createElement('div');
+            const isU1 = user === 'U1';
+            
+            div.className = `flex flex-col max-w-[85%] ${isU1 ? 'mr-auto items-start' : 'ml-auto items-end'}`;
+            
+            const bubble = document.createElement('div');
+            bubble.className = `p-4 rounded-2xl shadow-md text-lg relative ${isU1 ? 'chat-bubble-u1' : 'chat-bubble-u2'}`;
+            
+            // Original Text
+            const originalSpan = document.createElement('div');
+            originalSpan.textContent = text;
+            originalSpan.className = "font-medium";
+            
+            // Translation Text
+            const transSpan = document.createElement('div');
+            transSpan.textContent = translationPlaceholder;
+            transSpan.className = "translation-text";
+            transSpan.id = `last-trans-${Date.now()}`; // Unique ID to update later
+
+            bubble.appendChild(originalSpan);
+            bubble.appendChild(transSpan);
+            
+            // Label
+            const label = document.createElement('span');
+            label.className = "text-xs text-gray-500 mt-1 px-1";
+            label.textContent = isU1 ? "User 1" : "User 2";
+
+            div.appendChild(bubble);
+            div.appendChild(label);
+            
+            chatContainer.appendChild(div);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            
+            // Store reference to update translation
+            window.lastTransElement = transSpan;
+        }
+
+        function updateLastMessageTranslation(text) {
+            if (window.lastTransElement) {
+                window.lastTransElement.textContent = text;
+            }
+        }
+
+        function addSystemMessage(text) {
+            const div = document.createElement('div');
+            div.className = "text-center text-xs text-gray-400 my-2";
+            div.textContent = text;
+            chatContainer.appendChild(div);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // --- SETTINGS HANDLING ---
+        apiSettingsBtn.addEventListener('click', () => apiPanel.classList.toggle('hidden'));
+        closeApiBtn.addEventListener('click', () => apiPanel.classList.add('hidden'));
+        saveApiBtn.addEventListener('click', () => {
+            const val = userEmailInput.value.trim();
+            if(val) {
+                USER_EMAIL = val;
+                localStorage.setItem('dhwani_user_email', val);
+                alert("Email Saved! Limit increased.");
+                apiPanel.classList.add('hidden');
+            } else {
+                alert("Please enter a valid email.");
+            }
         });
-    }
 
-    // --- UTILITIES ---
-    els.repeatBtn.onclick = () => {
-        if (lastSpokenText && !synth.speaking) {
-            const utt = new SpeechSynthesisUtterance(lastSpokenText);
-            utt.lang = lastSpokenLang;
-            synth.speak(utt);
-        }
-    };
+        // Initialize
+        initLanguages();
 
-    els.shareBtn.onclick = async () => {
-        const text = Array.from(document.querySelectorAll('#chat-container div'))
-            .map(d => d.innerText).join('\n');
-        try {
-            await navigator.clipboard.writeText(text);
-            alert("Chat copied!");
-        } catch (err) {}
-    };
-
-    function resetUI() {
-        els.u1.panel.classList.remove('active-turn', 'inactive-turn');
-        els.u2.panel.classList.remove('active-turn', 'inactive-turn');
-        els.u1.mic.classList.remove('mic-listening');
-        els.u2.mic.classList.remove('mic-listening');
-        els.u1.btn.classList.add('hidden'); els.u2.btn.classList.add('hidden');
-        els.u1.timer.classList.add('hidden'); els.u2.timer.classList.add('hidden');
-        els.u1.status.textContent = "IDLE"; els.u2.status.textContent = "IDLE";
-    }
-
-    function addChatBubble(user, original, translated, isErr=false) {
-        const d = document.createElement('div');
-        const align = user === 1 ? 'self-start text-left' : 'self-end text-right';
-        let bg = user === 1 ? 'bg-indigo-900/80 border-indigo-700' : 'bg-emerald-900/80 border-emerald-700';
-        if (isErr) bg = 'bg-red-900/80 border-red-700';
-
-        d.className = `max-w-[85%] ${align} p-4 rounded-xl border ${bg} mb-3 shadow-lg msg-enter`;
-        d.innerHTML = `
-            <div class="text-[10px] uppercase text-gray-400 font-bold mb-1">User ${user}</div>
-            <div class="text-gray-300 text-sm italic mb-2">"${original}"</div>
-            <div class="text-white text-lg font-medium">${translated}</div>
-        `;
-        els.chat.appendChild(d);
-        els.chat.scrollTop = els.chat.scrollHeight;
-    }
-</script>
+    </script>
+</body>
+</html>
