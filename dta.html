@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dhwani - Android Fix</title>
+    <title>Dhwani - Smart AI Translator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
     
@@ -18,13 +18,16 @@
         .speaking-now { border-color: #8b5cf6 !important; box-shadow: 0 0 30px rgba(139, 92, 246, 0.5); }
         
         @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
-        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .msg-enter { animation: slideIn 0.3s ease-out forwards; }
         
         select { background-color: #334155; color: white; border: 1px solid #475569; padding: 12px; border-radius: 8px; width: 100%; outline: none; }
+        .msg-enter { animation: slideIn 0.3s ease-out forwards; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         
-        /* Live Transcript Styling */
-        .live-text { color: #fbbf24; font-style: italic; font-size: 0.9em; margin-top: 5px; min-height: 20px; }
+        /* Live Text Styling */
+        .live-preview { color: #fbbf24; font-size: 0.85rem; margin-top: 8px; font-style: italic; min-height: 20px; word-wrap: break-word; }
+        
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
     </style>
 </head>
 
@@ -33,7 +36,7 @@
     <header class="w-full max-w-4xl flex justify-between items-center mb-4 p-4 glass-panel rounded-2xl shadow-lg shrink-0">
         <div class="flex items-center gap-3">
             <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400">
-                Dhwani <span class="text-xs text-green-400 font-mono border border-green-500/30 px-2 py-1 rounded">ANDROID</span>
+                Dhwani <span class="text-xs text-green-400 font-mono border border-green-500/30 px-2 py-1 rounded">Smart AI Translator</span>
             </h1>
         </div>
         <div>
@@ -46,10 +49,8 @@
         
         <div id="chat-container" class="flex-grow bg-slate-900/50 rounded-2xl border border-slate-800 p-4 overflow-y-auto min-h-[300px] flex flex-col gap-3 shadow-inner relative">
             <div id="welcome-msg" class="text-center text-slate-500 mt-10 text-sm">
-                <b>Android Optimized Mode</b><br>
-                1. Select Languages.<br>
-                2. Click START.<br>
-                3. Speak freely (No repetition).
+                Select Languages & Click <b>START</b>.<br>
+                Auto-detects 5s silence. Optimized for Android.
             </div>
         </div>
 
@@ -63,21 +64,20 @@
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-1 shrink-0 pb-2">
-            
             <div id="panel-u1" class="glass-panel p-4 rounded-xl border-t-4 border-indigo-500 flex flex-col gap-3 transition-all">
                 <div class="flex justify-between items-center mb-1">
                     <span class="text-indigo-400 font-bold text-sm uppercase flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-indigo-500"></span> User 1</span>
                     <div id="status-u1" class="text-xs font-mono text-gray-400 font-bold">READY</div>
                 </div>
                 <select id="lang-u1"></select>
-                <div id="live-u1" class="live-text"></div>
+                <div id="live-u1" class="live-preview"></div>
                 
                 <div class="relative flex items-center gap-4">
                     <div id="mic-icon-u1" class="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center transition-all border border-slate-600 shadow-md">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-white"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" /></svg>
                     </div>
                     <div class="flex-grow flex flex-col justify-center h-12">
-                        <div id="timer-u1" class="hidden text-xs text-indigo-300 font-mono">Pause: <span id="countdown-u1">0</span>s</div>
+                        <div id="timer-u1" class="hidden text-xs text-indigo-300 font-mono">Silence: <span id="countdown-u1">0</span>s</div>
                         <button id="manual-send-u1" class="hidden bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-1 rounded w-fit mt-1">Finish</button>
                     </div>
                 </div>
@@ -89,19 +89,18 @@
                     <div id="status-u2" class="text-xs font-mono text-gray-400 font-bold">READY</div>
                 </div>
                 <select id="lang-u2"></select>
-                <div id="live-u2" class="live-text"></div>
+                <div id="live-u2" class="live-preview"></div>
 
                 <div class="relative flex items-center gap-4">
                     <div id="mic-icon-u2" class="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center transition-all border border-slate-600 shadow-md">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-white"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" /></svg>
                     </div>
                     <div class="flex-grow flex flex-col justify-center h-12">
-                        <div id="timer-u2" class="hidden text-xs text-emerald-300 font-mono">Pause: <span id="countdown-u2">0</span>s</div>
+                        <div id="timer-u2" class="hidden text-xs text-emerald-300 font-mono">Silence: <span id="countdown-u2">0</span>s</div>
                         <button id="manual-send-u2" class="hidden bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1 rounded w-fit mt-1">Finish</button>
                     </div>
                 </div>
             </div>
-
         </div>
         <div id="global-status" class="w-full text-center py-1 text-[10px] text-gray-500 font-mono uppercase tracking-widest">System Idle</div>
     </main>
@@ -119,19 +118,16 @@
             { code: "ar-SA", name: "Arabic (العربية)" }
         ];
 
-        // --- VARS ---
-        let recognition;
-        let isConversationActive = false, activeTurn = 0;
+        // --- GLOBAL VARIABLES ---
+        let recognition, isConversationActive = false, activeTurn = 0;
         let silenceTimer = null, pauseSeconds = 0, pauseInterval = null;
         
-        // **ANDROID FIX VARIABLES**
-        let finalTranscript = ""; // Stores ONLY committed final text
-        let interimTranscript = ""; // Stores fleeting interim text
+        // **ANDROID FIX: SEPARATE BUFFERS**
+        let finalTranscript = ""; 
         
         let lastSpokenText = "", lastSpokenLang = "";
         let synth = window.speechSynthesis, voices = [];
 
-        // --- DOM ---
         const els = {
             startBtn: document.getElementById('start-btn'), stopBtn: document.getElementById('stop-btn'),
             shareBtn: document.getElementById('share-btn'), repeatBtn: document.getElementById('repeat-btn'),
@@ -172,25 +168,35 @@
                 if (isConversationActive && activeTurn !== 0) { try { recognition.start(); } catch(e){} }
             };
 
-            // **ANDROID FIX LOGIC HERE**
+            // **ANDROID FIX: LOGIC CHANGE**
             recognition.onresult = (event) => {
                 resetSilenceWatcher();
-                interimTranscript = ""; // Clear interim every time
-
+                
+                let interim = "";
+                // Loop only through new results, but since Android sends everything, we reconstruct
+                // We rely on 'finalTranscript' variable which accumulates only committed results
+                
+                // IMPORTANT: In continuous mode, event.results grows.
+                // We must rebuild the whole string from resultIndex 0 if we want full context,
+                // OR handle the specific index.
+                // The cleanest way for Android: Rebuild current turn string from scratch every event.
+                
+                let currentSessionText = "";
+                
                 for (let i = event.resultIndex; i < event.results.length; ++i) {
                     if (event.results[i].isFinal) {
-                        finalTranscript += event.results[i][0].transcript + " ";
+                        finalTranscript += event.results[i][0].transcript;
                     } else {
-                        interimTranscript += event.results[i][0].transcript;
+                        interim += event.results[i][0].transcript;
                     }
                 }
 
-                // Display Logic: Show Final + Interim (No Repetition)
-                const displayText = finalTranscript + interimTranscript;
+                // Display
+                const display = finalTranscript + interim;
                 const u = activeTurn === 1 ? els.u1 : els.u2;
                 
-                if (displayText.trim()) {
-                    u.live.textContent = displayText.substring(displayText.length - 50); // Show last 50 chars
+                if (display.trim()) {
+                    u.live.textContent = display.substring(Math.max(0, display.length - 100)); // Show last 100 chars
                     u.status.textContent = "HEARING...";
                 }
             };
@@ -203,10 +209,9 @@
             pauseInterval = setInterval(() => {
                 pauseSeconds++; updateTimerUI(pauseSeconds);
                 if (pauseSeconds >= 5) {
-                    // Check if we have any text (Final OR Interim)
-                    const fullText = (finalTranscript + interimTranscript).trim();
-                    if (fullText.length > 0) processTurn();
-                    else pauseSeconds = 0;
+                    // Check if we have text
+                    if (finalTranscript.trim().length > 0) processTurn();
+                    else pauseSeconds = 0; // Reset if silence but no text (ghost trigger)
                 }
             }, 1000);
         }
@@ -227,9 +232,8 @@
             if (!isConversationActive) return;
             activeTurn = num; 
             
-            // Clear Buffers for new turn
+            // **RESET BUFFERS**
             finalTranscript = "";
-            interimTranscript = "";
             els.u1.live.textContent = "";
             els.u2.live.textContent = "";
 
@@ -253,8 +257,7 @@
             stopSilenceWatcher(); if(recognition) recognition.stop();
             
             const src = activeTurn, tgt = src === 1 ? 2 : 1;
-            // combine final + interim one last time
-            const text = (finalTranscript + interimTranscript).trim();
+            const text = finalTranscript.trim(); // Use only FINAL text for translation
             
             if (!text) { activateUser(src); return; }
 
