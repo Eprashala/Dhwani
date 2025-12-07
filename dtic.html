@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>STT Deduped — Robust Android</title>
+<style>
+  body { font-family: Arial, sans-serif; margin:18px; background:#f7f9ff; color:#111; }
+  .wrap { max-width:920px; margin:0 auto; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+  button { padding:8px 12px; border-radius:6px; border:1px solid #bbb; background:#fff; cursor:pointer; }
+  button.primary { background:#154ea6; color:#fff; border-color:#0f3d8a; }
+  .panel { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .card { padding:12px; background:#fff; border-radius:8px; box-shadow:0 1px 6px rgba(0,0,0,0.06); }
+  .live { min-height:60px; padding:8px; border-radius:6px; background:#eef6ff; }
+  .translated { min-height:50px; padding:8px; border-radius:6px; background:#fff6f0; margin-top:8px; }
+  .small { font-size:13px; color:#444; }
+  .debug { font-family:monospace; font-size:12px; color:#666; margin-top:8px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h2>Robust STT (Android) — Deduped</h2>
+
+    <div class="row">
+      <button id="u1Btn" class="primary">User 1</button>
+      <button id="u2Btn">User 2</button>
+      <label class="small">U1 lang:
+        <select id="lang1"><option value="en-US">en-US</option><option value="mr-IN">mr-IN</option></select>
+      </label>
+      <label class="small">U2 lang:
+        <select id="lang2"><option value="hi-IN">hi-IN</option><option value="en-US">en-US</option></select>
+      </label>
+      <button id="startBtn">Start</button>
+      <button id="stopBtn">Stop</button>
+
+      <label style="margin-left:auto" class="small"><input type="checkbox" id="dbg"> show debug</label>
+    </div>
+
+    <div class="panel">
+      <div class="card">
+        <div class="small"><strong>USER 1</strong></div>
+        <div id="u1Live" class="live">—</div>
+        <div id="u1Status" class="small" style="margin-top:6px">idle</div>
+        <div class="small" style="margin-top:10px"><strong>USER 2 (TRANS)</strong></div>
+        <div id="u1Trans" class="translated">—</div>
+      </div>
+
+      <div class="card">
+        <div class="small"><strong>USER 2</strong></div>
+        <div id="u2Live" class="live">—</div>
+        <div id="u2Status" class="small" style="margin-top:6px">idle</div>
+        <div class="small" style="margin-top:10px"><strong>USER 1 (TRANS)</strong></div>
+        <div id="u2Trans" class="translated">—</div>
+      </div>
+    </div>
+
+    <div id="debugBox" class="debug" style="display:none"></div>
+  </div>
+
+<script>
+/* ---------- Elements ---------- */
+const els = {
+  u1Btn: document.getElementById('u1Btn'),
+  u2Btn: document.getElementById('u2Btn'),
+  startBtn: document.getElementById('startBtn'),
+  stopBtn: document.getElementById('stopBtn'),
+  lang1: document.getElementById('lang1'),
+  lang2: document.getElementById('lang2'),
+  u1Live: document.getElementById('u1Live'),
+  u1Status: document.getElementById('u1Status'),
+  u1Trans: document.getElementById('u1Trans'),
+  u2Live: document.getElementById('u2Live'),
+  u2Status: document.getElementById('u2Status'),
+  u2Trans: document.getElementById('u2Trans'),
+  dbg: document.getElementById('dbg'),
+  debugBox: document.getElementById('debugBox')
+};
+
+/* ---------- State ---------- */
+let activeTurn = 1;
+let recognition = null;
+
+/* Buffers and dedupe maps */
+let processedResultsMap = {}; // map: index -> { transcript, isFinal }
+let lastShownText = "";       // last text that was sent for translation / shown as "final"
+let lastUpdateAt = 0;         // timestamp of last UI refresh (throttle)
+let silenceTimer = null;
+
+/* Config */
+const SILENCE_MS = 1400;
+const UI_THROTTLE_MS = 200; // don't update UI faster than this
+
+/* ---------- UI / turn switch ---------- */
+function setActiveTurn(n) {
+  activeTurn = n;
+  if (n === 1) {
+    els.u1Btn.classList.add('primary');
+    els.u2Btn.classList.remove('primary');
+  } else {
+    els.u2Btn.classList.add('primary');
+    els.u1Btn.classList.remove('primary');
+  }
+  // Reset buffers when switching speaker
+  processedResultsMap = {};
+  lastShownText = "";
+  updateDisplays();
+  updateStatus('idle');
+}
+els.u1Btn.onclick = () => setActiveTurn(1);
+els.u2Btn.onclick = () => setActiveTurn(2);
+
+function updateStatus(s) {
+  if (activeTurn === 1) els.u1Status.textContent = s;
+  else els.u2Status.textContent = s;
+}
+function updateDisplays() {
+  const text = buildCurrentDisplayText();
+  if (activeTurn === 1) els.u1Live.textContent = text || '—';
+  else els.u2Live.textContent = text || '—';
+}
+
+/* ---------- Helpers to build text from processedResultsMap ---------- */
+function buildCurrentDisplayText() {
+  // Build final from all indices where isFinal true (ordered by numeric index)
+  const indices = Object.keys(processedResultsMap).map(n => parseInt(n,10)).sort((a,b)=>a-b);
+  const finalParts = [];
+  let lastNonFinal = ""; // fallback interim from latest non-final slot
+  for (const i of indices) {
+    const obj = processedResultsMap[i];
+    if (!obj) continue;
+    if (obj.isFinal) finalParts.push(obj.transcript);
+    else lastNonFinal = obj.transcript;
+  }
+  const finalText = finalParts.join(' ').trim();
+  const interimText = lastNonFinal.trim();
+  if (finalText && interimText) return (finalText + ' ' + interimText).trim();
+  return finalText || interimText || '';
+}
+
+/* ---------- Silence watcher ---------- */
+function resetSilenceWatcher() {
+  if (silenceTimer) clearTimeout(silenceTimer);
+  silenceTimer = setTimeout(() => {
+    handleUtteranceComplete();
+  }, SILENCE_MS);
+}
+
+/* When we conclude a phrase has finished */
+async function handleUtteranceComplete() {
+  const text = buildCurrentDisplayText().trim();
+  if (!text) {
+    // clear maps & UI tidily
+    processedResultsMap = {};
+    lastShownText = "";
+    updateDisplays();
+    updateStatus('idle');
+    return;
+  }
+
+  // If we already showed/processed this exact text, ignore
+  if (text === lastShownText) {
+    // clear buffers for next phrase
+    processedResultsMap = {};
+    lastShownText = "";
+    updateDisplays();
+    updateStatus('idle');
+    return;
+  }
+
+  // Show final result and translate
+  if (activeTurn === 1) {
+    els.u1Live.textContent = text;
+    els.u1Status.textContent = "HEARD — translating...";
+  } else {
+    els.u2Live.textContent = text;
+    els.u2Status.textContent = "HEARD — translating...";
+  }
+
+  // Translation (MyMemory free for demo)
+  try {
+    const from = activeTurn === 1 ? els.lang1.value.split('-')[0] : els.lang2.value.split('-')[0];
+    const to   = activeTurn === 1 ? els.lang2.value.split('-')[0] : els.lang1.value.split('-')[0];
+    const translated = await translateText(text, from, to);
+    if (activeTurn === 1) {
+      els.u1Trans.textContent = translated || '—';
+      els.u1Status.textContent = "TRANSLATED";
+    } else {
+      els.u2Trans.textContent = translated || '—';
+      els.u2Status.textContent = "TRANSLATED";
+    }
+  } catch (e) {
+    if (activeTurn === 1) {
+      els.u1Trans.textContent = "Translation error";
+      els.u1Status.textContent = "ERROR";
+    } else {
+      els.u2Trans.textContent = "Translation error";
+      els.u2Status.textContent = "ERROR";
+    }
+    console.error('translate error', e);
+  }
+
+  // Mark this text as processed and clear per-phrase state
+  lastShownText = text;
+  processedResultsMap = {};
+  // clear UI after short time (so user sees final)
+  setTimeout(()=> {
+    lastShownText = "";
+    updateDisplays();
+    updateStatus('idle');
+  }, 600);
+}
+
+/* ---------- Translation helper (free demo) ---------- */
+async function translateText(text, from, to) {
+  if (!text) return "";
+  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${from}|${to}`;
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error('Network error');
+  const data = await resp.json();
+  let translated = data && data.responseData && data.responseData.translatedText ? data.responseData.translatedText : "";
+  if ((!translated || translated.trim()==="") && Array.isArray(data.matches) && data.matches.length) {
+    translated = data.matches[0].translation || translated;
+  }
+  return translated;
+}
+
+/* ---------- Build recognition with per-index tracking ---------- */
+function buildRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) { alert('SpeechRecognition not supported. Use Chrome.'); return null; }
+
+  const r = new SpeechRecognition();
+  r.interimResults = true;
+  r.continuous = true;
+  r.maxAlternatives = 1;
+  r.lang = activeTurn === 1 ? els.lang1.value : els.lang2.value;
+
+  r.onstart = () => updateStatus('listening...');
+
+  r.onresult = (event) => {
+    resetSilenceWatcher();
+
+    // Optional debug dump
+    if (els.dbg.checked) {
+      try {
+        const short = [];
+        for (let i=0;i<event.results.length;i++){
+          short.push(`[${i}](${event.results[i].isFinal? 'F':'i'}) "${event.results[i][0].transcript.trim()}"`);
+        }
+        els.debugBox.style.display = 'block';
+        els.debugBox.textContent = `onresult idx=${event.resultIndex} | ${short.join(' | ')}`;
+      } catch(e){}
+    } else {
+      els.debugBox.style.display = 'none';
+    }
+
+    // Process every slot index in event.results — update only if transcript changed.
+    // Note: event.results can be a live array of all prior results (Android),
+    // so we compare per-index to detect real changes.
+    for (let i = 0; i < event.results.length; ++i) {
+      const res = event.results[i];
+      if (!res || !res[0]) continue;
+      const transcript = res[0].transcript.trim();
+      const isFinal = Boolean(res.isFinal);
+
+      const prev = processedResultsMap[i];
+      // If previous exists and both transcript and final flag are same -> nothing changed
+      if (prev && prev.transcript === transcript && prev.isFinal === isFinal) {
+        continue;
+      }
+      // Otherwise update the slot
+      processedResultsMap[i] = { transcript, isFinal };
+    }
+
+    // Throttle UI updates to avoid very rapid repeated writes
+    const now = Date.now();
+    if (now - lastUpdateAt < UI_THROTTLE_MS) {
+      return;
+    }
+    lastUpdateAt = now;
+
+    // Rebuild and show current text (finals + latest interim)
+    const displayText = buildCurrentDisplayText();
+    if (displayText) {
+      if (activeTurn === 1) els.u1Live.textContent = displayText;
+      else els.u2Live.textContent = displayText;
+    }
+    updateStatus('HEARING...');
+
+    // If the displayText equals lastShownText, we don't call translation here — wait for silence
+    // The silence handler will clear the processedResultsMap after translating.
+  };
+
+  r.onerror = (ev) => {
+    console.warn('recognition error', ev);
+    updateStatus('ERROR: ' + (ev.error || ev.type));
+    if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
+      stopRecognition();
+    }
+  };
+
+  r.onend = () => {
+    // I
