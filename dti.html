@@ -2,497 +2,500 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dhwani - Smart AI Translator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dhwani Dark AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
-    
     <style>
-        body { font-family: 'Outfit', sans-serif; background-color: #0f172a; color: #e2e8f0; }
-        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); transition: all 0.3s ease; }
-        
-        /* Active User Animation - Gold Border Pulse */
-        .active-turn { 
-            border-color: #facc15 !important; 
-            box-shadow: 0 0 15px rgba(250, 204, 21, 0.3); 
-            transform: scale(1.02); 
-            opacity: 1 !important;
-        }
-        
-        /* Inactive User - Dimmed */
-        .inactive-turn {
-            opacity: 0.4;
-            pointer-events: none;
-            filter: grayscale(0.8);
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+
+        /* Smooth scrolling */
+        .chat-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        .chat-scroll::-webkit-scrollbar { display: none; }
+
+        /* Animations */
+        .pulse-ring { animation: pulse-purple 2s infinite; }
+        @keyframes pulse-purple {
+            0% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(168, 85, 247, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0); }
         }
 
-        /* Mic Listening Animation - Red Pulse */
-        .mic-listening { 
-            animation: pulse-red 1.5s infinite; 
-            background-color: #ef4444 !important; 
-            color: white !important; 
-            border-color: #ef4444 !important; 
+        /* Glassmorphism - Smart Ai Translator */
+        .glass-header {
+            background: rgba(30, 41, 59, 0.9); /* Slate-800 */
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
-        @keyframes pulse-red { 
-            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 
-            70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); } 
-            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } 
+        .glass-footer {
+            background: rgba(30, 41, 59, 0.95);
+            backdrop-filter: blur(12px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.2);
         }
 
-        /* System Speaking Animation - Purple Glow */
-        .speaking-now { border-color: #8b5cf6 !important; box-shadow: 0 0 30px rgba(139, 92, 246, 0.6); }
-
-        select { background-color: #334155; color: white; border: 1px solid #475569; padding: 12px; border-radius: 8px; width: 100%; outline: none; font-size: 14px; }
+        /* Bubbles - Slightly darker gradients for contrast */
+        .chat-bubble-u1 {
+            background: linear-gradient(135deg, #6d28d9 0%, #7c3aed 100%);
+            color: white;
+            border-bottom-left-radius: 2px;
+        }
+        .chat-bubble-u2 {
+            background: linear-gradient(135deg, #be185d 0%, #db2777 100%);
+            color: white;
+            border-bottom-right-radius: 2px;
+        }
         
-        /* Chat Bubble Animation */
-        .msg-enter { animation: slideIn 0.3s ease-out forwards; }
-        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        button { user-select: none; -webkit-tap-highlight-color: transparent; }
     </style>
 </head>
+<body class="bg-slate-900 h-[100dvh] w-full flex flex-col overflow-hidden text-slate-100">
 
-<body class="flex flex-col items-center min-h-screen p-2 md:p-6" oncontextmenu="return false;">
-
-    <header class="w-full max-w-4xl flex justify-between items-center mb-4 p-4 glass-panel rounded-2xl shadow-lg shrink-0">
-        <div class="flex items-center gap-3">
-            <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400">
-                Dhwani <span class="text-xs text-yellow-400 font-mono border border-yellow-500/30 px-2 py-1 rounded">Smart Ai Translator</span>
-            </h1>
+    <header class="glass-header z-50 shrink-0 px-4 py-3 flex justify-between items-center relative">
+        <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">D</div>
+            <div>
+                <h1 class="text-lg font-bold text-white leading-tight">Dhwani</h1>
+                <p class="text-[10px] text-purple-400 font-medium tracking-wide">Smart AI Translator</p>
+            </div>
         </div>
-        <div>
-            <button id="start-btn" class="bg-green-600 hover:bg-green-500 text-white px-6 py-2 rounded-full font-bold shadow-lg transition transform hover:scale-105">
-                START CONVERSATION
-            </button>
-            <button id="stop-btn" class="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-full font-bold shadow-lg transition hidden">
-                END CONVERSATION
-            </button>
+        <button id="api-settings-btn" class="p-2 text-slate-400 hover:text-purple-400 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.157.92c.447.1.879.255 1.288.452l.85-.386c.52-.236 1.137-.089 1.48.358l.775 1.127c.36.523.275 1.197-.184 1.54l-.768.56c.06.33.097.67.097 1.01 0 .34-.037.68-.097 1.01l.768.56c.459.343.544 1.017.184 1.54l-.775 1.127c-.343.447-.96.594-1.48.358l-.85-.386c-.409.197-.841.352-1.288.452l-.157.92z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+        </button>
+        
+        <div id="api-panel" class="hidden absolute top-full right-0 mt-2 w-64 bg-slate-800 shadow-xl rounded-xl border border-slate-700 p-3 mr-2 z-50">
+            <p class="text-xs text-slate-400 mb-2">Translation API Email (Optional):</p>
+            <input type="email" id="user-email-input" placeholder="email@example.com" class="w-full text-xs p-2 rounded bg-slate-700 border border-slate-600 text-white mb-2 focus:ring-2 focus:ring-purple-500 outline-none">
+            <button id="save-api-btn" class="w-full bg-purple-600 text-white text-xs py-2 rounded font-bold hover:bg-purple-500">Save & Close</button>
         </div>
     </header>
 
-    <main class="w-full max-w-4xl flex-grow flex flex-col gap-4 overflow-hidden h-full">
-        
-        <div id="chat-container" class="flex-grow bg-slate-900/50 rounded-2xl border border-slate-800 p-4 overflow-y-auto min-h-[300px] flex flex-col gap-3 shadow-inner relative">
-            <div id="welcome-msg" class="text-center text-slate-500 mt-10 text-sm">
-                Select languages below.<br>
-                Click <b>START</b> to begin the auto-loop.<br>
-                <span class="text-xs text-gray-600">The system detects 5-second pauses automatically.</span>
-            </div>
+    <div class="bg-slate-800/50 shrink-0 px-4 py-2 border-b border-slate-700 flex gap-3">
+        <div class="flex-1">
+            <label class="text-[10px] font-bold text-purple-400 uppercase block mb-1">User 1 (Me)</label>
+            <select id="lang-u1" class="w-full text-sm p-2 rounded-lg border border-slate-600 bg-slate-700 text-white focus:border-purple-500 outline-none shadow-sm"></select>
         </div>
-
-        <div class="flex justify-center gap-4 shrink-0">
-            <button id="repeat-btn" class="text-indigo-400 hover:text-white text-xs flex items-center gap-1 disabled:opacity-30" disabled>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
-                Repeat Last Audio
-            </button>
-            <button id="share-btn" class="text-emerald-400 hover:text-white text-xs flex items-center gap-1">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" /></svg>
-                Share Chat
-            </button>
+        <div class="flex-1 text-right">
+            <label class="text-[10px] font-bold text-pink-400 uppercase block mb-1">User 2 (Guest)</label>
+            <select id="lang-u2" class="w-full text-sm p-2 rounded-lg border border-slate-600 bg-slate-700 text-white focus:border-pink-500 outline-none shadow-sm text-right" dir="rtl"></select>
         </div>
+    </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-1 shrink-0 pb-2">
-            
-            <div id="panel-u1" class="glass-panel p-4 rounded-xl border-t-4 border-indigo-500 flex flex-col gap-3 transition-all">
-                <div class="flex justify-between items-center mb-1">
-                    <span class="text-indigo-400 font-bold text-sm uppercase flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-indigo-500"></span> User 1
-                    </span>
-                    <div id="status-u1" class="text-xs font-mono text-gray-400 font-bold">READY</div>
-                </div>
-                
-                <select id="lang-u1"></select>
-
-                <div class="relative flex items-center gap-4">
-                    <div id="mic-icon-u1" class="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center transition-all border border-slate-600 shadow-md">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-white">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
-                        </svg>
-                    </div>
-                    
-                    <div class="flex-grow flex flex-col justify-center h-12">
-                        <div id="timer-u1" class="hidden text-xs text-indigo-300 font-mono animate-pulse">Wait... 5s</div>
-                        <button id="manual-send-u1" class="hidden bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-1 rounded w-fit mt-1">Finish & Send</button>
-                    </div>
-                </div>
+    <main id="chat-container" class="flex-grow chat-scroll overflow-y-auto px-4 py-4 space-y-4 bg-gradient-to-b from-slate-900 to-slate-800">
+        <div id="intro-msg" class="text-center mt-12 opacity-30">
+            <div class="w-16 h-16 bg-slate-700 rounded-full mx-auto flex items-center justify-center mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
             </div>
-
-            <div id="panel-u2" class="glass-panel p-4 rounded-xl border-t-4 border-emerald-500 flex flex-col gap-3 transition-all">
-                <div class="flex justify-between items-center mb-1">
-                    <span class="text-emerald-400 font-bold text-sm uppercase flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span> User 2
-                    </span>
-                    <div id="status-u2" class="text-xs font-mono text-gray-400 font-bold">READY</div>
-                </div>
-
-                <select id="lang-u2"></select>
-
-                <div class="relative flex items-center gap-4">
-                    <div id="mic-icon-u2" class="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center transition-all border border-slate-600 shadow-md">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-white">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
-                        </svg>
-                    </div>
-
-                    <div class="flex-grow flex flex-col justify-center h-12">
-                        <div id="timer-u2" class="hidden text-xs text-emerald-300 font-mono animate-pulse">Wait... 5s</div>
-                        <button id="manual-send-u2" class="hidden bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1 rounded w-fit mt-1">Finish & Send</button>
-                    </div>
-                </div>
-            </div>
-
+            <p class="text-sm text-slate-400 font-medium">Ready to translate</p>
         </div>
-
-        <div id="global-status" class="w-full text-center py-1 text-[10px] text-gray-500 font-mono uppercase tracking-widest">System Idle</div>
-
+        <div class="h-32 w-full shrink-0"></div>
     </main>
 
-    <script>
-        // --- CONFIGURATION ---
-        const languages = [
-            // Indian Languages
-            { code: "en-IN", name: "English (India)" }, 
-            { code: "hi-IN", name: "Hindi (हिंदी)" },
-            { code: "mr-IN", name: "Marathi (मराठी)" }, 
-            { code: "gu-IN", name: "Gujarati (ગુજરાતી)" },
-            { code: "bn-IN", name: "Bengali (বাংলা)" }, 
-            { code: "ta-IN", name: "Tamil (தமிழ்)" },
-            { code: "te-IN", name: "Telugu (తెలుగు)" }, 
-            { code: "kn-IN", name: "Kannada (ಕನ್ನಡ)" },
-            { code: "ml-IN", name: "Malayalam (മലയാളം)" },
+    <div id="status-bar" class="fixed top-24 left-1/2 -translate-x-1/2 z-40 px-4 py-1.5 bg-purple-900/90 backdrop-blur text-white text-xs font-medium rounded-full hidden pointer-events-none border border-purple-500/30">
+        Listening...
+    </div>
+
+    <div class="z-50 shrink-0 w-full glass-footer">
+        <div class="px-4 pt-3 pb-3 flex items-center gap-3">
+             <div class="flex-grow h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                <div id="silence-progress" class="bg-gradient-to-r from-purple-500 to-pink-500 h-full w-0 transition-all duration-100 ease-linear"></div>
+             </div>
+             
+             <button id="manual-send-btn" disabled class="shrink-0 px-6 py-2 bg-slate-700 text-slate-500 text-xs font-bold uppercase rounded-lg transition-colors border border-slate-600 hover:bg-slate-600">
+                Send Now ↵
+             </button>
+        </div>
+
+        <footer class="px-4 pb-4 grid grid-cols-3 gap-3 items-center">
             
-            // International Languages
-            { code: "zh-CN", name: "Chinese (Mandarin/中文)" }, // Added
-            { code: "th-TH", name: "Thai (ไทย)" },              // Added
-            { code: "ja-JP", name: "Japanese (日本語)" },
-            { code: "ko-KR", name: "Korean (한국어)" },         // Added
-            { code: "id-ID", name: "Indonesian (Bahasa)" },     // Added
-            { code: "es-ES", name: "Spanish (Español)" },
-            { code: "fr-FR", name: "French (Français)" }, 
-            { code: "de-DE", name: "German (Deutsch)" },
-            { code: "ru-RU", name: "Russian (Pусский)" },
-            { code: "ar-SA", name: "Arabic (العربية)" },
-            { code: "it-IT", name: "Italian (Italiano)" },      // Added
-            { code: "pt-BR", name: "Portuguese (Português)" }   // Added
+            <button id="repeat-btn" class="col-span-1 h-12 rounded-xl bg-slate-700 text-slate-300 flex items-center justify-center hover:bg-slate-600 active:scale-95 transition-all border border-slate-600 disabled:opacity-50" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+            </button>
+
+            <button id="main-action-btn" class="col-span-1 h-12 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-900/50 flex items-center justify-center font-bold text-sm active:scale-95 transition-all transform hover:brightness-110">
+                <span id="btn-text">Start</span>
+            </button>
+
+            <button id="share-btn" class="col-span-1 h-12 rounded-xl bg-slate-700 text-slate-300 flex items-center justify-center hover:bg-slate-600 active:scale-95 transition-all border border-slate-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+            </button>
+        </footer>
+    </div>
+
+    <script>
+        // --- SCREEN WAKE LOCK (Keep screen on) ---
+        let wakeLock = null;
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('Screen Wake Lock active');
+                    wakeLock.addEventListener('release', () => {
+                        console.log('Wake Lock released');
+                    });
+                }
+            } catch (err) {
+                console.error(`Wake Lock Error: ${err.name}, ${err.message}`);
+            }
+        }
+        // Re-acquire lock when page becomes visible again
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+                await requestWakeLock();
+            }
+        });
+        // Request on load
+        window.onload = requestWakeLock;
+
+
+        // --- CONFIG ---
+        const LANGUAGES = [
+            { code: 'en-IN', name: 'English (IN)' },
+            { code: 'hi-IN', name: 'Hindi (हिंदी)' },
+            { code: 'mr-IN', name: 'Marathi (मराठी)' },
+            { code: 'gu-IN', name: 'Gujarati' },
+            { code: 'ta-IN', name: 'Tamil' },
+            { code: 'te-IN', name: 'Telugu' },
+            { code: 'bn-IN', name: 'Bengali' },
+            { code: 'kn-IN', name: 'Kannada' },
+            { code: 'ml-IN', name: 'Malayalam' },
+            { code: 'en-US', name: 'English (US)' },
+            { code: 'es-ES', name: 'Spanish' },
+            { code: 'fr-FR', name: 'French' },
+            { code: 'de-DE', name: 'German' },
+            { code: 'ja-JP', name: 'Japanese' },
+            { code: 'zh-CN', name: 'Chinese' },
+            { code: 'ru-RU', name: 'Russian' },
+            { code: 'ar-SA', name: 'Arabic' }
         ];
 
-        // --- GLOBAL VARIABLES ---
+        let USER_EMAIL = ""; 
+        let lastTranslatedText = "";
+        let lastTranslatedLang = "";
+
+        // --- ELEMENTS ---
+        const mainBtn = document.getElementById('main-action-btn');
+        const btnText = document.getElementById('btn-text');
+        const manualSendBtn = document.getElementById('manual-send-btn');
+        const repeatBtn = document.getElementById('repeat-btn');
+        const shareBtn = document.getElementById('share-btn');
+        const chatContainer = document.getElementById('chat-container');
+        const introMsg = document.getElementById('intro-msg');
+        const statusBar = document.getElementById('status-bar');
+        const silenceProgress = document.getElementById('silence-progress');
+        const langU1Select = document.getElementById('lang-u1');
+        const langU2Select = document.getElementById('lang-u2');
+        const apiPanel = document.getElementById('api-panel');
+        const apiSettingsBtn = document.getElementById('api-settings-btn');
+        const userEmailInput = document.getElementById('user-email-input');
+        const saveApiBtn = document.getElementById('save-api-btn');
+
+        // --- STATE ---
+        let state = 'IDLE'; 
         let recognition;
-        let isConversationActive = false;
-        let activeTurn = 0; // 0=None, 1=User1, 2=User2
-        let silenceTimer = null;
-        let countdownInterval = null;
-        let currentTranscript = "";
-        let lastSpokenText = ""; // For Repeat
-        let lastSpokenLang = "";
         let synth = window.speechSynthesis;
-        let voices = [];
+        let finalTranscript = '';
+        let silenceTimer = null;
+        let silenceInterval = null;
+        const SILENCE_TIMEOUT_MS = 5000;
+        let silenceTimeElapsed = 0;
+        let isProcessing = false;
 
-        // --- DOM REFERENCES ---
-        const els = {
-            startBtn: document.getElementById('start-btn'), stopBtn: document.getElementById('stop-btn'),
-            shareBtn: document.getElementById('share-btn'), repeatBtn: document.getElementById('repeat-btn'),
-            chat: document.getElementById('chat-container'), welcome: document.getElementById('welcome-msg'),
-            status: document.getElementById('global-status'),
-            u1: {
-                panel: document.getElementById('panel-u1'), lang: document.getElementById('lang-u1'),
-                status: document.getElementById('status-u1'), mic: document.getElementById('mic-icon-u1'),
-                timer: document.getElementById('timer-u1'), btn: document.getElementById('manual-send-u1')
-            },
-            u2: {
-                panel: document.getElementById('panel-u2'), lang: document.getElementById('lang-u2'),
-                status: document.getElementById('status-u2'), mic: document.getElementById('mic-icon-u2'),
-                timer: document.getElementById('timer-u2'), btn: document.getElementById('manual-send-u2')
-            }
-        };
-
-        // --- INITIALIZATION ---
-        window.onload = () => {
-            // Load Languages
-            languages.forEach(l => {
-                els.u1.lang.add(new Option(l.name, l.code));
-                els.u2.lang.add(new Option(l.name, l.code));
+        // --- INIT ---
+        function init() {
+            LANGUAGES.forEach(l => {
+                langU1Select.add(new Option(l.name, l.code));
+                langU2Select.add(new Option(l.name, l.code));
             });
-            els.u1.lang.value = "en-IN"; els.u2.lang.value = "zh-CN"; // Default to English & Chinese
+            langU1Select.value = 'en-IN';
+            langU2Select.value = 'hi-IN';
 
-            // Load Voices
-            const loadVoices = () => { voices = synth.getVoices(); };
-            if (speechSynthesis.onvoiceschanged !== undefined) { speechSynthesis.onvoiceschanged = loadVoices; }
-            loadVoices();
-
-            // Setup Speech Rec
-            if (!('webkitSpeechRecognition' in window)) {
-                alert("Speech Recognition not supported. Use Chrome.");
-                els.startBtn.disabled = true;
-            } else {
-                setupRecognition();
+            const savedEmail = localStorage.getItem('dhwani_email');
+            if(savedEmail) {
+                USER_EMAIL = savedEmail;
+                userEmailInput.value = savedEmail;
             }
-        };
+        }
 
+        // --- RECOGNITION SETUP ---
         function setupRecognition() {
-            const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-            recognition = new SpeechRec();
-            recognition.continuous = true; // Key for "Talk as long as you want"
-            recognition.interimResults = true;
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) return null;
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const rec = new SpeechRecognition();
+            
+            rec.continuous = false; // Manual loop fix
+            rec.interimResults = true;
 
-            recognition.onstart = () => {
-                if (!isConversationActive) return;
-                const u = activeTurn === 1 ? els.u1 : els.u2;
-                u.status.textContent = "LISTENING...";
-                u.mic.classList.add('mic-listening');
-                startSilenceTimer(); // Start 5s countdown immediately
-            };
-
-            recognition.onend = () => {
-                // If conversation is on, but mic stopped (maybe silence or manual stop)
-                // If we have text, process it. If not, and still active, restart mic.
-                if (isConversationActive && activeTurn !== 0) {
-                    if (currentTranscript.trim()) {
-                        processTranslation();
-                    } else {
-                        // Restart if silence without text (keep loop alive)
-                        try { recognition.start(); } catch(e){} 
-                    }
+            rec.onstart = () => {
+                if(state.includes('LISTENING')) {
+                    updateStatus(state === 'LISTENING_U1' ? "User 1 Listening..." : "User 2 Listening...");
+                    startSilenceTimer();
+                    requestWakeLock(); // Ensure screen stays on
                 }
             };
 
-            recognition.onresult = (event) => {
-                let final = "";
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) final += event.results[i][0].transcript;
-                }
-                
-                if (final) {
-                    currentTranscript += final;
-                    startSilenceTimer(); // Reset timer because user spoke
-                    const u = activeTurn === 1 ? els.u1 : els.u2;
-                    u.status.textContent = "Hearing...";
-                }
-            };
-            
-            recognition.onerror = (e) => {
-                if(e.error === 'not-allowed') toggleStop();
-            };
-        }
+            rec.onresult = (event) => {
+                const result = event.results[event.results.length - 1];
+                const transcript = result[0].transcript;
 
-        // --- FLOW CONTROLLER ---
-        els.startBtn.onclick = () => {
-            isConversationActive = true;
-            els.startBtn.classList.add('hidden');
-            els.stopBtn.classList.remove('hidden');
-            els.welcome.style.display = 'none';
-            els.status.textContent = "CONVERSATION STARTED";
-            activateUser(1); // Start with User 1
-        };
-
-        els.stopBtn.onclick = toggleStop;
-
-        function toggleStop() {
-            isConversationActive = false;
-            activeTurn = 0;
-            if(recognition) recognition.stop();
-            if(synth) synth.cancel();
-            clearTimers();
-            resetUI();
-            els.startBtn.classList.remove('hidden');
-            els.stopBtn.classList.add('hidden');
-            els.status.textContent = "CONVERSATION ENDED";
-        }
-
-        function activateUser(userNum) {
-            if (!isConversationActive) return;
-            activeTurn = userNum;
-            currentTranscript = "";
-            
-            // UI Update
-            const active = userNum === 1 ? els.u1 : els.u2;
-            const inactive = userNum === 1 ? els.u2 : els.u1;
-            
-            active.panel.classList.remove('inactive-turn');
-            active.panel.classList.add('active-turn');
-            active.btn.classList.remove('hidden'); // Show manual done button
-            active.timer.classList.remove('hidden');
-            
-            inactive.panel.classList.add('inactive-turn');
-            inactive.panel.classList.remove('active-turn');
-            inactive.btn.classList.add('hidden');
-            inactive.timer.classList.add('hidden');
-            inactive.mic.classList.remove('mic-listening');
-            inactive.status.textContent = "WAITING";
-
-            // Start Mic
-            recognition.lang = active.lang.value;
-            try { recognition.start(); } catch(e) {}
-        }
-
-        // --- SILENCE DETECTION (5 Seconds) ---
-        function startSilenceTimer() {
-            clearTimers();
-            let timeLeft = 5;
-            updateTimerUI(timeLeft);
-
-            countdownInterval = setInterval(() => {
-                timeLeft--;
-                updateTimerUI(timeLeft);
-                if (timeLeft <= 0) clearInterval(countdownInterval);
-            }, 1000);
-
-            silenceTimer = setTimeout(() => {
-                // Pause Limit Reached -> Process
-                if(recognition) recognition.stop(); // This triggers onend -> processTranslation
-            }, 5000);
-        }
-
-        function updateTimerUI(sec) {
-            if (activeTurn === 1) els.u1.timer.textContent = `Auto-send: ${sec}s`;
-            if (activeTurn === 2) els.u2.timer.textContent = `Auto-send: ${sec}s`;
-        }
-
-        function clearTimers() {
-            clearTimeout(silenceTimer);
-            clearInterval(countdownInterval);
-        }
-
-        // Manual Trigger
-        els.u1.btn.onclick = () => { if(recognition) recognition.stop(); };
-        els.u2.btn.onclick = () => { if(recognition) recognition.stop(); };
-
-        // --- TRANSLATION CORE ---
-        async function processTranslation() {
-            if (!isConversationActive || !currentTranscript.trim()) return;
-            
-            clearTimers();
-            const srcUser = activeTurn;
-            const targetUser = srcUser === 1 ? 2 : 1;
-            const text = currentTranscript;
-
-            // Lock UI during processing
-            activeTurn = 0; 
-            resetUI(); 
-            els.chat.classList.add('speaking-now');
-            els.status.textContent = `TRANSLATING USER ${srcUser}...`;
-
-            // MyMemory API
-            const sLang = srcUser === 1 ? els.u1.lang.value : els.u2.lang.value;
-            const tLang = targetUser === 1 ? els.u1.lang.value : els.u2.lang.value;
-            const pair = `${sLang}|${tLang}`;
-
-            try {
-                const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${pair}`);
-                const data = await res.json();
-                
-                if (data.responseData) {
-                    const transText = data.responseData.translatedText;
-                    
-                    // Show in Console (Left/Right)
-                    addChatBubble(srcUser, text, transText);
-                    
-                    // TTS - Critical: Wait for completion before next turn
-                    await speakText(transText, tLang);
-                    
-                    // Loop continues
-                    if (isConversationActive) {
-                        els.chat.classList.remove('speaking-now');
-                        activateUser(targetUser);
-                    }
+                if (result.isFinal) {
+                    finalTranscript += transcript + " ";
+                    updateStatus("Heard: " + transcript.slice(-15) + "...");
+                    resetSilenceTimer();
                 } else {
-                    throw new Error("API Limit/Error");
+                    updateStatus("Hearing: " + transcript.slice(-15) + "...");
+                    resetSilenceTimer();
                 }
-            } catch (e) {
-                console.error(e);
-                addChatBubble(srcUser, text, "Translation Error", true);
-                if (isConversationActive) activateUser(targetUser); // Skip turn on error
-            }
+            };
+
+            rec.onend = () => {
+                if (state.includes('LISTENING') && !isProcessing) {
+                    try { rec.start(); } 
+                    catch(e) { setTimeout(() => { if(state.includes('LISTENING')) rec.start(); }, 100); }
+                }
+            };
+
+            rec.onerror = (e) => {
+                if (e.error === 'not-allowed') { stopAll(); alert("Microphone blocked."); }
+            };
+            return rec;
         }
+        
+        recognition = setupRecognition();
 
-        // --- TTS ENGINE ---
-        function speakText(text, lang) {
-            return new Promise((resolve) => {
-                if (!text) { resolve(); return; }
-                if (synth.speaking) synth.cancel();
+        // --- CONTROLLER ---
+        mainBtn.addEventListener('click', toggleConversation);
+        manualSendBtn.addEventListener('click', () => { 
+            if(state.includes('LISTENING')) finishTurn(); 
+        });
+        
+        repeatBtn.addEventListener('click', () => {
+            if(lastTranslatedText && lastTranslatedLang) speak(lastTranslatedText, lastTranslatedLang, () => {});
+        });
 
-                // Store for repeat button
-                lastSpokenText = text;
-                lastSpokenLang = lang;
-                els.repeatBtn.disabled = false;
-
-                const utt = new SpeechSynthesisUtterance(text);
-                utt.lang = lang;
-                utt.rate = 0.9; // Slower speed request
-
-                // Better Voice Matching for Android/Chrome
-                if (voices.length === 0) voices = synth.getVoices();
-                
-                // Enhanced voice matching logic
-                // 1. Exact match (e.g., 'zh-CN')
-                let v = voices.find(v => v.lang === lang);
-                // 2. Base language match (e.g., 'zh' for 'zh-CN')
-                if (!v) v = voices.find(v => v.lang.startsWith(lang.split('-')[0]));
-                // 3. Prefer Google voices if available (usually higher quality on Android/Chrome)
-                let googleVoice = voices.find(v => v.lang === lang && v.name.includes("Google"));
-                if (googleVoice) v = googleVoice;
-
-                if (v) utt.voice = v;
-
-                utt.onend = () => { resolve(); };
-                utt.onerror = () => { resolve(); }; // Proceed even if TTS fails
-
-                // Android Chrome Resume Hack (Keeps TTS alive for long text)
-                const resumeHack = setInterval(() => {
-                    if (!synth.speaking) clearInterval(resumeHack);
-                    else { synth.pause(); synth.resume(); }
-                }, 14000);
-
-                synth.speak(utt);
+        shareBtn.addEventListener('click', async () => {
+            let fullText = "--- Dhwani Dark Chat ---\n\n";
+            chatContainer.querySelectorAll('.chat-bubble-u1, .chat-bubble-u2').forEach(b => {
+                const user = b.classList.contains('chat-bubble-u1') ? "User 1" : "User 2";
+                const original = b.querySelector('.font-medium').innerText;
+                const translated = b.querySelector('.translation-text').innerText;
+                fullText += `${user}: ${original}\n[Trans]: ${translated}\n\n`;
             });
-        }
-
-        // --- UTILITIES ---
-        els.repeatBtn.onclick = () => {
-            if (lastSpokenText && !synth.speaking) {
-                const utt = new SpeechSynthesisUtterance(lastSpokenText);
-                utt.lang = lastSpokenLang;
-                utt.rate = 0.9;
-                synth.speak(utt);
+            if (navigator.share) {
+                try { await navigator.share({ title: 'Dhwani Chat', text: fullText }); } catch (err) {}
+            } else {
+                navigator.clipboard.writeText(fullText);
+                updateStatus("Copied to Clipboard!", true);
             }
-        };
+        });
 
-        els.shareBtn.onclick = async () => {
-            const text = Array.from(document.querySelectorAll('#chat-container div'))
-                .map(d => d.innerText).join('\n');
+        function toggleConversation() {
+            if (state === 'IDLE') {
+                if(synth.speaking) synth.cancel();
+                introMsg.classList.add('hidden');
+                chatContainer.innerHTML = '<div class="h-4"></div>'; 
+                startTurn('U1');
+                updateUIState('STARTED');
+                requestWakeLock(); // Active lock
+            } else {
+                stopAll();
+            }
+        }
+
+        function stopAll() {
+            state = 'IDLE';
+            isProcessing = false;
+            if (recognition) recognition.stop();
+            if (synth) synth.cancel();
+            stopSilenceTimer();
+            updateUIState('STOPPED');
+            updateStatus("Session Ended", true);
+        }
+
+        function startTurn(user) {
+            state = user === 'U1' ? 'LISTENING_U1' : 'LISTENING_U2';
+            finalTranscript = ''; 
+            isProcessing = false;
+            
+            const langCode = user === 'U1' ? langU1Select.value : langU2Select.value;
+            recognition.lang = langCode;
+
+            try { recognition.start(); } catch (e) {}
+            
+            highlightUser(user);
+            updateStatus(user === 'U1' ? "User 1 Speaking..." : "User 2 Speaking...", false, true);
+        }
+
+        function finishTurn() {
+            isProcessing = true; 
+            if (recognition) recognition.stop();
+            stopSilenceTimer();
+
+            if (!finalTranscript.trim()) {
+                updateStatus("No speech detected", true);
+                setTimeout(() => startTurn(state === 'LISTENING_U1' ? 'U1' : 'U2'), 1000);
+                return;
+            }
+            processTranslation(finalTranscript);
+        }
+
+        async function processTranslation(text) {
+            const currentUser = state === 'LISTENING_U1' ? 'U1' : 'U2';
+            state = 'PROCESSING';
+            updateStatus("Translating...", false, true);
+            manualSendBtn.disabled = true;
+
+            addMessage(currentUser, text, "...");
+
+            const sCode = currentUser === 'U1' ? langU1Select.value : langU2Select.value;
+            const tCode = currentUser === 'U1' ? langU2Select.value : langU1Select.value;
+
             try {
-                await navigator.clipboard.writeText(text);
-                alert("Chat copied to clipboard!");
-            } catch (err) { alert("Could not copy."); }
+                const transText = await fetchMyMemory(text, sCode, tCode);
+                updateLastMessage(transText);
+                
+                lastTranslatedText = transText;
+                lastTranslatedLang = tCode;
+                repeatBtn.disabled = false;
+
+                speak(transText, tCode, () => {
+                    const nextUser = currentUser === 'U1' ? 'U2' : 'U1';
+                    setTimeout(() => startTurn(nextUser), 500);
+                });
+            } catch (err) {
+                updateLastMessage("[Error] " + err.message);
+                setTimeout(() => startTurn(currentUser === 'U1' ? 'U2' : 'U1'), 2000);
+            }
+        }
+
+        // --- API & TTS ---
+        async function fetchMyMemory(text, s, t) {
+            const pair = `${s}|${t}`;
+            let url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${pair}`;
+            if (USER_EMAIL) url += `&de=${USER_EMAIL}`;
+            
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data.responseStatus === 200 || data.responseStatus === '200') return data.responseData.translatedText;
+            throw new Error(data.responseDetails || "Trans Error");
+        }
+
+        function speak(text, lang, cb) {
+            state = 'SPEAKING';
+            updateStatus("Speaking...");
+            const ut = new SpeechSynthesisUtterance(text);
+            ut.lang = lang;
+            ut.rate = 0.9;
+            const v = synth.getVoices().find(v => v.lang === lang) || 
+                      synth.getVoices().find(v => v.lang.startsWith(lang.split('-')[0]));
+            if(v) ut.voice = v;
+            ut.onend = cb;
+            ut.onerror = cb;
+            synth.speak(ut);
+        }
+
+        // --- UI UPDATERS ---
+        function addMessage(user, text, trans) {
+            const isU1 = user === 'U1';
+            const div = document.createElement('div');
+            div.className = `flex flex-col max-w-[85%] ${isU1 ? 'mr-auto items-start' : 'ml-auto items-end'} animate-fade-in-up`;
+            div.innerHTML = `
+                <div class="p-3 shadow-sm relative ${isU1 ? 'chat-bubble-u1' : 'chat-bubble-u2'}">
+                    <div class="font-medium text-[15px] leading-snug">${text}</div>
+                    <div class="translation-text text-sm opacity-90 italic mt-1 pt-1 border-t border-white/20">${trans}</div>
+                </div>
+                <span class="text-[10px] text-slate-500 mt-1 px-1 font-bold tracking-wide">${isU1 ? 'USER 1' : 'USER 2'}</span>
+            `;
+            chatContainer.insertBefore(div, chatContainer.lastElementChild);
+            window.lastTransNode = div.querySelector('.translation-text');
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function updateLastMessage(text) {
+            if (window.lastTransNode) window.lastTransNode.innerText = text;
+        }
+
+        function startSilenceTimer() {
+            silenceTimeElapsed = 0;
+            silenceProgress.style.width = '0%';
+            manualSendBtn.disabled = false;
+            manualSendBtn.classList.remove('text-slate-500', 'bg-slate-700');
+            manualSendBtn.classList.add('text-purple-300', 'bg-slate-600', 'border-purple-500'); // Active style
+            manualSendBtn.innerHTML = "Send Now";
+
+            clearInterval(silenceInterval);
+            silenceInterval = setInterval(() => {
+                silenceTimeElapsed += 100;
+                silenceProgress.style.width = (silenceTimeElapsed / SILENCE_TIMEOUT_MS * 100) + '%';
+                if (silenceTimeElapsed >= SILENCE_TIMEOUT_MS) finishTurn();
+            }, 100);
+        }
+
+        function resetSilenceTimer() {
+            silenceTimeElapsed = 0;
+            silenceProgress.style.width = '0%';
+        }
+
+        function stopSilenceTimer() {
+            clearInterval(silenceInterval);
+            silenceProgress.style.width = '0%';
+            manualSendBtn.disabled = true;
+            manualSendBtn.classList.add('text-slate-500', 'bg-slate-700');
+            manualSendBtn.classList.remove('text-purple-300', 'bg-slate-600', 'border-purple-500');
+        }
+
+        function updateStatus(msg, hide = false, pulse = false) {
+            statusBar.innerText = msg;
+            statusBar.classList.remove('hidden');
+            if(hide) setTimeout(() => statusBar.classList.add('hidden'), 2000);
+        }
+
+        function highlightUser(user) {
+            if(user === 'U1') {
+                langU1Select.parentElement.classList.add('pulse-ring');
+                langU2Select.parentElement.classList.remove('pulse-ring');
+            } else {
+                langU1Select.parentElement.classList.remove('pulse-ring');
+                langU2Select.parentElement.classList.add('pulse-ring');
+            }
+        }
+
+        function updateUIState(s) {
+            if(s === 'STARTED') {
+                mainBtn.classList.remove('from-purple-600', 'to-pink-600');
+                mainBtn.classList.add('bg-slate-700');
+                btnText.innerText = "Stop";
+                repeatBtn.disabled = true;
+            } else {
+                mainBtn.classList.add('from-purple-600', 'to-pink-600');
+                mainBtn.classList.remove('bg-slate-700');
+                btnText.innerText = "Start";
+                langU1Select.parentElement.classList.remove('pulse-ring');
+                langU2Select.parentElement.classList.remove('pulse-ring');
+            }
+        }
+
+        apiSettingsBtn.onclick = () => apiPanel.classList.toggle('hidden');
+        saveApiBtn.onclick = () => {
+            const val = userEmailInput.value.trim();
+            if(val) {
+                USER_EMAIL = val;
+                localStorage.setItem('dhwani_email', val);
+                alert("Email Saved!");
+            }
+            apiPanel.classList.add('hidden');
         };
 
-        function resetUI() {
-            els.u1.panel.classList.remove('active-turn', 'inactive-turn');
-            els.u2.panel.classList.remove('active-turn', 'inactive-turn');
-            els.u1.mic.classList.remove('mic-listening');
-            els.u2.mic.classList.remove('mic-listening');
-            els.u1.btn.classList.add('hidden'); els.u2.btn.classList.add('hidden');
-            els.u1.timer.classList.add('hidden'); els.u2.timer.classList.add('hidden');
-            els.u1.status.textContent = "IDLE"; els.u2.status.textContent = "IDLE";
-        }
-
-        function addChatBubble(user, original, translated, isErr=false) {
-            const d = document.createElement('div');
-            const align = user === 1 ? 'self-start text-left' : 'self-end text-right';
-            // User 1 = Indigo, User 2 = Emerald
-            let bg = user === 1 ? 'bg-indigo-900/80 border-indigo-700' : 'bg-emerald-900/80 border-emerald-700';
-            if (isErr) bg = 'bg-red-900/80 border-red-700';
-
-            d.className = `max-w-[85%] ${align} p-4 rounded-xl border ${bg} mb-3 shadow-lg msg-enter`;
-            d.innerHTML = `
-                <div class="text-[10px] uppercase text-gray-400 font-bold mb-1">User ${user}</div>
-                <div class="text-gray-300 text-sm italic mb-2">"${original}"</div>
-                <div class="text-white text-lg font-medium">${translated}</div>
-            `;
-            els.chat.appendChild(d);
-            els.chat.scrollTop = els.chat.scrollHeight;
-        }
+        init();
     </script>
 </body>
 </html>
