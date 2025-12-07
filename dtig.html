@@ -1,341 +1,351 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dhwani - Smart AI Translator</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
-    
-    <style>
-        body { font-family: 'Outfit', sans-serif; background-color: #0f172a; color: #e2e8f0; }
-        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); transition: all 0.3s ease; }
-        
-        .active-turn { border-color: #facc15 !important; box-shadow: 0 0 20px rgba(250, 204, 21, 0.2); transform: scale(1.01); opacity: 1 !important; }
-        .inactive-turn { opacity: 0.5; filter: grayscale(0.6); pointer-events: none; }
-        
-        .mic-listening { animation: pulse-red 1.5s infinite; background-color: #ef4444 !important; color: white !important; border-color: #ef4444 !important; }
-        .speaking-now { border-color: #8b5cf6 !important; box-shadow: 0 0 30px rgba(139, 92, 246, 0.5); }
-        
-        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
-        @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .msg-enter { animation: slideIn 0.3s ease-out forwards; }
-        
-        select { background-color: #334155; color: white; border: 1px solid #475569; padding: 12px; border-radius: 8px; width: 100%; outline: none; }
-        
-        /* Live Transcript Styling */
-        .live-text { color: #fbbf24; font-style: italic; font-size: 0.9em; margin-top: 5px; min-height: 20px; }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Two-User Live STT + Translate (Android-safe)</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; margin: 18px; background:#f6f7fb; color:#111; }
+    .container { max-width:900px; margin:0 auto; }
+    h1 { margin-bottom: 8px; font-size:20px; }
+    .controls { display:flex; gap:8px; margin-bottom:12px; align-items:center; flex-wrap:wrap; }
+    button { padding:8px 12px; border-radius:6px; border:1px solid #ccc; background:white; cursor:pointer; }
+    button.primary { background:#0044cc; color:white; border-color:#0033aa; }
+    .users { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:8px; }
+    .card { background:white; padding:12px; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+    .label { font-weight:700; margin-bottom:6px; }
+    .live { min-height:48px; border-radius:6px; padding:8px; background:#f2f6ff; }
+    .status { margin-top:6px; font-size:12px; color:#666; }
+    .translated { margin-top:8px; padding:8px; background:#fff3f0; border-radius:6px; min-height:40px; }
+    .small { font-size:13px; color:#555; }
+    select { padding:6px; border-radius:6px; }
+  </style>
 </head>
+<body>
+  <div class="container">
+    <h1>Two-User Live STT + Translate — Android-safe</h1>
 
-<body class="flex flex-col items-center min-h-screen p-2 md:p-6" oncontextmenu="return false;">
+    <div class="controls">
+      <div>
+        <label class="small">Active speaker:</label>
+        <button id="u1Btn" class="primary">User 1 (EN)</button>
+        <button id="u2Btn">User 2 (HI)</button>
+      </div>
 
-    <header class="w-full max-w-4xl flex justify-between items-center mb-4 p-4 glass-panel rounded-2xl shadow-lg shrink-0">
-        <div class="flex items-center gap-3">
-            <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400">
-                Dhwani <span class="text-xs text-green-400 font-mono border border-green-500/30 px-2 py-1 rounded">Smart AI Translator</span>
-            </h1>
-        </div>
-        <div>
-            <button id="start-btn" class="bg-green-600 hover:bg-green-500 text-white px-6 py-2 rounded-full font-bold shadow-lg transition transform hover:scale-105">START</button>
-            <button id="stop-btn" class="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-full font-bold shadow-lg transition hidden">END</button>
-        </div>
-    </header>
+      <div>
+        <label class="small">User 1 lang</label>
+        <select id="lang1">
+          <option value="en-US">English (en-US)</option>
+          <option value="mr-IN">Marathi (mr-IN)</option>
+        </select>
+      </div>
 
-    <main class="w-full max-w-4xl flex-grow flex flex-col gap-4 overflow-hidden h-full">
-        
-        <div id="chat-container" class="flex-grow bg-slate-900/50 rounded-2xl border border-slate-800 p-4 overflow-y-auto min-h-[300px] flex flex-col gap-3 shadow-inner relative">
-            <div id="welcome-msg" class="text-center text-slate-500 mt-10 text-sm">
-                <b>Android Optimized Mode</b><br>
-                1. Select Languages.<br>
-                2. Click START.<br>
-                3. Speak freely (No repetition).
-            </div>
-        </div>
+      <div>
+        <label class="small">User 2 lang</label>
+        <select id="lang2">
+          <option value="hi-IN">Hindi (hi-IN)</option>
+          <option value="en-US">English (en-US)</option>
+        </select>
+      </div>
 
-        <div class="flex justify-center gap-4 shrink-0">
-            <button id="repeat-btn" class="text-indigo-400 hover:text-white text-xs flex items-center gap-1 disabled:opacity-30" disabled>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg> Repeat
-            </button>
-            <button id="share-btn" class="text-emerald-400 hover:text-white text-xs flex items-center gap-1">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z" /></svg> Share
-            </button>
-        </div>
+      <div>
+        <button id="startBtn">Start</button>
+        <button id="stopBtn">Stop</button>
+      </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-1 shrink-0 pb-2">
-            
-            <div id="panel-u1" class="glass-panel p-4 rounded-xl border-t-4 border-indigo-500 flex flex-col gap-3 transition-all">
-                <div class="flex justify-between items-center mb-1">
-                    <span class="text-indigo-400 font-bold text-sm uppercase flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-indigo-500"></span> User 1</span>
-                    <div id="status-u1" class="text-xs font-mono text-gray-400 font-bold">READY</div>
-                </div>
-                <select id="lang-u1"></select>
-                <div id="live-u1" class="live-text"></div>
-                
-                <div class="relative flex items-center gap-4">
-                    <div id="mic-icon-u1" class="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center transition-all border border-slate-600 shadow-md">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-white"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" /></svg>
-                    </div>
-                    <div class="flex-grow flex flex-col justify-center h-12">
-                        <div id="timer-u1" class="hidden text-xs text-indigo-300 font-mono">Pause: <span id="countdown-u1">0</span>s</div>
-                        <button id="manual-send-u1" class="hidden bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-1 rounded w-fit mt-1">Finish</button>
-                    </div>
-                </div>
-            </div>
+      <div class="small" style="margin-left:auto">
+        <strong>Note:</strong> Use Chrome on Android. Allow microphone when prompted.
+      </div>
+    </div>
 
-            <div id="panel-u2" class="glass-panel p-4 rounded-xl border-t-4 border-emerald-500 flex flex-col gap-3 transition-all">
-                <div class="flex justify-between items-center mb-1">
-                    <span class="text-emerald-400 font-bold text-sm uppercase flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> User 2</span>
-                    <div id="status-u2" class="text-xs font-mono text-gray-400 font-bold">READY</div>
-                </div>
-                <select id="lang-u2"></select>
-                <div id="live-u2" class="live-text"></div>
+    <div class="users">
+      <div class="card">
+        <div class="label">USER 1</div>
+        <div id="u1Live" class="live">—</div>
+        <div id="u1Status" class="status">idle</div>
+        <div class="label" style="margin-top:8px;">USER 2 (TRANS)</div>
+        <div id="u1Trans" class="translated">—</div>
+      </div>
 
-                <div class="relative flex items-center gap-4">
-                    <div id="mic-icon-u2" class="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center transition-all border border-slate-600 shadow-md">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-white"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" /></svg>
-                    </div>
-                    <div class="flex-grow flex flex-col justify-center h-12">
-                        <div id="timer-u2" class="hidden text-xs text-emerald-300 font-mono">Pause: <span id="countdown-u2">0</span>s</div>
-                        <button id="manual-send-u2" class="hidden bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1 rounded w-fit mt-1">Finish</button>
-                    </div>
-                </div>
-            </div>
+      <div class="card">
+        <div class="label">USER 2</div>
+        <div id="u2Live" class="live">—</div>
+        <div id="u2Status" class="status">idle</div>
+        <div class="label" style="margin-top:8px;">USER 1 (TRANS)</div>
+        <div id="u2Trans" class="translated">—</div>
+      </div>
+    </div>
+  </div>
 
-        </div>
-        <div id="global-status" class="w-full text-center py-1 text-[10px] text-gray-500 font-mono uppercase tracking-widest">System Idle</div>
-    </main>
+  <script>
+  // ---------- Configuration ----------
+  const els = {
+    u1Btn: document.getElementById('u1Btn'),
+    u2Btn: document.getElementById('u2Btn'),
+    startBtn: document.getElementById('startBtn'),
+    stopBtn: document.getElementById('stopBtn'),
+    lang1: document.getElementById('lang1'),
+    lang2: document.getElementById('lang2'),
+    u1Live: document.getElementById('u1Live'),
+    u1Status: document.getElementById('u1Status'),
+    u1Trans: document.getElementById('u1Trans'),
+    u2Live: document.getElementById('u2Live'),
+    u2Status: document.getElementById('u2Status'),
+    u2Trans: document.getElementById('u2Trans')
+  };
 
-    <script>
-        // --- LANGUAGES ---
-        const languages = [
-            { code: "en-IN", name: "English (India)" }, { code: "hi-IN", name: "Hindi (हिंदी)" },
-            { code: "mr-IN", name: "Marathi (मराठी)" }, { code: "gu-IN", name: "Gujarati (ગુજરાતી)" },
-            { code: "bn-IN", name: "Bengali (বাংলা)" }, { code: "ta-IN", name: "Tamil (தமிழ்)" },
-            { code: "te-IN", name: "Telugu (తెలుగు)" }, { code: "kn-IN", name: "Kannada (ಕನ್ನಡ)" },
-            { code: "ml-IN", name: "Malayalam (മലയാളം)" }, { code: "es-ES", name: "Spanish (Español)" },
-            { code: "fr-FR", name: "French (Français)" }, { code: "de-DE", name: "German (Deutsch)" },
-            { code: "ja-JP", name: "Japanese (日本語)" }, { code: "ru-RU", name: "Russian (Pусский)" },
-            { code: "ar-SA", name: "Arabic (العربية)" }
-        ];
+  // ---------- State ----------
+  let activeTurn = 1; // 1 or 2
+  let recognition = null;
+  let finalTranscript = "";
+  let interimTranscript = "";
+  let silenceTimer = null;
 
-        // --- VARS ---
-        let recognition;
-        let isConversationActive = false, activeTurn = 0;
-        let silenceTimer = null, pauseSeconds = 0, pauseInterval = null;
-        
-        // **ANDROID FIX VARIABLES**
-        let finalTranscript = ""; // Stores ONLY committed final text
-        let interimTranscript = ""; // Stores fleeting interim text
-        
-        let lastSpokenText = "", lastSpokenLang = "";
-        let synth = window.speechSynthesis, voices = [];
+  // ---------- Turn UI ----------
+  function setActiveTurn(n) {
+    activeTurn = n;
+    if (n === 1) {
+      els.u1Btn.classList.add('primary');
+      els.u2Btn.classList.remove('primary');
+    } else {
+      els.u2Btn.classList.add('primary');
+      els.u1Btn.classList.remove('primary');
+    }
+    // clear display buffers for neatness when switching
+    finalTranscript = "";
+    interimTranscript = "";
+    updateDisplays();
+    updateStatus('idle');
+  }
 
-        // --- DOM ---
-        const els = {
-            startBtn: document.getElementById('start-btn'), stopBtn: document.getElementById('stop-btn'),
-            shareBtn: document.getElementById('share-btn'), repeatBtn: document.getElementById('repeat-btn'),
-            chat: document.getElementById('chat-container'), welcome: document.getElementById('welcome-msg'),
-            status: document.getElementById('global-status'),
-            u1: { panel: document.getElementById('panel-u1'), lang: document.getElementById('lang-u1'), status: document.getElementById('status-u1'), mic: document.getElementById('mic-icon-u1'), timer: document.getElementById('timer-u1'), countdown: document.getElementById('countdown-u1'), btn: document.getElementById('manual-send-u1'), live: document.getElementById('live-u1') },
-            u2: { panel: document.getElementById('panel-u2'), lang: document.getElementById('lang-u2'), status: document.getElementById('status-u2'), mic: document.getElementById('mic-icon-u2'), timer: document.getElementById('timer-u2'), countdown: document.getElementById('countdown-u2'), btn: document.getElementById('manual-send-u2'), live: document.getElementById('live-u2') }
-        };
+  els.u1Btn.onclick = () => setActiveTurn(1);
+  els.u2Btn.onclick = () => setActiveTurn(2);
 
-        // --- INIT ---
-        window.onload = () => {
-            languages.forEach(l => { els.u1.lang.add(new Option(l.name, l.code)); els.u2.lang.add(new Option(l.name, l.code)); });
-            els.u1.lang.value = "en-IN"; els.u2.lang.value = "hi-IN";
-            
-            const loadVoices = () => { voices = synth.getVoices(); };
-            if (speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = loadVoices;
-            loadVoices();
+  // ---------- Status / displays ----------
+  function updateDisplays() {
+    const text = (finalTranscript + interimTranscript).trim();
+    if (activeTurn === 1) {
+      els.u1Live.textContent = text || '—';
+    } else {
+      els.u2Live.textContent = text || '—';
+    }
+  }
+  function updateStatus(s) {
+    if (activeTurn === 1) {
+      els.u1Status.textContent = s;
+    } else {
+      els.u2Status.textContent = s;
+    }
+  }
 
-            if (!('webkitSpeechRecognition' in window)) { alert("Use Chrome."); els.startBtn.disabled = true; } 
-            else { setupRecognition(); }
-        };
+  // ---------- Silence watcher ----------
+  function resetSilenceWatcher() {
+    if (silenceTimer) clearTimeout(silenceTimer);
+    // when user is silent for 1500ms, consider the phrase finished and translate
+    silenceTimer = setTimeout(() => {
+      processCompletedUtterance();
+    }, 1500);
+  }
 
-        function setupRecognition() {
-            const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-            recognition = new SpeechRec();
-            recognition.continuous = true; 
-            recognition.interimResults = true;
+  // ---------- Process completed phrase ----------
+  async function processCompletedUtterance() {
+    if (!finalTranscript.trim() && !interimTranscript.trim()) return;
+    const text = (finalTranscript + interimTranscript).trim();
 
-            recognition.onstart = () => {
-                if (!isConversationActive) return;
-                const u = activeTurn === 1 ? els.u1 : els.u2;
-                u.status.textContent = "LISTENING...";
-                u.mic.classList.add('mic-listening');
-                startSilenceWatcher();
-            };
+    // show "final" quickly
+    if (activeTurn === 1) {
+      els.u1Live.textContent = text;
+      els.u1Status.textContent = "HEARD — translating...";
+    } else {
+      els.u2Live.textContent = text;
+      els.u2Status.textContent = "HEARD — translating...";
+    }
 
-            recognition.onend = () => {
-                if (isConversationActive && activeTurn !== 0) { try { recognition.start(); } catch(e){} }
-            };
+    // Get translation target languages
+    const fromLang = activeTurn === 1 ? els.lang1.value.split('-')[0] : els.lang2.value.split('-')[0];
+    const toLang = activeTurn === 1 ? els.lang2.value.split('-')[0] : els.lang1.value.split('-')[0];
 
-            // **ANDROID FIX LOGIC HERE**
-            recognition.onresult = (event) => {
-    resetSilenceWatcher();
+    // Translate using MyMemory (simple free endpoint)
+    try {
+      const translated = await translateText(text, fromLang, toLang);
+      if (activeTurn === 1) {
+        els.u1Trans.textContent = translated || '—';
+        els.u1Status.textContent = "TRANSLATED";
+      } else {
+        els.u2Trans.textContent = translated || '—';
+        els.u2Status.textContent = "TRANSLATED";
+      }
+    } catch (e) {
+      if (activeTurn === 1) {
+        els.u1Trans.textContent = "Translation error";
+        els.u1Status.textContent = "ERROR";
+      } else {
+        els.u2Trans.textContent = "Translation error";
+        els.u2Status.textContent = "ERROR";
+      }
+      console.error('translate error', e);
+    }
 
-    // 🔴 IMPORTANT: Rebuild from scratch every time
-    let tempFinal = "";
-    let tempInterim = "";
+    // Clear transcripts to avoid re-processing same text
+    finalTranscript = "";
+    interimTranscript = "";
+    updateDisplays();
+  }
 
-    for (let i = 0; i < event.results.length; ++i) {
+  // ---------- Translation function (MyMemory) ----------
+  // Note: free endpoint, limited usage. Consider using a paid translate API for production.
+  async function translateText(text, from, to) {
+    if (!text) return "";
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${from}|${to}`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('Network error');
+    const data = await resp.json();
+    // MyMemory returns translatedText in data.responseData.translatedText
+    let translated = data && data.responseData && data.responseData.translatedText ? data.responseData.translatedText : "";
+    // fallback: if there's a match in the matches array with better quality
+    if ((!translated || translated.trim() === "") && Array.isArray(data.matches)) {
+      const best = data.matches.find(m => m.id === 0) || data.matches[0];
+      translated = best ? best.translation : translated;
+    }
+    return translated;
+  }
+
+  // ---------- Build recognition (Android-friendly) ----------
+  function buildRecognition() {
+    // Check browser support
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('SpeechRecognition not supported in this browser. Use Chrome on Android/Desktop.');
+      return null;
+    }
+
+    const r = new SpeechRecognition();
+    r.interimResults = true;
+    r.continuous = true; // keep listening
+    r.maxAlternatives = 1;
+
+    // set initial language
+    r.lang = (activeTurn === 1 ? els.lang1.value : els.lang2.value) || 'en-US';
+
+    // Crucial fix: rebuild finalTranscript each time from event.results
+    r.onresult = (event) => {
+      resetSilenceWatcher();
+
+      // Rebuild transcripts from entire results array instead of appending.
+      let rebuiltFinal = "";
+      let interim = "";
+
+      for (let i = 0; i < event.results.length; ++i) {
         const res = event.results[i];
         if (res.isFinal) {
-            tempFinal += res[0].transcript + " ";
+          rebuiltFinal += res[0].transcript + " ";
         } else {
-            tempInterim += res[0].transcript;
+          interim += res[0].transcript;
         }
+      }
+
+      finalTranscript = rebuiltFinal.trim();
+      interimTranscript = interim.trim();
+
+      // Update UI
+      updateDisplays();
+      updateStatus('HEARING...');
+    };
+
+    r.onerror = (ev) => {
+      console.warn('recognition error', ev);
+      updateStatus('ERROR: ' + (ev.error || ev.type));
+      // If 'no-speech' or 'not-allowed' happen, stop recognition gracefully
+      if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
+        stopRecognition();
+      }
+    };
+
+    r.onend = () => {
+      // auto-restart unless explicitly stopped by user
+      // keep short delay to avoid tight restarts
+      if (recognition) {
+        // restart with current turn's language (helps Android keep correct lang)
+        setTimeout(() => {
+          try {
+            recognition.lang = (activeTurn === 1 ? els.lang1.value : els.lang2.value) || 'en-US';
+            recognition.start();
+          } catch (e) {
+            console.warn('restart failed', e);
+          }
+        }, 200);
+      } else {
+        updateStatus('stopped');
+      }
+    };
+
+    r.onstart = () => {
+      updateStatus('listening...');
+    };
+
+    return r;
+  }
+
+  // ---------- Control start / stop ----------
+  function startRecognition() {
+    if (recognition) return;
+    recognition = buildRecognition();
+    if (!recognition) return;
+    finalTranscript = "";
+    interimTranscript = "";
+    try {
+      recognition.start();
+    } catch (e) {
+      // some browsers will throw if start is called twice quickly
+      console.warn('start error', e);
     }
+  }
 
-    // ✅ Now finalTranscript is always the clean full text (no doubling)
-    finalTranscript = tempFinal;
-    interimTranscript = tempInterim;
-
-    const displayText = (finalTranscript + interimTranscript).trim();
-    const u = activeTurn === 1 ? els.u1 : els.u2;
-
-    if (displayText) {
-        // Just show last 50 characters in the yellow live line
-        u.live.textContent = displayText.slice(-50);
-        u.status.textContent = "HEARING...";
+  function stopRecognition() {
+    if (!recognition) return;
+    recognition.onresult = null;
+    recognition.onend = null;
+    recognition.onerror = null;
+    try {
+      recognition.stop();
+    } catch (e) {
+      console.warn('stop failed', e);
     }
-};
+    recognition = null;
+    if (silenceTimer) { clearTimeout(silenceTimer); silenceTimer = null; }
+    finalTranscript = "";
+    interimTranscript = "";
+    updateStatus('stopped');
+  }
 
-            
-            recognition.onerror = (e) => { if(e.error === 'not-allowed') toggleStop(); };
-        }
+  els.startBtn.onclick = () => {
+    setActiveTurn(activeTurn); // ensure UI updated
+    startRecognition();
+  };
+  els.stopBtn.onclick = () => {
+    stopRecognition();
+  };
 
-        function startSilenceWatcher() {
-            clearInterval(pauseInterval); pauseSeconds = 0; updateTimerUI(0);
-            pauseInterval = setInterval(() => {
-                pauseSeconds++; updateTimerUI(pauseSeconds);
-                if (pauseSeconds >= 5) {
-                    // Check if we have any text (Final OR Interim)
-                    const fullText = (finalTranscript + interimTranscript).trim();
-                    if (fullText.length > 0) processTurn();
-                    else pauseSeconds = 0;
-                }
-            }, 1000);
-        }
+  // when user changes language while running, update recognition.lang
+  els.lang1.onchange = els.lang2.onchange = () => {
+    if (recognition) {
+      try {
+        recognition.lang = (activeTurn === 1 ? els.lang1.value : els.lang2.value);
+      } catch (e) { /* ignore */ }
+    }
+  };
 
-        function resetSilenceWatcher() { pauseSeconds = 0; updateTimerUI(0); }
-        function stopSilenceWatcher() { clearInterval(pauseInterval); pauseSeconds = 0; els.u1.timer.classList.add('hidden'); els.u2.timer.classList.add('hidden'); }
-        function updateTimerUI(sec) {
-            const u = activeTurn === 1 ? els.u1 : els.u2;
-            u.timer.classList.remove('hidden'); u.countdown.textContent = sec;
-        }
+  // On page load, set defaults
+  setActiveTurn(1);
 
-        // --- FLOW ---
-        els.startBtn.onclick = () => { isConversationActive = true; els.startBtn.classList.add('hidden'); els.stopBtn.classList.remove('hidden'); els.welcome.style.display='none'; activateUser(1); };
-        els.stopBtn.onclick = toggleStop;
-        function toggleStop() { isConversationActive = false; activeTurn = 0; if(recognition) recognition.stop(); if(synth) synth.cancel(); stopSilenceWatcher(); resetUI(); els.startBtn.classList.remove('hidden'); els.stopBtn.classList.add('hidden'); els.status.textContent = "STOPPED"; }
+  // Optional: allow clicking the live area to force process (handy during tests)
+  els.u1Live.onclick = () => { if (activeTurn === 1) processCompletedUtterance(); };
+  els.u2Live.onclick = () => { if (activeTurn === 2) processCompletedUtterance(); };
 
-        function activateUser(num) {
-            if (!isConversationActive) return;
-            activeTurn = num; 
-            
-            // Clear Buffers for new turn
-            finalTranscript = "";
-            interimTranscript = "";
-            els.u1.live.textContent = "";
-            els.u2.live.textContent = "";
-
-            resetUIStyles();
-            const active = num === 1 ? els.u1 : els.u2;
-            const inactive = num === 1 ? els.u2 : els.u1;
-            
-            active.panel.classList.replace('inactive-turn', 'active-turn');
-            active.btn.classList.remove('hidden');
-            inactive.panel.classList.replace('active-turn', 'inactive-turn');
-            
-            els.status.textContent = `USER ${num} SPEAKING`;
-            recognition.lang = active.lang.value;
-            try { recognition.start(); } catch(e){}
-        }
-
-        els.u1.btn.onclick = () => processTurn(); els.u2.btn.onclick = () => processTurn();
-
-        async function processTurn() {
-            if (!isConversationActive) return;
-            stopSilenceWatcher(); if(recognition) recognition.stop();
-            
-            const src = activeTurn, tgt = src === 1 ? 2 : 1;
-            // combine final + interim one last time
-            const text = (finalTranscript + interimTranscript).trim();
-            
-            if (!text) { activateUser(src); return; }
-
-            activeTurn = 0; resetUIStyles();
-            els.status.textContent = "TRANSLATING..."; els.chat.classList.add('speaking-now');
-            addChatBubble(src, text, false);
-
-            const sLang = src === 1 ? els.u1.lang.value : els.u2.lang.value;
-            const tLang = tgt === 1 ? els.u1.lang.value : els.u2.lang.value;
-            const pair = `${sLang}|${tLang}`;
-
-            try {
-                const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${pair}`);
-                const data = await res.json();
-                if (data.responseData) {
-                    const trans = data.responseData.translatedText;
-                    addChatBubble(tgt, trans, true);
-                    await speakText(trans, tLang);
-                    if (isConversationActive) { els.chat.classList.remove('speaking-now'); activateUser(tgt); }
-                } else throw new Error("API Limit");
-            } catch (e) {
-                console.error(e);
-                addChatBubble(src, "Translation Failed", true, true);
-                if (isConversationActive) activateUser(tgt);
-            }
-        }
-
-        function speakText(text, lang) {
-            return new Promise((resolve) => {
-                if (!text) { resolve(); return; }
-                if (synth.speaking) synth.cancel();
-                lastSpokenText = text; lastSpokenLang = lang; els.repeatBtn.disabled = false;
-                
-                const utt = new SpeechSynthesisUtterance(text);
-                utt.lang = lang; utt.rate = 0.9;
-                
-                if(voices.length===0) voices = synth.getVoices();
-                let v = voices.find(v => v.lang === lang && v.name.includes("Google"));
-                if(!v) v = voices.find(v => v.lang === lang);
-                if(v) utt.voice = v;
-
-                utt.onend = resolve; utt.onerror = resolve;
-                synth.speak(utt);
-                
-                const wake = setInterval(() => {
-                    if (!synth.speaking) clearInterval(wake);
-                    else { synth.pause(); synth.resume(); }
-                }, 14000);
-            });
-        }
-
-        els.repeatBtn.onclick = () => { if(lastSpokenText) { const u = new SpeechSynthesisUtterance(lastSpokenText); u.lang = lastSpokenLang; u.rate = 0.9; synth.speak(u); } };
-        els.shareBtn.onclick = async () => { try { await navigator.clipboard.writeText(els.chat.innerText); alert("Copied!"); } catch(e){} };
-
-        function resetUIStyles() {
-            els.u1.panel.classList.remove('active-turn'); els.u2.panel.classList.remove('active-turn');
-            els.u1.panel.classList.add('inactive-turn'); els.u2.panel.classList.add('inactive-turn');
-            els.u1.btn.classList.add('hidden'); els.u2.btn.classList.add('hidden');
-            els.u1.mic.classList.remove('mic-listening'); els.u2.mic.classList.remove('mic-listening');
-            els.u1.status.textContent = "WAITING"; els.u2.status.textContent = "WAITING";
-        }
-        function resetUI() { resetUIStyles(); els.chat.classList.remove('speaking-now'); }
-
-        function addChatBubble(u, txt, isTrans, isErr=false) {
-            const d = document.createElement('div');
-            const align = u === 1 ? 'self-start text-left' : 'self-end text-right';
-            let bg = u === 1 ? 'bg-indigo-900/80 border-indigo-700' : 'bg-emerald-900/80 border-emerald-700';
-            if (isErr) bg = 'bg-red-900/80 border-red-700';
-            d.className = `max-w-[85%] ${align} p-3 rounded-xl border ${bg} mb-2 shadow-lg msg-enter`;
-            d.innerHTML = `<div class="text-[10px] uppercase text-gray-400 font-bold mb-1">User ${u} ${isTrans?'(Trans)':''}</div><div class="text-white text-lg">${txt}</div>`;
-            els.chat.appendChild(d); els.chat.scrollTop = els.chat.scrollHeight;
-        }
-    </script>
+  // Safety: before unload, stop recognition
+  window.addEventListener('beforeunload', () => {
+    stopRecognition();
+  });
+  </script>
 </body>
 </html>
