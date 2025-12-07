@@ -151,14 +151,30 @@
     <script>
         // --- CONFIGURATION ---
         const languages = [
-            { code: "en-IN", name: "English (India)" }, { code: "hi-IN", name: "Hindi (हिंदी)" },
-            { code: "mr-IN", name: "Marathi (मराठी)" }, { code: "gu-IN", name: "Gujarati (ગુજરાતી)" },
-            { code: "bn-IN", name: "Bengali (বাংলা)" }, { code: "ta-IN", name: "Tamil (தமிழ்)" },
-            { code: "te-IN", name: "Telugu (తెలుగు)" }, { code: "kn-IN", name: "Kannada (ಕನ್ನಡ)" },
-            { code: "ml-IN", name: "Malayalam (മലയാളം)" }, { code: "es-ES", name: "Spanish (Español)" },
-            { code: "fr-FR", name: "French (Français)" }, { code: "de-DE", name: "German (Deutsch)" },
-            { code: "ja-JP", name: "Japanese (日本語)" }, { code: "ru-RU", name: "Russian (Pусский)" },
-            { code: "ar-SA", name: "Arabic (العربية)" }
+            // Indian Languages
+            { code: "en-IN", name: "English (India)" }, 
+            { code: "hi-IN", name: "Hindi (हिंदी)" },
+            { code: "mr-IN", name: "Marathi (मराठी)" }, 
+            { code: "gu-IN", name: "Gujarati (ગુજરાતી)" },
+            { code: "bn-IN", name: "Bengali (বাংলা)" }, 
+            { code: "ta-IN", name: "Tamil (தமிழ்)" },
+            { code: "te-IN", name: "Telugu (తెలుగు)" }, 
+            { code: "kn-IN", name: "Kannada (ಕನ್ನಡ)" },
+            { code: "ml-IN", name: "Malayalam (മലയാളം)" },
+            
+            // International Languages
+            { code: "zh-CN", name: "Chinese (Mandarin/中文)" }, // Added
+            { code: "th-TH", name: "Thai (ไทย)" },              // Added
+            { code: "ja-JP", name: "Japanese (日本語)" },
+            { code: "ko-KR", name: "Korean (한국어)" },         // Added
+            { code: "id-ID", name: "Indonesian (Bahasa)" },     // Added
+            { code: "es-ES", name: "Spanish (Español)" },
+            { code: "fr-FR", name: "French (Français)" }, 
+            { code: "de-DE", name: "German (Deutsch)" },
+            { code: "ru-RU", name: "Russian (Pусский)" },
+            { code: "ar-SA", name: "Arabic (العربية)" },
+            { code: "it-IT", name: "Italian (Italiano)" },      // Added
+            { code: "pt-BR", name: "Portuguese (Português)" }   // Added
         ];
 
         // --- GLOBAL VARIABLES ---
@@ -198,7 +214,7 @@
                 els.u1.lang.add(new Option(l.name, l.code));
                 els.u2.lang.add(new Option(l.name, l.code));
             });
-            els.u1.lang.value = "en-IN"; els.u2.lang.value = "hi-IN";
+            els.u1.lang.value = "en-IN"; els.u2.lang.value = "zh-CN"; // Default to English & Chinese
 
             // Load Voices
             const loadVoices = () => { voices = synth.getVoices(); };
@@ -407,9 +423,16 @@
 
                 // Better Voice Matching for Android/Chrome
                 if (voices.length === 0) voices = synth.getVoices();
-                let v = voices.find(v => v.lang === lang && v.name.includes("Google")); // Prefer Google
-                if (!v) v = voices.find(v => v.lang === lang); // Fallback exact lang
-                if (!v) v = voices.find(v => v.lang.startsWith(lang.split('-')[0])); // Fallback generic lang
+                
+                // Enhanced voice matching logic
+                // 1. Exact match (e.g., 'zh-CN')
+                let v = voices.find(v => v.lang === lang);
+                // 2. Base language match (e.g., 'zh' for 'zh-CN')
+                if (!v) v = voices.find(v => v.lang.startsWith(lang.split('-')[0]));
+                // 3. Prefer Google voices if available (usually higher quality on Android/Chrome)
+                let googleVoice = voices.find(v => v.lang === lang && v.name.includes("Google"));
+                if (googleVoice) v = googleVoice;
+
                 if (v) utt.voice = v;
 
                 utt.onend = () => { resolve(); };
