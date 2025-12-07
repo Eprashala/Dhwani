@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>STT + Translate — Android dedupe</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; margin:18px; background:#fafbff; color:#111; }
+    .wrap { max-width:900px; margin:0 auto; }
+    .row { display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
+    button { padding:8px 12px; border-radius:6px; border:1px solid #bbb; background:#fff; cursor:pointer; }
+    button.primary { background:#1366d6; color:#fff; border-color:#0e54b0; }
+    .box { background:#fff; padding:12px; border-radius:8px; box-shadow:0 1px 6px rgba(0,0,0,0.06); }
+    .live { min-height:56px; padding:8px; border-radius:6px; background:#eef6ff; }
+    .translated { min-height:48px; padding:8px; border-radius:6px; background:#fff6f0; margin-top:8px; }
+    .small { font-size:13px; color:#444; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h2>Android-safe STT + Translate (dedupe)</h2>
+    <div class="row">
+      <button id="u1Btn" class="primary">User 1</button>
+      <button id="u2Btn">User 2</button>
+      <label class="small">U1 lang:
+        <select id="lang1"><option value="en-US">en-US</option><option value="mr-IN">mr-IN</option></select>
+      </label>
+      <label class="small">U2 lang:
+        <select id="lang2"><option value="hi-IN">hi-IN</option><option value="en-US">en-US</option></select>
+      </label>
+      <button id="startBtn">Start</button>
+      <button id="stopBtn">Stop</button>
+      <div style="margin-left:auto" class="small">Use Chrome on Android. Allow mic.</div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <div class="box">
+        <div class="small"><strong>USER 1</strong></div>
+        <div id="u1Live" class="live">—</div>
+        <div id="u1Status" class="small" style="margin-top:6px">idle</div>
+
+        <div style="margin-top:10px" class="small"><strong>USER 2 (TRANS)</strong></div>
+        <div id="u1Trans" class="translated">—</div>
+      </div>
+
+      <div class="box">
+        <div class="small"><strong>USER 2</strong></div>
+        <div id="u2Live" class="live">—</div>
+        <div id="u2Status" class="small" style="margin-top:6px">idle</div>
+
+        <div style="margin-top:10px" class="small"><strong>USER 1 (TRANS)</strong></div>
+        <div id="u2Trans" class="translated">—</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  // ---------- Elements ----------
+  const els = {
+    u1Btn: document.getElementById('u1Btn'),
+    u2Btn: document.getElementById('u2Btn'),
+    startBtn: document.getElementById('startBtn'),
+    stopBtn: document.getElementById('stopBtn'),
+    lang1: document.getElementById('lang1'),
+    lang2: document.getElementById('lang2'),
+    u1Live: document.getElementById('u1Live'),
+    u1Status: document.getElementById('u1Status'),
+    u1Trans: document.getElementById('u1Trans'),
+    u2Live: document.getElementById('u2Live'),
+    u2Status: document.getElementById('u2Status'),
+    u2Trans: document.getElementById('u2Trans')
+  };
+
+  // ---------- State ----------
+  let activeTurn = 1;
+  let recognition = null;
+  let finalTranscript = "";
+  let interimTranscript = "";
+  let silenceTimer = null;
+
+  // Dedupe helpers
+  let lastFinalSnapshot = "";  // last final transcript that was shown
+  let lastFinalCount = 0;      // number of final result entries processed last time
+
+  // ---------- Turn switching ----------
+  function setActiveTurn(n) {
+    activeTurn = n;
+    if (n === 1) {
+      els.u1Btn.classList.add('primary');
+      els.u2Btn.classList.remove('primary');
+    } else {
+      els.u2Btn.classList.add('primary');
+      els.u1Btn.classList.remove('primary');
+    }
+    finalTranscript = "";
+    interimTranscript = "";
+    lastFinalSnapshot = "";
+    lastFinalCount = 0;
+    updateDisplays();
+    updateStatus('idle');
+  }
+  els.u1Btn.onclick = () => setActiveTurn(1);
+  els.u2Btn.onclick = () => setActiveTurn(2);
+
+  function updateDisplays() {
+    const text = (finalTranscript + (interimTranscript ? ' ' + interimTranscript : '')).trim();
+    if (activeTurn === 1) els.u1Live.textContent = text || '—';
+    else els.u2Live.textContent = text || '—';
+  }
+  function updateStatus(s) {
+    if (activeTurn === 1) els.u1Status.textContent = s;
+    else els.u2Status.textContent = s;
+  }
+
+  // ---------- Silence watcher ----------
+  function resetSilenceWatcher() {
+    if (silenceTimer) clearTimeout(silenceTimer);
+    silenceTimer = setTimeout(() => {
+      processCompletedUtterance();
+    }, 1400);
+  }
+
+  // ---------- Process completed phrase ----------
+  async function processCompletedUtterance() {
+    const text = (finalTranscript + (interimTranscript ? ' ' + interimTranscript : '')).trim();
+    if (!text) return;
+
+    // Protect: if the same phrase already processed, skip
+    if (text === lastFinalSnapshot) {
+      // already processed — clear and return
+      finalTranscript = "";
+      interimTranscript = "";
+      lastFinalSnapshot = "";
+      lastFinalCount = 0;
+      updateDisplays();
+      updateStatus('idle');
+      return;
+    }
+
+    // Show in UI
+    if (activeTurn === 1) {
+      els.u1Live.textContent = text;
+      els.u1Status.textContent = "HEARD — translating...";
+    } else {
+      els.u2Live.textContent = text;
+      els.u2Status.textContent = "HEARD — translating...";
+    }
+
+    // Translate (MyMemory free; replace with your API if desired)
+    try {
+      const from = activeTurn === 1 ? els.lang1.value.split('-')[0] : els.lang2.value.split('-')[0];
+      const to   = activeTurn === 1 ? els.lang2.value.split('-')[0] : els.lang1.value.split('-')[0];
+      const translation = await translateText(text, from, to);
+
+      if (activeTurn === 1) {
+        els.u1Trans.textContent = translation || '—';
+        els.u1Status.textContent = "TRANSLATED";
+      } else {
+        els.u2Trans.textContent = translation || '—';
+        els.u2Status.textContent = "TRANSLATED";
+      }
+    } catch (e) {
+      if (activeTurn === 1) {
+        els.u1Trans.textContent = "Translation error";
+        els.u1Status.textContent = "ERROR";
+      } else {
+        els.u2Trans.textContent = "Translation error";
+        els.u2Status.textContent = "ERROR";
+      }
+      console.error('translate error', e);
+    }
+
+    // Clear buffers and snapshots so next phrase is fresh
+    finalTranscript = "";
+    interimTranscript = "";
+    lastFinalSnapshot = "";
+    lastFinalCount = 0;
+    updateDisplays();
+  }
+
+  async function translateText(text, from, to) {
+    if (!text) return "";
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${from}|${to}`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('Network error');
+    const data = await resp.json();
+    let translated = data && data.responseData && data.responseData.translatedText ? data.responseData.translatedText : "";
+    if ((!translated || translated.trim() === "") && Array.isArray(data.matches) && data.matches.length) {
+      translated = data.matches[0].translation || translated;
+    }
+    return translated;
+  }
+
+  // ---------- Build recognition with robust dedupe ----------
+  function buildRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('SpeechRecognition not supported. Use Chrome on Android/Desktop.');
+      return null;
+    }
+    const r = new SpeechRecognition();
+    r.interimResults = true;
+    r.continuous = true;
+    r.maxAlternatives = 1;
+    r.lang = activeTurn === 1 ? els.lang1.value : els.lang2.value;
+
+    r.onstart = () => {
+      updateStatus('listening...');
+    };
+
+    r.onresult = (event) => {
+      resetSilenceWatcher();
+
+      // DEBUG: inspect event.results contents (uncomment to use)
+      // console.log('onresult fired, resultIndex=', event.resultIndex, 'results length=', event.results.length, event.results);
+
+      // Two-layer approach:
+      // 1) Try to process only the new results using event.resultIndex and lastFinalCount
+      // 2) Build a final string and dedupe against lastFinalSnapshot
+      let rebuiltFinalParts = [];
+      let interim = "";
+
+      // If event.resultIndex is present and looks sane, process from there.
+      // But Android sometimes uses 0 always, so we also check lastFinalCount and dedupe later.
+      const startIdx = (typeof event.resultIndex === 'number') ? event.resultIndex : 0;
+
+      for (let i = 0; i < event.results.length; ++i) {
+        const res = event.results[i];
+        if (res.isFinal) {
+          rebuiltFinalParts.push(res[0].transcript.trim());
+        } else {
+          interim += res[0].transcript.trim() + " ";
+        }
+      }
+
+      // join finals
+      const rebuiltFinal = rebuiltFinalParts.join(' ').trim();
+
+      // If rebuiltFinal equals the last snapshot, DO NOT update (dedupe).
+      if (rebuiltFinal && rebuiltFinal === lastFinalSnapshot) {
+        // update interim but don't duplicate final display
+        interimTranscript = interim.trim();
+        // keep finalTranscript empty to avoid re-showing
+        finalTranscript = lastFinalSnapshot;
+        updateDisplays();
+        updateStatus('HEARING...');
+        return;
+      }
+
+      // If rebuiltFinal is non-empty and different, accept it.
+      if (rebuiltFinal) {
+        finalTranscript = rebuiltFinal;
+        lastFinalSnapshot = rebuiltFinal;    // record for dedupe
+        lastFinalCount = rebuiltFinalParts.length;
+      } else {
+        // no final parts — clear finalTranscript but keep last snapshot unchanged
+        finalTranscript = "";
+      }
+
+      interimTranscript = interim.trim();
+      updateDisplays();
+      updateStatus('HEARING...');
+    };
+
+    r.onerror = (ev) => {
+      console.warn('recognition error', ev);
+      updateStatus('ERROR: ' + (ev.error || ev.type));
+      if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
+        stopRecognition();
+      }
+    };
+
+    r.onend = () => {
+      // If recognition is stopped by us, recognition is null and we will not restart.
+      if (!recognition) {
+        updateStatus('stopped');
+        return;
+      }
+
+      // Small delay then restart — keeps listening continuous but avoids tight loops
+      setTimeout(() => {
+        try {
+          r.lang = activeTurn === 1 ? els.lang1.value : els.lang2.value;
+          r.start();
+        } catch (e) {
+          console.warn('restart failed', e);
+          updateStatus('stopped');
+        }
+      }, 180);
+    };
+
+    return r;
+  }
+
+  // ---------- Start / Stop ----------
+  function startRecognition() {
+    if (recognition) return;
+    recognition = buildRecognition();
+    if (!recognition) return;
+    // reset state
+    finalTranscript = "";
+    interimTranscript = "";
+    lastFinalSnapshot = "";
+    lastFinalCount = 0;
+    try {
+      recognition.start();
+    } catch (e) {
+      console.warn('start error', e);
+    }
+  }
+
+  function stopRecognition() {
+    if (!recognition) return;
+    try {
+      recognition.stop();
+    } catch (e) {
+      console.warn('stop failed', e);
+    }
+    recognition = null;
+    if (silenceTimer) { clearTimeout(silenceTimer); silenceTimer = null; }
+    finalTranscript = "";
+    interimTranscript = "";
+    lastFinalSnapshot = "";
+    lastFinalCount = 0;
+    updateStatus('stopped');
+    updateDisplays();
+  }
+
+  els.startBtn.onclick = () => {
+    setActiveTurn(activeTurn);
+    startRecognition();
+  };
+  els.stopBtn.onclick = () => stopRecognition();
+
+  // Update recognition language on change
+  els.lang1.onchange = els.lang2.onchange = () => {
+    if (recognition) {
+      try { recognition.lang = activeTurn === 1 ? els.lang1.value : els.lang2.value; }
+      catch(e){ /* ignore */ }
+    }
+  };
+
+  // Click the live area to force process (handy for manual testing)
+  els.u1Live.onclick = () => { if (activeTurn === 1) processCompletedUtterance(); };
+  els.u2Live.onclick = () => { if (activeTurn === 2) processCompletedUtterance(); };
+
+  // default
+  setActiveTurn(1);
+
+  // cleanup
+  window.addEventListener('beforeunload', () => stopRecognition());
+  </script>
+</body>
+</html>
