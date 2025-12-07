@@ -1,0 +1,376 @@
+<script>
+    // --- CONFIGURATION ---
+    const languages = [
+        { code: "en-IN", name: "English (India)" }, 
+        { code: "hi-IN", name: "Hindi (हिंदी)" },
+        { code: "mr-IN", name: "Marathi (मराठी)" }, 
+        { code: "gu-IN", name: "Gujarati (ગુજરાતી)" },
+        { code: "bn-IN", name: "Bengali (বাংলা)" }, 
+        { code: "ta-IN", name: "Tamil (தமிழ்)" },
+        { code: "te-IN", name: "Telugu (తెలుగు)" }, 
+        { code: "kn-IN", name: "Kannada (ಕನ್ನಡ)" },
+        { code: "ml-IN", name: "Malayalam (മലയാളം)" },
+        { code: "zh-CN", name: "Chinese (Mandarin/中文)" },
+        { code: "ja-JP", name: "Japanese (日本語)" },
+        { code: "es-ES", name: "Spanish (Español)" },
+        { code: "fr-FR", name: "French (Français)" }, 
+        { code: "de-DE", name: "German (Deutsch)" },
+        { code: "ru-RU", name: "Russian (Pусский)" },
+        { code: "ar-SA", name: "Arabic (العربية)" }
+    ];
+
+    // --- GLOBAL VARIABLES ---
+    let recognition;
+    let isConversationActive = false;
+    let activeTurn = 0; // 0=None, 1=User1, 2=User2
+    let silenceTimer = null;
+    let countdownInterval = null;
+    let currentTranscript = "";
+    let lastSpokenText = "";
+    let lastSpokenLang = "";
+    let synth = window.speechSynthesis;
+    let voices = [];
+    let isRestarting = false; // Prevents race conditions on Android
+
+    // --- DOM REFERENCES ---
+    const els = {
+        startBtn: document.getElementById('start-btn'), stopBtn: document.getElementById('stop-btn'),
+        shareBtn: document.getElementById('share-btn'), repeatBtn: document.getElementById('repeat-btn'),
+        chat: document.getElementById('chat-container'), welcome: document.getElementById('welcome-msg'),
+        status: document.getElementById('global-status'),
+        u1: {
+            panel: document.getElementById('panel-u1'), lang: document.getElementById('lang-u1'),
+            status: document.getElementById('status-u1'), mic: document.getElementById('mic-icon-u1'),
+            timer: document.getElementById('timer-u1'), btn: document.getElementById('manual-send-u1')
+        },
+        u2: {
+            panel: document.getElementById('panel-u2'), lang: document.getElementById('lang-u2'),
+            status: document.getElementById('status-u2'), mic: document.getElementById('mic-icon-u2'),
+            timer: document.getElementById('timer-u2'), btn: document.getElementById('manual-send-u2')
+        }
+    };
+
+    // --- INITIALIZATION ---
+    window.onload = () => {
+        // Load Languages
+        languages.forEach(l => {
+            els.u1.lang.add(new Option(l.name, l.code));
+            els.u2.lang.add(new Option(l.name, l.code));
+        });
+        els.u1.lang.value = "en-IN"; els.u2.lang.value = "zh-CN";
+
+        // Load Voices
+        const loadVoices = () => { voices = synth.getVoices(); };
+        if (speechSynthesis.onvoiceschanged !== undefined) { speechSynthesis.onvoiceschanged = loadVoices; }
+        loadVoices();
+
+        // Check for HTTPS (Critical for Android)
+        if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+            alert("WARNING: Android requires HTTPS for microphone access. This may not work on HTTP.");
+        }
+
+        // Setup Speech Rec
+        if (!('webkitSpeechRecognition' in window)) {
+            alert("Speech Recognition not supported. Use Chrome.");
+            els.startBtn.disabled = true;
+        } else {
+            setupRecognition();
+        }
+    };
+
+    function setupRecognition() {
+        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRec();
+        // ANDROID FIX: continuous true is buggy, but we use it with aggressive restarts
+        recognition.continuous = true; 
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
+
+        recognition.onstart = () => {
+            isRestarting = false;
+            if (!isConversationActive) return;
+            const u = activeTurn === 1 ? els.u1 : els.u2;
+            u.status.textContent = "LISTENING...";
+            u.mic.classList.add('mic-listening');
+            startSilenceTimer(); 
+        };
+
+        recognition.onend = () => {
+            // ANDROID FIX: The mic died on its own. 
+            // If we are still in a conversation and haven't processed text, restart it.
+            if (isConversationActive && activeTurn !== 0 && !isRestarting) {
+                if (currentTranscript.trim()) {
+                    // We have text, so the silence timer will catch it and process it.
+                    // But if the user stopped speaking and the mic cut, we might want to process immediately?
+                    // For now, let's restart listening to catch more speech until timer runs out.
+                    restartMic();
+                } else {
+                    // No text, just silence/noise. Restart immediately.
+                    restartMic();
+                }
+            }
+        };
+
+        recognition.onresult = (event) => {
+            let final = "";
+            let interim = "";
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    final += event.results[i][0].transcript;
+                } else {
+                    interim += event.results[i][0].transcript;
+                }
+            }
+            
+            // ANDROID FIX: Android sometimes sends same text twice
+            if (final && !currentTranscript.includes(final)) {
+                currentTranscript += " " + final;
+                startSilenceTimer(); // Reset timer
+                const u = activeTurn === 1 ? els.u1 : els.u2;
+                u.status.textContent = "Captured: " + final.substring(0, 15) + "...";
+            }
+        };
+        
+        recognition.onerror = (e) => {
+            console.log("Speech Error:", e.error);
+            // ANDROID FIX: Ignore 'no-speech' and 'network' errors and try to keep going
+            if(e.error === 'no-speech' || e.error === 'network') {
+                if (isConversationActive) restartMic();
+            } else if (e.error === 'not-allowed') {
+                toggleStop();
+                alert("Microphone blocked. Please check permissions.");
+            }
+        };
+    }
+
+    // --- ANDROID SPECIFIC RESTART LOGIC ---
+    function restartMic() {
+        if (isRestarting || !isConversationActive) return;
+        isRestarting = true;
+        
+        const u = activeTurn === 1 ? els.u1 : els.u2;
+        recognition.lang = u.lang.value; // Ensure lang is set
+
+        // DELAY IS CRITICAL FOR ANDROID
+        setTimeout(() => {
+            try {
+                recognition.start();
+            } catch(e) {
+                console.warn("Mic start overlap", e);
+                isRestarting = false;
+            }
+        }, 200); // 200ms delay allows the audio engine to clear up
+    }
+
+    // --- FLOW CONTROLLER ---
+    els.startBtn.onclick = () => {
+        isConversationActive = true;
+        els.startBtn.classList.add('hidden');
+        els.stopBtn.classList.remove('hidden');
+        els.welcome.style.display = 'none';
+        els.status.textContent = "CONVERSATION STARTED";
+        activateUser(1); 
+    };
+
+    els.stopBtn.onclick = toggleStop;
+
+    function toggleStop() {
+        isConversationActive = false;
+        activeTurn = 0;
+        if(recognition) recognition.stop();
+        if(synth) synth.cancel();
+        clearTimers();
+        resetUI();
+        els.startBtn.classList.remove('hidden');
+        els.stopBtn.classList.add('hidden');
+        els.status.textContent = "CONVERSATION ENDED";
+    }
+
+    function activateUser(userNum) {
+        if (!isConversationActive) return;
+        activeTurn = userNum;
+        currentTranscript = "";
+        
+        // UI Update
+        const active = userNum === 1 ? els.u1 : els.u2;
+        const inactive = userNum === 1 ? els.u2 : els.u1;
+        
+        active.panel.classList.remove('inactive-turn');
+        active.panel.classList.add('active-turn');
+        active.btn.classList.remove('hidden'); 
+        active.timer.classList.remove('hidden');
+        
+        inactive.panel.classList.add('inactive-turn');
+        inactive.panel.classList.remove('active-turn');
+        inactive.btn.classList.add('hidden');
+        inactive.timer.classList.add('hidden');
+        inactive.mic.classList.remove('mic-listening');
+        inactive.status.textContent = "WAITING";
+
+        // Start Mic with Android safety
+        restartMic();
+    }
+
+    // --- SILENCE DETECTION (5 Seconds) ---
+    function startSilenceTimer() {
+        clearTimers();
+        let timeLeft = 5;
+        updateTimerUI(timeLeft);
+
+        countdownInterval = setInterval(() => {
+            timeLeft--;
+            updateTimerUI(timeLeft);
+            if (timeLeft <= 0) clearInterval(countdownInterval);
+        }, 1000);
+
+        silenceTimer = setTimeout(() => {
+            // Pause Limit Reached -> Process
+            // On Android, we must manually stop so the onend event knows we are DONE, not just restarting
+            isRestarting = true; // Lock restart logic
+            if(recognition) recognition.stop(); 
+            processTranslation();
+        }, 5000);
+    }
+
+    function updateTimerUI(sec) {
+        const text = `Auto-send: ${sec}s`;
+        if (activeTurn === 1) els.u1.timer.textContent = text;
+        if (activeTurn === 2) els.u2.timer.textContent = text;
+    }
+
+    function clearTimers() {
+        clearTimeout(silenceTimer);
+        clearInterval(countdownInterval);
+    }
+
+    // Manual Trigger
+    els.u1.btn.onclick = () => { triggerManualProcess(); };
+    els.u2.btn.onclick = () => { triggerManualProcess(); };
+
+    function triggerManualProcess() {
+        clearTimers();
+        isRestarting = true; // Prevent auto-restart
+        if(recognition) recognition.stop();
+        processTranslation();
+    }
+
+    // --- TRANSLATION CORE ---
+    async function processTranslation() {
+        if (!isConversationActive) return;
+        
+        // If no text was captured, just switch turns (or restart same user?)
+        // Let's restart same user if empty to avoid endless looping of silence
+        if (!currentTranscript.trim()) {
+            isRestarting = false;
+            restartMic(); // Give them another chance
+            return;
+        }
+        
+        const srcUser = activeTurn;
+        const targetUser = srcUser === 1 ? 2 : 1;
+        const text = currentTranscript.trim();
+
+        // Lock UI
+        activeTurn = 0; 
+        resetUI(); 
+        els.chat.classList.add('speaking-now');
+        els.status.textContent = `TRANSLATING USER ${srcUser}...`;
+
+        const sLang = srcUser === 1 ? els.u1.lang.value : els.u2.lang.value;
+        const tLang = targetUser === 1 ? els.u1.lang.value : els.u2.lang.value;
+        const pair = `${sLang}|${tLang}`;
+
+        try {
+            const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${pair}`);
+            const data = await res.json();
+            
+            if (data.responseData) {
+                const transText = data.responseData.translatedText;
+                addChatBubble(srcUser, text, transText);
+                await speakText(transText, tLang);
+                
+                if (isConversationActive) {
+                    els.chat.classList.remove('speaking-now');
+                    activateUser(targetUser);
+                }
+            } else {
+                throw new Error("API Error");
+            }
+        } catch (e) {
+            console.error(e);
+            addChatBubble(srcUser, text, "Translation Error", true);
+            if (isConversationActive) activateUser(targetUser);
+        }
+    }
+
+    // --- TTS ENGINE ---
+    function speakText(text, lang) {
+        return new Promise((resolve) => {
+            if (!text) { resolve(); return; }
+            if (synth.speaking) synth.cancel();
+
+            lastSpokenText = text;
+            lastSpokenLang = lang;
+            els.repeatBtn.disabled = false;
+
+            const utt = new SpeechSynthesisUtterance(text);
+            utt.lang = lang;
+            utt.rate = 0.9;
+
+            // Voice Logic
+            if (voices.length === 0) voices = synth.getVoices();
+            let v = voices.find(v => v.lang === lang);
+            if (!v) v = voices.find(v => v.lang.startsWith(lang.split('-')[0]));
+            if (v) utt.voice = v;
+
+            utt.onend = () => { resolve(); };
+            utt.onerror = () => { resolve(); }; 
+
+            synth.speak(utt);
+        });
+    }
+
+    // --- UTILITIES ---
+    els.repeatBtn.onclick = () => {
+        if (lastSpokenText && !synth.speaking) {
+            const utt = new SpeechSynthesisUtterance(lastSpokenText);
+            utt.lang = lastSpokenLang;
+            synth.speak(utt);
+        }
+    };
+
+    els.shareBtn.onclick = async () => {
+        const text = Array.from(document.querySelectorAll('#chat-container div'))
+            .map(d => d.innerText).join('\n');
+        try {
+            await navigator.clipboard.writeText(text);
+            alert("Chat copied!");
+        } catch (err) {}
+    };
+
+    function resetUI() {
+        els.u1.panel.classList.remove('active-turn', 'inactive-turn');
+        els.u2.panel.classList.remove('active-turn', 'inactive-turn');
+        els.u1.mic.classList.remove('mic-listening');
+        els.u2.mic.classList.remove('mic-listening');
+        els.u1.btn.classList.add('hidden'); els.u2.btn.classList.add('hidden');
+        els.u1.timer.classList.add('hidden'); els.u2.timer.classList.add('hidden');
+        els.u1.status.textContent = "IDLE"; els.u2.status.textContent = "IDLE";
+    }
+
+    function addChatBubble(user, original, translated, isErr=false) {
+        const d = document.createElement('div');
+        const align = user === 1 ? 'self-start text-left' : 'self-end text-right';
+        let bg = user === 1 ? 'bg-indigo-900/80 border-indigo-700' : 'bg-emerald-900/80 border-emerald-700';
+        if (isErr) bg = 'bg-red-900/80 border-red-700';
+
+        d.className = `max-w-[85%] ${align} p-4 rounded-xl border ${bg} mb-3 shadow-lg msg-enter`;
+        d.innerHTML = `
+            <div class="text-[10px] uppercase text-gray-400 font-bold mb-1">User ${user}</div>
+            <div class="text-gray-300 text-sm italic mb-2">"${original}"</div>
+            <div class="text-white text-lg font-medium">${translated}</div>
+        `;
+        els.chat.appendChild(d);
+        els.chat.scrollTop = els.chat.scrollHeight;
+    }
+</script>
