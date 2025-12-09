@@ -3,17 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dhwani AI - Robust</title>
+    <title>Dhwani AI - Ultimate</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
 
-        /* Hide Scrollbar */
         .chat-scroll { -ms-overflow-style: none; scrollbar-width: none; }
         .chat-scroll::-webkit-scrollbar { display: none; }
 
-        /* Glassmorphism */
         .glass-header {
             background: rgba(30, 41, 59, 0.95);
             backdrop-filter: blur(12px);
@@ -25,7 +23,6 @@
             padding-bottom: env(safe-area-inset-bottom);
         }
 
-        /* Chat Bubbles */
         .chat-bubble-u1 {
             background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
             color: white;
@@ -37,7 +34,6 @@
             border-bottom-right-radius: 2px;
         }
 
-        /* Push Button Animations */
         .push-btn {
             transition: all 0.1s ease-in-out;
             transform: scale(1);
@@ -163,9 +159,8 @@
         // --- STATE ---
         let recognition = null;
         let synth = window.speechSynthesis;
-        let finalTranscript = ''; // Stores committed text
-        let isRecording = false; // Is button physically held?
-        let isTranslating = false;
+        let finalTranscript = ''; 
+        let isButtonHeld = false; // Is button physically held?
         let activeUser = null; 
         
         let lastTranslationData = null; 
@@ -203,41 +198,45 @@
             if (window.SpeechRecognition || window.webkitSpeechRecognition) {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 recognition = new SpeechRecognition();
-                
-                // CRITICAL FIX: continuous = false for Android reliability
-                recognition.continuous = false; 
+                recognition.continuous = false; // Fix Android repetition bug
                 recognition.interimResults = true;
                 
                 recognition.onresult = (e) => {
                     let interim = '';
-                    // Since continuous=false, we only care about the last result usually
                     const result = e.results[e.results.length - 1];
                     const text = result[0].transcript;
                     
+                    // Always update UI immediately
+                    showStatus((finalTranscript + " " + text).slice(-30));
+
                     if (result.isFinal) {
                         finalTranscript += text + " ";
-                    } else {
-                        interim = text;
                     }
-                    showStatus((finalTranscript + interim).slice(-30) || "Listening...");
                 };
                 
+                // THE EXPERT FIX:
+                // Use 'onend' to decide if we should RESTART (user still holding)
+                // or PROCESS (user released)
                 recognition.onend = () => {
-                    // ROBUST LOGIC: If button is still held, RESTART immediately
-                    if (isRecording) {
-                        try {
-                            recognition.start();
-                        } catch(e) {
-                            // If start fails, retry after tiny delay
-                            setTimeout(() => { if(isRecording) recognition.start(); }, 50);
+                    if (isButtonHeld) {
+                        // User is still holding, but silence cut it off.
+                        // Restart immediately to keep capturing.
+                        try { recognition.start(); } catch(e) {}
+                    } else {
+                        // User released button. The session is truly done.
+                        // Now we process the gathered text.
+                        const fullText = finalTranscript.trim();
+                        if (fullText) {
+                            handleTranslation(fullText, activeUser);
+                        } else {
+                            showStatus("No speech detected", true);
                         }
+                        finalTranscript = ''; // Reset buffer
                     }
                 };
                 
                 recognition.onerror = (e) => { 
-                    console.error(e); 
-                    // Ignore no-speech, it's normal
-                    if(e.error !== 'no-speech') showStatus("Mic Error: " + e.error); 
+                    if(e.error !== 'no-speech') showStatus("Error: " + e.error);
                 };
             } else {
                 alert("Browser not supported. Use Chrome.");
@@ -247,14 +246,13 @@
         // --- PUSH TO TALK LOGIC ---
 
         function startRecording(user) {
-            if (isTranslating) return;
-            if (isRecording) return; // Prevent double trigger
+            if (isButtonHeld) return; // Prevent double taps
 
             if (synth.speaking) synth.cancel();
 
             activeUser = user;
-            isRecording = true;
-            finalTranscript = ''; // Clear previous
+            isButtonHeld = true;
+            finalTranscript = ''; // Start fresh
             
             showStatus(user === 'U1' ? "Me Speaking..." : "Guest Speaking...");
             
@@ -263,70 +261,50 @@
                 btnMe.classList.add('pressed');
                 ringMe.style.opacity = '1';
                 btnGuest.style.opacity = '0.5';
-                recognition.lang = langU1.value; // Set Language
+                recognition.lang = langU1.value; 
             } else {
                 btnGuest.classList.add('pressed');
                 ringGuest.style.opacity = '1';
                 btnMe.style.opacity = '0.5';
-                recognition.lang = langU2.value; // Set Language
+                recognition.lang = langU2.value; 
             }
 
-            try { recognition.start(); } catch(e) { recognition.stop(); }
+            try { recognition.start(); } catch(e) {}
         }
 
         function stopRecording() {
-            if (!isRecording) return;
+            if (!isButtonHeld) return;
             
-            isRecording = false; // This flag stops the onend auto-restart
-            recognition.stop(); 
+            isButtonHeld = false; // This flag changes behavior in 'onend'
+            recognition.stop();   // This will trigger 'onend' naturally
             
-            // Reset UI
+            // Reset UI immediately
             btnMe.classList.remove('pressed');
             btnGuest.classList.remove('pressed');
             ringMe.style.opacity = '0';
             ringGuest.style.opacity = '0';
             btnMe.style.opacity = '1';
             btnGuest.style.opacity = '1';
-
-            // Wait 200ms for final recognition result to settle
-            setTimeout(() => {
-                const textToTranslate = finalTranscript.trim();
-                if (textToTranslate) {
-                    handleTranslation(textToTranslate, activeUser);
-                } else {
-                    showStatus("No speech detected", true);
-                }
-            }, 200);
+            
+            showStatus("Processing...");
         }
 
         // --- TRANSLATION LOGIC ---
         async function handleTranslation(text, user) {
-            isTranslating = true;
             showStatus("Translating...");
             
             addChatBubble(user, text, "...");
 
-            // LOGIC FIX:
-            // If Me (U1) speaks: Source=U1, Target=U2
-            // If Guest (U2) speaks: Source=U2, Target=U1
             const sCode = user === 'U1' ? langU1.value : langU2.value;
             const tCode = user === 'U1' ? langU2.value : langU1.value;
 
             try {
-                let translatedText = "";
-                if (currentApi === 'mymemory') {
-                    translatedText = await apiMyMemory(text, sCode, tCode);
-                } else {
-                    translatedText = await apiMyMemory(text, sCode, tCode); // Fallback
-                }
-
+                let translatedText = await apiMyMemory(text, sCode, tCode);
                 updateLastBubble(translatedText);
                 lastTranslationData = { text: translatedText, lang: tCode };
                 speak(translatedText, tCode);
-
             } catch (err) {
                 updateLastBubble("Error: " + err.message);
-                isTranslating = false;
             }
         }
 
@@ -347,8 +325,7 @@
             const v = synth.getVoices().find(v => v.lang === lang) || synth.getVoices().find(v => v.lang.startsWith(lang.split('-')[0]));
             if (v) ut.voice = v;
 
-            ut.onend = () => { isTranslating = false; showStatus("Ready", true); };
-            ut.onerror = () => { isTranslating = false; };
+            ut.onend = () => { showStatus("Ready", true); };
             synth.speak(ut);
         }
 
@@ -390,8 +367,10 @@
         const attachEvents = (btn, user) => {
             const start = (e) => { e.preventDefault(); startRecording(user); };
             const end = (e) => { e.preventDefault(); stopRecording(); };
+            
             btn.addEventListener('mousedown', start);
             btn.addEventListener('touchstart', start);
+            
             btn.addEventListener('mouseup', end);
             btn.addEventListener('mouseleave', end);
             btn.addEventListener('touchend', end);
@@ -413,7 +392,6 @@
         document.getElementById('share-btn').onclick = () => {
             let fullText = "--- Dhwani Chat ---\n\n";
             document.querySelectorAll('.chat-bubble-u1, .chat-bubble-u2').forEach(b => {
-                 // Simple scraper for demo
                  fullText += b.innerText + "\n\n";
             });
             if (navigator.share) navigator.share({ title: 'Chat', text: fullText });
