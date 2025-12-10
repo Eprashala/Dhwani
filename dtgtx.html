@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dhwani AI Translator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+
+        .chat-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        .chat-scroll::-webkit-scrollbar { display: none; }
+
+        .glass-header {
+            background: rgba(30, 41, 59, 0.95);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .glass-footer {
+            background: rgba(15, 23, 42, 0.98);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        .chat-bubble-u1 {
+            background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+            color: white;
+            border-bottom-left-radius: 2px;
+        }
+        .chat-bubble-u2 {
+            background: linear-gradient(135deg, #db2777 0%, #be185d 100%);
+            color: white;
+            border-bottom-right-radius: 2px;
+        }
+
+        .push-btn {
+            transition: all 0.1s ease-in-out;
+            transform: scale(1);
+        }
+        .push-btn:active, .push-btn.pressed {
+            transform: scale(0.92);
+            filter: brightness(1.2);
+        }
+        
+        * { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+        .chat-text-selectable { -webkit-user-select: text; user-select: text; }
+    </style>
+</head>
+<body class="bg-slate-900 h-[100dvh] w-full flex flex-col overflow-hidden text-slate-100">
+
+    <header class="glass-header z-50 shrink-0 px-4 py-3 flex justify-between items-center relative">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">D</div>
+            
+            <div class="flex flex-col">
+                <h1 class="text-[10px] text-purple-300 font-bold uppercase tracking-wider mb-0.5">Dhwani Translator</h1>
+                <select id="api-selector" class="bg-slate-800 text-xs text-white font-bold py-1 px-2 rounded border border-slate-600 outline-none focus:border-purple-500">
+                    <option value="google_free">Google (Free/High Accuracy)</option>
+                    <option value="mymemory">MyMemory (Backup)</option>
+                    <option value="google_cloud">Google Cloud (Paid Key)</option>
+                    <option value="microsoft">Microsoft Azure (Paid Key)</option>
+                </select>
+            </div>
+        </div>
+
+        <button id="settings-btn" class="p-2 text-slate-400 hover:text-purple-400 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+        </button>
+
+        <div id="api-key-panel" class="hidden absolute top-full right-0 mt-2 w-64 bg-slate-800 shadow-xl rounded-xl border border-slate-700 p-3 mr-2 z-50">
+            <p class="text-[10px] text-slate-400 mb-1 uppercase font-bold">API Key (If using Paid)</p>
+            <input type="text" id="api-key-input" placeholder="Paste Key..." class="w-full text-xs p-2 rounded bg-slate-900 border border-slate-600 text-white mb-2 focus:ring-2 focus:ring-purple-500 outline-none">
+            <button id="save-key-btn" class="w-full bg-purple-600 text-white text-xs py-2 rounded font-bold hover:bg-purple-500">Save</button>
+        </div>
+    </header>
+
+    <div class="bg-slate-800/50 shrink-0 px-4 py-2 border-b border-slate-700 flex gap-4">
+        <div class="flex-1">
+            <label class="text-[10px] font-bold text-purple-400 uppercase block mb-1">Me (Mic)</label>
+            <select id="lang-u1" class="w-full text-sm p-2 rounded-lg border border-slate-600 bg-slate-700 text-white outline-none"></select>
+        </div>
+        <div class="flex-1 text-right">
+            <label class="text-[10px] font-bold text-pink-400 uppercase block mb-1">Guest (Mic)</label>
+            <select id="lang-u2" class="w-full text-sm p-2 rounded-lg border border-slate-600 bg-slate-700 text-white outline-none text-right" dir="rtl"></select>
+        </div>
+    </div>
+
+    <main id="chat-container" class="flex-grow chat-scroll overflow-y-auto px-4 py-4 space-y-4 bg-gradient-to-b from-slate-900 to-slate-800 relative">
+        <div id="intro-msg" class="text-center mt-20 opacity-30 flex flex-col items-center">
+            <div class="w-16 h-16 bg-slate-700 rounded-full flex items-center justify-center mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                </svg>
+            </div>
+            <p class="text-sm text-slate-400 font-medium">Hold Button to Speak</p>
+        </div>
+        <div class="h-24 w-full shrink-0"></div>
+    </main>
+
+    <div id="status-bar" class="fixed top-28 left-1/2 -translate-x-1/2 z-40 px-5 py-2 bg-slate-950/90 backdrop-blur text-white text-xs font-bold rounded-full border border-purple-500/50 hidden shadow-lg">
+        Ready
+    </div>
+
+    <div class="z-50 shrink-0 w-full glass-footer pt-3 pb-6 px-4">
+        
+        <div class="flex justify-center items-center gap-2 mb-3">
+             <button id="repeat-btn" class="p-2 rounded-full bg-slate-800 text-slate-400 hover:bg-slate-700 disabled:opacity-30">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+            </button>
+             <button id="share-btn" class="p-2 rounded-full bg-slate-800 text-slate-400 hover:bg-slate-700">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+            </button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 h-24">
+            <button id="btn-me" class="push-btn relative w-full h-full rounded-2xl bg-gradient-to-br from-purple-700 to-purple-900 border-t border-purple-500 shadow-lg shadow-purple-900/40 flex flex-col items-center justify-center gap-1">
+                <span class="text-xl font-black text-white tracking-widest">ME</span>
+                <span class="text-[10px] text-purple-200 font-medium uppercase tracking-wide">Hold to Speak</span>
+                <div class="absolute inset-0 rounded-2xl border-2 border-purple-400 opacity-0 transition-opacity" id="ring-me"></div>
+            </button>
+
+            <button id="btn-guest" class="push-btn relative w-full h-full rounded-2xl bg-gradient-to-br from-pink-700 to-pink-900 border-t border-pink-500 shadow-lg shadow-pink-900/40 flex flex-col items-center justify-center gap-1">
+                <span class="text-xl font-black text-white tracking-widest">GUEST</span>
+                <span class="text-[10px] text-pink-200 font-medium uppercase tracking-wide">Hold to Speak</span>
+                <div class="absolute inset-0 rounded-2xl border-2 border-pink-400 opacity-0 transition-opacity" id="ring-guest"></div>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA ---
+        const LANGUAGES = [
+            { code: 'en-IN', name: 'English (India)' },
+            { code: 'hi-IN', name: 'Hindi (हिंदी)' },
+            { code: 'mr-IN', name: 'Marathi (मराठी)' },
+            { code: 'gu-IN', name: 'Gujarati (ગુજરાતી)' },
+            { code: 'ta-IN', name: 'Tamil (தமிழ்)' },
+            { code: 'te-IN', name: 'Telugu (తెలుగు)' },
+            { code: 'pa-IN', name: 'Punjabi (ਪੰਜਾਬੀ)' },
+            { code: 'en-US', name: 'English (US)' },
+            { code: 'zh-CN', name: 'Chinese (Mandarin)' },
+            { code: 'ja-JP', name: 'Japanese (日本語)' },
+            { code: 'ko-KR', name: 'Korean (한국어)' },
+            { code: 'th-TH', name: 'Thai (ไทย)' },
+            { code: 'ms-MY', name: 'Malay (Malaysia)' },
+            { code: 'id-ID', name: 'Indonesian' },
+            { code: 'es-ES', name: 'Spanish' },
+            { code: 'fr-FR', name: 'French' },
+            { code: 'de-DE', name: 'German' },
+            { code: 'ru-RU', name: 'Russian' },
+            { code: 'ar-SA', name: 'Arabic' }
+        ];
+
+        // --- STATE ---
+        let recognition = null;
+        let synth = window.speechSynthesis;
+        let finalTranscript = ''; 
+        let isButtonHeld = false; 
+        let activeUser = null; 
+        
+        let lastTranslationData = null; 
+        let currentApi = 'google_free'; // Default to High Accuracy
+        let savedApiKey = localStorage.getItem('dhwani_api_key') || '';
+
+        // --- DOM ---
+        const btnMe = document.getElementById('btn-me');
+        const btnGuest = document.getElementById('btn-guest');
+        const ringMe = document.getElementById('ring-me');
+        const ringGuest = document.getElementById('ring-guest');
+        const chatContainer = document.getElementById('chat-container');
+        const statusBar = document.getElementById('status-bar');
+        const langU1 = document.getElementById('lang-u1');
+        const langU2 = document.getElementById('lang-u2');
+        const apiSelector = document.getElementById('api-selector');
+        const settingsBtn = document.getElementById('settings-btn');
+        const apiKeyPanel = document.getElementById('api-key-panel');
+        const apiKeyInput = document.getElementById('api-key-input');
+        const saveKeyBtn = document.getElementById('save-key-btn');
+
+        // --- INIT ---
+        function init() {
+            LANGUAGES.forEach(l => {
+                langU1.add(new Option(l.name, l.code));
+                langU2.add(new Option(l.name, l.code));
+            });
+            langU1.value = 'en-IN';
+            langU2.value = 'hi-IN';
+
+            if(savedApiKey) apiKeyInput.value = savedApiKey;
+            if ('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(()=>{});
+
+            if (window.SpeechRecognition || window.webkitSpeechRecognition) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                recognition.continuous = false; // Android reliability
+                recognition.interimResults = true;
+                
+                recognition.onresult = (e) => {
+                    const result = e.results[e.results.length - 1];
+                    const text = result[0].transcript;
+                    showStatus((finalTranscript + " " + text).slice(-30));
+                    if (result.isFinal) finalTranscript += text + " ";
+                };
+                
+                recognition.onend = () => {
+                    if (isButtonHeld) {
+                        try { recognition.start(); } catch(e) {}
+                    } else {
+                        const fullText = finalTranscript.trim();
+                        if (fullText) handleTranslation(fullText, activeUser);
+                        else showStatus("No speech detected", true);
+                        finalTranscript = ''; 
+                    }
+                };
+                
+                recognition.onerror = (e) => { 
+                    if(e.error !== 'no-speech') showStatus("Error: " + e.error);
+                };
+            } else {
+                alert("Browser not supported. Use Chrome.");
+            }
+        }
+
+        // --- PUSH TO TALK ---
+        function startRecording(user) {
+            if (isButtonHeld) return;
+            if (synth.speaking) synth.cancel();
+
+            activeUser = user;
+            isButtonHeld = true;
+            finalTranscript = ''; 
+            
+            showStatus(user === 'U1' ? "Me Speaking..." : "Guest Speaking...");
+            
+            // Set Mic Language correctly based on who pressed
+            if(user === 'U1') {
+                btnMe.classList.add('pressed');
+                ringMe.style.opacity = '1';
+                btnGuest.style.opacity = '0.5';
+                recognition.lang = langU1.value; 
+            } else {
+                btnGuest.classList.add('pressed');
+                ringGuest.style.opacity = '1';
+                btnMe.style.opacity = '0.5';
+                recognition.lang = langU2.value; 
+            }
+
+            try { recognition.start(); } catch(e) {}
+        }
+
+        function stopRecording() {
+            if (!isButtonHeld) return;
+            isButtonHeld = false; 
+            recognition.stop(); 
+            
+            btnMe.classList.remove('pressed');
+            btnGuest.classList.remove('pressed');
+            ringMe.style.opacity = '0';
+            ringGuest.style.opacity = '0';
+            btnMe.style.opacity = '1';
+            btnGuest.style.opacity = '1';
+            
+            showStatus("Processing...");
+        }
+
+        // --- TRANSLATION CONTROLLER ---
+        async function handleTranslation(text, user) {
+            showStatus("Translating...");
+            addChatBubble(user, text, "...");
+
+            // Logic: If U1 speaks, translate U1 -> U2. If U2 speaks, U2 -> U1.
+            const sCode = user === 'U1' ? langU1.value : langU2.value;
+            const tCode = user === 'U1' ? langU2.value : langU1.value;
+
+            try {
+                let translatedText = "";
+                
+                switch (currentApi) {
+                    case 'google_free':
+                        translatedText = await apiGoogleFree(text, sCode, tCode);
+                        break;
+                    case 'google_cloud':
+                        translatedText = await apiGoogleCloud(text, sCode, tCode);
+                        break;
+                    case 'microsoft':
+                        translatedText = await apiMicrosoft(text, sCode, tCode);
+                        break;
+                    case 'mymemory':
+                    default:
+                        translatedText = await apiMyMemory(text, sCode, tCode);
+                        break;
+                }
+
+                updateLastBubble(translatedText);
+                lastTranslationData = { text: translatedText, lang: tCode };
+                speak(translatedText, tCode);
+
+            } catch (err) {
+                updateLastBubble("Error: " + err.message);
+            }
+        }
+
+        // --- HIGH ACCURACY API ENGINES ---
+        
+        // 1. GOOGLE FREE (GTX) - High Accuracy
+        async function apiGoogleFree(text, s, t) {
+            // Extract 'en' from 'en-IN'
+            const source = s.split('-')[0];
+            const target = t.split('-')[0];
+            
+            const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${source}&tl=${target}&dt=t&q=${encodeURIComponent(text)}`;
+            
+            const res = await fetch(url);
+            const data = await res.json();
+            
+            // Google returns nested arrays. We typically want data[0][0][0]
+            // Sometimes it splits sentences, so we map and join
+            if (data && data[0]) {
+                return data[0].map(x => x[0]).join('');
+            }
+            throw new Error("Translation failed");
+        }
+
+        // 2. MYMEMORY (Free Backup)
+        async function apiMyMemory(text, s, t) {
+            const pair = `${s}|${t}`;
+            let emailPart = savedApiKey && savedApiKey.includes('@') ? `&de=${savedApiKey}` : '';
+            const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${pair}${emailPart}`);
+            const data = await res.json();
+            return decodeEntities(data.responseData.translatedText);
+        }
+
+        // 3. GOOGLE CLOUD (Paid)
+        async function apiGoogleCloud(text, s, t) {
+            if (!savedApiKey) throw new Error("API Key Required");
+            const url = `https://translation.googleapis.com/language/translate/v2?key=${savedApiKey}`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ q: text, source: s.split('-')[0], target: t.split('-')[0], format: 'text' })
+            });
+            const data = await res.json();
+            if(data.error) throw new Error(data.error.message);
+            return decodeEntities(data.data.translations[0].translatedText);
+        }
+
+        // 4. MICROSOFT (Paid)
+        async function apiMicrosoft(text, s, t) {
+            if (!savedApiKey) throw new Error("API Key Required");
+            const url = `https://api.cognitive.microsofttranslator.com/translate?api-version=3.0&to=${t.split('-')[0]}`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Ocp-Apim-Subscription-Key': savedApiKey,
+                    'Ocp-Apim-Subscription-Region': 'global', 
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify([{ 'Text': text }])
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error.message);
+            return data[0].translations[0].text;
+        }
+
+        // --- TTS ---
+        function speak(text, lang) {
+            const ut = new SpeechSynthesisUtterance(text);
+            ut.lang = lang;
+            ut.rate = 0.9;
+            const v = synth.getVoices().find(v => v.lang === lang) || synth.getVoices().find(v => v.lang.startsWith(lang.split('-')[0]));
+            if (v) ut.voice = v;
+
+            ut.onend = () => { showStatus("Ready", true); };
+            synth.speak(ut);
+        }
+
+        // --- UTILS ---
+        function addChatBubble(user, text, trans) {
+            const isMe = user === 'U1';
+            const div = document.createElement('div');
+            div.className = `flex flex-col max-w-[85%] ${isMe ? 'mr-auto items-start' : 'ml-auto items-end'} mb-4 animate-fade-in`;
+            div.innerHTML = `
+                <div class="p-3 shadow-md relative ${isMe ? 'chat-bubble-u1' : 'chat-bubble-u2'} text-left">
+                    <div class="font-medium text-[15px] leading-snug chat-text-selectable">${text}</div>
+                    <div class="translation-text text-sm opacity-90 italic mt-1 pt-1 border-t border-white/20 chat-text-selectable">${trans}</div>
+                </div>
+                <span class="text-[10px] text-slate-500 mt-1 px-1 font-bold tracking-wide">${isMe ? 'ME' : 'GUEST'}</span>
+            `;
+            chatContainer.insertBefore(div, chatContainer.lastElementChild);
+            window.lastTransRef = div.querySelector('.translation-text');
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            document.getElementById('intro-msg').style.display = 'none';
+        }
+
+        function updateLastBubble(text) {
+            if (window.lastTransRef) window.lastTransRef.innerText = text;
+        }
+
+        function showStatus(msg, autoHide=false) {
+            statusBar.innerText = msg;
+            statusBar.classList.remove('hidden');
+            if (autoHide) setTimeout(() => statusBar.classList.add('hidden'), 2000);
+        }
+
+        function decodeEntities(html) {
+            const txt = document.createElement("textarea");
+            txt.innerHTML = html;
+            return txt.value;
+        }
+
+        // --- EVENTS ---
+        const attachEvents = (btn, user) => {
+            const start = (e) => { e.preventDefault(); startRecording(user); };
+            const end = (e) => { e.preventDefault(); stopRecording(); };
+            btn.addEventListener('mousedown', start);
+            btn.addEventListener('touchstart', start);
+            btn.addEventListener('mouseup', end);
+            btn.addEventListener('mouseleave', end);
+            btn.addEventListener('touchend', end);
+        };
+
+        attachEvents(btnMe, 'U1');
+        attachEvents(btnGuest, 'U2');
+
+        settingsBtn.onclick = () => apiKeyPanel.classList.toggle('hidden');
+        apiSelector.onchange = () => {
+            currentApi = apiSelector.value;
+            if(currentApi !== 'google_free' && currentApi !== 'mymemory') {
+                apiKeyPanel.classList.remove('hidden');
+                apiKeyInput.focus();
+            }
+        };
+        saveKeyBtn.onclick = () => {
+            savedApiKey = apiKeyInput.value.trim();
+            localStorage.setItem('dhwani_api_key', savedApiKey);
+            apiKeyPanel.classList.add('hidden');
+            alert("API Key Saved");
+        };
+        document.getElementById('repeat-btn').onclick = () => {
+            if(lastTranslationData) speak(lastTranslationData.text, lastTranslationData.lang);
+        };
+        document.getElementById('share-btn').onclick = () => {
+            let fullText = "--- Dhwani Chat ---\n\n";
+            document.querySelectorAll('.chat-bubble-u1, .chat-bubble-u2').forEach(b => {
+                 fullText += b.innerText + "\n\n";
+            });
+            if (navigator.share) navigator.share({ title: 'Chat', text: fullText });
+            else { navigator.clipboard.writeText(fullText); alert("Copied to clipboard"); }
+        };
+
+        window.onload = init;
+    </script>
+</body>
+</html>
