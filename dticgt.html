@@ -36,7 +36,7 @@
             border-bottom-right-radius: 2px;
         }
         
-        button { user-select: none; -webkit-tap-highlight-color: transparent; }
+        button { user-select: none; -webkit-tap-highlight-color: transparent; touch-action: none; }
     </style>
 </head>
 <body class="bg-slate-900 h-[100dvh] w-full flex flex-col overflow-hidden text-slate-100">
@@ -97,10 +97,10 @@
     <!-- FOOTER: PUSH-TO-TALK BUTTONS -->
     <footer class="z-50 shrink-0 w-full bg-slate-900/95 border-t border-slate-800 px-4 pb-5 pt-3">
         <div class="flex gap-4">
-            <button id="btn-me" class="flex-1 h-14 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-sm flex items-center justify-center shadow-lg shadow-purple-900/40 active:scale-95 transition-all touch-none">
+            <button id="btn-me" class="flex-1 h-14 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-sm flex items-center justify-center shadow-lg shadow-purple-900/40 active:scale-95 transition-all">
                 <span>Me – Hold to Talk</span>
             </button>
-            <button id="btn-guest" class="flex-1 h-14 rounded-2xl bg-gradient-to-r from-pink-600 to-rose-600 text-white font-bold text-sm flex items-center justify-center shadow-lg shadow-rose-900/40 active:scale-95 transition-all touch-none">
+            <button id="btn-guest" class="flex-1 h-14 rounded-2xl bg-gradient-to-r from-pink-600 to-rose-600 text-white font-bold text-sm flex items-center justify-center shadow-lg shadow-rose-900/40 active:scale-95 transition-all">
                 <span>Guest – Hold to Talk</span>
             </button>
         </div>
@@ -172,16 +172,24 @@
         let USER_EMAIL = "";
         let state = 'IDLE'; // IDLE | LISTENING_ME | LISTENING_GUEST | PROCESSING | SPEAKING
         let activeSpeaker = null; // 'ME' or 'GUEST'
+        let lastSpeaker = null;   // who just spoke
         let recognition = null;
         let synth = window.speechSynthesis;
         let availableVoices = [];
-        let finalTranscript = '';
-        let currentFullTranscript = '';
-        let liveMessage = null; // { speaker, originalNode, translationNode, container }
+
+        let finalTranscript = '';        // concatenation of all final segments
+        let currentFullTranscript = '';  // final + latest interim
+        let liveMessage = null;          // { speaker, originalNode, translationNode, container }
         let lastTranslatedText = "";
         let lastTranslatedLang = "";
         let currentTranslationId = 0;
         let currentAbortController = null;
+
+        // why did we stop recognition?
+        // 'USER_RELEASE' -> send for translation
+        // 'SPEAKING'     -> we stopped because TTS needs silence
+        // 'OTHER'        -> errors, manual, etc.
+        let stopReason = null;
 
         // preload voices
         if (synth) {
@@ -219,7 +227,7 @@
             }
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             const rec = new SpeechRecognition();
-            rec.continuous = false;
+            rec.continuous = true;       // let it keep listening while button is held
             rec.interimResults = true;
 
             rec.onstart = () => {
@@ -232,36 +240,60 @@
             };
 
             rec.onresult = (event) => {
-                const result = event.results[event.results.length - 1];
-                const transcript = result[0]?.transcript || "";
-                if (!transcript) return;
-
-                if (result.isFinal) {
-                    finalTranscript += transcript + " ";
+                // accumulate all final results for this press
+                finalTranscript = '';
+                for (let i = 0; i < event.results.length; i++) {
+                    const res = event.results[i];
+                    if (res.isFinal) {
+                        finalTranscript += res[0].transcript + ' ';
+                    }
                 }
+                finalTranscript = finalTranscript.trim();
 
-                currentFullTranscript = (finalTranscript + (result.isFinal ? "" : transcript)).trim();
+                const lastRes = event.results[event.results.length - 1];
+                const interim = !lastRes.isFinal ? lastRes[0].transcript : '';
+                currentFullTranscript = (finalTranscript + ' ' + interim).trim();
 
                 if (liveMessage && liveMessage.originalNode) {
                     liveMessage.originalNode.textContent = currentFullTranscript || '...';
                 }
 
-                updateStatus("Hearing: " + transcript.slice(-40), false);
+                updateStatus("Hearing: " + lastRes[0].transcript.slice(-40), false);
             };
 
             rec.onend = () => {
-                // we don't auto-restart; recording lifecycle controlled by button
-                if (state === 'LISTENING_ME' || state === 'LISTENING_GUEST') {
+                // Called after we call recognition.stop()
+                // Decide based on stopReason
+                if (stopReason === 'USER_RELEASE' && lastSpeaker) {
+                    const text = (finalTranscript || currentFullTranscript).trim();
+                    finalTranscript = '';
+                    currentFullTranscript = '';
+                    const speaker = lastSpeaker;
+                    stopReason = null;
                     state = 'IDLE';
-                    updateStatus("Mic stopped.", true);
+
+                    if (!text) {
+                        updateStatus("No speech captured.", true);
+                        return;
+                    }
+                    processTranslation(text, speaker);
+                } else {
+                    // generic stop (e.g. speaking, error)
+                    if (state === 'LISTENING_ME' || state === 'LISTENING_GUEST') {
+                        state = 'IDLE';
+                        updateStatus("Mic stopped.", true);
+                    }
+                    stopReason = null;
                 }
             };
 
             rec.onerror = (e) => {
                 if (e.error === 'not-allowed') {
                     state = 'IDLE';
+                    stopReason = 'OTHER';
                     alert("Microphone permission denied.");
                 } else {
+                    stopReason = 'OTHER';
                     updateStatus("Speech error: " + e.error, true);
                 }
             };
@@ -288,15 +320,15 @@
                 return;
             }
 
-            // stop any ongoing speech
             if (synth.speaking) synth.cancel();
 
-            // hard mute mic while speaking
-            state = 'SPEAKING';
-            if (recognition) {
+            // 🔇 ensure we don't accidentally trigger onend->translation
+            if (recognition && (state === 'LISTENING_ME' || state === 'LISTENING_GUEST')) {
+                stopReason = 'SPEAKING';
                 try { recognition.stop(); } catch (e) {}
             }
 
+            state = 'SPEAKING';
             updateStatus("Speaking...", false);
 
             const ut = new SpeechSynthesisUtterance(text);
@@ -349,6 +381,7 @@
                 lastTranslatedText = translated;
                 lastTranslatedLang = targetLang;
 
+                // speak translation; mic is muted in speak()
                 speak(translated, targetLang, () => {
                     updateStatus("Ready. Hold a button to speak.", true);
                 });
@@ -407,18 +440,19 @@
                 updateStatus("Speech recognition not available.", true);
                 return;
             }
-            if (state === 'PROCESSING') {
-                // ignore presses while translating to avoid conflicts
+            if (state === 'PROCESSING' || state === 'SPEAKING') {
+                // ignore presses while busy
                 return;
             }
 
-            // cancel any ongoing TTS
             if (synth && synth.speaking) synth.cancel();
 
             activeSpeaker = speaker;
+            lastSpeaker = speaker;
             state = speaker === 'ME' ? 'LISTENING_ME' : 'LISTENING_GUEST';
             finalTranscript = '';
             currentFullTranscript = '';
+            stopReason = null;
 
             const langCode = speaker === 'ME' ? langMeSelect.value : langGuestSelect.value;
             recognition.lang = langCode;
@@ -437,10 +471,11 @@
             }
         }
 
-        function stopListeningAndTranslate() {
+        function stopListeningAndQueueTranslation() {
             if (!(state === 'LISTENING_ME' || state === 'LISTENING_GUEST')) return;
-            const speaker = activeSpeaker;
-            activeSpeaker = null;
+
+            // mark that this stop is because user released button
+            stopReason = 'USER_RELEASE';
 
             if (recognition) {
                 try { recognition.stop(); } catch (e) {}
@@ -449,17 +484,7 @@
             langMeSelect.parentElement.classList.remove('pulse-ring');
             langGuestSelect.parentElement.classList.remove('pulse-ring');
 
-            const text = currentFullTranscript.trim();
-            finalTranscript = '';
-            currentFullTranscript = '';
-
-            if (!text) {
-                state = 'IDLE';
-                updateStatus("No speech captured.", true);
-                return;
-            }
-
-            processTranslation(text, speaker);
+            // actual processTranslation will be called from recognition.onend
         }
 
         // --- BUTTON EVENTS (PUSH-TO-TALK) ---
@@ -470,16 +495,16 @@
             });
             btn.addEventListener('pointerup', (e) => {
                 e.preventDefault();
-                stopListeningAndTranslate();
+                stopListeningAndQueueTranslation();
             });
             btn.addEventListener('pointerleave', (e) => {
                 if (state === 'LISTENING_ME' || state === 'LISTENING_GUEST') {
-                    stopListeningAndTranslate();
+                    stopListeningAndQueueTranslation();
                 }
             });
             btn.addEventListener('pointercancel', (e) => {
                 if (state === 'LISTENING_ME' || state === 'LISTENING_GUEST') {
-                    stopListeningAndTranslate();
+                    stopListeningAndQueueTranslation();
                 }
             });
         }
