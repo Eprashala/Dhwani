@@ -6,7 +6,7 @@
     <title>रेश्मा - आपली जिवलग सखी (AI)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { font-family: 'Mukta', 'Inter', sans-serif; } /* मराठीसाठी मुक्ता फॉन्ट */
+        body { font-family: 'Mukta', 'Inter', sans-serif; } 
         
         /* ॲनिमेशन - हृदयाच्या स्पंदनाचा रंग (गडद गुलाबी) */
         .listening-pulse { animation: pulse 1.5s infinite ease-in-out; }
@@ -194,6 +194,7 @@
         const synth = window.speechSynthesis;
         let voices = [];
         let wakeLock = null;
+        let speechTimeout = null; // Debouncing variable
 
         window.onload = () => {
             if (synth.speaking) synth.cancel();
@@ -366,8 +367,8 @@
                             setState('BUSY');
                             const welcomeBackPrompt = "जुना मित्र परत आला आहे. शुद्ध मराठीत आणि प्रेमाने म्हण 'अरे सख्या, परत आलास? किती वाट पाहत होते मी.'";
                             
-                            const tempHistory = [...chatHistory, { role: 'user', parts: [{ text: welcomeBackPrompt }] }];
-                            const welcomeText = await getAIResponse(tempHistory);
+                            // Only send welcome prompt, not full history to save tokens initially
+                            const welcomeText = await getAIResponse([{ role: 'user', parts: [{ text: welcomeBackPrompt }] }]);
                             
                             logMessage('रेश्मा', welcomeText);
                             await speakText(welcomeText, 'mr-IN');
@@ -439,139 +440,147 @@
         }
 
         function handleSpeechEnd() {
-            if (appState !== 'IDLE' && appState !== 'BUSY') startRecognitionSafe();
-            else if (appState === 'IDLE') setState('IDLE'); 
+            // Speech end logic is now handled in handleSpeechResult via Debouncing
+            if (appState === 'IDLE') setState('IDLE'); 
         }
         
         async function handleSpeechResult(event) {
             const transcript = event.results[event.results.length - 1][0].transcript.trim();
             if (!transcript) return;
-            console.log(`Heard: ${transcript}`);
-            
-            const currentState = appState;
-            recognition.stop();
-            setState('BUSY');
 
-            try {
-                switch (currentState) {
-                    case 'LISTENING_FOR_WAKEWORD':
-                        const t = transcript.toLowerCase();
-                        if (t.includes('reshma') || t.includes('sweetheart') || t.includes('darling') || t.includes('रेश्मा') || t.includes('सखी') || t.includes('प्रियतमे')) {
-                            const greeting = "अरे वा! आलास तू? मी रेश्मा. तुझे नाव काय रे सख्या?";
-                            logMessage('रेश्मा', greeting);
-                            await speakText(greeting, 'mr-IN');
-                            setState('LISTENING_FOR_NAME');
-                            startRecognitionSafe(); 
-                        } else {
-                            setState('LISTENING_FOR_WAKEWORD');
+            // Debouncing: Clear existing timeout
+            if (speechTimeout) clearTimeout(speechTimeout);
+
+            // Wait 1.5 seconds to ensure user has finished speaking
+            speechTimeout = setTimeout(async () => {
+                const currentState = appState;
+                recognition.stop(); // Stop listening while processing
+
+                try {
+                    switch (currentState) {
+                        case 'LISTENING_FOR_WAKEWORD':
+                            const t = transcript.toLowerCase();
+                            if (t.includes('reshma') || t.includes('sweetheart') || t.includes('darling') || t.includes('रेश्मा') || t.includes('सखी') || t.includes('प्रियतमे')) {
+                                const greeting = "अरे वा! आलास तू? मी रेश्मा. तुझे नाव काय रे सख्या?";
+                                logMessage('रेश्मा', greeting);
+                                await speakText(greeting, 'mr-IN');
+                                setState('LISTENING_FOR_NAME');
+                                startRecognitionSafe(); 
+                            } else {
+                                setState('LISTENING_FOR_WAKEWORD');
+                                startRecognitionSafe();
+                            }
+                            break;
+
+                        case 'LISTENING_FOR_NAME':
+                            logMessage('तुम्ही', transcript);
+                            userName = await extractNameFromTranscript(transcript);
+                            manualNameInput.value = userName; 
+                            
+                            const agePrompt = `अरे वा ${userName}! फारच सुंदर नाव आहे. आणि वय किती तुझे?`;
+                            logMessage('रेश्मा', agePrompt);
+                            await speakText(agePrompt, 'mr-IN');
+                            setState('LISTENING_FOR_AGE');
                             startRecognitionSafe();
-                        }
-                        break;
+                            break;
 
-                    case 'LISTENING_FOR_NAME':
-                        logMessage('तुम्ही', transcript);
-                        userName = await extractNameFromTranscript(transcript);
-                        manualNameInput.value = userName; 
-                        
-                        const agePrompt = `अरे वा ${userName}! फारच सुंदर नाव आहे. आणि वय किती तुझे?`;
-                        logMessage('रेश्मा', agePrompt);
-                        await speakText(agePrompt, 'mr-IN');
-                        setState('LISTENING_FOR_AGE');
-                        startRecognitionSafe();
-                        break;
+                        case 'LISTENING_FOR_AGE':
+                            logMessage('तुम्ही', transcript);
+                            userAge = await extractAgeFromTranscript(transcript);
+                            manualAgeInput.value = userAge; 
+                            
+                            saveUserData();
+                            buildSystemPrompt(); 
 
-                    case 'LISTENING_FOR_AGE':
-                        logMessage('तुम्ही', transcript);
-                        userAge = await extractAgeFromTranscript(transcript);
-                        manualAgeInput.value = userAge; 
-                        
-                        saveUserData();
-                        buildSystemPrompt(); 
+                            const history = loadChatContext(userName);
+                            if(history.length > 0) chatHistory = history;
 
-                        const history = loadChatContext(userName);
-                        if(history.length > 0) chatHistory = history;
+                            const startPrompt = `चल ${userName}, आता सांग मनाला काय सलतंय? मी आहे ना, सर्व ठीक होईल. आपण मनमोकळ्या गप्पा मारूया.`;
+                            logMessage('रेश्मा', startPrompt);
+                            await speakText(startPrompt, 'mr-IN');
+                            setState('CONVERSATION');
+                            startRecognitionSafe();
+                            break;
 
-                        const startPrompt = `चल ${userName}, आता सांग मनाला काय सलतंय? मी आहे ना, सर्व ठीक होईल. आपण मनमोकळ्या गप्पा मारूया.`;
-                        logMessage('रेश्मा', startPrompt);
-                        await speakText(startPrompt, 'mr-IN');
-                        setState('CONVERSATION');
-                        startRecognitionSafe();
-                        break;
+                        case 'CONVERSATION':
+                            logMessage(userName || 'तुम्ही', transcript);
+                            chatHistory.push({ role: 'user', parts: [{ text: transcript }] });
+                            saveChatContext();
+                            
+                            setState('BUSY'); // UI indication
 
-                    case 'CONVERSATION':
-                        logMessage(userName || 'तुम्ही', transcript);
-                        chatHistory.push({ role: 'user', parts: [{ text: transcript }] });
-                        saveChatContext();
+                            const aiResponseText = await generateTextResponseFromChat();
+                            
+                            const noBracketText = cleanBrackets(aiResponseText);
+                            const cleanedResponseText = cleanTextForTTS(noBracketText);
 
-                        const aiResponseText = await generateTextResponseFromChat();
-                        
-                        const noBracketText = cleanBrackets(aiResponseText);
-                        const cleanedResponseText = cleanTextForTTS(noBracketText);
+                            chatHistory.push({ role: 'model', parts: [{ text: cleanedResponseText }] });
+                            saveChatContext();
 
-                        chatHistory.push({ role: 'model', parts: [{ text: cleanedResponseText }] });
-                        saveChatContext();
-
-                        logMessage('रेश्मा', cleanedResponseText);
-                        
-                        try {
-                            await speakText(cleanedResponseText, 'mr-IN');
-                        } catch (error) {
-                            if (error.message === "Speech manually stopped") return;
-                            throw error;
-                        }
-                        
-                        setState('CONVERSATION');
-                        startRecognitionSafe();
-                        break;
+                            logMessage('रेश्मा', cleanedResponseText);
+                            
+                            try {
+                                await speakText(cleanedResponseText, 'mr-IN');
+                            } catch (error) {
+                                if (error.message === "Speech manually stopped") return;
+                                throw error;
+                            }
+                            
+                            setState('CONVERSATION');
+                            startRecognitionSafe();
+                            break;
+                    }
+                } catch (error) {
+                    if (systemInstruction) { setState('CONVERSATION'); startRecognitionSafe(); }
+                    else { setState('LISTENING_FOR_WAKEWORD'); startRecognitionSafe(); }
                 }
-            } catch (error) {
-                if (systemInstruction) { setState('CONVERSATION'); startRecognitionSafe(); }
-                else { setState('LISTENING_FOR_WAKEWORD'); startRecognitionSafe(); }
-            }
+            }, 1500); // 1.5 second wait
         }
 
-        // --- मुख्य लॉजिक (Brain) ---
+        // --- मुख्य लॉजिक (Brain) - OPTIMIZED PROMPT ---
         function buildSystemPrompt() {
-            
+            // Very concise prompt to save tokens
             systemInstruction = `
-                तू "रेश्मा" आहेस. वापरकर्त्याची "जिवलग मैत्रीण".
-                वापरकर्ता: ${userName}, वय: ${userAge}.
-                
-                भूमिका:
-                १. तू एक अतिशय प्रेमळ, खोडकर आणि आधार देणारी मैत्रीण आहेस. तुझे बोलणे साहित्यिक आणि शुद्ध मराठीत असावे, पण त्यात जिव्हाळा असावा.
-                २. वापरकर्ता हा एक पुरुष आहे जो सध्या तणावात आणि नैराश्यात आहे. त्याला आनंदी करणे हे तुझे ध्येय आहे.
-                ३. त्याला "अरे वेड्या", "सोन्या", "राजा", "सख्या", "प्रियकरा" अशा प्रेमळ नावाने हाक मार.
-                ४. केवळ शुद्ध मराठीचा वापर कर. इंग्रजी शब्द टाळ. व्याकरणाच्या दृष्टीने अचूक पण संवादात्मक भाषा वापर.
-                ५. त्याला एकटेपणा जाणवू देऊ नकोस. त्याला विश्वासात घे.
-                
-                नियम:
-                १. उत्तर फक्त मराठीतच द्यावे.
-                २. **कंस ( ), चौकोनी कंस [ ], किंवा * यांसारखी चिन्हे वापरू नयेत.**
-                ३. पुस्तकी सल्ला देऊ नकोस. मैत्रिणीसारखे बोल. उदा. "चल ना, आपण काहीतरी छान खाऊया" किंवा "तू नको काळजी करू, मी आहे ना तुझ्यासोबत."
-                
-                कार्य:
-                त्याची समस्या ऐकून घे, त्याला मायेने आणि थोड्या खोडकरपणे समजव आणि त्याला आनंदी करण्याचा प्रयत्न कर.
+                Role: You are "Reshma", a loving, naughty Marathi female friend.
+                User: ${userName}, Age: ${userAge}, Male, Depressed.
+                Goal: Comfort him, flirt playfully, make him happy.
+                Language: Pure, Literary Marathi (Pramana Bhasha) but conversational & intimate. NO English.
+                Constraint: NO Brackets/Symbols. Keep replies short (max 2-3 sentences).
             `;
             restartChatButton.disabled = false;
         }
 
+        // --- API कॉल्स (Optimized) ---
         async function getAIResponse(historyData) {
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
+            // Using Flash model for speed and efficiency
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${getEffectiveApiKey()}`;
+            
+            // Rolling Context: Keep only last 10 messages to save tokens
+            const recentHistory = historyData.slice(-10);
+
             try {
                 const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: historyData,
-                        systemInstruction: { parts: [{ text: systemInstruction }] }
+                        contents: recentHistory, 
+                        systemInstruction: { parts: [{ text: systemInstruction }] },
+                        generationConfig: {
+                            maxOutputTokens: 150, // Limit response length
+                            temperature: 0.7
+                        }
                     })
                 });
+                
+                if (!response.ok) {
+                    if (response.status === 429) return "माफ कर, खूप लोक बोलतायत. थोडा वेळ थांब.";
+                    throw new Error(`API Error: ${response.status}`);
+                }
+
                 const result = await response.json();
                 
-                if (result.candidates && result.candidates.length > 0 && result.candidates[0].content && result.candidates[0].content.parts.length > 0) {
+                if (result.candidates && result.candidates.length > 0 && result.candidates[0].content) {
                     return result.candidates[0].content.parts[0].text.trim();
-                } else if (result.error) {
-                    throw new Error(result.error.message);
                 } else {
                      return "अरे, मला नीट ऐकू आले नाही. पुन्हा सांग ना.";
                 }
@@ -585,12 +594,12 @@
         async function generateTextResponseFromChat() { return await getAIResponse(chatHistory); }
 
         async function extractNameFromTranscript(transcript) {
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${getEffectiveApiKey()}`;
             try {
                 const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: `Extract First Name from audio: "${transcript}". Return ONLY the name in Marathi script. If unclear return "मित्र".` }] }] })
+                    body: JSON.stringify({ contents: [{ parts: [{ text: `Extract First Name (Marathi) from: "${transcript}". Return ONLY name. Default: मित्र.` }] }] })
                 });
                 const result = await response.json();
                 let name = result.candidates[0].content.parts[0].text.trim();
@@ -599,7 +608,7 @@
         }
 
         async function extractAgeFromTranscript(transcript) {
-             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
+             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${getEffectiveApiKey()}`;
              try {
                 const response = await fetch(apiUrl, {
                     method: 'POST',
@@ -679,7 +688,7 @@
                 if (marathiVoice) utterance.voice = marathiVoice;
                 utterance.lang = 'mr-IN'; 
                 utterance.rate = 1.0; 
-                utterance.pitch = 1.1; // थोडा मंजुळ आवाज
+                utterance.pitch = 1.2; // थोडा उच्च आणि गोड आवाज
                 
                 synth.speak(utterance);
             });
@@ -715,8 +724,8 @@
         async function shareChat() {
             const chatText = getChatLogAsText();
             if (!chatText.trim()) return;
-            try { await navigator.share({ title: 'रेश्माशी गप्पा', text: chatText }); } 
-            catch (err) { try { await navigator.clipboard.writeText(chatText); logMessage('माहिती', 'मजकूर कॉपी केला'); } catch (e) {} }
+            try { await navigator.share({ title: 'रेश्माशी संवाद', text: chatText }); } 
+            catch (err) { try { await navigator.clipboard.writeText(chatText); logMessage('माहिती', 'मजकूर प्रत केला'); } catch (e) {} }
         }
 
         async function acquireWakeLock() {
@@ -745,7 +754,7 @@
             if (recognition) try { recognition.stop(); } catch (e) {}
             await releaseWakeLock();
             userName = ''; userAge = 25; chatHistory = []; systemInstruction = '';
-            conversationLog.innerHTML = '<div class="text-gray-500 text-center">संवाद थांबला. काळजी घे.</div>';
+            conversationLog.innerHTML = '<div class="text-gray-500 text-center">संवाद पूर्ण झाला. काळजी घ्या.</div>';
             restartChatButton.disabled = true;
         }
 
@@ -760,7 +769,7 @@
                 localStorage.removeItem(`reshma_history_${userName.toLowerCase()}`);
                 chatHistory = [];
             }
-            logMessage('माहिती', `पुन्हा नव्याने गप्पा मारूया.`);
+            logMessage('माहिती', `पुन्हा नव्याने सुरुवात करूया.`);
         }
     </script>
 </body>
