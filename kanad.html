@@ -152,7 +152,7 @@
         </button>
 
         <div class="mt-4 grid grid-cols-3 gap-3 shrink-0">
-            <button id="restart-chat-button" class="utility-btn" disabled>पुन्हा सुरू करा</button>
+            <button id="restart-chat-button" class="utility-btn" disabled>नवीन विषय</button>
             <button id="share-button" class="utility-btn bg-[#455a64] hover:bg-[#37474f]">शेअर करा</button>
             <button id="end-chat-button" class="utility-btn text-red-100 bg-[#c62828] hover:bg-[#b71c1c]" disabled>थांबवा</button>
         </div>
@@ -197,6 +197,7 @@
         let recognition;
         let lastSpokenText = ''; 
         let speechManuallyStopped = false; 
+        let isPaused = false; // New Helper Variable
         const synth = window.speechSynthesis;
         let voices = [];
         let wakeLock = null;
@@ -360,7 +361,6 @@
                         saveUserData(); 
                         buildSystemPrompt(); 
 
-                        // जुना इतिहास तपासणे
                         const previousHistory = loadChatContext(userName);
                         
                         if (previousHistory.length > 0) {
@@ -537,8 +537,6 @@
 
         // --- मुख्य लॉजिक (Brain) - कणाद सिस्टम प्रॉम्प्ट ---
         function buildSystemPrompt() {
-            
-            // वयानुसार सूचना (Logic for Age-based Persona)
             let ageToneInstruction = "";
             let conceptsToFocus = "";
 
@@ -594,7 +592,6 @@
             restartChatButton.disabled = false;
         }
 
-        // --- API कॉल्स ---
         async function getAIResponse(historyData) {
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
             try {
@@ -642,7 +639,6 @@
         }
 
         function cleanBrackets(text) {
-             // ( ) आणि [ ] आणि < > आणि * मधील मजकूर आणि चिन्हे काढणे
              return text.replace(/[\*\[\]\(\)<>`]/g, '')
                         .replace(/\(.*?\)/g, '')
                         .replace(/\[.*?\]/g, '')
@@ -659,45 +655,128 @@
             if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => { voices = synth.getVoices(); };
         }
 
+        // --- NEW & FIXED MEDIA FUNCTIONS ---
+
         function togglePauseResume() {
-            if (synth.paused) synth.resume();
-            else if (synth.speaking) { synth.pause(); recognition.stop(); setState('BUSY'); }
+            if (synth.speaking && !synth.paused) {
+                // Action: PAUSE
+                synth.pause();
+                isPaused = true;
+                // Change Icon to PLAY
+                pauseResumeButton.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
+                    </svg>`;
+                recognition.stop(); 
+            } else if (synth.paused) {
+                // Action: RESUME
+                synth.resume();
+                isPaused = false;
+                // Change Icon back to PAUSE
+                pauseResumeButton.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+                    </svg>`;
+            }
         }
 
         function stopSpeech() {
-            if (!synth.speaking) return;
-            speechManuallyStopped = true; 
+            if (!synth.speaking && !synth.paused) return;
+            
+            speechManuallyStopped = true;
             synth.cancel(); 
             recognition.stop(); 
+            
+            isPaused = false;
+            // Reset Pause Icon
+            pauseResumeButton.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+                </svg>`;
+            
             toggleMediaButtons(true);
-            logMessage('माहिती', 'थांबले.');
-            setTimeout(() => {
-                speechManuallyStopped = false;
-                if (appState !== 'IDLE') {
-                    if (systemInstruction) { setState('CONVERSATION'); startRecognitionSafe(); }
-                    else { setState('LISTENING_FOR_WAKEWORD'); startRecognitionSafe(); }
-                }
-            }, 1500);
+            logMessage('माहिती', 'संवाद थांबवला.');
+            
+            setState('IDLE'); 
         }
 
         function replaySpeech() {
-            if (lastSpokenText) { recognition.stop(); setState('BUSY'); speakText(lastSpokenText); }
+            if (lastSpokenText) {
+                recognition.stop();
+                setState('BUSY'); 
+                speakText(lastSpokenText).then(() => {}).catch(e => console.log(e));
+            }
         }
-        
+
+        async function endChat() {
+            // Requirement 6: Stop chat and start listening keeping history
+            speechManuallyStopped = true;
+            synth.cancel();
+            
+            if (recognition) recognition.stop();
+
+            logMessage('सिस्टम', 'संवाद थांबवला. पुन्हा ऐकत आहे...');
+            
+            // Do NOT clear history. Just reset state to conversation.
+            setState('CONVERSATION');
+            
+            setTimeout(() => {
+                startRecognitionSafe();
+            }, 500);
+        }
+
+        async function restartChat() {
+            // Requirement 4: Clear history and start fresh
+            if (!systemInstruction) return;
+            
+            if (synth.speaking) synth.cancel();
+            if (recognition) try { recognition.stop(); } catch(e){}
+            
+            chatHistory = [];
+            if(userName) {
+                localStorage.removeItem(`kanad_history_${userName.toLowerCase()}`);
+            }
+            
+            appState = 'IDLE'; 
+            setState('IDLE');
+            await releaseWakeLock();
+            
+            conversationLog.innerHTML = '';
+            logMessage('माहिती', `नवीन विषय सुरू केला. इतिहास पुसला.`);
+        }
+
         async function speakText(text, lang = 'mr-IN') {
             if (synth.speaking) synth.cancel();
             lastSpokenText = text;
             speechManuallyStopped = false;
+            isPaused = false;
+            
             if (voices.length === 0) voices = synth.getVoices();
 
             return new Promise((resolve, reject) => {
                 const utterance = new SpeechSynthesisUtterance(text);
-                utterance.onstart = () => { toggleMediaButtons(false); };
+                
+                utterance.onstart = () => { 
+                    toggleMediaButtons(false); 
+                    pauseResumeButton.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+                    </svg>`;
+                };
+
                 utterance.onend = () => {
                     toggleMediaButtons(true);
-                    if (speechManuallyStopped) reject(new Error("Speech manually stopped"));
-                    else resolve();
+                    if (speechManuallyStopped) {
+                        reject(new Error("Speech manually stopped"));
+                    } else {
+                        // Requirement 3: Resume listening automatically
+                        if (appState === 'CONVERSATION') {
+                            startRecognitionSafe();
+                        }
+                        resolve();
+                    }
                 };
+
                 utterance.onerror = (e) => { 
                     toggleMediaButtons(true);
                     if (e.error === 'interrupted') resolve(); else reject(e.error); 
@@ -766,31 +845,6 @@
 
         async function handleVisibilityChange() {
             if (appState !== 'IDLE' && document.visibilityState === 'visible') await acquireWakeLock();
-        }
-
-        async function endChat() {
-            appState = 'IDLE'; setState('IDLE');
-            speechManuallyStopped = true;
-            if (synth.speaking) synth.cancel();
-            if (recognition) try { recognition.stop(); } catch (e) {}
-            await releaseWakeLock();
-            userName = ''; userAge = 25; chatHistory = []; systemInstruction = '';
-            conversationLog.innerHTML = '<div class="text-gray-500 text-center">हरि ओम.</div>';
-            restartChatButton.disabled = true;
-        }
-
-        async function restartChat() {
-            if (!systemInstruction) return;
-            if (synth.speaking) synth.cancel();
-            if (recognition) try { recognition.stop(); } catch(e){}
-            appState = 'IDLE'; setState('IDLE');
-            await releaseWakeLock();
-            conversationLog.innerHTML = '';
-            if(userName) {
-                localStorage.removeItem(`kanad_history_${userName.toLowerCase()}`);
-                chatHistory = [];
-            }
-            logMessage('माहिती', `सत्र पुन्हा सुरू झाले.`);
         }
     </script>
 </body>
