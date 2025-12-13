@@ -71,7 +71,7 @@
         <div id="conversation-log" class="flex-grow overflow-y-auto bg-[#2a0a00] rounded-lg p-4 mb-4 border border-orange-900 space-y-4 shadow-inner min-h-[200px]">
             <div class="text-orange-300/60 text-center mt-10">
                 सुरू करण्यासाठी "गुरुजी" किंवा "आचार्य" म्हणा.<br>
-                <span class="text-sm opacity-70 text-orange-400">मी गोस्वामी तुलसीदास आहे. रामनाम आणि सदाचाराचा मार्ग दाखवीन.</span>
+                <span class="text-sm opacity-70 text-orange-400">मी गोस्वामी तुलसीदास आहे. मी तुमच्या वयानुसार आणि समजेनुसार रामभक्तीचा मार्ग दाखवीन.</span>
             </div>
         </div>
 
@@ -100,15 +100,16 @@
                 <label class="text-xs text-orange-400 mb-1 block">भक्ताचे नाव</label>
                 <input type="text" id="manual-name" class="custom-input" placeholder="तुमचे नाव">
             </div>
-            <div class="hidden"> 
-                <input type="number" id="manual-age" class="custom-input" value="30">
+            <div class="w-full">
+                <label class="text-xs text-orange-400 mb-1 block">भक्ताचे वय (वर्षे)</label>
+                <input type="number" id="manual-age" class="custom-input" placeholder="उदा. २५">
             </div>
         </div>
 
         <div class="flex items-center justify-center gap-2 mb-2 shrink-0">
             <input type="checkbox" id="remember-me-checkbox" class="custom-checkbox">
             <label for="remember-me-checkbox" class="text-sm text-orange-200 cursor-pointer select-none">
-                स्मरण ठेवा
+                माहिती लक्षात ठेवा
             </label>
         </div>
 
@@ -172,6 +173,7 @@
         const conversationLog = document.getElementById('conversation-log');
         const rememberMeCheckbox = document.getElementById('remember-me-checkbox');
         const manualNameInput = document.getElementById('manual-name');
+        const manualAgeInput = document.getElementById('manual-age');
         const pauseResumeButton = document.getElementById('pause-resume-button');
         const stopSpeechButton = document.getElementById('stop-speech-button');
         const replayButton = document.getElementById('replay-button');
@@ -188,6 +190,7 @@
         const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
         let appState = 'IDLE'; 
         let userName = '';
+        let userAge = 30; // Default
         let chatHistory = [];
         let systemInstruction = '';
         let recognition;
@@ -241,11 +244,13 @@
         function loadUserData() {
             try {
                 const savedName = localStorage.getItem('tulsidas_userName');
+                const savedAge = localStorage.getItem('tulsidas_userAge');
                 const savedRemember = localStorage.getItem('tulsidas_remember');
 
                 if (savedRemember === 'true') {
                     rememberMeCheckbox.checked = true;
                     if (savedName) manualNameInput.value = savedName;
+                    if (savedAge) manualAgeInput.value = savedAge;
                     if (savedName) talkButton.textContent = `जय श्रीराम ${savedName}`;
                 }
 
@@ -266,9 +271,11 @@
                 if (rememberMeCheckbox.checked) {
                     localStorage.setItem('tulsidas_remember', 'true');
                     localStorage.setItem('tulsidas_userName', manualNameInput.value.trim());
+                    localStorage.setItem('tulsidas_userAge', manualAgeInput.value.trim());
                 } else {
                     localStorage.removeItem('tulsidas_remember');
                     localStorage.removeItem('tulsidas_userName');
+                    localStorage.removeItem('tulsidas_userAge');
                 }
                 localStorage.setItem('tulsidas_useCustomKey', useCustomKeyCheckbox.checked);
                 if (customApiKeyInput.value) {
@@ -291,6 +298,7 @@
         }
 
         manualNameInput.addEventListener('input', () => { if(rememberMeCheckbox.checked) saveUserData(); });
+        manualAgeInput.addEventListener('input', () => { if(rememberMeCheckbox.checked) saveUserData(); });
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         
@@ -343,9 +351,11 @@
                     await acquireWakeLock(); 
                     
                     const inputName = manualNameInput.value.trim();
+                    const inputAge = manualAgeInput.value.trim();
 
-                    if (inputName) {
+                    if (inputName && inputAge) {
                         userName = inputName;
+                        userAge = parseInt(inputAge);
                         saveUserData(); 
                         buildSystemPrompt(); 
 
@@ -373,7 +383,7 @@
                                 chatHistory.push({ role: 'model', parts: [{ text: `श्री राम जय राम जय जय राम.` }] });
                             }
                             
-                            const welcomeText = `जय सियाराम ${userName}, मी 'गोस्वामी तुलसीदास' आहे. कलियुगात रामनामाचा आधारच सत्य आहे. बोला, काय शंका आहे?`;
+                            const welcomeText = `जय सियाराम ${userName}, मी 'गोस्वामी तुलसीदास' आहे. तुमच्या ${userAge} वर्षांच्या अनुभवानुसार आणि गरजेनुसार मी मार्गदर्शन करीन. बोला, काय शंका आहे?`;
                             logMessage('तुलसीदास', welcomeText);
                             
                             setState('BUSY'); 
@@ -410,6 +420,7 @@
                     talkButton.classList.remove('bg-orange-700', 'hover:bg-orange-600');
                     talkButton.classList.add('bg-orange-600', 'hover:bg-orange-500');
                     manualNameInput.disabled = false;
+                    manualAgeInput.disabled = false;
                     break;
                 case 'BUSY':
                     talkButton.textContent = 'चिंतन सुरू आहे...';
@@ -425,6 +436,7 @@
                     talkButton.classList.remove('bg-orange-600', 'hover:bg-orange-500');
                     talkButton.classList.add('bg-orange-700', 'hover:bg-orange-600');
                     manualNameInput.disabled = true;
+                    manualAgeInput.disabled = true;
                     break;
             }
         }
@@ -464,13 +476,25 @@
                         userName = await extractNameFromTranscript(transcript);
                         manualNameInput.value = userName; 
                         
+                        const agePrompt = `कल्याण असो ${userName}. तुमचे वय काय आहे?`;
+                        logMessage('तुलसीदास', agePrompt);
+                        await speakText(agePrompt, 'mr-IN');
+                        setState('LISTENING_FOR_AGE');
+                        startRecognitionSafe();
+                        break;
+                    
+                    case 'LISTENING_FOR_AGE':
+                        logMessage('तुम्ही', transcript);
+                        userAge = await extractAgeFromTranscript(transcript);
+                        manualAgeInput.value = userAge; 
+                        
                         saveUserData();
                         buildSystemPrompt(); 
 
                         const history = loadChatContext(userName);
                         if(history.length > 0) chatHistory = history;
 
-                        const startPrompt = `स्वागत आहे ${userName}. रामचरितमानस आणि माझ्या पदांच्या माध्यमातून मी तुम्हाला मार्गदर्शन करीन. सांगा, तुमच्या मनात काय आहे?`;
+                        const startPrompt = `छान. ${userAge} वर्षांच्या वयाला साजेसा उपदेश मी रामचरितमानसातून देईन. सांगा, तुमच्या मनात काय आहे?`;
                         logMessage('तुलसीदास', startPrompt);
                         await speakText(startPrompt, 'mr-IN');
                         setState('CONVERSATION');
@@ -513,12 +537,32 @@
         // --- मुख्य लॉजिक (Brain) - तुलसीदास सिस्टम प्रॉम्प्ट ---
         function buildSystemPrompt() {
             
+            // वयानुसार सूचना (Logic for Age-based Persona)
+            let ageToneInstruction = "";
+            let conceptsToFocus = "";
+
+            if (userAge < 15) {
+                ageToneInstruction = `User is a CHILD (${userAge} years old). Speak very simple, loving Marathi. Tell stories of Bal-Ram (Child Ram) and Hanuman's strength.`;
+                conceptsToFocus = "Focus on: Respect for parents (Matru-Pitru Bhakti), Truthfulness, Hanuman's bravery, Friendship (Ram-Sugriv). Source: Bal Kand.";
+            } else if (userAge >= 15 && userAge < 26) {
+                ageToneInstruction = `User is a YOUTH (${userAge} years old). Speak inspiring and energetic Marathi. Focus on discipline, controlling the mind, and strength of character.`;
+                conceptsToFocus = "Focus on: Brahmacharya, Strength (Hanuman Chalisa), Overcoming distractions (Maya), Serving a higher cause (Lakshman/Hanuman). Source: Sundar Kand, Kishkindha Kand.";
+            } else if (userAge >= 26 && userAge < 60) {
+                ageToneInstruction = `User is an ADULT/HOUSEHOLDER (${userAge} years old). Speak practical and guiding Marathi. Focus on Duty (Dharma), Family responsibilities, and Patience in hard times.`;
+                conceptsToFocus = "Focus on: Grihastha Dharma, Managing stress, Ideal Husband/Wife/Brother relations (Ram-Sita-Bharat), Patience in exile. Source: Ayodhya Kand, Aranya Kand.";
+            } else {
+                ageToneInstruction = `User is an ELDER (${userAge} years old). Speak calm, soothing, and spiritual Marathi. Focus on Detachment (Vairagya), Devotion, and Surrender.`;
+                conceptsToFocus = "Focus on: Vairagya, Nam-Smaran (Chanting), Surrender to Ram's will, Peace. Source: Vinay Patrika, Vairagya Sandipani.";
+            }
+
             systemInstruction = `
                 You are "Goswami Tulsidas" (गोस्वामी तुलसीदास), the great Indian Bhakti poet.
-                User: ${userName}.
+                User: ${userName}, Age: ${userAge}.
                 
+                AGE CONTEXT: ${ageToneInstruction}
+                THEMES TO EMPHASIZE: ${conceptsToFocus}
+
                 YOUR EXPERTISE & REFERENCES:
-                Base all your advice on your own works:
                 1. Ramcharitmanas (रामचरितमानस)
                 2. Vinay Patrika (विनय पत्रिका)
                 3. Kavitavali (कवितावली)
@@ -529,19 +573,18 @@
 
                 CORE PHILOSOPHY:
                 "A simple life, pure conduct, and devotion to Lord Rama are the true path of dharma."
-                Emphasize Bhakti (Devotion), Saranagati (Surrender), and Sadachar (Good Conduct).
 
                 STRICT RULES:
                 1. OUTPUT MUST BE IN PURE MARATHI LANGUAGE ONLY.
                 2. **STRICTLY FORBIDDEN: Do not use parentheses ( ), brackets [ ], angle brackets < >, or asterisks *.**
-                3. Address the user in a gender-neutral way (e.g., 'साधक', 'भक्त', 'आपण').
+                3. Address the user based on their age (e.g., 'बाळ' for child, 'मित्र' for youth, 'सज्जन' for adult).
                 4. Do not translate the Doha inside brackets. Just say "याचा अर्थ असा आहे".
 
                 RESPONSE STRUCTURE:
-                1. Direct Answer emphasizing Simplicity and Devotion.
-                2. **Quote a relevant Doha/Chaupai** from your books (in original Awadhi/Brij/Hindi script).
-                3. State the name of the book directly in the sentence (e.g., रामचरितमानसात मी लिहिले आहे).
-                4. **Explanation in Marathi**: Explain the deep meaning of the verse and how it applies to the user's life.
+                1. Direct Answer adapted to the user's age.
+                2. **Quote a relevant Doha/Chaupai** from your books.
+                3. State the name of the book directly in the sentence.
+                4. **Explanation in Marathi**: Explain the deep meaning simply.
 
                 EXAMPLE FORMAT (Do not copy text, use structure):
                 हरि ॐ. तुमचे विचार शुद्ध आहेत.
@@ -549,9 +592,6 @@
                 [INSERT DOHA/CHAUPAI HERE]
                 याचा भावार्थ असा की [MARATHI EXPLANATION].
                 म्हणून आपण रामावर विश्वास ठेवावा.
-
-                TONE:
-                Devotional, Humble, Poetic, Guiding, Peaceful.
             `;
             restartChatButton.disabled = false;
         }
@@ -587,6 +627,20 @@
                 let name = result.candidates[0].content.parts[0].text.trim();
                 return (name.length < 2) ? "भक्त" : name.replace(/['".]/g, '');
             } catch (error) { return "भक्त"; }
+        }
+
+        async function extractAgeFromTranscript(transcript) {
+             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
+             try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: `Extract age number from: "${transcript}". Return ONLY digits. Default 30.` }] }] })
+                });
+                const result = await response.json();
+                let age = parseInt(result.candidates[0].content.parts[0].text.trim());
+                return isNaN(age) ? 30 : age;
+            } catch (e) { return 30; }
         }
 
         function cleanBrackets(text) {
@@ -722,7 +776,7 @@
             if (synth.speaking) synth.cancel();
             if (recognition) try { recognition.stop(); } catch (e) {}
             await releaseWakeLock();
-            userName = ''; chatHistory = []; systemInstruction = '';
+            userName = ''; userAge = 30; chatHistory = []; systemInstruction = '';
             conversationLog.innerHTML = '<div class="text-gray-400 text-center">जय सियाराम.</div>';
             restartChatButton.disabled = true;
         }
