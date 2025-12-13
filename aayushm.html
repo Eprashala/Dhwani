@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aayush's Dhwani AI Coach</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .listening-pulse { animation: pulse 1.5s infinite ease-in-out; }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        .icon-btn {
+            @apply p-3 rounded-full text-white transition-all duration-200 bg-gray-700 hover:bg-gray-600 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-40 disabled:cursor-not-allowed;
+        }
+        .utility-btn {
+            @apply w-full py-3 px-2 rounded-lg text-sm font-semibold transition-colors bg-gray-700 text-white hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-800 disabled:text-gray-600;
+        }
+        .cricket-accent { color: #60a5fa; }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4" oncontextmenu="return false;">
+
+    <div class="bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-2xl flex flex-col h-[95vh] md:h-auto">
+        
+        <div class="flex items-center justify-between mb-4 shrink-0">
+            <div>
+                <h1 class="text-2xl md:text-3xl font-bold text-white">
+                    Hello <span class="cricket-accent">Aayush</span> 🏏
+                </h1>
+                <p class="text-xs text-gray-400">Std 10th Prep • Future Legend</p>
+            </div>
+            <div id="status-indicator" class="w-4 h-4 rounded-full bg-gray-500 transition-colors" title="Offline"></div>
+        </div>
+
+        <div id="conversation-log" class="flex-grow overflow-y-auto bg-gray-900 rounded-lg p-4 mb-4 border border-gray-700 space-y-4 shadow-inner min-h-[200px]">
+            <div class="text-gray-400 text-center mt-10">
+                Ready for practice & studies?<br>
+                <span class="text-sm opacity-70">Tap "Start Session" to begin.</span>
+            </div>
+        </div>
+
+        <div class="flex justify-center gap-8 mb-4 shrink-0 bg-gray-800/50 p-2 rounded-xl">
+            <button id="pause-resume-button" class="icon-btn bg-blue-900/30 hover:bg-blue-800" disabled><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" /></svg></button>
+            <button id="stop-speech-button" class="icon-btn bg-red-900/30 hover:bg-red-800" disabled><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z" /></svg></button>
+            <button id="replay-button" class="icon-btn bg-green-900/30 hover:bg-green-800" disabled><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg></button>
+        </div>
+
+        <div class="w-full flex flex-col items-center justify-center mb-4 shrink-0">
+             <div class="flex items-center justify-center gap-2 mb-2">
+                <input type="checkbox" id="remember-history-checkbox" class="custom-checkbox" checked>
+                <label for="remember-history-checkbox" class="text-sm text-gray-300 cursor-pointer select-none">Remember Context</label>
+            </div>
+            
+            <button id="advance-toggle-btn" class="text-xs text-blue-400 hover:text-blue-300 underline mb-2 focus:outline-none">▼ API Key Settings</button>
+            <div id="advance-container" class="hidden w-full bg-gray-800/80 border border-gray-700 rounded-lg p-4 flex flex-col gap-3 transition-all">
+                <input type="text" id="custom-api-key-input" class="block w-full text-center border border-gray-500 rounded-lg p-2 bg-black text-white text-xs" placeholder="Paste API Key">
+            </div>
+        </div>
+
+        <button id="talk-button" class="w-full py-4 px-6 rounded-lg text-lg font-bold transition-all duration-300 ease-in-out shrink-0 bg-blue-600 text-white shadow-lg shadow-blue-900/50 hover:bg-blue-500 hover:shadow-blue-500/50 hover:-translate-y-0.5 disabled:bg-gray-600 disabled:cursor-not-allowed">
+            Start Session 🏏
+        </button>
+
+        <div class="mt-4 grid grid-cols-2 gap-3 shrink-0">
+            <button id="restart-chat-button" class="utility-btn" disabled>New Topic</button>
+            <button id="end-chat-button" class="utility-btn text-red-200 hover:bg-red-900/40" disabled>End Chat</button>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIG ---
+        const DEFAULT_API_KEY = "AIzaSyA0JhywNB9YCLKXokLI4gAre_AQfFgVUbE"; 
+        
+        // --- ELEMENTS ---
+        const talkBtn = document.getElementById('talk-button');
+        const statusInd = document.getElementById('status-indicator');
+        const chatLog = document.getElementById('conversation-log');
+        const keyInput = document.getElementById('custom-api-key-input');
+        const advanceBox = document.getElementById('advance-container');
+        const historyCheck = document.getElementById('remember-history-checkbox');
+        
+        // --- STATE ---
+        let appState = 'IDLE';
+        let recognition;
+        let chatHistory = [];
+        let synth = window.speechSynthesis;
+        let voices = [];
+        let lastText = "";
+
+        // --- INIT ---
+        window.onload = () => {
+            // Load Voices
+            voices = synth.getVoices();
+            if(synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => voices = synth.getVoices();
+            
+            // Load Settings
+            if(localStorage.getItem('dhwani_key')) keyInput.value = localStorage.getItem('dhwani_key');
+            
+            // Setup Mic
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert("Browser does not support Speech API. Use Chrome.");
+                talkBtn.disabled = true;
+                talkBtn.textContent = "Browser Not Supported";
+            } else {
+                const SpeechReq = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechReq();
+                recognition.continuous = false;
+                recognition.lang = 'en-IN'; // Input is English (Indian)
+                recognition.interimResults = false;
+                
+                recognition.onstart = () => { console.log("Mic Started"); };
+                recognition.onresult = (e) => handleSpeech(e.results[e.results.length-1][0].transcript);
+                recognition.onerror = (e) => { 
+                    console.error("Mic Error:", e.error);
+                    if(appState === 'CONVERSATION' && e.error === 'no-speech') {
+                        try { recognition.start(); } catch(e){} 
+                    } else if (e.error === 'not-allowed') {
+                        alert("Microphone access denied. Please check site permissions.");
+                        resetState();
+                    }
+                };
+                recognition.onend = () => {
+                    if(appState === 'CONVERSATION') { try { recognition.start(); } catch(e){} }
+                    else { resetState(); }
+                };
+            }
+        };
+
+        // --- CORE LOGIC ---
+        talkBtn.addEventListener('click', async () => {
+            if (appState === 'IDLE') {
+                // STARTING
+                try {
+                    // 1. Try Fullscreen
+                    try { await document.documentElement.requestFullscreen(); } catch(e){ console.log("Fullscreen failed"); }
+                    
+                    // 2. Set State
+                    appState = 'BUSY';
+                    updateUI('BUSY');
+                    
+                    // 3. Greeting Logic
+                    const hasHistory = localStorage.getItem('aayush_hist');
+                    let prompt = "";
+                    
+                    if (historyCheck.checked && hasHistory) {
+                        chatHistory = JSON.parse(hasHistory);
+                        prompt = "System: I am back. Greet me about cricket (Sachin/Virat) and REVISE the last topic from history briefly.";
+                    } else {
+                        chatHistory = [];
+                        prompt = "System: Start fresh. Greet Aayush (16yo, 10th std, cricketer). Ask about practice and wish him to break Sachin/Virat/Joe Root records.";
+                    }
+
+                    // 4. API Call
+                    log("Dhwani", "Thinking...");
+                    const response = await callGemini(prompt, true); 
+                    
+                    // 5. Speak & Listen
+                    updateChat(response, 'model');
+                    await speak(response);
+                    
+                    appState = 'CONVERSATION';
+                    updateUI('LISTENING');
+                    try { recognition.start(); } catch(e) { console.error("Recog Start Fail", e); }
+                    
+                } catch (err) {
+                    console.error("Critical Start Error:", err);
+                    alert("Error starting: " + err.message);
+                    resetState();
+                }
+            } else {
+                // STOPPING
+                resetState();
+            }
+        });
+
+        // --- SPEECH HANDLING ---
+        async function handleSpeech(text) {
+            recognition.stop();
+            appState = 'BUSY';
+            updateUI('BUSY');
+            
+            updateChat(text, 'user');
+            
+            const response = await callGemini(text, false);
+            updateChat(response, 'model');
+            
+            await speak(response);
+            
+            appState = 'CONVERSATION';
+            updateUI('LISTENING');
+            try { recognition.start(); } catch(e){}
+        }
+
+        // --- GEMINI API ---
+        async function callGemini(userInput, isHidden) {
+            const key = keyInput.value.trim() || DEFAULT_API_KEY;
+            
+            // --- MODIFIED SYSTEM PROMPT FOR MARATHI TEACHER PERSONA IN ENGLISH ---
+            const systemInst = `
+            You are "Dhwani Teacher", a native Maharashtrian teacher from a State Board school.
+            Student: Aayush (16 years old, 10th Standard, State Level Cricketer).
+            
+            **TEACHING STYLE & LANGUAGE RULES:**
+            1. **Primary Language:** ENGLISH (Indian). Since he is in English medium 10th std, you must teach the syllabus in English.
+            2. **The "Marathi Teacher" Vibe:** Even though you speak English, your *soul* and *style* must be Maharashtrian. 
+               - Use Marathi interjections like "Arre baba", "Lakshat thev" (remember this), "Shabbas" (Well done), "Neet aaik" (Listen carefully).
+               - If a concept is hard, explain the *logic* using Marathi examples, but keep the definition in English.
+               - Example: "Newton's third law says equal and opposite reaction. Jas tu ball bhintivar marlas tar to parat yeto, tech he!"
+            3. **Cricket Connection:** Always support his cricket. Wish him to break records of Sachin, Virat, and Joe Root.
+            4. **Brevity:** Keep answers SHORT and simple (0.9 speed). He has limited time.
+            5. **Goal:** Prepare him for the 10th Board Exam.
+            
+            Always end your explanation with a short question to check if he understood.
+            `;
+
+            const msgObj = { role: 'user', parts: [{ text: userInput }] };
+            const payloadHistory = [...chatHistory, msgObj];
+
+            try {
+                const req = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${key}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        contents: payloadHistory,
+                        systemInstruction: { parts: [{ text: systemInst }] }
+                    })
+                });
+                
+                if(!req.ok) throw new Error("API Error: " + req.statusText);
+                
+                const data = await req.json();
+                return data.candidates[0].content.parts[0].text;
+            } catch (e) {
+                return "Network error. Please check internet or API Key.";
+            }
+        }
+
+        // --- TTS ---
+        function speak(text) {
+            if(synth.speaking) synth.cancel();
+            return new Promise(resolve => {
+                const utt = new SpeechSynthesisUtterance(cleanText(text));
+                
+                // --- SPEED REDUCED TO 0.9 ---
+                utt.rate = 0.9; 
+                
+                // Voice Selection: Priority to Indian English (en-IN)
+                const v = voices.find(x => x.lang === 'en-IN' || x.lang === 'hi-IN');
+                if(v) utt.voice = v;
+                
+                utt.onend = resolve;
+                utt.onerror = resolve; 
+                synth.speak(utt);
+            });
+        }
+
+        // --- UI HELPERS ---
+        function updateUI(state) {
+            if (state === 'IDLE') {
+                talkBtn.textContent = "Start Session 🏏";
+                talkBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                talkBtn.classList.add('bg-blue-600', 'hover:bg-blue-500');
+                statusInd.className = "w-4 h-4 rounded-full bg-gray-500";
+            } else if (state === 'BUSY') {
+                talkBtn.textContent = "Thinking...";
+                statusInd.className = "w-4 h-4 rounded-full bg-yellow-400";
+            } else {
+                talkBtn.textContent = "Stop Listening";
+                talkBtn.classList.remove('bg-blue-600', 'hover:bg-blue-500');
+                talkBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+                statusInd.className = "w-4 h-4 rounded-full bg-blue-500 listening-pulse";
+            }
+        }
+
+        function resetState() {
+            appState = 'IDLE';
+            try { recognition.stop(); } catch(e){}
+            synth.cancel();
+            updateUI('IDLE');
+        }
+
+        function updateChat(text, role) {
+            if (!text) return;
+            const logs = chatLog.querySelectorAll('div');
+            if(logs.length > 0 && logs[logs.length-1].textContent.includes("Thinking...")) {
+                logs[logs.length-1].remove();
+            }
+
+            const div = document.createElement('div');
+            const name = role === 'user' ? 'Aayush' : 'Dhwani Teacher';
+            const color = role === 'user' ? 'text-green-400' : 'text-cyan-400';
+            
+            div.innerHTML = `<strong class="${color}">${name}:</strong> ${cleanText(text)}`;
+            chatLog.appendChild(div);
+            chatLog.scrollTop = chatLog.scrollHeight;
+
+            if(role !== 'system') {
+                chatHistory.push({ role: role, parts: [{ text: text }] });
+                if(chatHistory.length > 15) chatHistory = chatHistory.slice(-15);
+                localStorage.setItem('aayush_hist', JSON.stringify(chatHistory));
+            }
+        }
+
+        function log(sender, msg) {
+            const div = document.createElement('div');
+            div.innerHTML = `<span class="text-gray-400 italic">${sender}: ${msg}</span>`;
+            chatLog.appendChild(div);
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+
+        function cleanText(t) { return t.replace(/[*#]/g, '').trim(); }
+
+        // Settings Toggles
+        document.getElementById('advance-toggle-btn').onclick = () => {
+            advanceBox.classList.toggle('hidden');
+        };
+        document.getElementById('custom-api-key-input').oninput = (e) => {
+            localStorage.setItem('dhwani_key', e.target.value);
+        };
+        document.getElementById('restart-chat-button').onclick = () => {
+            localStorage.removeItem('aayush_hist');
+            chatHistory = [];
+            chatLog.innerHTML = '<div class="text-gray-500 text-center">Chat Cleared.</div>';
+            resetState();
+        };
+        document.getElementById('end-chat-button').onclick = resetState;
+
+    </script>
+</body>
+</html>
