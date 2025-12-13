@@ -73,8 +73,8 @@
         <div class="flex justify-center gap-4 mb-4 shrink-0 bg-gray-800/80 p-3 rounded-xl border border-gray-700/50">
             
             <button id="pause-resume-button" class="icon-btn" title="Pause/Resume Speech" disabled>
-                <svg id="icon-pause" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 hidden"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" /></svg>
-                <svg id="icon-play" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" /></svg>
+                <svg id="icon-pause" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" /></svg>
+                <svg id="icon-play" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 hidden"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" /></svg>
             </button>
             
             <button id="stop-speech-button" class="icon-btn hover:bg-red-900/50 hover:border-red-500/50" title="Stop Speaking" disabled>
@@ -130,7 +130,7 @@
            ========================================================================== */
 
         const USER_NAME = "Ayush";
-        const DEFAULT_API_KEY = "AIzaSyDrug6WnhILDj0t_weHOOpLf0dXy-IRU9Q"; 
+        const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
 
         // DOM Elements
         const talkBtn = document.getElementById('talk-button');
@@ -216,22 +216,27 @@
         // Repeat
         repeatBtn.addEventListener('click', () => {
             if (!lastSpokenText) return;
+            // CRITICAL FIX: Ensure recognition is stopped BEFORE speaking starts
             if (recognition) recognition.stop();
+            isMicListening = false;
+            
             synth.cancel();
             speakAndThenListen(lastSpokenText);
         });
 
-        // Pause/Resume
+        // Pause/Resume (FIXED: ICON TOGGLE)
         pauseBtn.addEventListener('click', () => {
             if (synth.speaking) {
                 if (synth.paused) {
+                    // RESUME
                     synth.resume();
-                    iconPause.classList.remove('hidden');
-                    iconPlay.classList.add('hidden');
+                    iconPause.classList.remove('hidden'); // Show Pause
+                    iconPlay.classList.add('hidden');    // Hide Play
                 } else {
+                    // PAUSE
                     synth.pause();
-                    iconPause.classList.add('hidden');
-                    iconPlay.classList.remove('hidden');
+                    iconPause.classList.add('hidden');   // Hide Pause
+                    iconPlay.classList.remove('hidden'); // Show Play
                 }
             }
         });
@@ -267,13 +272,18 @@
         }
 
         async function speakAndThenListen(text) {
-            // Ensure Mic is OFF while speaking
+            // STEP 1: STRICTLY STOP MIC
             if (recognition) recognition.stop();
             isMicListening = false;
+            
             updateStatusBadge("SPEAKING", "bg-yellow-500", "text-black");
             toggleControls(true); 
 
             lastSpokenText = text; 
+
+            // RESET ICONS (Always show Pause icon when new speech starts)
+            iconPause.classList.remove('hidden');
+            iconPlay.classList.add('hidden');
 
             await new Promise((resolve) => {
                 const utterance = new SpeechSynthesisUtterance(text);
@@ -291,12 +301,9 @@
                 utterance.onerror = resolve;
 
                 synth.speak(utterance);
-                
-                iconPause.classList.remove('hidden');
-                iconPlay.classList.add('hidden');
             });
 
-            // Turn Mic ON after speaking
+            // STEP 2: START MIC ONLY AFTER SPEECH ENDS
             if (isSessionActive) {
                 startListening();
             }
@@ -339,7 +346,7 @@
                 talkBtn.textContent = "Dhwani is teaching...";
                 
                 const rawReply = await getGeminiResponse();
-                const cleanReply = cleanText(rawReply); // Strict cleaning logic applied here
+                const cleanReply = cleanText(rawReply); 
                 
                 appendMessage('Dhwani', cleanReply);
                 chatHistory.push({ role: 'model', parts: [{ text: cleanReply }] });
@@ -366,7 +373,6 @@
         async function getGeminiResponse() {
             const key = customKeyChk.checked && apiKeyInput.value ? apiKeyInput.value : DEFAULT_API_KEY;
             
-            // PEDAGOGY UPDATE: Teach First, Marks Later. No LaTeX.
             const systemPrompt = `
                 You are Dhwani, a professional school teacher for 10th Standard Maharashtra Board.
                 Student: Ayush (16 years old).
@@ -378,10 +384,10 @@
                 4. Tone: Professional, caring, authoritative yet kind.
                 
                 STRICT FORMATTING RULES:
-                1. DO NOT use brackets () in your speech for instructions or translations.
-                2. DO NOT use LaTeX symbols like $. Write "x squared" not "$x^2$". Write "Rupees" not "₹".
+                1. DO NOT use brackets () in your speech.
+                2. DO NOT use LaTeX symbols like $.
                 3. DO NOT use markdown like * or #.
-                4. Keep answers within 7-8 lines maximum per turn (break down long topics).
+                4. Keep answers within 7-8 lines maximum per turn.
             `;
 
             try {
@@ -401,16 +407,10 @@
         }
 
         // --- 6. UTILITIES (CLEANING & STATE) ---
-        
-        // RECTIFIED CLEANING FUNCTION
         function cleanText(text) {
-            // 1. Remove all * and # (Markdown)
             let cleaned = text.replace(/[*#]/g, '');
-            // 2. Remove all $ signs (LaTeX artifacts)
             cleaned = cleaned.replace(/\$/g, ''); 
-            // 3. Remove text inside brackets () and the brackets themselves
             cleaned = cleaned.replace(/\s*\(.*?\)\s*/g, ' '); 
-            // 4. Collapse multiple spaces
             return cleaned.replace(/\s+/g, ' ').trim();
         }
 
@@ -431,6 +431,8 @@
                 stopBtn.disabled = true;
                 repeatBtn.disabled = true;
                 updateStatusBadge("OFFLINE", "bg-gray-700", "text-gray-400");
+                iconPause.classList.remove('hidden'); // Reset icons
+                iconPlay.classList.add('hidden');
             }
         }
 
@@ -487,14 +489,12 @@
         };
         apiKeyInput.oninput = (e) => localStorage.setItem('dhwani_key', e.target.value);
         
-        // PASTE BUTTON LOGIC
         pasteKeyBtn.addEventListener('click', async () => {
             try {
                 const text = await navigator.clipboard.readText();
                 if(text) {
                     apiKeyInput.value = text;
                     localStorage.setItem('dhwani_key', text);
-                    // Visual feedback
                     const originalText = pasteKeyBtn.innerText;
                     pasteKeyBtn.innerText = "Pasted!";
                     setTimeout(() => pasteKeyBtn.innerText = originalText, 1000);
