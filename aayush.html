@@ -158,6 +158,7 @@
         // State Variables
         let isSessionActive = false;
         let isMicListening = false; 
+        let isAiSpeaking = false; // NEW SAFETY FLAG
         let chatHistory = [];
         let recognition;
         let lastSpokenText = ''; 
@@ -213,38 +214,43 @@
             await speakAndThenListen(freshStart);
         });
 
-        // Repeat
+        // --- FIXED REPEAT FUNCTION ---
         repeatBtn.addEventListener('click', () => {
             if (!lastSpokenText) return;
-            // CRITICAL FIX: Ensure recognition is stopped BEFORE speaking starts
-            if (recognition) recognition.stop();
+            
+            // 1. Force kill microphone immediately
+            if (recognition) {
+                recognition.abort(); // 'abort' is faster than 'stop'
+            }
             isMicListening = false;
             
+            // 2. Stop current speech
             synth.cancel();
-            speakAndThenListen(lastSpokenText);
+
+            // 3. Wait for hardware to release before speaking (CRITICAL FIX)
+            setTimeout(() => {
+                speakAndThenListen(lastSpokenText);
+            }, 300); // 300ms delay ensures mic is truly off
         });
 
-        // Pause/Resume (FIXED: ICON TOGGLE)
+        // Pause/Resume
         pauseBtn.addEventListener('click', () => {
             if (synth.speaking) {
                 if (synth.paused) {
-                    // RESUME
                     synth.resume();
-                    iconPause.classList.remove('hidden'); // Show Pause
-                    iconPlay.classList.add('hidden');    // Hide Play
+                    iconPause.classList.remove('hidden'); 
+                    iconPlay.classList.add('hidden');    
                 } else {
-                    // PAUSE
                     synth.pause();
-                    iconPause.classList.add('hidden');   // Hide Pause
-                    iconPlay.classList.remove('hidden'); // Show Play
+                    iconPause.classList.add('hidden');   
+                    iconPlay.classList.remove('hidden'); 
                 }
             }
         });
 
         // Stop
         stopBtn.addEventListener('click', () => {
-            synth.cancel(); 
-            if (recognition) recognition.stop();
+            stopEverything();
             setUIState('IDLE_WAITING');
         });
 
@@ -267,27 +273,28 @@
 
         function stopEverything() {
             if (synth.speaking) synth.cancel();
-            if (recognition) try { recognition.stop(); } catch(e){}
+            if (recognition) try { recognition.abort(); } catch(e){}
             isMicListening = false;
+            isAiSpeaking = false;
         }
 
         async function speakAndThenListen(text) {
-            // STEP 1: STRICTLY STOP MIC
-            if (recognition) recognition.stop();
+            // SAFEGUARD: Ensure mic is OFF
+            if (recognition) recognition.abort();
             isMicListening = false;
+            isAiSpeaking = true; // Set flag
             
             updateStatusBadge("SPEAKING", "bg-yellow-500", "text-black");
             toggleControls(true); 
 
             lastSpokenText = text; 
 
-            // RESET ICONS (Always show Pause icon when new speech starts)
             iconPause.classList.remove('hidden');
             iconPlay.classList.add('hidden');
 
             await new Promise((resolve) => {
                 const utterance = new SpeechSynthesisUtterance(text);
-                utterance.rate = 0.9; // Requirement: 0.9x speed
+                utterance.rate = 0.9; 
                 utterance.pitch = 1.0;
                 
                 const isDevanagari = /[\u0900-\u097F]/.test(text);
@@ -297,13 +304,19 @@
                 const preferredVoice = voices.find(v => v.lang === langCode && v.name.includes('Google')) || voices.find(v => v.lang === langCode);
                 if (preferredVoice) utterance.voice = preferredVoice;
 
-                utterance.onend = resolve;
-                utterance.onerror = resolve;
+                utterance.onend = () => {
+                    isAiSpeaking = false; // Clear flag
+                    resolve();
+                };
+                utterance.onerror = () => {
+                    isAiSpeaking = false;
+                    resolve();
+                };
 
                 synth.speak(utterance);
             });
 
-            // STEP 2: START MIC ONLY AFTER SPEECH ENDS
+            // Start Mic only after speech is done
             if (isSessionActive) {
                 startListening();
             }
@@ -318,6 +331,11 @@
             recognition.lang = 'en-IN';
 
             recognition.onstart = () => {
+                // SAFETY CHECK: If AI is still speaking, kill the mic
+                if(isAiSpeaking) {
+                    recognition.abort();
+                    return;
+                }
                 isMicListening = true;
                 updateStatusBadge("LISTENING", "bg-red-500", "text-white");
                 talkBtn.classList.add('bg-red-600', 'animate-pulse');
@@ -328,13 +346,18 @@
             recognition.onend = () => {
                 isMicListening = false;
                 talkBtn.classList.remove('bg-red-600', 'animate-pulse');
-                if (isSessionActive && statusBadge.innerText !== "THINKING") {
+                
+                // Only go to WAITING if we aren't about to Think or Speak
+                if (isSessionActive && statusBadge.innerText !== "THINKING" && statusBadge.innerText !== "SPEAKING") {
                     updateStatusBadge("WAITING", "bg-green-600", "text-white");
                     talkBtn.textContent = "Tap to Speak";
                 }
             };
 
             recognition.onresult = async (event) => {
+                // SAFETY CHECK: Ignore result if AI is speaking
+                if(isAiSpeaking) return;
+
                 const transcript = event.results[0][0].transcript.trim();
                 if (!transcript) return;
 
@@ -359,7 +382,7 @@
         }
 
         function startListening() {
-            if (isSessionActive && recognition && !isMicListening) {
+            if (isSessionActive && recognition && !isMicListening && !isAiSpeaking) {
                 try { recognition.start(); } catch(e) {}
             }
         }
@@ -431,8 +454,13 @@
                 stopBtn.disabled = true;
                 repeatBtn.disabled = true;
                 updateStatusBadge("OFFLINE", "bg-gray-700", "text-gray-400");
-                iconPause.classList.remove('hidden'); // Reset icons
+                iconPause.classList.remove('hidden'); 
                 iconPlay.classList.add('hidden');
+            } else if (state === 'IDLE_WAITING') {
+                 // For stop button
+                 talkBtn.textContent = "Tap to Speak";
+                 talkBtn.classList.remove('bg-red-600', 'animate-pulse');
+                 updateStatusBadge("WAITING", "bg-green-600", "text-white");
             }
         }
 
