@@ -11,7 +11,7 @@
         /* Pulse Animation for Mic */
         .listening-pulse { animation: pulse 1.5s infinite ease-in-out; }
         @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } /* Red pulse */
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 
             70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
             100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
         }
@@ -54,9 +54,9 @@
         <div class="flex items-center justify-between mb-4 shrink-0">
             <div>
                 <h1 class="text-2xl font-bold text-white tracking-tight">
-                    <span class="text-blue-400">Dhwani</span> AI Tutor
+                    <span class="text-blue-400">Dhwani</span> AI Teacher
                 </h1>
-                <p class="text-xs text-gray-400">Student: <b>Ayush (10th Std)</b> | Focus: Cricket & Exams</p>
+                <p class="text-xs text-gray-400">Student: <b>Ayush (10th Std)</b> | Mode: Professional Teaching</p>
             </div>
             <div id="status-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-gray-700 text-gray-400 border border-gray-600">
                 OFFLINE
@@ -66,7 +66,7 @@
         <div id="conversation-log" class="flex-grow overflow-y-auto bg-gray-900 rounded-xl p-4 mb-4 border border-gray-700 space-y-4 shadow-inner min-h-[300px]">
             <div class="text-gray-500 text-center mt-20 text-sm">
                 Tap <b>"Start Class"</b> to begin.<br>
-                <span class="opacity-70 text-xs">Remember: Quality over Quantity.</span>
+                <span class="opacity-70 text-xs">Topic -> Explanation -> Exam Questions</span>
             </div>
         </div>
 
@@ -102,7 +102,7 @@
         </div>
 
         <div class="mt-4 flex flex-col items-center">
-             <button id="advance-toggle-btn" class="text-xs text-gray-500 hover:text-gray-300 mb-2">▼ Settings (API & Memory)</button>
+             <button id="advance-toggle-btn" class="text-xs text-gray-500 hover:text-gray-300 mb-2">▼ Settings</button>
              <div id="advance-container" class="hidden w-full flex-col gap-2 p-3 bg-gray-800 rounded border border-gray-700">
                 <div class="flex items-center justify-between">
                     <label class="text-sm text-gray-300">Remember History</label>
@@ -124,21 +124,19 @@
            ========================================================================== */
 
         const USER_NAME = "Ayush";
-        const DEFAULT_API_KEY = "AIzaSyDrug6WnhILDj0t_weHOOpLf0dXy-IRU9Q"; 
+        const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
 
         // DOM Elements
         const talkBtn = document.getElementById('talk-button');
         const statusBadge = document.getElementById('status-badge');
         const chatLog = document.getElementById('conversation-log');
         
-        // Media Buttons
+        // Buttons
         const pauseBtn = document.getElementById('pause-resume-button');
         const stopBtn = document.getElementById('stop-speech-button');
         const repeatBtn = document.getElementById('repeat-button');
         const iconPause = document.getElementById('icon-pause');
         const iconPlay = document.getElementById('icon-play');
-
-        // Action Buttons
         const newTopicBtn = document.getElementById('new-topic-button');
         const endChatBtn = document.getElementById('end-chat-button');
         const shareBtn = document.getElementById('share-button');
@@ -151,8 +149,8 @@
         const apiKeyInput = document.getElementById('custom-api-key-input');
 
         // State Variables
-        let isSessionActive = false; // Is the class running?
-        let isMicListening = false;  // Is mic currently grabbing audio?
+        let isSessionActive = false;
+        let isMicListening = false; 
         let chatHistory = [];
         let recognition;
         let lastSpokenText = ''; 
@@ -182,45 +180,41 @@
                 if (saved.length > 0) {
                     chatHistory = saved;
                     appendMessage('Dhwani', "Welcome back, Ayush.");
-                    await speakAndThenListen("Welcome back, Ayush. Ready to continue our session?");
+                    await speakAndThenListen("Welcome back, Ayush. I remember our last lesson. Shall we continue?");
                 } else {
                     chatHistory = [];
-                    const intro = "Hello Ayush! I know you are tired from cricket, but let's focus. Which subject specifically shall we target today?";
+                    const intro = "Hello Ayush. As your teacher, I will ensure you understand the concepts fully first. Which chapter shall we start with?";
                     appendMessage('Dhwani', intro);
                     await speakAndThenListen(intro);
                 }
             } else {
-                // If clicked while active, just toggle listening if not speaking
                 if (!synth.speaking) toggleMic();
             }
         });
 
-        // New Topic (Reset)
+        // New Topic (Fresh Start)
         newTopicBtn.addEventListener('click', async () => {
             stopEverything();
             isSessionActive = true;
-            chatHistory = []; // Wipe context
-            chatLog.innerHTML = ''; // Wipe screen
-            saveChatContext(); // Save empty state
+            chatHistory = []; 
+            chatLog.innerHTML = ''; 
+            saveChatContext(); 
             setUIState('ACTIVE');
             
-            const freshStart = "Okay, new topic. Screen cleared. What is the next subject, Captain?";
+            const freshStart = "New Topic. I am ready. Please tell me the subject and chapter name, Ayush.";
             appendMessage('Dhwani', freshStart);
             await speakAndThenListen(freshStart);
         });
 
-        // Repeat Last Answer
+        // Repeat
         repeatBtn.addEventListener('click', () => {
             if (!lastSpokenText) return;
-            // Stop mic first to prevent feedback
             if (recognition) recognition.stop();
-            // Stop current speech if any
             synth.cancel();
-            // Speak text, then auto-listen
             speakAndThenListen(lastSpokenText);
         });
 
-        // Pause/Resume Speech
+        // Pause/Resume
         pauseBtn.addEventListener('click', () => {
             if (synth.speaking) {
                 if (synth.paused) {
@@ -235,14 +229,14 @@
             }
         });
 
-        // Stop Speech
+        // Stop
         stopBtn.addEventListener('click', () => {
-            synth.cancel(); // Stop talking
-            if (recognition) recognition.stop(); // Stop listening
-            setUIState('IDLE_WAITING'); // Update UI to show we stopped
+            synth.cancel(); 
+            if (recognition) recognition.stop();
+            setUIState('IDLE_WAITING');
         });
 
-        // End Class
+        // End
         endChatBtn.addEventListener('click', () => {
             stopEverything();
             isSessionActive = false;
@@ -266,26 +260,23 @@
         }
 
         async function speakAndThenListen(text) {
-            // 1. Ensure Mic is OFF
+            // Ensure Mic is OFF while speaking
             if (recognition) recognition.stop();
             isMicListening = false;
             updateStatusBadge("SPEAKING", "bg-yellow-500", "text-black");
-            toggleControls(true); // Enable pause/stop/repeat
+            toggleControls(true); 
 
-            lastSpokenText = text; // Save for repeat button
+            lastSpokenText = text; 
 
-            // 2. Speak
             await new Promise((resolve) => {
                 const utterance = new SpeechSynthesisUtterance(text);
-                utterance.rate = 0.9; 
+                utterance.rate = 0.9; // Requirement: 0.9x speed
                 utterance.pitch = 1.0;
                 
-                // Language Detection
                 const isDevanagari = /[\u0900-\u097F]/.test(text);
                 const langCode = isDevanagari ? 'hi-IN' : 'en-IN';
                 utterance.lang = langCode;
 
-                // Voice Selection
                 const preferredVoice = voices.find(v => v.lang === langCode && v.name.includes('Google')) || voices.find(v => v.lang === langCode);
                 if (preferredVoice) utterance.voice = preferredVoice;
 
@@ -294,12 +285,11 @@
 
                 synth.speak(utterance);
                 
-                // Update Pause Icon state
                 iconPause.classList.remove('hidden');
                 iconPlay.classList.add('hidden');
             });
 
-            // 3. Turn Mic ON (Wait for input)
+            // Turn Mic ON after speaking
             if (isSessionActive) {
                 startListening();
             }
@@ -309,7 +299,7 @@
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
             recognition = new SpeechRecognition();
-            recognition.continuous = false; // We want turn-taking
+            recognition.continuous = false; 
             recognition.interimResults = false;
             recognition.lang = 'en-IN';
 
@@ -318,19 +308,15 @@
                 updateStatusBadge("LISTENING", "bg-red-500", "text-white");
                 talkBtn.classList.add('bg-red-600', 'animate-pulse');
                 talkBtn.textContent = "Listening...";
-                toggleControls(false); // Disable speech controls while listening
+                toggleControls(false); 
             };
 
             recognition.onend = () => {
                 isMicListening = false;
                 talkBtn.classList.remove('bg-red-600', 'animate-pulse');
-                // If we didn't just end the class, and not processing, go to IDLE waiting
                 if (isSessionActive && statusBadge.innerText !== "THINKING") {
                     updateStatusBadge("WAITING", "bg-green-600", "text-white");
                     talkBtn.textContent = "Tap to Speak";
-                    // Note: We don't auto-restart here to give Ayush time to think. 
-                    // He must tap 'Tap to Speak' or we can add auto-restart logic if preferred.
-                    // For now, let's keep it manual trigger if silence to avoid loops.
                 }
             };
 
@@ -338,26 +324,24 @@
                 const transcript = event.results[0][0].transcript.trim();
                 if (!transcript) return;
 
-                // User spoke -> Go to Thinking State
                 appendMessage('Ayush', transcript);
                 chatHistory.push({ role: 'user', parts: [{ text: transcript }] });
                 saveChatContext();
                 
                 updateStatusBadge("THINKING", "bg-blue-500", "text-white");
-                talkBtn.textContent = "Dhwani is thinking...";
+                talkBtn.textContent = "Dhwani is teaching...";
                 
-                // Get AI Answer
-                const reply = await getGeminiResponse();
+                const rawReply = await getGeminiResponse();
+                const cleanReply = cleanText(rawReply); // Strict cleaning logic applied here
                 
-                // AI Speaks -> Then Listens
-                appendMessage('Dhwani', reply);
-                chatHistory.push({ role: 'model', parts: [{ text: reply }] });
+                appendMessage('Dhwani', cleanReply);
+                chatHistory.push({ role: 'model', parts: [{ text: cleanReply }] });
                 saveChatContext();
                 
-                await speakAndThenListen(reply);
+                await speakAndThenListen(cleanReply);
             };
         } else {
-            alert("Chrome browser required for Voice.");
+            alert("Chrome browser required.");
         }
 
         function startListening() {
@@ -374,16 +358,23 @@
         // --- 5. AI LOGIC (GEMINI) ---
         async function getGeminiResponse() {
             const key = customKeyChk.checked && apiKeyInput.value ? apiKeyInput.value : DEFAULT_API_KEY;
+            
+            // PEDAGOGY UPDATE: Teach First, Marks Later. No LaTeX.
             const systemPrompt = `
-                You are Dhwani, an expert teacher.
-                Student: Ayush (16, Cricketer, 10th Std Maharashtra Board).
-                Context: He is tired, has little time.
-                Goal: Teach High-Yield Exam Points.
-                Rules:
-                1. Concise (Max 6 lines).
-                2. Simple English (0.9x speed style).
-                3. If asked for Hindi/Marathi, switch language.
-                4. End with a short check-in question.
+                You are Dhwani, a professional school teacher for 10th Standard Maharashtra Board.
+                Student: Ayush (16 years old).
+                
+                TEACHING METHODOLOGY:
+                1. DO NOT rush to Q&A or shortcuts. 
+                2. FIRST, explain the concept/lesson thoroughly like a classroom lecture. Use examples.
+                3. ONLY AFTER the concept is taught, tell him how to write the answer for exams to score marks.
+                4. Tone: Professional, caring, authoritative yet kind.
+                
+                STRICT FORMATTING RULES:
+                1. DO NOT use brackets () in your speech for instructions or translations.
+                2. DO NOT use LaTeX symbols like $. Write "x squared" not "$x^2$". Write "Rupees" not "₹".
+                3. DO NOT use markdown like * or #.
+                4. Keep answers within 7-8 lines maximum per turn (break down long topics).
             `;
 
             try {
@@ -396,14 +387,27 @@
                     })
                 });
                 const data = await res.json();
-                let text = data.candidates[0].content.parts[0].text;
-                return text.replace(/[*#]/g, '').trim(); // Remove markdown
+                return data.candidates[0].content.parts[0].text;
             } catch (e) {
-                return "Ayush, check your internet connection.";
+                return "Ayush, please check your internet connection.";
             }
         }
 
-        // --- 6. UTILITIES ---
+        // --- 6. UTILITIES (CLEANING & STATE) ---
+        
+        // RECTIFIED CLEANING FUNCTION
+        function cleanText(text) {
+            // 1. Remove all * and # (Markdown)
+            let cleaned = text.replace(/[*#]/g, '');
+            // 2. Remove all $ signs (LaTeX artifacts)
+            cleaned = cleaned.replace(/\$/g, ''); 
+            // 3. Remove text inside brackets () and the brackets themselves to avoid meta-speech
+            // Note: This removes anything inside parenthesis. E.g. "Velocity (v)" becomes "Velocity ".
+            cleaned = cleaned.replace(/\s*\(.*?\)\s*/g, ' '); 
+            // 4. Collapse multiple spaces
+            return cleaned.replace(/\s+/g, ' ').trim();
+        }
+
         function setUIState(state) {
             if (state === 'ACTIVE') {
                 talkBtn.disabled = false;
@@ -467,7 +471,6 @@
         }
         function loadVoices() { voices = synth.getVoices(); synth.onvoiceschanged = () => voices = synth.getVoices(); }
         
-        // Settings UI Events
         settingsBtn.onclick = () => settingsPanel.classList.toggle('hidden');
         customKeyChk.onchange = (e) => { apiKeyInput.disabled = !e.target.checked; if(!e.target.checked) localStorage.removeItem('dhwani_key'); };
         apiKeyInput.oninput = (e) => localStorage.setItem('dhwani_key', e.target.value);
