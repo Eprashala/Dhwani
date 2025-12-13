@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dhwani AI Teacher for Ayush (High Capacity)</title>
+    <title>Dhwani AI Teacher for Ayush (Debug Mode)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
@@ -44,6 +44,7 @@
         /* Chat bubbles */
         .msg-user { @apply bg-blue-900/40 border border-blue-800 rounded-br-none; }
         .msg-ai { @apply bg-gray-700/50 border border-gray-600 rounded-bl-none; }
+        .msg-error { @apply bg-red-900/40 border border-red-800 text-red-200; }
     </style>
 </head>
 
@@ -56,7 +57,7 @@
                 <h1 class="text-2xl font-bold text-white tracking-tight">
                     <span class="text-blue-400">Dhwani</span> AI Teacher
                 </h1>
-                <p class="text-xs text-gray-400">Student: <b>Ayush (10th Std)</b> | Model: <b>Gemini 1.5 Flash</b></p>
+                <p class="text-xs text-gray-400">Student: <b>Ayush</b> | Model: <b>Gemini 1.5 Flash</b></p>
             </div>
             <div id="status-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-gray-700 text-gray-400 border border-gray-600">
                 OFFLINE
@@ -66,21 +67,18 @@
         <div id="conversation-log" class="flex-grow overflow-y-auto bg-gray-900 rounded-xl p-4 mb-4 border border-gray-700 space-y-4 shadow-inner min-h-[300px]">
             <div class="text-gray-500 text-center mt-20 text-sm">
                 Tap <b>"Start Class"</b> to begin.<br>
-                <span class="opacity-70 text-xs">Powered by Gemini 1.5 Flash (High Capacity)</span>
+                <span class="opacity-70 text-xs">Error Reporting Enabled</span>
             </div>
         </div>
 
         <div class="flex justify-center gap-4 mb-4 shrink-0 bg-gray-800/80 p-3 rounded-xl border border-gray-700/50">
-            
             <button id="pause-resume-button" class="icon-btn" title="Pause/Resume Speech" disabled>
                 <svg id="icon-pause" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" /></svg>
                 <svg id="icon-play" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 hidden"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" /></svg>
             </button>
-            
             <button id="stop-speech-button" class="icon-btn hover:bg-red-900/50 hover:border-red-500/50" title="Stop Speaking" disabled>
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z" /></svg>
             </button>
-
             <button id="repeat-button" class="icon-btn hover:bg-green-900/50 hover:border-green-500/50" title="Repeat Last Answer" disabled>
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
@@ -103,9 +101,7 @@
 
         <div class="flex items-center justify-center gap-2 mt-4 mb-2">
             <input type="checkbox" id="remember-history-checkbox" class="custom-checkbox" checked>
-            <label for="remember-history-checkbox" class="text-sm text-gray-300 cursor-pointer select-none">
-                Remember History
-            </label>
+            <label for="remember-history-checkbox" class="text-sm text-gray-300 cursor-pointer select-none">Remember History</label>
         </div>
 
         <div class="flex flex-col items-center pb-2">
@@ -121,24 +117,16 @@
                 </div>
              </div>
         </div>
-
     </div>
 
     <script>
-        /* ==========================================================================
-           Dhwani AI Teacher - Ayush (10th Std)
-           MODEL: GEMINI 1.5 FLASH (High Limits)
-           ========================================================================== */
-
         const USER_NAME = "Ayush";
-        const DEFAULT_API_KEY = "AIzaSyDCaD54XKZvmVy6-lGYakUD5iS9AhPZhaA"; 
+        const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
 
         // DOM Elements
         const talkBtn = document.getElementById('talk-button');
         const statusBadge = document.getElementById('status-badge');
         const chatLog = document.getElementById('conversation-log');
-        
-        // Buttons
         const pauseBtn = document.getElementById('pause-resume-button');
         const stopBtn = document.getElementById('stop-speech-button');
         const repeatBtn = document.getElementById('repeat-button');
@@ -147,8 +135,6 @@
         const newTopicBtn = document.getElementById('new-topic-button');
         const endChatBtn = document.getElementById('end-chat-button');
         const shareBtn = document.getElementById('share-button');
-
-        // Settings
         const settingsBtn = document.getElementById('advance-toggle-btn');
         const settingsPanel = document.getElementById('advance-container');
         const rememberChk = document.getElementById('remember-history-checkbox');
@@ -156,7 +142,6 @@
         const apiKeyInput = document.getElementById('custom-api-key-input');
         const pasteKeyBtn = document.getElementById('paste-key-btn');
 
-        // State Variables
         let isSessionActive = false;
         let isMicListening = false; 
         let chatHistory = [];
@@ -166,7 +151,6 @@
         const synth = window.speechSynthesis;
         let voices = [];
 
-        // --- 1. INITIALIZATION ---
         window.onload = () => {
             if (synth.speaking) synth.cancel();
             loadSettings();
@@ -174,33 +158,26 @@
             requestWakeLock();
         };
 
-        // --- 2. LOGIC: BUTTON EVENTS ---
-
-        // Start Class
+        // --- BUTTON EVENTS ---
         talkBtn.addEventListener('click', async () => {
             if (!isSessionActive) {
                 isSessionActive = true;
                 setUIState('ACTIVE');
                 await requestWakeLock();
-                
-                // Smart Resume Logic
                 const saved = rememberChk.checked ? loadChatContext() : [];
                 if (saved.length > 0) {
                     chatHistory = saved;
                     appendMessage('Dhwani', "Welcome back, Ayush.");
-                    await speakAndThenListen("Welcome back, Ayush. I remember our last lesson. Shall we continue?");
+                    await speakAndThenListen("Welcome back, Ayush. Shall we continue?");
                 } else {
                     chatHistory = [];
-                    const intro = "Hello Ayush. I am ready to teach. Please tell me the subject and the specific topic you want to start with.";
+                    const intro = "Hello Ayush. Ready to teach. Which subject shall we start?";
                     appendMessage('Dhwani', intro);
                     await speakAndThenListen(intro);
                 }
-            } else {
-                if (!synth.speaking) toggleMic();
-            }
+            } else { if (!synth.speaking) toggleMic(); }
         });
 
-        // New Topic (Fresh Start)
         newTopicBtn.addEventListener('click', async () => {
             stopEverything();
             isSessionActive = true;
@@ -208,48 +185,32 @@
             chatLog.innerHTML = ''; 
             saveChatContext(); 
             setUIState('ACTIVE');
-            
-            const freshStart = "New Topic. I am ready. Please tell me the subject and chapter name, Ayush.";
+            const freshStart = "New Topic. Please tell me the subject and chapter name.";
             appendMessage('Dhwani', freshStart);
             await speakAndThenListen(freshStart);
         });
 
-        // Repeat
         repeatBtn.addEventListener('click', () => {
             if (!lastSpokenText) return;
-            // CRITICAL FIX: Ensure recognition is stopped BEFORE speaking starts
             if (recognition) recognition.stop();
             isMicListening = false;
-            
             synth.cancel();
             speakAndThenListen(lastSpokenText);
         });
 
-        // Pause/Resume (FIXED: ICON TOGGLE)
         pauseBtn.addEventListener('click', () => {
             if (synth.speaking) {
-                if (synth.paused) {
-                    // RESUME
-                    synth.resume();
-                    iconPause.classList.remove('hidden'); // Show Pause
-                    iconPlay.classList.add('hidden');    // Hide Play
-                } else {
-                    // PAUSE
-                    synth.pause();
-                    iconPause.classList.add('hidden');   // Hide Pause
-                    iconPlay.classList.remove('hidden'); // Show Play
-                }
+                if (synth.paused) { synth.resume(); iconPause.classList.remove('hidden'); iconPlay.classList.add('hidden'); }
+                else { synth.pause(); iconPause.classList.add('hidden'); iconPlay.classList.remove('hidden'); }
             }
         });
 
-        // Stop
         stopBtn.addEventListener('click', () => {
             synth.cancel(); 
             if (recognition) recognition.stop();
             setUIState('IDLE_WAITING');
         });
 
-        // End
         endChatBtn.addEventListener('click', () => {
             stopEverything();
             isSessionActive = false;
@@ -257,15 +218,13 @@
             appendMessage('System', 'Class Ended.');
         });
 
-        // Share
         shareBtn.addEventListener('click', async () => {
             const text = chatLog.innerText;
             try { await navigator.share({ title: 'Dhwani Notes', text: text }); }
             catch { navigator.clipboard.writeText(text); alert("Notes copied!"); }
         });
 
-        // --- 3. CORE FUNCTIONS ---
-
+        // --- CORE FUNCTIONS ---
         function stopEverything() {
             if (synth.speaking) synth.cancel();
             if (recognition) try { recognition.stop(); } catch(e){}
@@ -273,44 +232,32 @@
         }
 
         async function speakAndThenListen(text) {
-            // STEP 1: STRICTLY STOP MIC
             if (recognition) recognition.stop();
             isMicListening = false;
-            
             updateStatusBadge("SPEAKING", "bg-yellow-500", "text-black");
             toggleControls(true); 
-
             lastSpokenText = text; 
-
-            // RESET ICONS (Always show Pause icon when new speech starts)
             iconPause.classList.remove('hidden');
             iconPlay.classList.add('hidden');
 
             await new Promise((resolve) => {
                 const utterance = new SpeechSynthesisUtterance(text);
-                utterance.rate = 0.9; // Requirement: 0.9x speed
+                utterance.rate = 0.9; 
                 utterance.pitch = 1.0;
-                
                 const isDevanagari = /[\u0900-\u097F]/.test(text);
                 const langCode = isDevanagari ? 'hi-IN' : 'en-IN';
                 utterance.lang = langCode;
-
                 const preferredVoice = voices.find(v => v.lang === langCode && v.name.includes('Google')) || voices.find(v => v.lang === langCode);
                 if (preferredVoice) utterance.voice = preferredVoice;
-
                 utterance.onend = resolve;
                 utterance.onerror = resolve;
-
                 synth.speak(utterance);
             });
 
-            // STEP 2: START MIC ONLY AFTER SPEECH ENDS
-            if (isSessionActive) {
-                startListening();
-            }
+            if (isSessionActive) startListening();
         }
 
-        // --- 4. SPEECH RECOGNITION ---
+        // --- SPEECH RECOGNITION ---
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
             recognition = new SpeechRecognition();
@@ -338,62 +285,36 @@
             recognition.onresult = async (event) => {
                 const transcript = event.results[0][0].transcript.trim();
                 if (!transcript) return;
-
                 appendMessage('Ayush', transcript);
                 chatHistory.push({ role: 'user', parts: [{ text: transcript }] });
                 saveChatContext();
-                
                 updateStatusBadge("THINKING", "bg-blue-500", "text-white");
                 talkBtn.textContent = "Dhwani is teaching...";
-                
                 const rawReply = await getGeminiResponse();
-                const cleanReply = cleanText(rawReply); 
                 
-                appendMessage('Dhwani', cleanReply);
-                chatHistory.push({ role: 'model', parts: [{ text: cleanReply }] });
-                saveChatContext();
-                
-                await speakAndThenListen(cleanReply);
+                // CHECK FOR ERROR PREFIX
+                if (rawReply.startsWith("System Error:")) {
+                    appendMessage('Error', rawReply);
+                    updateStatusBadge("ERROR", "bg-red-600", "text-white");
+                    setUIState('IDLE_WAITING');
+                } else {
+                    const cleanReply = cleanText(rawReply); 
+                    appendMessage('Dhwani', cleanReply);
+                    chatHistory.push({ role: 'model', parts: [{ text: cleanReply }] });
+                    saveChatContext();
+                    await speakAndThenListen(cleanReply);
+                }
             };
-        } else {
-            alert("Chrome browser required.");
-        }
+        } else { alert("Chrome browser required."); }
 
-        function startListening() {
-            if (isSessionActive && recognition && !isMicListening) {
-                try { recognition.start(); } catch(e) {}
-            }
-        }
+        function startListening() { if (isSessionActive && recognition && !isMicListening) try { recognition.start(); } catch(e) {} }
+        function toggleMic() { if (isMicListening) recognition.stop(); else startListening(); }
 
-        function toggleMic() {
-            if (isMicListening) recognition.stop();
-            else startListening();
-        }
-
-        // --- 5. AI LOGIC (GEMINI) ---
+        // --- API LOGIC (DEBUG ENABLED) ---
         async function getGeminiResponse() {
             const key = customKeyChk.checked && apiKeyInput.value ? apiKeyInput.value : DEFAULT_API_KEY;
-            
-            // CHANGED MODEL TO GEMINI 1.5 FLASH
-            // This endpoint supports the higher rate limits on Free Tier
             const modelEndpoint = "gemini-1.5-flash"; 
-            
-            const systemPrompt = `
-                You are Dhwani, a professional school teacher for 10th Standard Maharashtra Board.
-                Student: Ayush (16 years old).
-                
-                TEACHING METHODOLOGY:
-                1. DO NOT rush to Q&A or shortcuts. 
-                2. FIRST, explain the concept/lesson thoroughly like a classroom lecture. Use examples.
-                3. ONLY AFTER the concept is taught, tell him how to write the answer for exams to score marks.
-                4. Tone: Professional, caring, authoritative yet kind.
-                
-                STRICT FORMATTING RULES:
-                1. DO NOT use brackets () in your speech.
-                2. DO NOT use LaTeX symbols like $.
-                3. DO NOT use markdown like * or #.
-                4. Keep answers within 7-8 lines maximum per turn.
-            `;
+            const systemPrompt = `You are Dhwani, Teacher for Ayush (10th Std). Teach concepts first, then exam marks. 6-7 lines max. No brackets.`;
 
             try {
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelEndpoint}:generateContent?key=${key}`, {
@@ -405,17 +326,23 @@
                     })
                 });
                 
-                if (!res.ok) throw new Error("API Error");
+                // DEBUGGING LOGIC: CAPTURE EXACT ERROR
+                if (!res.ok) {
+                    const errorBody = await res.json().catch(() => ({})); 
+                    const errorMsg = errorBody.error?.message || res.statusText || "Unknown Error";
+                    return `System Error: API Error ${res.status}: ${errorMsg}`;
+                }
                 
                 const data = await res.json();
                 return data.candidates[0].content.parts[0].text;
+
             } catch (e) {
-                console.error(e);
-                return "Ayush, I am having trouble connecting. Please check your internet or API key.";
+                // NETWORK/FETCH ERRORS
+                return `System Error: ${e.message}`;
             }
         }
 
-        // --- 6. UTILITIES (CLEANING & STATE) ---
+        // --- UTILS ---
         function cleanText(text) {
             let cleaned = text.replace(/[*#]/g, '');
             cleaned = cleaned.replace(/\$/g, ''); 
@@ -425,23 +352,16 @@
 
         function setUIState(state) {
             if (state === 'ACTIVE') {
-                talkBtn.disabled = false;
-                newTopicBtn.disabled = false;
-                endChatBtn.disabled = false;
-                shareBtn.disabled = false;
+                talkBtn.disabled = false; newTopicBtn.disabled = false; endChatBtn.disabled = false; shareBtn.disabled = false;
                 updateStatusBadge("ONLINE", "bg-green-600", "text-white");
             } else if (state === 'OFFLINE') {
-                talkBtn.disabled = false;
-                talkBtn.textContent = "Start Class";
-                talkBtn.classList.remove('bg-red-600');
-                newTopicBtn.disabled = true;
-                endChatBtn.disabled = true;
-                pauseBtn.disabled = true;
-                stopBtn.disabled = true;
-                repeatBtn.disabled = true;
+                talkBtn.disabled = false; talkBtn.textContent = "Start Class"; talkBtn.classList.remove('bg-red-600');
+                newTopicBtn.disabled = true; endChatBtn.disabled = true; pauseBtn.disabled = true; stopBtn.disabled = true; repeatBtn.disabled = true;
                 updateStatusBadge("OFFLINE", "bg-gray-700", "text-gray-400");
-                iconPause.classList.remove('hidden'); // Reset icons
-                iconPlay.classList.add('hidden');
+                iconPause.classList.remove('hidden'); iconPlay.classList.add('hidden');
+            } else if (state === 'IDLE_WAITING') {
+                talkBtn.textContent = "Tap to Speak";
+                updateStatusBadge("WAITING", "bg-green-600", "text-white");
             }
         }
 
@@ -450,40 +370,34 @@
             statusBadge.className = `px-3 py-1 rounded-full text-xs font-bold border border-gray-600 ${bgClass} ${textClass}`;
         }
 
-        function toggleControls(enable) {
-            pauseBtn.disabled = !enable;
-            stopBtn.disabled = !enable;
-            repeatBtn.disabled = !enable;
-        }
+        function toggleControls(enable) { pauseBtn.disabled = !enable; stopBtn.disabled = !enable; repeatBtn.disabled = !enable; }
 
         function appendMessage(sender, text) {
             const div = document.createElement('div');
-            const isAI = sender === 'Dhwani';
-            div.className = `p-3 rounded-xl max-w-[85%] text-sm ${isAI ? 'msg-ai self-start mr-auto' : 'msg-user self-end ml-auto'}`;
-            div.innerHTML = `<div class="font-bold text-xs mb-1 ${isAI ? 'text-cyan-300' : 'text-blue-300'}">${sender}</div>${text}`;
+            let bgClass = sender === 'Dhwani' ? 'msg-ai' : 'msg-user';
+            let alignClass = sender === 'Dhwani' ? 'self-start mr-auto' : 'self-end ml-auto';
+            let colorClass = sender === 'Dhwani' ? 'text-cyan-300' : 'text-blue-300';
+            
+            if (sender.includes('Error')) {
+                bgClass = 'msg-error';
+                alignClass = 'self-center mx-auto w-full text-center';
+                colorClass = 'text-red-300';
+            }
+
+            div.className = `p-3 rounded-xl max-w-[85%] text-sm ${bgClass} ${alignClass}`;
+            div.innerHTML = `<div class="font-bold text-xs mb-1 ${colorClass}">${sender}</div>${text}`;
             chatLog.appendChild(div);
             chatLog.scrollTop = chatLog.scrollHeight;
         }
 
-        // Local Storage
-        function saveChatContext() {
-            if(rememberChk.checked) localStorage.setItem('dhwani_ayush_history', JSON.stringify(chatHistory.slice(-10)));
-        }
-        function loadChatContext() {
-            try { return JSON.parse(localStorage.getItem('dhwani_ayush_history')) || []; } catch { return []; }
-        }
-        
-        // Wake Lock & Settings
-        async function requestWakeLock() {
-            if ('wakeLock' in navigator && !wakeLock) { try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} }
-        }
+        function saveChatContext() { if(rememberChk.checked) localStorage.setItem('dhwani_ayush_history', JSON.stringify(chatHistory.slice(-10))); }
+        function loadChatContext() { try { return JSON.parse(localStorage.getItem('dhwani_ayush_history')) || []; } catch { return []; } }
+        async function requestWakeLock() { if ('wakeLock' in navigator && !wakeLock) { try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} } }
         document.addEventListener('click', requestWakeLock);
         
         function loadSettings() {
             if(localStorage.getItem('dhwani_key')) {
-                customKeyChk.checked = true;
-                apiKeyInput.disabled = false;
-                pasteKeyBtn.disabled = false;
+                customKeyChk.checked = true; apiKeyInput.disabled = false; pasteKeyBtn.disabled = false;
                 apiKeyInput.value = localStorage.getItem('dhwani_key');
             }
         }
@@ -491,26 +405,17 @@
         
         settingsBtn.onclick = () => settingsPanel.classList.toggle('hidden');
         customKeyChk.onchange = (e) => { 
-            const enabled = e.target.checked;
-            apiKeyInput.disabled = !enabled; 
-            pasteKeyBtn.disabled = !enabled;
+            const enabled = e.target.checked; apiKeyInput.disabled = !enabled; pasteKeyBtn.disabled = !enabled;
             if(!enabled) localStorage.removeItem('dhwani_key'); 
         };
         apiKeyInput.oninput = (e) => localStorage.setItem('dhwani_key', e.target.value);
-        
         pasteKeyBtn.addEventListener('click', async () => {
             try {
                 const text = await navigator.clipboard.readText();
-                if(text) {
-                    apiKeyInput.value = text;
-                    localStorage.setItem('dhwani_key', text);
-                    const originalText = pasteKeyBtn.innerText;
-                    pasteKeyBtn.innerText = "Pasted!";
-                    setTimeout(() => pasteKeyBtn.innerText = originalText, 1000);
-                }
-            } catch(e) { alert("Could not paste. Please check browser permissions."); }
+                if(text) { apiKeyInput.value = text; localStorage.setItem('dhwani_key', text); 
+                const orig = pasteKeyBtn.innerText; pasteKeyBtn.innerText = "Pasted!"; setTimeout(()=>pasteKeyBtn.innerText=orig,1000); }
+            } catch(e) { alert("Check permissions."); }
         });
-
     </script>
 </body>
 </html>
