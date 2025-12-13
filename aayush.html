@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aayush Dhwani Marathi</title>
+    <title>Aayush Dhwani Coach</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
@@ -30,17 +30,17 @@
         <div class="flex items-center justify-between mb-4 shrink-0">
             <div>
                 <h1 class="text-2xl md:text-3xl font-bold text-white">
-                    नमस्ते <span class="cricket-accent">आयुष</span> 🏏
+                    Hi <span class="cricket-accent">Aayush</span> 🏏
                 </h1>
-                <p class="text-xs text-gray-400">इयत्ता १० वी • मराठी माध्यम</p>
+                <p class="text-xs text-gray-400">Std 10th • English Medium + Marathi Explanations</p>
             </div>
             <div id="status-indicator" class="w-4 h-4 rounded-full bg-gray-500 transition-colors" title="Offline"></div>
         </div>
 
         <div id="conversation-log" class="flex-grow overflow-y-auto bg-gray-900 rounded-lg p-4 mb-4 border border-gray-700 space-y-4 shadow-inner min-h-[200px]">
             <div class="text-gray-400 text-center mt-10">
-                अभ्यासासाठी तयार आहात?<br>
-                <span class="text-sm opacity-70">सुरू करण्यासाठी खालील बटण दाबा.</span>
+                Ready for practice & studies?<br>
+                <span class="text-sm opacity-70">Tap "Start Session" to begin.</span>
             </div>
         </div>
 
@@ -61,7 +61,7 @@
         <div class="w-full flex flex-col items-center justify-center mb-4 shrink-0">
              <div class="flex items-center justify-center gap-2 mb-2">
                 <input type="checkbox" id="remember-history-checkbox" class="custom-checkbox" checked>
-                <label for="remember-history-checkbox" class="text-sm text-gray-300 cursor-pointer select-none">मागील आठवणी ठेवा (History)</label>
+                <label for="remember-history-checkbox" class="text-sm text-gray-300 cursor-pointer select-none">Remember Context</label>
             </div>
             
             <button id="advance-toggle-btn" class="text-xs text-blue-400 hover:text-blue-300 underline mb-2 focus:outline-none">▼ API Key Settings</button>
@@ -71,17 +71,17 @@
         </div>
 
         <button id="talk-button" class="w-full py-4 px-6 rounded-lg text-lg font-bold transition-all duration-300 ease-in-out shrink-0 bg-blue-600 text-white shadow-lg shadow-blue-900/50 hover:bg-blue-500 hover:shadow-blue-500/50 hover:-translate-y-0.5 disabled:bg-gray-600 disabled:cursor-not-allowed">
-            सुरु करा (Start) 🏏
+            Start Session 🏏
         </button>
 
         <div class="mt-4 grid grid-cols-2 gap-3 shrink-0">
-            <button id="restart-chat-button" class="utility-btn" disabled>नवीन विषय (New Topic)</button>
-            <button id="end-chat-button" class="utility-btn text-red-200 hover:bg-red-900/40" disabled>थांबवा (End Chat)</button>
+            <button id="restart-chat-button" class="utility-btn" disabled>New Topic</button>
+            <button id="end-chat-button" class="utility-btn text-red-200 hover:bg-red-900/40" disabled>End Chat</button>
         </div>
     </div>
 
     <script>
-        const DEFAULT_API_KEY = "AIzaSyDrug6WnhILDj0t_weHOOpLf0dXy-IRU9Q"; 
+        const DEFAULT_API_KEY = "AIzaSyA0JhywNB9YCLKXokLI4gAre_AQfFgVUbE"; 
         
         const talkBtn = document.getElementById('talk-button');
         const statusInd = document.getElementById('status-indicator');
@@ -112,26 +112,21 @@
             initSpeechRecognition();
         };
 
-        // --- WAKE LOCK FUNCTION ---
+        // --- WAKE LOCK (Keep Screen On) ---
         async function requestWakeLock() {
             try {
-                wakeLock = await navigator.wakeLock.request('screen');
-                console.log('Screen Wake Lock Active');
-                wakeLock.addEventListener('release', () => {
-                    console.log('Screen Wake Lock Released');
-                });
-            } catch (err) {
-                console.error(`${err.name}, ${err.message}`);
-            }
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('Screen Wake Lock Active');
+                    wakeLock.addEventListener('release', () => console.log('Screen Wake Lock Released'));
+                }
+            } catch (err) { console.error(`${err.name}, ${err.message}`); }
         }
-        
-        // Re-acquire lock if tab becomes visible again
         document.addEventListener('visibilitychange', async () => {
-            if (wakeLock !== null && document.visibilityState === 'visible') {
-                await requestWakeLock();
-            }
+            if (wakeLock !== null && document.visibilityState === 'visible') await requestWakeLock();
         });
 
+        // --- SPEECH RECOGNITION (Input: English/Hindi Mix) ---
         function initSpeechRecognition() {
             if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
                 alert("Browser does not support Speech API. Use Chrome.");
@@ -142,12 +137,11 @@
             const SpeechReq = window.SpeechRecognition || window.webkitSpeechRecognition;
             recognition = new SpeechReq();
             recognition.continuous = false;
-            recognition.lang = 'mr-IN'; 
+            // 'en-IN' is best for English Medium students who might mix Marathi words
+            recognition.lang = 'en-IN'; 
             recognition.interimResults = false;
             
-            recognition.onstart = () => { 
-                if(appState === 'CONVERSATION') updateButtonState('LISTENING'); 
-            };
+            recognition.onstart = () => { if(appState === 'CONVERSATION') updateButtonState('LISTENING'); };
             recognition.onresult = (e) => handleSpeech(e.results[e.results.length-1][0].transcript);
             recognition.onerror = (e) => { 
                 if(appState === 'CONVERSATION' && e.error === 'no-speech') {
@@ -160,34 +154,32 @@
             recognition.onend = () => {
                 if(appState === 'CONVERSATION' && !isSpeaking) { 
                     try { recognition.start(); } catch(e){} 
-                } else if (appState === 'IDLE') {
-                    updateButtonState('IDLE');
-                }
+                } else if (appState === 'IDLE') updateButtonState('IDLE');
             };
         }
 
+        // --- MAIN BUTTON LOGIC ---
         talkBtn.addEventListener('click', async () => {
             if (appState === 'IDLE') {
                 try {
-                    await requestWakeLock(); // Request Screen Lock
+                    await requestWakeLock(); 
                     try { await document.documentElement.requestFullscreen(); } catch(e){}
                     
                     appState = 'BUSY';
                     updateButtonState('BUSY');
                     
-                    const hasHistory = localStorage.getItem('aayush_marathi_hist');
+                    const hasHistory = localStorage.getItem('aayush_mix_hist');
                     let prompt = "";
                     
                     if (historyCheck.checked && hasHistory) {
                         chatHistory = JSON.parse(hasHistory);
-                        prompt = "System: I am back. Greet me in Marathi about cricket (Sachin/Virat) and REVISE the last topic.";
+                        prompt = "System: I am back. Greet me (in English+Marathi) about cricket and revise last topic.";
                     } else {
                         chatHistory = [];
-                        prompt = "System: Start fresh. Greet Aayush (16yo cricketer) in Marathi. Ask about practice.";
+                        prompt = "System: Start fresh. Greet Aayush (Cricketer, 10th Std) in English, but use a Marathi line to motivate him. Ask about practice.";
                     }
 
                     const response = await callGemini(prompt, true); 
-                    
                     updateChat(response, 'model');
                     await speak(response);
                     
@@ -203,22 +195,18 @@
             }
         });
 
+        // --- CONTROL BUTTONS ---
         stopBtn.addEventListener('click', () => {
             if(synth.speaking) {
                 synth.cancel();
                 isSpeaking = false;
-                if(appState !== 'IDLE') {
-                   try { recognition.start(); } catch(e){}
-                }
+                if(appState !== 'IDLE') try { recognition.start(); } catch(e){}
             }
         });
 
         pauseBtn.addEventListener('click', () => {
-            if(synth.speaking && !synth.paused) {
-                synth.pause();
-            } else if (synth.paused) {
-                synth.resume();
-            }
+            if(synth.speaking && !synth.paused) synth.pause();
+            else if (synth.paused) synth.resume();
         });
 
         replayBtn.addEventListener('click', () => {
@@ -234,13 +222,13 @@
             synth.cancel();
             try { recognition.stop(); } catch(e){}
             chatHistory = [];
-            localStorage.removeItem('aayush_marathi_hist');
-            chatLog.innerHTML = '<div class="text-gray-500 text-center mb-4">विषय बदलला आहे (Topic Cleared)</div>';
+            localStorage.removeItem('aayush_mix_hist');
+            chatLog.innerHTML = '<div class="text-gray-500 text-center mb-4">Topic Cleared.</div>';
             
             appState = 'BUSY';
             updateButtonState('BUSY');
             setTimeout(async () => {
-                const prompt = "System: Start a brand new topic. Ask Aayush what he wants to study in Marathi.";
+                const prompt = "System: Start a brand new topic. Ask Aayush what subject he wants to study (Math/Science). Use Cricket analogy.";
                 const response = await callGemini(prompt, true);
                 updateChat(response, 'model');
                 await speak(response);
@@ -257,21 +245,18 @@
             synth.cancel();
             isSpeaking = false;
             updateButtonState('IDLE');
-            if (wakeLock !== null) {
-                wakeLock.release().then(() => { wakeLock = null; });
-            }
+            if (wakeLock !== null) wakeLock.release().then(() => { wakeLock = null; });
         }
 
+        // --- AI LOGIC ---
         async function handleSpeech(text) {
             recognition.stop();
             appState = 'BUSY';
             updateButtonState('BUSY');
             
             updateChat(text, 'user');
-            
             const response = await callGemini(text, false);
             updateChat(response, 'model');
-            
             await speak(response);
             
             appState = 'CONVERSATION';
@@ -281,18 +266,19 @@
         async function callGemini(userInput, isHidden) {
             const key = keyInput.value.trim() || DEFAULT_API_KEY;
             
+            // --- INSTRUCTION: ENGLISH MEDIUM + MARATHI EXPLANATION ---
             const systemInst = `
-            You are "Dhwani", a kind Marathi teacher from Maharashtra.
-            Student: Aayush (16 years old, 10th Std, Cricketer).
+            You are "Dhwani Teacher" for Aayush (10th Std, English Medium, Cricketer).
             
-            **STRICT RULES:**
-            1. **LANGUAGE:** SPEAK ONLY IN MARATHI (Devanagari Script).
-            2. **TONE:** Use a native, caring Maharashtrian tone (e.g., "अरे बाळा", "लक्षात ठेव", "शाब्बास").
-            3. **CONTEXT:** Always relate studies to Cricket (Sachin, Virat, Joe Root).
-            4. **LENGTH:** Keep answers SHORT (Maximum 3 sentences).
-            5. **GOAL:** Prepare for 10th Board Exams.
-            
-            Do not use markdown symbols like asterisks or brackets in your response. Clean text only.
+            **TEACHING RULES:**
+            1. **Primary Language (Exam Prep):** Speak in **ENGLISH**. Give definitions and main answers in clear English.
+            2. **Secondary Language (Understanding):** Immediately explain the concept in **MARATHI**.
+            3. **Structure:** "English Sentence. (Marathi Explanation)."
+            4. **Analogy:** Use **CRICKET** (Sachin, Virat, fielding, batting) to explain Science/Math.
+            5. **Format:** NO markdown. NO brackets like [], (), <>, *. 
+            6. **Length:** Short (Max 3-4 sentences).
+
+            **Example:** "Newton's First Law states an object stays at rest. Mhanje jar ball pitchvar thevla tar to halnar nahi."
             `;
 
             const msgObj = { role: 'user', parts: [{ text: userInput }] };
@@ -311,11 +297,10 @@
                 if(!req.ok) throw new Error("API Error");
                 const data = await req.json();
                 return data.candidates[0].content.parts[0].text;
-            } catch (e) {
-                return "माफ करा, इंटरनेटची समस्या आहे. पुन्हा प्रयत्न करा.";
-            }
+            } catch (e) { return "Internet issue. Please check connection."; }
         }
 
+        // --- TTS ---
         function speak(text) {
             if(synth.speaking) synth.cancel();
             isSpeaking = true;
@@ -323,58 +308,45 @@
             updateButtonState('SPEAKING'); 
 
             return new Promise(resolve => {
-                const utt = new SpeechSynthesisUtterance(cleanText(text));
+                // CLEAN TEXT: Remove brackets, stars, etc.
+                const clean = text.replace(/[\*\[\]\(\)<>]/g, '').trim();
+                const utt = new SpeechSynthesisUtterance(clean);
                 utt.rate = 0.9; 
                 
-                const v = voices.find(x => x.lang === 'mr-IN') || voices.find(x => x.lang === 'hi-IN');
+                // Voice Priority: Hindi/Indian English usually handles Mixed English/Marathi best
+                const v = voices.find(x => x.lang === 'hi-IN') || voices.find(x => x.lang === 'en-IN');
                 if(v) utt.voice = v;
                 
-                utt.onend = () => {
-                    isSpeaking = false;
-                    resolve();
-                };
-                utt.onerror = () => {
-                    isSpeaking = false;
-                    resolve();
-                };
+                utt.onend = () => { isSpeaking = false; resolve(); };
+                utt.onerror = () => { isSpeaking = false; resolve(); };
                 synth.speak(utt);
             });
         }
 
+        // --- UI ---
         function updateButtonState(state) {
             if (state === 'IDLE') {
-                talkBtn.textContent = "सुरु करा (Start) 🏏";
+                talkBtn.textContent = "Start Session 🏏";
                 talkBtn.classList.replace('bg-red-600', 'bg-blue-600');
                 talkBtn.classList.replace('hover:bg-red-700', 'hover:bg-blue-500');
                 statusInd.className = "w-4 h-4 rounded-full bg-gray-500";
+                
+                pauseBtn.disabled = true; stopBtn.disabled = true; replayBtn.disabled = true; 
+                newTopicBtn.disabled = true; endChatBtn.disabled = true;
             } else if (state === 'BUSY') {
-                talkBtn.textContent = "विचार करत आहे...";
+                talkBtn.textContent = "Thinking...";
                 statusInd.className = "w-4 h-4 rounded-full bg-yellow-400";
             } else {
-                talkBtn.textContent = "ऐकत आहे (Stop)";
+                talkBtn.textContent = "Stop Listening";
                 talkBtn.classList.replace('bg-blue-600', 'bg-red-600');
                 talkBtn.classList.replace('hover:bg-blue-500', 'hover:bg-red-700');
                 statusInd.className = "w-4 h-4 rounded-full bg-blue-500 listening-pulse";
-            }
-
-            if (state === 'IDLE') {
-                pauseBtn.disabled = true;
-                stopBtn.disabled = true;
-                replayBtn.disabled = true; 
-                newTopicBtn.disabled = true;
-                endChatBtn.disabled = true;
-            } else {
-                newTopicBtn.disabled = false;
-                endChatBtn.disabled = false;
-
+                
+                newTopicBtn.disabled = false; endChatBtn.disabled = false;
                 if (state === 'SPEAKING') {
-                    pauseBtn.disabled = false;
-                    stopBtn.disabled = false;
-                    replayBtn.disabled = true; 
+                    pauseBtn.disabled = false; stopBtn.disabled = false; replayBtn.disabled = true; 
                 } else {
-                    pauseBtn.disabled = true;
-                    stopBtn.disabled = true;
-                    replayBtn.disabled = (lastSpokenText === ""); 
+                    pauseBtn.disabled = true; stopBtn.disabled = true; replayBtn.disabled = (lastSpokenText === ""); 
                 }
             }
         }
@@ -382,33 +354,27 @@
         function updateChat(text, role) {
             if (!text) return;
             const logs = chatLog.querySelectorAll('div');
-            if(logs.length > 0 && logs[logs.length-1].textContent.includes("विचार करत आहे...")) {
-                logs[logs.length-1].remove();
-            }
+            if(logs.length > 0 && logs[logs.length-1].textContent.includes("Thinking...")) logs[logs.length-1].remove();
 
             const div = document.createElement('div');
-            const name = role === 'user' ? 'आयुष' : 'ध्वनी टीचर';
+            const name = role === 'user' ? 'Aayush' : 'Dhwani';
             const color = role === 'user' ? 'text-green-400' : 'text-cyan-400';
+            // Clean display text too
+            const displayClean = text.replace(/[\*\[\]\(\)<>]/g, '');
             
-            div.innerHTML = `<strong class="${color}">${name}:</strong> ${cleanText(text)}`;
+            div.innerHTML = `<strong class="${color}">${name}:</strong> ${displayClean}`;
             chatLog.appendChild(div);
             chatLog.scrollTop = chatLog.scrollHeight;
 
             if(role !== 'system') {
                 chatHistory.push({ role: role, parts: [{ text: text }] });
                 if(chatHistory.length > 15) chatHistory = chatHistory.slice(-15);
-                localStorage.setItem('aayush_marathi_hist', JSON.stringify(chatHistory));
+                localStorage.setItem('aayush_mix_hist', JSON.stringify(chatHistory));
             }
         }
 
-        function cleanText(t) { return t.replace(/[*#]/g, '').trim(); }
-
-        document.getElementById('advance-toggle-btn').onclick = () => {
-            advanceBox.classList.toggle('hidden');
-        };
-        document.getElementById('custom-api-key-input').oninput = (e) => {
-            localStorage.setItem('dhwani_key', e.target.value);
-        };
+        document.getElementById('advance-toggle-btn').onclick = () => advanceBox.classList.toggle('hidden');
+        document.getElementById('custom-api-key-input').oninput = (e) => localStorage.setItem('dhwani_key', e.target.value);
 
     </script>
 </body>
