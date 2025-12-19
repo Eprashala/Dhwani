@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>अथर्ववेद - तांत्रिक गुरुजी (अंगिरस विद्या)</title>
+    <title>अथर्ववेद - तांत्रिक गुरुजी (Advanced)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { 
@@ -14,7 +14,7 @@
         /* ॲनिमेशन - लाल रंग (तांत्रिक थीम) */
         .listening-pulse { animation: pulse 1.5s infinite ease-in-out; }
         @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); } /* लाल सावली */
+            0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); } 
             70% { box-shadow: 0 0 0 15px rgba(220, 38, 38, 0); }
             100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
         }
@@ -49,7 +49,6 @@
             opacity: 1 !important;
         }
         
-        /* स्क्रोलबार कस्टमायझेशन */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #000; }
         ::-webkit-scrollbar-thumb { background: #330000; border-radius: 4px; }
@@ -71,7 +70,7 @@
         <div id="conversation-log" class="flex-grow overflow-y-auto bg-black rounded-lg p-4 mb-4 border border-red-900/50 space-y-4 shadow-inner min-h-[200px]">
             <div class="text-red-900/70 text-center mt-10 font-serif">
                 आवाहन करण्यासाठी "गुरुजी" म्हणा.<br>
-                <span class="text-sm opacity-60 text-red-800">मी तंत्र आणि अभिचार मंत्रांचा ज्ञाता आहे. सावध रहा.</span>
+                <span class="text-sm opacity-60 text-red-800">मी तंत्र आणि अभिचार मंत्रांचा ज्ञाता आहे.</span>
             </div>
         </div>
 
@@ -100,14 +99,26 @@
                 <label class="text-xs text-red-900 mb-1 block uppercase tracking-widest">साधकाचे नाव</label>
                 <input type="text" id="manual-name" class="custom-input" placeholder="नाव">
             </div>
-            <input type="hidden" id="manual-age" value="30">
+            <div class="w-full">
+                <label class="text-xs text-red-900 mb-1 block uppercase tracking-widest">वय</label>
+                <input type="number" id="manual-age" class="custom-input" placeholder="वय">
+            </div>
         </div>
 
-        <div class="flex items-center justify-center gap-2 mb-2 shrink-0">
-            <input type="checkbox" id="remember-me-checkbox" class="custom-checkbox">
-            <label for="remember-me-checkbox" class="text-sm text-red-800 cursor-pointer select-none hover:text-red-600">
-                माहिती जतन करा
-            </label>
+        <div class="flex flex-col items-center justify-center gap-2 mb-2 shrink-0">
+            <div class="flex items-center gap-2">
+                <input type="checkbox" id="remember-me-checkbox" class="custom-checkbox">
+                <label for="remember-me-checkbox" class="text-sm text-red-800 cursor-pointer select-none hover:text-red-600">
+                    नाव आणि वय लक्षात ठेवा
+                </label>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <input type="checkbox" id="remember-history-checkbox" class="custom-checkbox">
+                <label for="remember-history-checkbox" class="text-sm text-red-800 cursor-pointer select-none hover:text-red-600">
+                    संवाद इतिहास लक्षात ठेवा
+                </label>
+            </div>
         </div>
 
         <div class="w-full flex flex-col items-center justify-center mb-4 shrink-0">
@@ -158,8 +169,13 @@
         const talkButton = document.getElementById('talk-button');
         const statusIndicator = document.getElementById('status-indicator');
         const conversationLog = document.getElementById('conversation-log');
+        
         const rememberMeCheckbox = document.getElementById('remember-me-checkbox');
+        const rememberHistoryCheckbox = document.getElementById('remember-history-checkbox'); // नवीन चेकबॉक्स
+        
         const manualNameInput = document.getElementById('manual-name');
+        const manualAgeInput = document.getElementById('manual-age'); // वय इनपुट
+        
         const pauseResumeButton = document.getElementById('pause-resume-button');
         const stopSpeechButton = document.getElementById('stop-speech-button');
         const replayButton = document.getElementById('replay-button');
@@ -176,6 +192,7 @@
         const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
         let appState = 'IDLE'; 
         let userName = '';
+        let userAge = 30; // डिफॉल्ट वय
         let chatHistory = [];
         let systemInstruction = '';
         let recognition;
@@ -226,12 +243,19 @@
         function loadUserData() {
             try {
                 const savedName = localStorage.getItem('tantrik_userName');
+                const savedAge = localStorage.getItem('tantrik_userAge');
                 const savedRemember = localStorage.getItem('tantrik_remember');
+                const savedHistoryOption = localStorage.getItem('tantrik_rememberHistory'); // नवीन
 
                 if (savedRemember === 'true') {
                     rememberMeCheckbox.checked = true;
                     if (savedName) manualNameInput.value = savedName;
+                    if (savedAge) manualAgeInput.value = savedAge;
                     if (savedName) talkButton.textContent = `पुन्हा आवाहन करा`;
+                }
+
+                if (savedHistoryOption === 'true') {
+                    rememberHistoryCheckbox.checked = true;
                 }
 
                 const savedUseKey = localStorage.getItem('tantrik_useCustomKey');
@@ -248,13 +272,20 @@
 
         function saveUserData() {
             try {
+                // नाव आणि वय सेव्ह करणे
                 if (rememberMeCheckbox.checked) {
                     localStorage.setItem('tantrik_remember', 'true');
                     localStorage.setItem('tantrik_userName', manualNameInput.value.trim());
+                    localStorage.setItem('tantrik_userAge', manualAgeInput.value.trim());
                 } else {
                     localStorage.removeItem('tantrik_remember');
                     localStorage.removeItem('tantrik_userName');
+                    localStorage.removeItem('tantrik_userAge');
                 }
+
+                // इतिहास पर्याय सेव्ह करणे
+                localStorage.setItem('tantrik_rememberHistory', rememberHistoryCheckbox.checked);
+
                 localStorage.setItem('tantrik_useCustomKey', useCustomKeyCheckbox.checked);
                 if (customApiKeyInput.value) {
                     localStorage.setItem('tantrik_customKey', customApiKeyInput.value.trim());
@@ -271,11 +302,18 @@
         function saveChatContext() {
             if (!userName) return;
             const key = `tantrik_history_${userName.toLowerCase()}`;
-            const limitedHistory = chatHistory.slice(-20); 
-            localStorage.setItem(key, JSON.stringify(limitedHistory));
+            // इतिहास चेकबॉक्स टिक असेल तरच सेव्ह करा
+            if (rememberHistoryCheckbox.checked) {
+                const limitedHistory = chatHistory.slice(-20); 
+                localStorage.setItem(key, JSON.stringify(limitedHistory));
+            } else {
+                localStorage.removeItem(key); // अनचेक केले असेल तर जुना इतिहास उडवा
+            }
         }
 
         manualNameInput.addEventListener('input', () => { if(rememberMeCheckbox.checked) saveUserData(); });
+        manualAgeInput.addEventListener('input', () => { if(rememberMeCheckbox.checked) saveUserData(); });
+        rememberHistoryCheckbox.addEventListener('change', saveUserData);
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         
@@ -327,43 +365,53 @@
                     await acquireWakeLock(); 
                     
                     const inputName = manualNameInput.value.trim();
+                    const inputAge = manualAgeInput.value.trim();
 
                     if (inputName) {
                         userName = inputName;
+                        if(inputAge) userAge = inputAge;
+
                         saveUserData(); 
                         buildSystemPrompt(); 
 
-                        const previousHistory = loadChatContext(userName);
-                        
-                        if (previousHistory.length > 0) {
-                            chatHistory = previousHistory;
-                            logMessage('सिस्टम', 'गुरुजी लक्ष घालत आहेत...');
-                            
-                            setState('BUSY');
-                            const welcomeBackPrompt = "जुना साधक परत आला आहे. म्हणा 'पुन्हा आलास? काय समस्या आहे?'";
-                            const tempHistory = [...chatHistory, { role: 'user', parts: [{ text: welcomeBackPrompt }] }];
-                            const welcomeText = await getAIResponse(tempHistory);
-                            
-                            logMessage('गुरुजी', welcomeText);
-                            await speakText(welcomeText);
-                            setState('CONVERSATION');
-                            startRecognitionSafe();
-
-                        } else {
-                            if (chatHistory.length === 0) {
-                                chatHistory.push({ role: 'user', parts: [{ text: "Start session." }] });
+                        // नवीन लॉजिक: इतिहास चेक करणे
+                        if (rememberHistoryCheckbox.checked) {
+                            const previousHistory = loadChatContext(userName);
+                            if (previousHistory.length > 0) {
+                                // इतिहास आहे आणि चेकबॉक्स टिक आहे
+                                chatHistory = previousHistory;
+                                logMessage('सिस्टम', 'गुरुजी जुना धागा जोडत आहेत...');
+                                setState('BUSY');
+                                
+                                const welcomeBackText = "नमस्कार, आपण मागच्या चर्चेला परत पुढे सुरू करूया का?";
+                                logMessage('गुरुजी', welcomeBackText);
+                                await speakText(welcomeBackText);
+                                
+                                setState('CONVERSATION');
+                                startRecognitionSafe();
+                            } else {
+                                // चेकबॉक्स टिक आहे पण इतिहास नाही (नवीन सुरुवात)
+                                chatHistory = [];
+                                const welcomeText = "नमस्कार, काय प्रश्न आहे?";
+                                logMessage('गुरुजी', welcomeText);
+                                setState('BUSY');
+                                await speakText(welcomeText);
+                                setState('CONVERSATION');
+                                startRecognitionSafe();
                             }
-                            
-                            const welcomeText = `कोण आहेस तू? मी अथर्ववेदाचा, अंगिरस विद्येचा जाणकार आहे. नाव सांग ${userName}. तुझ्या आयुष्यात कोणते संकट किंवा शत्रू आहे?`;
+                        } else {
+                             // चेकबॉक्स टिक नाही - नवीन सुरुवात
+                            chatHistory = [];
+                            const welcomeText = "नमस्कार, काय प्रश्न आहे?";
                             logMessage('गुरुजी', welcomeText);
-                            
-                            setState('BUSY'); 
+                            setState('BUSY');
                             await speakText(welcomeText);
                             setState('CONVERSATION');
                             startRecognitionSafe();
                         }
 
                     } else {
+                        // नाव नाही - नाव विचारा
                         setState('LISTENING_FOR_WAKEWORD');
                         startRecognitionSafe();
                         if (conversationLog.childElementCount < 3) logMessage('माहिती', '"गुरुजी" म्हणा.');
@@ -390,6 +438,7 @@
                     endChatButton.disabled = true;
                     talkButton.className = "w-full py-4 px-6 rounded-lg text-lg font-bold tracking-wider transition-all duration-300 ease-in-out shrink-0 bg-red-900 text-white shadow-[0_0_15px_rgba(153,27,27,0.4)] hover:bg-red-800 hover:shadow-[0_0_25px_rgba(220,38,38,0.6)] hover:-translate-y-0.5";
                     manualNameInput.disabled = false;
+                    manualAgeInput.disabled = false;
                     break;
                 case 'BUSY':
                     talkButton.textContent = 'मंत्र उच्चार सुरू आहे...';
@@ -404,6 +453,7 @@
                     endChatButton.disabled = false;
                     talkButton.className = "w-full py-4 px-6 rounded-lg text-lg font-bold tracking-wider transition-all duration-300 ease-in-out shrink-0 bg-gray-800 text-red-500 border border-red-900 hover:bg-gray-700";
                     manualNameInput.disabled = true;
+                    manualAgeInput.disabled = true;
                     break;
             }
         }
@@ -443,14 +493,28 @@
                         userName = await extractNameFromTranscript(transcript);
                         manualNameInput.value = userName; 
                         saveUserData();
-                        buildSystemPrompt(); 
-
-                        const startPrompt = `ऐकले मी ${userName}. आता सांग, कशासाठी आला आहेस? शत्रुचा नाश, रोग मुक्ती, की वशीकरण?`;
-                        logMessage('गुरुजी', startPrompt);
-                        await speakText(startPrompt);
-                        setState('CONVERSATION');
-                        startRecognitionSafe();
+                        
+                        const nextPrompt = "तुझे वय काय?";
+                        logMessage('गुरुजी', nextPrompt);
+                        await speakText(nextPrompt);
+                        setState('LISTENING_FOR_AGE'); // वयासाठी नवीन स्टेट
+                        startRecognitionSafe(); 
                         break;
+                        
+                    case 'LISTENING_FOR_AGE':
+                         logMessage('साधक', transcript);
+                         // वयाचे एक्सट्रॅक्शन
+                         userAge = await extractAgeFromTranscript(transcript);
+                         manualAgeInput.value = userAge;
+                         saveUserData();
+                         buildSystemPrompt();
+                         
+                         const startPrompt = "नमस्कार, काय प्रश्न आहे?";
+                         logMessage('गुरुजी', startPrompt);
+                         await speakText(startPrompt);
+                         setState('CONVERSATION');
+                         startRecognitionSafe();
+                         break;
 
                     case 'CONVERSATION':
                         logMessage(userName || 'साधक', transcript);
@@ -458,8 +522,6 @@
                         saveChatContext();
 
                         const aiResponseText = await generateTextResponseFromChat();
-                        
-                        // फिल्टर: सर्व प्रकारचे कंस काढणे
                         const cleanedResponseText = cleanText(aiResponseText);
 
                         chatHistory.push({ role: 'model', parts: [{ text: cleanedResponseText }] });
@@ -483,39 +545,27 @@
             }
         }
 
-        // --- मुख्य लॉजिक (Tantrik Brain) ---
         function buildSystemPrompt() {
             systemInstruction = `
                 You are a "Tantrik Guruji", an expert in the **Atharvaveda's Angirasa** tradition (Black Magic, Sorcery, Healing, Protection).
-                User: ${userName}.
+                User: ${userName}, Age: ${userAge}.
                 
                 STRICT RULES:
                 1. **NO BRACKETS, NO ASTERISKS, NO ANGLE BRACKETS.** Do not use: ( ) [ ] < > * { }. Eliminate them completely.
                 2. LANGUAGE: PURE MARATHI ONLY. No English words.
-                3. TONE: Mysterious, commanding, intense, dark, fearless. You are an expert in 'Abhichara' (hostile magic) and 'Kritya' (created entities).
-                4. SOURCE: Quote EXACT verses from **Atharvaveda** related to:
-                   - Abhichara (Sorcery against enemies)
-                   - Raksha (Protection from demons)
-                   - Bheshajya (Healing charms)
-                   - Vashikaran (Influence)
+                3. TONE: Mysterious, commanding, intense, dark, fearless.
+                4. SOURCE: Quote EXACT verses from **Atharvaveda** related to: Abhichara, Raksha, Bheshajya, Vashikaran.
                 
                 YOUR TASK:
                 1. Listen to the user's problem.
                 2. Provide the EXACT MANTRA from Atharvaveda (Angiras section).
                 3. Explain the mantra's deep, hidden meaning (Bhavartha) in Marathi.
                 4. DO NOT CENSOR the hostile nature of the verses. Explain them as they are in the text.
-                5. DO NOT give practical instructions on how to harm people today (safety). Focus on the POWER of the ANCIENT TEXT.
-
-                RESPONSE FORMAT (Strictly without special chars):
-                हे साधका तुझे संकट मला समजले
-                अथर्ववेदाच्या या कांडात मंत्र आहे
-                SANSKRIT MANTRA
-                याचा गूढ अर्थ असा आहे की... (Explanation in Marathi)
+                5. Do not use any brackets or special characters in the output.
             `;
             restartChatButton.disabled = false;
         }
 
-        // --- API कॉल्स ---
         async function getAIResponse(historyData) {
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
             try {
@@ -525,9 +575,7 @@
                     body: JSON.stringify({
                         contents: historyData,
                         systemInstruction: { parts: [{ text: systemInstruction }] },
-                        generationConfig: {
-                            temperature: 1.0, // उच्च तापमान अधिक 'गूढ' उत्तरासाठी
-                        }
+                        generationConfig: { temperature: 1.0 }
                     })
                 });
                 const result = await response.json();
@@ -543,7 +591,7 @@
                 const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: `Extract Name from: "${transcript}". Return ONLY name in Marathi. If no name, return "साधक".` }] }] })
+                    body: JSON.stringify({ contents: [{ parts: [{ text: `Extract Name from: "${transcript}". Return ONLY name in Marathi.` }] }] })
                 });
                 const result = await response.json();
                 let name = result.candidates[0].content.parts[0].text.trim();
@@ -551,7 +599,20 @@
             } catch (error) { return "साधक"; }
         }
         
-        // **स्वच्छता (Cleaning Function) - सर्व चिन्हे काढून टाकणे**
+        async function extractAgeFromTranscript(transcript) {
+             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
+             try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: `Extract age number from: "${transcript}". Return ONLY digits. Default 30.` }] }] })
+                });
+                const result = await response.json();
+                let age = parseInt(result.candidates[0].content.parts[0].text.trim());
+                return isNaN(age) ? 30 : age;
+            } catch (e) { return 30; }
+        }
+        
         function cleanText(text) {
              return text.replace(/[\(\)\[\]\{\}\<\>\*#`]/g, '') // सर्व कंस आणि चिन्हे काढा
                         .replace(/\n\s*\n/g, '\n') // रिकाम्या ओळी कमी करा
@@ -611,8 +672,8 @@
                                  
                 if (vedicVoice) utterance.voice = vedicVoice;
                 utterance.lang = 'mr-IN'; 
-                utterance.rate = 0.8; // थोडा हळू आणि गंभीर
-                utterance.pitch = 0.6; // खोल आवाज (Deep Voice)
+                utterance.rate = 0.8; 
+                utterance.pitch = 0.6; 
                 
                 synth.speak(utterance);
             });
@@ -696,9 +757,13 @@
             appState = 'IDLE'; setState('IDLE');
             await releaseWakeLock();
             conversationLog.innerHTML = '';
+            // नाव कायम ठेवले आहे, पण इतिहास उडवणे
             if(userName) {
-                localStorage.removeItem(`tantrik_history_${userName.toLowerCase()}`);
-                chatHistory = [];
+                 // फक्त जर इतिहास ठेवू नये असे असेल तरच उडवा
+                 if (!rememberHistoryCheckbox.checked) {
+                    localStorage.removeItem(`tantrik_history_${userName.toLowerCase()}`);
+                    chatHistory = [];
+                 }
             }
             logMessage('माहिती', `साधना पुन्हा सुरू झाली.`);
         }
