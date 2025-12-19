@@ -17,6 +17,7 @@ html, body {
 
 body { -webkit-touch-callout: none; }
 
+/* ---------- HOME ---------- */
 #menu {
     height: 100vh;
     text-align: center;
@@ -52,6 +53,7 @@ button, select {
     font-size: 20px;
 }
 
+/* ---------- THERAPY ---------- */
 #therapy {
     display: none;
     width: 100vw;
@@ -73,34 +75,59 @@ button, select {
     position: absolute;
 }
 
-#closeBtn, #fullscreenBtn {
+/* ---------- TOP CONTROLS ---------- */
+#closeBtn {
     position: fixed;
     top: 10px;
+    right: 12px;
     font-size: 24px;
     color: white;
     cursor: pointer;
     z-index: 999;
 }
 
-#closeBtn { right: 12px; }
-#fullscreenBtn { left: 12px; }
-
+/* ---------- POPUP ---------- */
 #popup {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.9);
+    background: rgba(0,0,0,0.92);
     display: none;
     align-items: center;
     justify-content: center;
     flex-direction: column;
-    font-size: 24px;
     color: white;
+    text-align: center;
+    padding: 20px;
+}
+
+#popup h2 {
+    margin-bottom: 10px;
+}
+
+#popup p {
+    font-size: 18px;
+    color: #fde68a;
+}
+
+#fullscreenPopupBtn {
+    background: #22c55e;
+    color: black;
+    font-size: 20px;
+    padding: 14px 22px;
+    border-radius: 14px;
+    margin-top: 16px;
+}
+
+#count {
+    margin-top: 16px;
+    font-size: 22px;
 }
 </style>
 </head>
 
 <body oncontextmenu="return false" onload="keepScreenAwake()">
 
+<!-- ========== HOME ========== -->
 <div id="menu">
 <h1>👁️ Lazy Eye Visual Therapy</h1>
 <p>Consult an Eye Specialist to identify the lazy eye</p>
@@ -121,16 +148,28 @@ button, select {
 </select>
 
 <br><br>
-<button id="startBtn" onclick="start()">Start Therapy</button>
+<button id="startBtn" onclick="showPopup()">Start Therapy</button>
 </div>
 
+<!-- ========== VR INSTRUCTION POPUP ========== -->
 <div id="popup">
-<div>📱 Place the phone in VR headset</div>
-<div id="count">Starting in 10</div>
+<h2>📱 VR Setup</h2>
+
+<p>
+Step 1: Click <b>Fullscreen</b><br>
+Step 2: Rotate phone to <b>Landscape</b><br>
+Step 3: Place phone in <b>VR Headset</b>
+</p>
+
+<button id="fullscreenPopupBtn" onclick="enterFullscreenAndStart()">
+Enter Fullscreen
+</button>
+
+<div id="count"></div>
 </div>
 
+<!-- ========== THERAPY ========== -->
 <div id="therapy">
-<div id="fullscreenBtn" onclick="goFullscreen()">⛶</div>
 <div id="closeBtn" onclick="exitTherapy()">❌</div>
 <div id="left" class="half"></div>
 <div id="right" class="half"></div>
@@ -141,25 +180,26 @@ button, select {
 </audio>
 
 <script>
-/* ---------------- Screen Wake Lock ---------------- */
+/* ---------- Wake Lock ---------- */
 let wakeLock = null;
 async function keepScreenAwake() {
     try {
         if ('wakeLock' in navigator) {
             wakeLock = await navigator.wakeLock.request('screen');
         }
-    } catch(e) {}
+    } catch(e){}
 }
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') keepScreenAwake();
 });
 
-/* ---------------- Globals ---------------- */
+/* ---------- Globals ---------- */
 let eye = "left";
 let area, obj;
 let x = 0, y = 0;
 let sessionTimer;
 
+/* ---------- Data ---------- */
 const colors = ["red","blue","green","yellow","orange","pink","brown"];
 const shapes = ["circle","square","rectangle","triangle","oval"];
 const fruits = ["🍎","🍌","🍊","🍉","🍓"];
@@ -169,29 +209,44 @@ const speech = new SpeechSynthesisUtterance();
 speech.rate = 0.65;
 speech.pitch = 1.4;
 
-/* ---------------- Eye Selection ---------------- */
+/* ---------- Eye Selection ---------- */
 function selectEye(e) {
     eye = e;
     document.querySelectorAll(".eye-btn").forEach(b => b.classList.remove("active"));
     document.getElementById(e === "left" ? "btnLeft" : "btnRight").classList.add("active");
 }
 
-/* ---------------- Start Flow ---------------- */
-function start() {
-    let c = 10;
+/* ---------- Show Popup ---------- */
+function showPopup() {
     document.getElementById("popup").style.display = "flex";
-    let t = setInterval(() => {
-        document.getElementById("count").innerText = "Starting in " + c;
+}
+
+/* ---------- Fullscreen + Countdown ---------- */
+async function enterFullscreenAndStart() {
+    try {
+        await document.documentElement.requestFullscreen();
+        if (screen.orientation?.lock) {
+            await screen.orientation.lock("landscape");
+        }
+        keepScreenAwake();
+    } catch(e){}
+
+    let c = 10;
+    const countEl = document.getElementById("count");
+    countEl.innerText = "Starting in " + c;
+
+    const timer = setInterval(() => {
         c--;
+        countEl.innerText = "Starting in " + c;
         if (c < 0) {
-            clearInterval(t);
+            clearInterval(timer);
             document.getElementById("popup").style.display = "none";
             launch();
         }
     }, 1000);
 }
 
-/* ---------------- Launch Therapy ---------------- */
+/* ---------- Launch Therapy ---------- */
 function launch() {
     document.getElementById("menu").style.display = "none";
     document.getElementById("therapy").style.display = "block";
@@ -211,24 +266,13 @@ function launch() {
     sessionTimer = setTimeout(exitTherapy, 15 * 60 * 1000);
 }
 
-/* ---------------- Exit ---------------- */
+/* ---------- Exit ---------- */
 function exitTherapy() {
     if (wakeLock) wakeLock.release();
     location.reload();
 }
 
-/* ---------------- Fullscreen ---------------- */
-async function goFullscreen() {
-    try {
-        await document.documentElement.requestFullscreen();
-        if (screen.orientation?.lock) {
-            await screen.orientation.lock("landscape");
-        }
-        keepScreenAwake();
-    } catch(e) {}
-}
-
-/* ---------------- Smooth Safe Animation ---------------- */
+/* ---------- Smooth Safe Motion ---------- */
 function animate() {
     if (!obj || !area) return;
 
@@ -248,7 +292,7 @@ function animate() {
     requestAnimationFrame(animate);
 }
 
-/* ---------------- Visual Logic ---------------- */
+/* ---------- Visual Logic ---------- */
 function updateVisual() {
     let mode = document.getElementById("mode").value;
     if (mode === "random") {
@@ -322,7 +366,7 @@ function updateVisual() {
     }
 }
 
-/* ---------------- Speech ---------------- */
+/* ---------- Speech ---------- */
 function speak(text) {
     speech.text = text;
     speechSynthesis.cancel();
