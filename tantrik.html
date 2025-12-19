@@ -14,24 +14,24 @@
             color: #d1d5db;
         }
 
-        /* स्क्रोलबार कस्टमायझेशन */
+        /* स्क्रोलबार */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #1a0505; }
         ::-webkit-scrollbar-thumb { background: #7f1d1d; border-radius: 3px; }
 
-        /* ॲनिमेशन */
+        /* ॲनिमेशन (जुन्या फाईलसारखेच पण लाल रंगात) */
+        .listening-pulse { animation: bloodPulse 1.5s infinite ease-in-out; }
+        @keyframes bloodPulse {
+            0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(220, 38, 38, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+        }
+
         .breathing-glow { animation: redPulse 3s infinite ease-in-out; }
         @keyframes redPulse {
             0% { box-shadow: 0 0 5px rgba(220, 38, 38, 0.2); }
             50% { box-shadow: 0 0 20px rgba(220, 38, 38, 0.6); border-color: #ef4444; }
             100% { box-shadow: 0 0 5px rgba(220, 38, 38, 0.2); }
-        }
-
-        .listening-pulse { animation: bloodPulse 1.5s infinite; }
-        @keyframes bloodPulse {
-            0% { box-shadow: 0 0 0 0 rgba(185, 28, 28, 0.7); }
-            70% { box-shadow: 0 0 0 15px rgba(185, 28, 28, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(185, 28, 28, 0); }
         }
 
         /* इनपुट स्टाईल */
@@ -40,6 +40,7 @@
             border: 1px solid #7f1d1d !important;
             color: #ffffff !important;
             text-align: center;
+            caret-color: #ef4444;
         }
         .tantra-input:focus {
             border-color: #ef4444 !important;
@@ -171,7 +172,7 @@
     </div>
 
     <script>
-        // --- ग्लोबल व्हेरिएबल्स ---
+        // --- 1. मूळ फाइलमधील कोअर व्हेरिएबल्स (Original Variables) ---
         const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
         
         let appState = 'IDLE'; 
@@ -181,8 +182,11 @@
         let systemInstruction = '';
         let recognition;
         let lastSpokenText = ''; 
-        let isPaused = false;
-        
+        let speechManuallyStopped = false; 
+        const synth = window.speechSynthesis;
+        let voices = [];
+        let wakeLock = null;
+
         // --- DOM Elements ---
         const talkButton = document.getElementById('talk-button');
         const statusIndicator = document.getElementById('status-indicator');
@@ -206,12 +210,11 @@
         const shareButton = document.getElementById('share-button');
         const restartChatBtn = document.getElementById('restart-chat-btn');
 
-        const synth = window.speechSynthesis;
-
         // --- Init ---
         window.onload = () => {
             if (synth.speaking) synth.cancel();
             loadUserData();
+            loadVoices();
         };
 
         // उजवी क्लिक बंद
@@ -245,7 +248,7 @@
                     pasteKeyBtn.textContent = "OK";
                     setTimeout(() => { pasteKeyBtn.innerHTML = originalText; }, 1000);
                 }
-            } catch (err) { alert('Clipboard permission denied'); }
+            } catch (err) { alert('पेस्ट परमिशन नाही.'); }
         });
 
         function getEffectiveApiKey() {
@@ -253,6 +256,11 @@
                 return customApiKeyInput.value.trim();
             }
             return DEFAULT_API_KEY;
+        }
+
+        function loadVoices() {
+            voices = synth.getVoices();
+            if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => { voices = synth.getVoices(); };
         }
 
         // --- Storage Logic ---
@@ -291,20 +299,38 @@
                         logMessage(role, item.parts[0].text);
                     });
                     if(chatHistory.length > 0) restartChatBtn.disabled = false;
-                } catch(e) { console.log("History error", e); }
+                } catch(e) {}
             }
         }
 
-        // --- Speech Recognition ---
+        // --- 2. मूळ फाईलमधील स्पीच इंजिन (Corrected Logic) ---
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (SpeechRecognition) {
-            recognition = new SpeechRecognition();
-            recognition.continuous = false;
-            recognition.lang = 'mr-IN';
-            recognition.onresult = handleSpeechResult;
-            recognition.onend = handleSpeechEnd;
+        
+        if (!SpeechRecognition) {
+            alert("हा ब्राउझर सपोर्ट करत नाही. Chrome वापरा.");
+            talkButton.disabled = true;
         } else {
-            alert("Speech API not supported in this browser.");
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;  // महत्त्वाचे: हे false ठेवले तरच लॅग येत नाही
+            recognition.interimResults = false;
+            recognition.lang = 'mr-IN';
+
+            recognition.onresult = handleSpeechResult;
+            recognition.onend = handleSpeechEnd; // हे लूप चालू ठेवण्यासाठी गरजेचे आहे
+            
+            recognition.onerror = (event) => {
+                // मूळ फाईलप्रमाणे Error Handling
+                if (event.error === 'no-speech' && appState !== 'IDLE' && appState !== 'BUSY') {
+                    startRecognitionSafe();
+                } else if (event.error === 'not-allowed') {
+                    setState('IDLE');
+                }
+            };
+        }
+
+        function startRecognitionSafe() {
+            if (!recognition) return;
+            try { recognition.start(); } catch (e) {}
         }
 
         // --- Event Listeners ---
@@ -316,26 +342,29 @@
         shareButton.addEventListener('click', shareChat);
         restartChatBtn.addEventListener('click', restartLastTurn);
 
-        // Auto Pause on Background
+        // Auto Pause
         document.addEventListener("visibilitychange", () => {
             if (document.hidden && synth.speaking && !synth.paused) {
                 togglePauseResume();
             }
         });
 
-        // --- Audio Logic ---
+        // --- Audio Logic (Original Sync Logic) ---
         function togglePauseResume() {
             if (synth.speaking) {
                 if (synth.paused) {
                     synth.resume();
-                    isPaused = false;
                     updatePauseIcon(false);
                 } else {
                     synth.pause();
-                    isPaused = true;
                     updatePauseIcon(true);
                     scrollToCenterCurrentMessage();
                 }
+            } else if (appState !== 'IDLE' && !synth.speaking) {
+                // जर ऑडिओ नसेल आणि ॲप ऐकत असेल, तर pause दाबल्यास माईक थांबवा
+                if(recognition) recognition.stop();
+                setState('BUSY'); // Temporary busy state essentially pauses mic
+                updatePauseIcon(true);
             }
         }
 
@@ -357,27 +386,32 @@
         }
 
         function stopSpeech() {
-            if (synth.speaking || synth.paused) {
-                synth.cancel();
-                isPaused = false;
-                conversationLog.scrollTop = conversationLog.scrollHeight;
-                setState('IDLE'); 
-                toggleMediaButtons(true);
-                updatePauseIcon(false);
-            }
+            speechManuallyStopped = true;
+            if (synth.speaking || synth.paused) synth.cancel();
+            if (recognition) recognition.stop();
+            
+            conversationLog.scrollTop = conversationLog.scrollHeight;
+            setState('IDLE'); 
+            toggleMediaButtons(true);
+            updatePauseIcon(false);
+            setTimeout(() => { speechManuallyStopped = false; }, 1000);
         }
 
         function replaySpeech() {
             if (!lastSpokenText) return;
-            try { recognition.stop(); } catch(e){}
+            if (recognition) recognition.stop();
             setState('BUSY');
-            speakText(lastSpokenText).then(() => setState('IDLE'));
+            speakText(lastSpokenText).then(() => {
+                setState('IDLE');
+            });
             scrollToCenterCurrentMessage();
         }
 
-        // --- Main Chat Logic ---
+        // --- 3. मेन लॉजिक फ्लो (Reverted to Original State Machine) ---
         async function toggleListening() {
             if (appState === 'IDLE') {
+                try { await acquireWakeLock(); } catch(e){}
+
                 userName = manualNameInput.value.trim();
                 userAge = manualAgeInput.value.trim() || 25;
 
@@ -386,29 +420,73 @@
                 saveUserData();
                 buildSystemPrompt();
                 
+                // डायरेक्ट "Wake Word" मोड मध्ये जाणे (जुन्या फाईलप्रमाणे)
                 setState('LISTENING_FOR_WAKEWORD');
                 startRecognitionSafe();
-                talkButton.textContent = "ऐकत आहे...";
-                talkButton.classList.add('breathing-glow');
+                
             } else {
-                stopSpeech();
+                setState('IDLE');
+                if (recognition) recognition.stop();
+                if (synth.speaking) synth.cancel();
+                releaseWakeLock();
             }
         }
 
-        function handleSpeechResult(event) {
-            const transcript = event.results[event.results.length - 1][0].transcript.trim();
-            console.log("Heard:", transcript);
-            try { recognition.stop(); } catch(e){}
+        function setState(newState) {
+            appState = newState;
+            switch (newState) {
+                case 'IDLE':
+                    talkButton.textContent = '॥ आवाहन करा ॥';
+                    talkButton.classList.remove('breathing-glow');
+                    statusIndicator.className = 'w-3 h-3 rounded-full bg-red-900 transition-colors';
+                    manualNameInput.disabled = false;
+                    manualAgeInput.disabled = false;
+                    break;
+                case 'BUSY':
+                    talkButton.textContent = 'मंत्रोच्चार सुरू आहे...';
+                    talkButton.disabled = true;
+                    statusIndicator.className = 'w-3 h-3 rounded-full bg-yellow-600 animate-pulse';
+                    break;
+                default: // Listening states
+                    talkButton.textContent = 'ऐकत आहे...';
+                    talkButton.disabled = false;
+                    talkButton.classList.add('breathing-glow');
+                    statusIndicator.className = 'w-3 h-3 rounded-full bg-red-500 listening-pulse transition-colors';
+                    manualNameInput.disabled = true;
+                    manualAgeInput.disabled = true;
+                    break;
+            }
+        }
 
+        function handleSpeechEnd() {
+            // मूळ फाईलमधले महत्त्वाचे लॉजिक: जर IDLE किंवा BUSY नसेल, तर माईक पुन्हा सुरू करा
+            if (appState !== 'IDLE' && appState !== 'BUSY') {
+                startRecognitionSafe();
+            } else if (appState === 'IDLE') {
+                setState('IDLE');
+            }
+        }
+        
+        async function handleSpeechResult(event) {
+            const transcript = event.results[event.results.length - 1][0].transcript.trim();
+            if (!transcript) return;
+            console.log(`Heard: ${transcript}`);
+            
+            // तात्पुरते थांबवणे (Avoid double trigger)
+            recognition.stop();
+            
             if (appState === 'LISTENING_FOR_WAKEWORD') {
                 const t = transcript.toLowerCase();
+                // "गुरुजी" लॉजिक (फास्ट)
                 if (t.includes('guruji') || t.includes('गुरुजी') || t.includes('गुरु जी')) {
                     const reply = `आदेश करा, ${userName}.`;
                     logMessage('गुरुजी', reply);
-                    speakText(reply);
+                    await speakText(reply);
                     setState('CONVERSATION');
+                    startRecognitionSafe();
                 } else {
-                    startRecognitionSafe(); 
+                    // वेकवर्ड नसल्यास लगेच पुन्हा ऐकणे सुरू करा
+                    startRecognitionSafe();
                 }
             } else if (appState === 'CONVERSATION') {
                 processUserQuery(transcript);
@@ -416,8 +494,8 @@
         }
 
         async function processUserQuery(text) {
-            logMessage(userName, text);
-            setState('BUSY');
+            logMessage(userName || 'साधक', text);
+            setState('BUSY'); // UI ब्लॉक करा
             
             chatHistory.push({ role: 'user', parts: [{ text: text }] });
             saveChatContext();
@@ -431,10 +509,18 @@
             logMessage('गुरुजी', cleanText);
             restartChatBtn.disabled = false;
             
-            await speakText(cleanText);
+            // उत्तर बोलून झाल्यावर परत Listening Mode (मूळ फाईलप्रमाणे)
+            try {
+                await speakText(cleanText);
+            } catch (error) {
+                if (error.message === "Speech manually stopped") return;
+            }
+            
+            // जर बोलणे संपले आणि Stop दाबले नाही, तर पुन्हा ऐकणे सुरू करा (Requirement 8)
             setState('IDLE'); 
         }
 
+        // --- System Logic ---
         function startNewChat() {
             stopSpeech();
             chatHistory = [];
@@ -461,10 +547,7 @@
             });
             if (!textToShare) return;
             try { await navigator.share({ title: 'तंत्र संवाद', text: textToShare }); }
-            catch (err) { 
-                navigator.clipboard.writeText(textToShare); 
-                alert("Copied to clipboard."); 
-            }
+            catch (err) { navigator.clipboard.writeText(textToShare); alert("कॉपी केले."); }
         }
 
         function restartLastTurn() {
@@ -487,7 +570,6 @@
         }
 
         function cleanTextStrict(text) {
-            // Removing special chars safely
             return text.replace(/[\*\[\]\(\)<>]/g, '')
                        .replace(/\s+/g, ' ')
                        .trim();
@@ -525,54 +607,64 @@
                 }
                 return "ध्यान भंग झाले. पुन्हा प्रयत्न करा.";
             } catch (e) { 
-                console.error(e);
-                return "बाधा आली आहे. इंटरनेट तपासा."; 
+                return "मंत्रांमध्ये अडथळा आला आहे. इंटरनेट तपासा."; 
             }
         }
 
-        function speakText(text) {
+        // --- 4. मूळ फाईलमधील स्पीच फंक्शन (Stable) ---
+        async function speakText(text) {
+            if (synth.speaking) synth.cancel();
+            lastSpokenText = text;
+            speechManuallyStopped = false;
+            
+            // व्हॉईस लोड होण्याची वाट पाहणे
+            if (voices.length === 0) voices = synth.getVoices();
+
             return new Promise((resolve, reject) => {
-                if (synth.speaking) synth.cancel();
-                lastSpokenText = text;
                 const utterance = new SpeechSynthesisUtterance(text);
+                
+                utterance.onstart = () => { toggleMediaButtons(false); updatePauseIcon(false); };
+                
+                utterance.onend = () => {
+                    toggleMediaButtons(true);
+                    updatePauseIcon(false);
+                    if (speechManuallyStopped) reject(new Error("Speech manually stopped"));
+                    else resolve();
+                };
+                
+                utterance.onerror = (e) => { 
+                    toggleMediaButtons(true);
+                    if (e.error === 'interrupted') resolve(); else reject(e.error); 
+                };
+
+                let vedicVoice = voices.find(voice => voice.lang === 'mr-IN') || 
+                                 voices.find(voice => voice.lang === 'hi-IN');
+                if (vedicVoice) utterance.voice = vedicVoice;
+                
                 utterance.lang = 'mr-IN';
                 utterance.rate = 0.8; 
                 utterance.pitch = 0.7; 
-                utterance.onstart = () => { toggleMediaButtons(false); updatePauseIcon(false); };
-                utterance.onend = () => { toggleMediaButtons(true); updatePauseIcon(false); resolve(); };
-                utterance.onerror = () => { toggleMediaButtons(true); resolve(); };
+                
                 synth.speak(utterance);
             });
         }
 
+        // --- UI Helpers ---
         function logMessage(sender, text) {
             const div = document.createElement('div');
             div.className = "chat-bubble mb-6 p-4 rounded-lg border border-red-900/40 bg-gray-900/80 shadow-lg";
+            
             const senderSpan = document.createElement('div');
             senderSpan.className = sender === 'गुरुजी' ? "text-red-500 font-bold mb-1 text-lg" : "text-gray-400 font-bold mb-1 text-sm text-right";
             senderSpan.innerText = sender + ":";
+            
             const textSpan = document.createElement('div');
             textSpan.className = sender === 'गुरुजी' ? "text-gray-200 leading-relaxed font-serif text-justify" : "text-gray-300 text-right italic";
             textSpan.innerText = text;
+
             div.appendChild(senderSpan); div.appendChild(textSpan);
             conversationLog.appendChild(div);
             conversationLog.scrollTop = conversationLog.scrollHeight;
-        }
-
-        function setState(state) {
-            appState = state;
-            if (state === 'IDLE') {
-                talkButton.innerText = "॥ आवाहन करा ॥";
-                talkButton.classList.remove('breathing-glow');
-                statusIndicator.className = "w-3 h-3 rounded-full bg-red-900";
-            } else if (state === 'LISTENING_FOR_WAKEWORD') {
-                statusIndicator.className = "w-3 h-3 rounded-full bg-red-500 listening-pulse";
-            } else if (state === 'BUSY') {
-                talkButton.innerText = "मंत्रोच्चार सुरू आहे...";
-                statusIndicator.className = "w-3 h-3 rounded-full bg-yellow-600 animate-pulse";
-            } else if (state === 'CONVERSATION') {
-                statusIndicator.className = "w-3 h-3 rounded-full bg-green-600";
-            }
         }
 
         function toggleMediaButtons(disabled) {
@@ -581,15 +673,21 @@
             replayButton.disabled = disabled;
         }
 
-        function startRecognitionSafe() {
-            if(recognition) {
-                try { recognition.start(); } catch (e) {}
+        // --- Wake Lock (Screen On Logic from Original) ---
+        async function acquireWakeLock() {
+            if ('wakeLock' in navigator) { 
+                try { 
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    wakeLock.addEventListener('release', () => {
+                        if (appState !== 'IDLE' && document.visibilityState === 'visible') acquireWakeLock();
+                    });
+                } catch (e) {} 
             }
         }
-
-        function handleSpeechEnd() {
-            if (appState === 'LISTENING_FOR_WAKEWORD') startRecognitionSafe();
+        async function releaseWakeLock() {
+            if (wakeLock) { try { await wakeLock.release(); wakeLock = null; } catch (e) {} }
         }
+        
         function saveChatContext() { localStorage.setItem('tantra_history', JSON.stringify(chatHistory)); }
     </script>
 </body>
