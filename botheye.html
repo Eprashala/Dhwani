@@ -4,32 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Eye Exercise & Lazy Eye Therapy</title>
-<script>
-let wakeLock = null;
-
-async function keepScreenAwake() {
-    try {
-        if ('wakeLock' in navigator) {
-            wakeLock = await navigator.wakeLock.request('screen');
-
-            wakeLock.addEventListener('release', () => {
-                console.log('Wake Lock released');
-            });
-
-            console.log('Wake Lock active');
-        }
-    } catch (err) {
-        console.error('Wake Lock error:', err);
-    }
-}
-
-/* Re-acquire wake lock if page becomes visible again */
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-        keepScreenAwake();
-    }
-});
-</script>
 
 <style>
 html, body {
@@ -72,7 +46,7 @@ button, select {
     margin-top: 4px;
 }
 
-/* Therapy */
+/* Therapy screen */
 #therapy {
     display: none;
     width: 100vw;
@@ -98,7 +72,7 @@ button, select {
     will-change: transform, left, top;
 }
 
-/* Subtle Close Button */
+/* Subtle close button */
 #closeBtn {
     position: fixed;
     top: 10px;
@@ -141,7 +115,7 @@ button, select {
 </style>
 </head>
 
-<body oncontextmenu="return false">
+<body oncontextmenu="return false" onload="requestWakeLock()">
 
 <!-- MENU -->
 <div id="menu">
@@ -173,7 +147,7 @@ Click on <b>Both Eyes</b> to act as a normal Eye Exerciser
 <button onclick="showPopup()">Start</button>
 </div>
 
-<!-- POPUP -->
+<!-- VR SETUP POPUP -->
 <div id="popup">
 <p>
 Click <b>Enter Fullscreen</b><br>
@@ -196,14 +170,34 @@ Place phone in <b>VR Headset</b>
 </audio>
 
 <script>
-/* ---------------- STATE ---------------- */
+/* ================== SCREEN WAKE LOCK ================== */
+let wakeLock = null;
+
+async function requestWakeLock() {
+    try {
+        if ('wakeLock' in navigator) {
+            wakeLock = await navigator.wakeLock.request('screen');
+            console.log("Wake lock active");
+        }
+    } catch (e) {
+        console.warn("Wake lock failed:", e);
+    }
+}
+
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+        requestWakeLock();
+    }
+});
+
+/* ================== STATE ================== */
 let eyeMode = "left";
 let objLeft = null;
 let objRight = null;
 let t = 0;
 let currentVisual = null;
 
-/* ---------------- DATA ---------------- */
+/* ================== DATA ================== */
 const colors = ["red","blue","green","yellow","orange","pink","brown"];
 const shapes = ["circle","square","rectangle","triangle","oval"];
 const fruits = ["🍎","🍌","🍊","🍉","🍓"];
@@ -214,7 +208,7 @@ const speech = new SpeechSynthesisUtterance();
 speech.rate = 0.7;
 speech.pitch = 1.4;
 
-/* ---------------- UI ---------------- */
+/* ================== UI ================== */
 function selectEye(mode) {
     eyeMode = mode;
     document.querySelectorAll(".eye-btn").forEach(b=>b.classList.remove("active"));
@@ -225,10 +219,11 @@ function showPopup() {
     document.getElementById("popup").style.display="flex";
 }
 
-/* ---------------- FULLSCREEN + AUDIO PRIME ---------------- */
+/* ================== FULLSCREEN + COUNTDOWN ================== */
 async function enterFullscreen() {
     document.getElementById("fullscreenBtn").style.display="none";
 
+    /* Prime audio (Android requirement) */
     speech.text = "Let's begin";
     speechSynthesis.speak(speech);
 
@@ -238,7 +233,9 @@ async function enterFullscreen() {
 
     try {
         await document.documentElement.requestFullscreen();
-        if (screen.orientation?.lock) await screen.orientation.lock("landscape");
+        if (screen.orientation?.lock) {
+            await screen.orientation.lock("landscape");
+        }
     } catch(e){}
 
     let c = 10;
@@ -256,7 +253,7 @@ async function enterFullscreen() {
     },1000);
 }
 
-/* ---------------- LAUNCH ---------------- */
+/* ================== LAUNCH ================== */
 function launch() {
     document.getElementById("menu").style.display="none";
     document.getElementById("therapy").style.display="block";
@@ -268,12 +265,12 @@ function launch() {
         objRight = createObject("right");
     }
 
-    applyVisual();                  // SAME visual for both eyes
-    setInterval(applyVisual, 5000); // change together
+    applyVisual();                  
+    setInterval(applyVisual, 5000);
     animate();
 }
 
-/* ---------------- OBJECT ---------------- */
+/* ================== OBJECT ================== */
 function createObject(side) {
     const o = document.createElement("div");
     o.className = "object";
@@ -281,24 +278,22 @@ function createObject(side) {
     return o;
 }
 
-/* ---------------- VISUAL (SINGLE SOURCE OF TRUTH) ---------------- */
+/* ================== VISUAL (SINGLE SOURCE) ================== */
 function applyVisual() {
     const sel = document.getElementById("mode").value;
     const mode = sel === "random"
         ? ["white","color","shape","line","fruit","flower"][Math.floor(Math.random()*6)]
         : sel;
 
-    // generate visual ONCE
     currentVisual = { mode };
 
     if (mode !== "white") {
         currentVisual.color = colors[Math.floor(Math.random()*colors.length)];
         currentVisual.shape = shapes[Math.floor(Math.random()*shapes.length)];
-        currentVisual.content = mode === "fruit"
-            ? fruits[Math.floor(Math.random()*fruits.length)]
-            : mode === "flower"
-            ? flowers[Math.floor(Math.random()*flowers.length)]
-            : null;
+        currentVisual.content =
+            mode === "fruit" ? fruits[Math.floor(Math.random()*fruits.length)] :
+            mode === "flower" ? flowers[Math.floor(Math.random()*flowers.length)] :
+            null;
 
         speak(
             mode === "color" ? "Can you tell me the colour?" :
@@ -357,7 +352,7 @@ function render(obj) {
     }
 }
 
-/* ---------------- MOTION + BINOCULAR DEPTH ---------------- */
+/* ================== MOTION + DEPTH ================== */
 function animate() {
     t += 0.006;
 
@@ -385,7 +380,7 @@ function move(obj, dir) {
     const y = my + (Math.sin(t*0.9)+1)/2*(r.height-2*my);
 
     const scale = eyeMode === "both"
-        ? 0.6 + (Math.sin(t)+1)/2 * 0.9   // stronger depth
+        ? 0.6 + (Math.sin(t)+1)/2 * 0.9
         : 0.7 + (Math.sin(t)+1)/2 * 0.6;
 
     obj.style.left = x+"px";
@@ -393,12 +388,16 @@ function move(obj, dir) {
     obj.style.transform = `scale(${scale})`;
 }
 
-/* ---------------- EXIT ---------------- */
+/* ================== EXIT ================== */
 function exitTherapy() {
+    if (wakeLock) {
+        wakeLock.release();
+        wakeLock = null;
+    }
     location.reload();
 }
 
-/* ---------------- SPEAK ---------------- */
+/* ================== SPEAK ================== */
 function speak(text) {
     if (!text) return;
     speech.text = text;
