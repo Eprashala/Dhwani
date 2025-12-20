@@ -17,6 +17,7 @@ html, body {
 
 body { -webkit-touch-callout: none; }
 
+/* ---------- HOME ---------- */
 #menu {
     height: 100vh;
     text-align: center;
@@ -24,9 +25,6 @@ body { -webkit-touch-callout: none; }
     background: radial-gradient(circle, #0f172a, #020617);
     color: white;
 }
-
-h1 { margin-bottom: 10px; }
-p { color: #fde68a; }
 
 button, select {
     font-size: 18px;
@@ -40,16 +38,9 @@ button, select {
     background: #1e293b;
     color: white;
 }
-
 .eye-btn.active {
     background: #22c55e;
     color: black;
-}
-
-#startBtn {
-    background: #2563eb;
-    color: white;
-    font-size: 20px;
 }
 
 /* ---------- THERAPY ---------- */
@@ -72,17 +63,23 @@ button, select {
 
 #object {
     position: absolute;
+    width: 36px;
+    height: 36px;
+    transform-origin: center center;
+    will-change: transform, left, top;
 }
 
-/* ---------- CLOSE ---------- */
+/* ---------- SUBTLE CLOSE BUTTON ---------- */
 #closeBtn {
     position: fixed;
     top: 10px;
     right: 12px;
-    font-size: 24px;
-    color: white;
-    cursor: pointer;
+    font-size: 20px;
+    color: rgba(200,200,200,0.55); /* soft grey */
+    background: transparent;
+    border: none;
     z-index: 999;
+    cursor: pointer;
 }
 
 /* ---------- POPUP ---------- */
@@ -97,11 +94,6 @@ button, select {
     color: white;
     text-align: center;
     padding: 20px;
-}
-
-#popup p {
-    font-size: 18px;
-    color: #fde68a;
 }
 
 #fullscreenPopupBtn {
@@ -120,17 +112,18 @@ button, select {
 </style>
 </head>
 
-<body oncontextmenu="return false" onload="keepScreenAwake()">
+<body oncontextmenu="return false">
 
+<!-- HOME -->
 <div id="menu">
-<h1>👁️ Lazy Eye Visual Therapy</h1>
-<p>Consult an Eye Specialist to identify the lazy eye</p>
+<h2>👁️ Lazy Eye Visual Therapy</h2>
+<p style="color:#fde68a">Consult an Eye Specialist to identify the lazy eye</p>
 
-<h3>Select Lazy Eye</h3>
 <button class="eye-btn" id="btnLeft" onclick="selectEye('left')">Left Eye</button>
 <button class="eye-btn" id="btnRight" onclick="selectEye('right')">Right Eye</button>
 
-<h3>Select Activity</h3>
+<br><br>
+
 <select id="mode">
 <option value="random">Random</option>
 <option value="white">White Dancing Ball</option>
@@ -142,27 +135,27 @@ button, select {
 </select>
 
 <br><br>
-<button id="startBtn" onclick="showPopup()">Start Therapy</button>
+<button onclick="showPopup()">Start Therapy</button>
 </div>
 
-<!-- VR SETUP POPUP -->
+<!-- POPUP -->
 <div id="popup">
-<h2>📱 VR Setup</h2>
 <p>
 Step 1: Click <b>Enter Fullscreen</b><br>
 Step 2: Rotate phone to <b>Landscape</b><br>
 Step 3: Place phone in <b>VR Headset</b>
 </p>
 
-<button id="fullscreenPopupBtn" onclick="enterFullscreenAndStart()">
+<button id="fullscreenPopupBtn" onclick="enterFullscreenAndStart(this)">
 Enter Fullscreen
 </button>
 
 <div id="count"></div>
 </div>
 
+<!-- THERAPY -->
 <div id="therapy">
-<div id="closeBtn" onclick="exitTherapy()">❌</div>
+<button id="closeBtn" onclick="exitTherapy()">✕</button>
 <div id="left" class="half"></div>
 <div id="right" class="half"></div>
 </div>
@@ -172,221 +165,183 @@ Enter Fullscreen
 </audio>
 
 <script>
-/* ---------- Wake Lock ---------- */
-let wakeLock = null;
-async function keepScreenAwake() {
-    try {
-        if ('wakeLock' in navigator) {
-            wakeLock = await navigator.wakeLock.request('screen');
-        }
-    } catch(e){}
-}
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') keepScreenAwake();
-});
-
-/* ---------- Globals ---------- */
 let eye = "left";
 let area, obj;
-let x = 0, y = 0;
-let sessionTimer;
+let t = 0;
+let currentRotation = 0;
 
+/* Data */
 const colors = ["red","blue","green","yellow","orange","pink","brown"];
 const shapes = ["circle","square","rectangle","triangle","oval"];
 const fruits = ["🍎","🍌","🍊","🍉","🍓"];
 const flowers = ["🌸","🌼","🌻","🌹"];
 
+/* Speech */
 const speech = new SpeechSynthesisUtterance();
-speech.rate = 0.65;
+speech.rate = 0.7;
 speech.pitch = 1.4;
 
-/* ---------- Eye Selection ---------- */
-function selectEye(e) {
+/* Eye */
+function selectEye(e){
     eye = e;
-    document.querySelectorAll(".eye-btn").forEach(b => b.classList.remove("active"));
-    document.getElementById(e === "left" ? "btnLeft" : "btnRight").classList.add("active");
+    document.querySelectorAll(".eye-btn").forEach(b=>b.classList.remove("active"));
+    document.getElementById(e==="left"?"btnLeft":"btnRight").classList.add("active");
 }
 
-/* ---------- Popup ---------- */
-function showPopup() {
-    document.getElementById("popup").style.display = "flex";
+/* Popup */
+function showPopup(){
+    document.getElementById("popup").style.display="flex";
 }
 
-/* ---------- Fullscreen + Orientation + Hide Button ---------- */
-async function enterFullscreenAndStart() {
-    const fsBtn = document.getElementById("fullscreenPopupBtn");
+/* Fullscreen */
+async function enterFullscreenAndStart(btn){
+    btn.style.display="none";
 
-    try {
+    try{
+        speech.text = "Let's begin";
+        speechSynthesis.speak(speech);
+
+        document.getElementById("bgm").volume = 0.12;
+        document.getElementById("bgm").play();
+    }catch(e){}
+
+    try{
         await document.documentElement.requestFullscreen();
-        if (screen.orientation?.lock) {
+        if(screen.orientation?.lock){
             await screen.orientation.lock("landscape");
         }
-        keepScreenAwake();
-        fsBtn.style.display = "none";
-    } catch(e){}
+    }catch(e){}
 
     let c = 10;
-    const countEl = document.getElementById("count");
-    countEl.innerText = "Starting in " + c;
+    const count = document.getElementById("count");
+    count.innerText = "Starting in " + c;
 
-    const timer = setInterval(() => {
+    const timer = setInterval(()=>{
         c--;
-        countEl.innerText = "Starting in " + c;
-        if (c < 0) {
+        count.innerText = "Starting in " + c;
+        if(c < 0){
             clearInterval(timer);
-            document.getElementById("popup").style.display = "none";
+            document.getElementById("popup").style.display="none";
             launch();
         }
-    }, 1000);
+    },1000);
 }
 
-/* ---------- Launch ---------- */
-function launch() {
-    document.getElementById("menu").style.display = "none";
-    document.getElementById("therapy").style.display = "block";
-
-    const bgm = document.getElementById("bgm");
-    bgm.volume = 0.12;
-    bgm.play();
+/* Launch */
+function launch(){
+    document.getElementById("menu").style.display="none";
+    document.getElementById("therapy").style.display="block";
 
     area = document.getElementById(eye);
     obj = document.createElement("div");
-    obj.id = "object";
+    obj.id="object";
     area.appendChild(obj);
 
-    setInterval(updateVisual, 5000);
+    updateVisual();
+    setInterval(updateVisual,5000);
     animate();
-
-    sessionTimer = setTimeout(exitTherapy, 15 * 60 * 1000);
 }
 
-/* ---------- Exit ---------- */
-function exitTherapy() {
-    if (wakeLock) wakeLock.release();
+/* Exit */
+function exitTherapy(){
     location.reload();
 }
 
-/* ---------- Smooth Safe Motion ---------- */
-function animate() {
-    if (!obj || !area) return;
+/* Motion + Depth */
+function animate(){
+    if(!obj || !area) return;
 
     const rect = area.getBoundingClientRect();
+    const marginX = rect.width * 0.15;
+    const marginY = rect.height * 0.18;
 
-    /* ---- 80% SAFE MOVEMENT AREA ---- */
-    const marginX = rect.width * 0.10;   // 10% left & right
-    const marginY = rect.height * 0.10;  // 10% top & bottom
+    t += 0.006;
 
-    const usableWidth  = rect.width  - 2 * marginX;
-    const usableHeight = rect.height - 2 * marginY;
+    const xPos = marginX + (Math.sin(t)+1)/2 * (rect.width-2*marginX);
+    const yPos = marginY + (Math.sin(t*0.9)+1)/2 * (rect.height-2*marginY);
 
-    /* ---- MOTION PHASE ---- */
-    x += 0.006;
-    y += 0.005;
+    const scale = 0.65 + (Math.sin(t)+1)/2 * 0.7;
 
-    /* ---- POSITION (SMOOTH PURSUIT) ---- */
-    const posX = marginX + ((Math.sin(x) + 1) / 2) * usableWidth;
-    const posY = marginY + ((Math.sin(y) + 1) / 2) * usableHeight;
-
-    obj.style.left = posX + "px";
-    obj.style.top  = posY + "px";
-
-    /* ---- DEPTH (3D SIZE EFFECT) ---- */
-    const depthPhase = (Math.sin(x) + 1) / 2;  // 0 → 1
-
-    /* Base size depends on object type */
-    let baseSize = 24;   // px (safe for VR)
-    let depthRange = 5; // how much it grows/shrinks
-
-    const size = baseSize + depthPhase * depthRange;
-
-    /* Apply size safely */
-    obj.style.width  = size + "px";
-    obj.style.height = size + "px";
-
-    /* Keep circles circular */
-    if (obj.style.borderRadius === "50%") {
-        obj.style.borderRadius = "50%";
-    }
+    obj.style.left = xPos+"px";
+    obj.style.top  = yPos+"px";
+    obj.style.transform = `scale(${scale}) rotate(${currentRotation}deg)`;
 
     requestAnimationFrame(animate);
 }
 
-/* ---------- Visual Logic ---------- */
-function updateVisual() {
+/* Visual */
+function updateVisual(){
     let mode = document.getElementById("mode").value;
-    if (mode === "random") {
-        mode = ["white","color","shape","line","fruit","flower"]
-               [Math.floor(Math.random() * 6)];
+    if(mode==="random"){
+        mode = ["white","color","shape","line","fruit","flower"][Math.floor(Math.random()*6)];
     }
 
-    obj.innerHTML = "";
-    obj.style = "";
+    obj.innerHTML="";
+    obj.style.background="";
+    obj.style.border="none";
+    obj.style.borderRadius="0";
+    obj.style.fontSize="";
+    currentRotation = 0;
 
-    if (mode === "white") {
-        obj.style.width = "6mm";
-        obj.style.height = "6mm";
-        obj.style.borderRadius = "50%";
-        obj.style.background = "white";
+    if(mode==="white"){
+        obj.style.width="36px";
+        obj.style.height="36px";
+        obj.style.background="white";
+        obj.style.borderRadius="50%";
         return;
     }
 
-    let color = colors[Math.floor(Math.random() * colors.length)];
+    const color = colors[Math.floor(Math.random()*colors.length)];
 
-    if (mode === "color") {
+    if(mode==="color"){
         speak("Can you tell me the colour?");
-        obj.style.width = "6mm";
-        obj.style.height = "6mm";
-        obj.style.borderRadius = "50%";
-        obj.style.background = color;
+        obj.style.width="36px";
+        obj.style.height="36px";
+        obj.style.background=color;
+        obj.style.borderRadius="50%";
     }
 
-    if (mode === "shape") {
+    if(mode==="shape"){
         speak("Can you tell me the shape?");
-        let s = shapes[Math.floor(Math.random() * shapes.length)];
-        obj.style.background = color;
-        obj.style.width = "40px";
-        obj.style.height = "40px";
-        if (s === "circle") obj.style.borderRadius = "50%";
-        if (s === "square") obj.style.borderRadius = "0";
-        if (s === "rectangle") obj.style.width = "60px";
-        if (s === "triangle") {
-            obj.style.background = "transparent";
-            obj.style.borderLeft = "20px solid transparent";
-            obj.style.borderRight = "20px solid transparent";
-            obj.style.borderBottom = "40px solid " + color;
+        const s = shapes[Math.floor(Math.random()*shapes.length)];
+        obj.style.background=color;
+        obj.style.width="42px";
+        obj.style.height="42px";
+
+        if(s==="circle") obj.style.borderRadius="50%";
+        if(s==="square") obj.style.borderRadius="0";
+        if(s==="rectangle") obj.style.width="62px";
+        if(s==="triangle"){
+            obj.style.background="transparent";
+            obj.style.borderLeft="21px solid transparent";
+            obj.style.borderRight="21px solid transparent";
+            obj.style.borderBottom="42px solid "+color;
         }
     }
 
-    if (mode === "line") {
+    if(mode==="line"){
         speak("Can you tell me the line?");
-        obj.style.width = "4px";
-        obj.style.height = "60px";
-        obj.style.background = color;
-        obj.style.transform = [
-            "rotate(0deg)",
-            "rotate(90deg)",
-            "rotate(30deg)",
-            "rotate(-30deg)",
-            "skewX(20deg)",
-            "skewX(-20deg)"
-        ][Math.floor(Math.random() * 6)];
+        obj.style.width="4px";
+        obj.style.height="62px";
+        obj.style.background=color;
+        currentRotation = [0,90,30,-30][Math.floor(Math.random()*4)];
     }
 
-    if (mode === "fruit") {
+    if(mode==="fruit"){
         speak("Which fruit is this?");
-        obj.style.fontSize = "40px";
-        obj.innerHTML = fruits[Math.floor(Math.random() * fruits.length)];
+        obj.style.fontSize="42px";
+        obj.innerHTML = fruits[Math.floor(Math.random()*fruits.length)];
     }
 
-    if (mode === "flower") {
+    if(mode==="flower"){
         speak("Which flower is this?");
-        obj.style.fontSize = "40px";
-        obj.innerHTML = flowers[Math.floor(Math.random() * flowers.length)];
+        obj.style.fontSize="42px";
+        obj.innerHTML = flowers[Math.floor(Math.random()*flowers.length)];
     }
 }
 
-/* ---------- Speech ---------- */
-function speak(text) {
+/* Speak */
+function speak(text){
     speech.text = text;
     speechSynthesis.cancel();
     speechSynthesis.speak(speech);
