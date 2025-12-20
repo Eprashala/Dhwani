@@ -17,7 +17,6 @@ html, body {
 
 body { -webkit-touch-callout: none; }
 
-/* ---------- HOME ---------- */
 #menu {
     height: 100vh;
     text-align: center;
@@ -75,7 +74,7 @@ button, select {
     position: absolute;
 }
 
-/* ---------- TOP CONTROLS ---------- */
+/* ---------- CLOSE ---------- */
 #closeBtn {
     position: fixed;
     top: 10px;
@@ -98,10 +97,6 @@ button, select {
     color: white;
     text-align: center;
     padding: 20px;
-}
-
-#popup h2 {
-    margin-bottom: 10px;
 }
 
 #popup p {
@@ -127,7 +122,6 @@ button, select {
 
 <body oncontextmenu="return false" onload="keepScreenAwake()">
 
-<!-- ========== HOME ========== -->
 <div id="menu">
 <h1>👁️ Lazy Eye Visual Therapy</h1>
 <p>Consult an Eye Specialist to identify the lazy eye</p>
@@ -151,12 +145,11 @@ button, select {
 <button id="startBtn" onclick="showPopup()">Start Therapy</button>
 </div>
 
-<!-- ========== VR INSTRUCTION POPUP ========== -->
+<!-- VR SETUP POPUP -->
 <div id="popup">
 <h2>📱 VR Setup</h2>
-
 <p>
-Step 1: Click <b>Fullscreen</b><br>
+Step 1: Click <b>Enter Fullscreen</b><br>
 Step 2: Rotate phone to <b>Landscape</b><br>
 Step 3: Place phone in <b>VR Headset</b>
 </p>
@@ -168,7 +161,6 @@ Enter Fullscreen
 <div id="count"></div>
 </div>
 
-<!-- ========== THERAPY ========== -->
 <div id="therapy">
 <div id="closeBtn" onclick="exitTherapy()">❌</div>
 <div id="left" class="half"></div>
@@ -199,7 +191,6 @@ let area, obj;
 let x = 0, y = 0;
 let sessionTimer;
 
-/* ---------- Data ---------- */
 const colors = ["red","blue","green","yellow","orange","pink","brown"];
 const shapes = ["circle","square","rectangle","triangle","oval"];
 const fruits = ["🍎","🍌","🍊","🍉","🍓"];
@@ -216,19 +207,22 @@ function selectEye(e) {
     document.getElementById(e === "left" ? "btnLeft" : "btnRight").classList.add("active");
 }
 
-/* ---------- Show Popup ---------- */
+/* ---------- Popup ---------- */
 function showPopup() {
     document.getElementById("popup").style.display = "flex";
 }
 
-/* ---------- Fullscreen + Countdown ---------- */
+/* ---------- Fullscreen + Orientation + Hide Button ---------- */
 async function enterFullscreenAndStart() {
+    const fsBtn = document.getElementById("fullscreenPopupBtn");
+
     try {
         await document.documentElement.requestFullscreen();
         if (screen.orientation?.lock) {
             await screen.orientation.lock("landscape");
         }
         keepScreenAwake();
+        fsBtn.style.display = "none";
     } catch(e){}
 
     let c = 10;
@@ -246,7 +240,7 @@ async function enterFullscreenAndStart() {
     }, 1000);
 }
 
-/* ---------- Launch Therapy ---------- */
+/* ---------- Launch ---------- */
 function launch() {
     document.getElementById("menu").style.display = "none";
     document.getElementById("therapy").style.display = "block";
@@ -277,17 +271,42 @@ function animate() {
     if (!obj || !area) return;
 
     const rect = area.getBoundingClientRect();
-    const marginX = rect.width * 0.1;
-    const marginY = rect.height * 0.1;
 
+    /* ---- 80% SAFE MOVEMENT AREA ---- */
+    const marginX = rect.width * 0.10;   // 10% left & right
+    const marginY = rect.height * 0.10;  // 10% top & bottom
+
+    const usableWidth  = rect.width  - 2 * marginX;
+    const usableHeight = rect.height - 2 * marginY;
+
+    /* ---- MOTION PHASE ---- */
     x += 0.006;
     y += 0.005;
 
-    const posX = marginX + ((Math.sin(x) + 1) / 2) * (rect.width - 2 * marginX);
-    const posY = marginY + ((Math.sin(y) + 1) / 2) * (rect.height - 2 * marginY);
+    /* ---- POSITION (SMOOTH PURSUIT) ---- */
+    const posX = marginX + ((Math.sin(x) + 1) / 2) * usableWidth;
+    const posY = marginY + ((Math.sin(y) + 1) / 2) * usableHeight;
 
     obj.style.left = posX + "px";
     obj.style.top  = posY + "px";
+
+    /* ---- DEPTH (3D SIZE EFFECT) ---- */
+    const depthPhase = (Math.sin(x) + 1) / 2;  // 0 → 1
+
+    /* Base size depends on object type */
+    let baseSize = 24;   // px (safe for VR)
+    let depthRange = 14; // how much it grows/shrinks
+
+    const size = baseSize + depthPhase * depthRange;
+
+    /* Apply size safely */
+    obj.style.width  = size + "px";
+    obj.style.height = size + "px";
+
+    /* Keep circles circular */
+    if (obj.style.borderRadius === "50%") {
+        obj.style.borderRadius = "50%";
+    }
 
     requestAnimationFrame(animate);
 }
