@@ -213,20 +213,31 @@
             if (window.SpeechRecognition || window.webkitSpeechRecognition) {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 recognition = new SpeechRecognition();
-                recognition.continuous = true;
+                
+                // --- FIX: SET CONTINUOUS FALSE ---
+                recognition.continuous = false; 
                 recognition.interimResults = true;
 
                 recognition.onresult = (event) => {
-                    let interim = '';
-                    for (let i = event.resultIndex; i < event.results.length; ++i) {
-                        if (event.results[i].isFinal) {
-                            finalTranscript += event.results[i][0].transcript + ' ';
-                        } else {
-                            interim += event.results[i][0].transcript;
-                        }
-                    }
-                    sttConsole.innerText = finalTranscript + interim;
+                    const result = event.results[event.results.length - 1];
+                    const text = result[0].transcript;
+                    
+                    // Show immediate preview
+                    sttConsole.innerText = finalTranscript + text;
                     sttConsole.scrollTop = sttConsole.scrollHeight;
+
+                    if (result.isFinal) {
+                        finalTranscript += text + " ";
+                    }
+                };
+
+                // --- FIX: RESTART LOGIC ON END ---
+                recognition.onend = () => {
+                    if (isListening) {
+                        // User is still holding button, restart immediately
+                        try { recognition.start(); } catch(e) {}
+                    }
+                    // Else, natural stop, do nothing.
                 };
 
                 recognition.onerror = (e) => console.error(e);
@@ -311,9 +322,6 @@
         }
 
         function prepareDownload(text, langCode) {
-            // Google TTS API (Unofficial but widely used for simple MP3 generation)
-            // Note: This often has a character limit (~100 chars). 
-            // For a robust app, a backend proxy is better. This is a client-side hack.
             const cleanLang = langCode.split('-')[0]; // 'en-IN' -> 'en'
             const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${cleanLang}&client=tw-ob`;
             
@@ -335,11 +343,11 @@
                 e.preventDefault();
                 if (isListening) return;
                 isListening = true;
-                finalTranscript = ''; // Reset on new press or Keep? User logic usually implies reset or append.
-                // Logic: Keep existing text, append new.
-                // If we want fresh start every time, uncomment next line:
-                // finalTranscript = ''; sttConsole.innerText = '';
                 
+                // NOTE: We do NOT clear finalTranscript here if we want to append.
+                // If you want to clear on every new press, uncomment below:
+                // finalTranscript = ''; sttConsole.innerText = '';
+
                 recognition.lang = langNative.value;
                 try { recognition.start(); } catch(e){}
                 btnListen.classList.add('pressed', 'ring-2', 'ring-purple-400');
@@ -350,11 +358,12 @@
                 e.preventDefault();
                 if (!isListening) return;
                 isListening = false;
+                
+                // recognition.stop() will trigger onend, which will see isListening=false and stop the loop
                 recognition.stop();
+                
                 btnListen.classList.remove('pressed', 'ring-2', 'ring-purple-400');
                 btnListen.querySelector('span').innerText = "LISTEN";
-                
-                // Update final transcript text in textarea logic is handled in onresult
             };
 
             btnListen.addEventListener('mousedown', startListen);
