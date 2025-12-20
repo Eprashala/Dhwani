@@ -382,15 +382,25 @@ function move(obj, dir) {
     const mx = r.width * 0.15;
     const my = r.height * 0.18;
 
-    const x = mx + (Math.sin(t*dir)+1)/2*(r.width-2*mx);
-    const y = my + (Math.sin(t*0.9)+1)/2*(r.height-2*my);
+    let x = mx + (Math.sin(t*dir)+1)/2*(r.width-2*mx);
+    let y = my + (Math.sin(t*0.9)+1)/2*(r.height-2*my);
+
+    /* 🔑 VR FUSION OFFSET (CRITICAL FIX) */
+    if (eyeMode === "both") {
+        const fusionOffset = r.width * 0.08; // ~6–10 mm in VR
+        if (area.id === "left") {
+            x += fusionOffset;   // move right eye-image inward
+        } else if (area.id === "right") {
+            x -= fusionOffset;   // move left eye-image inward
+        }
+    }
 
     const scale = eyeMode === "both"
         ? 0.6 + (Math.sin(t)+1)/2 * 0.9
         : 0.7 + (Math.sin(t)+1)/2 * 0.6;
 
-    obj.style.left = x+"px";
-    obj.style.top  = y+"px";
+    obj.style.left = x + "px";
+    obj.style.top  = y + "px";
     obj.style.transform = `scale(${scale})`;
 }
 
