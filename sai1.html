@@ -77,11 +77,11 @@
 
         <div class="flex justify-center gap-8 mb-4 shrink-0 bg-emerald-900/30 p-2 rounded-xl">
             <button id="pause-resume-button" class="icon-btn bg-emerald-700 hover:bg-emerald-600" title="थांबवा/पुन्हा सुरू करा" disabled>
-                <svg id="pause-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+                <svg id="icon-play" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8 hidden">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
                 </svg>
-                <svg id="play-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8 hidden">
-                     <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
+                <svg id="icon-pause" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
                 </svg>
             </button>
             
@@ -178,13 +178,13 @@
         const manualNameInput = document.getElementById('manual-name');
         const manualAgeInput = document.getElementById('manual-age');
         
-        // Buttons
+        // Media Buttons
         const pauseResumeButton = document.getElementById('pause-resume-button');
-        const pauseIcon = document.getElementById('pause-icon');
-        const playIcon = document.getElementById('play-icon');
+        const iconPlay = document.getElementById('icon-play');
+        const iconPause = document.getElementById('icon-pause');
+
         const stopSpeechButton = document.getElementById('stop-speech-button');
         const replayButton = document.getElementById('replay-button');
-        
         const shareButton = document.getElementById('share-button');
         const endChatButton = document.getElementById('end-chat-button');
         const restartChatButton = document.getElementById('restart-chat-button');
@@ -196,7 +196,12 @@
         const pasteKeyBtn = document.getElementById('paste-key-btn');
 
         const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
+        
+        // States
         let appState = 'IDLE'; 
+        let pausedState = null; // To store state when paused
+        let isSystemPaused = false; // Flag for pause/resume
+
         let userName = '';
         let userAge = 30; 
         let chatHistory = [];
@@ -208,16 +213,30 @@
         let voices = [];
         let wakeLock = null;
 
-        // --- NEW STATE VARIABLES ---
-        let isAppPaused = false;
-        let prePauseState = null; // To remember what we were doing before pause
-
         window.onload = () => {
             if (synth.speaking) synth.cancel();
             loadUserData(); 
             loadVoices();   
         };
 
+        // --- Event Listeners for Pausing on Interruptions ---
+        // When user switches tab/app or phone call comes in
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                if (appState !== 'IDLE' && !isSystemPaused) {
+                    performPause();
+                }
+            }
+        });
+
+        // When window loses focus (sometimes happens before visibility change)
+        window.addEventListener('blur', () => {
+             if (appState !== 'IDLE' && !isSystemPaused) {
+                 performPause();
+             }
+        });
+
+        // --- Setup Buttons ---
         advanceToggleBtn.addEventListener('click', () => {
             advanceContainer.classList.toggle('hidden');
             advanceContainer.classList.toggle('flex');
@@ -328,7 +347,7 @@
                 recognition.onend = handleSpeechEnd;
                 
                 recognition.onerror = (event) => {
-                    if (event.error === 'no-speech' && appState !== 'IDLE' && appState !== 'BUSY' && !isAppPaused) {
+                    if (event.error === 'no-speech' && appState !== 'IDLE' && appState !== 'BUSY' && !isSystemPaused) {
                         startRecognitionSafe();
                     } else if (event.error === 'not-allowed') {
                         setState('IDLE');
@@ -338,11 +357,12 @@
         }
 
         function startRecognitionSafe() {
-            if (!recognition || isAppPaused) return; // Don't start if paused
-            if (synth.speaking) return; // STRICT CHECK: Don't start if speaking
+            // Only start if not paused, not busy, and not currently speaking
+            if (!recognition || isSystemPaused || synth.speaking || appState === 'BUSY' || appState === 'IDLE') return;
             try { recognition.start(); } catch (e) {}
         }
 
+        // --- Main Button Handlers ---
         talkButton.addEventListener('click', toggleListening);
         pauseResumeButton.addEventListener('click', togglePauseResume);
         stopSpeechButton.addEventListener('click', stopSpeech);
@@ -350,54 +370,7 @@
         shareButton.addEventListener('click', shareChat);
         endChatButton.addEventListener('click', endChat);
         restartChatButton.addEventListener('click', restartChat);
-        
-        // --- 1. Visibility & Call Handling (Auto Pause) ---
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                if (!isAppPaused && appState !== 'IDLE') {
-                    togglePauseResume(); // Trigger pause when hidden
-                }
-            }
-            // Optional: Auto resume can be annoying, better to let user manually resume
-        });
 
-        // --- 2. Pause / Resume Functionality ---
-        function togglePauseResume() {
-            if (appState === 'IDLE') return;
-
-            isAppPaused = !isAppPaused;
-
-            if (isAppPaused) {
-                // PAUSE ACTION
-                prePauseState = appState; // Remember what we were doing
-                
-                // Toggle Icons
-                pauseIcon.classList.add('hidden');
-                playIcon.classList.remove('hidden');
-                statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-600 transition-colors'; // Yellow for pause
-
-                // Stop Everything
-                if (synth.speaking) {
-                    synth.pause(); // Try native pause first
-                }
-                try { recognition.stop(); } catch(e){}
-                
-            } else {
-                // RESUME ACTION
-                // Toggle Icons
-                playIcon.classList.add('hidden');
-                pauseIcon.classList.remove('hidden');
-                statusIndicator.className = 'w-4 h-4 rounded-full bg-emerald-500 listening-pulse transition-colors';
-
-                // Resume Logic
-                if (synth.paused) {
-                    synth.resume();
-                } else if (prePauseState) {
-                    // If we weren't speaking, we were likely listening or waiting
-                    startRecognitionSafe();
-                }
-            }
-        }
 
         async function toggleListening() {
             if (appState === 'IDLE') {
@@ -424,33 +397,40 @@
                         if (previousHistory.length > 0) {
                             chatHistory = previousHistory;
                             logMessage('सिस्टम', 'वैद्यजी तुम्हाला ओळखत आहेत...');
+                            
                             setState('BUSY');
                             const welcomeBackPrompt = "जुना रुग्ण परत आला आहे. म्हणा 'नमस्कार वैद्यजी, मला पुन्हा त्रास होत आहे.'";
+                            
                             const tempHistory = [...chatHistory, { role: 'user', parts: [{ text: welcomeBackPrompt }] }];
                             const welcomeText = await getAIResponse(tempHistory);
+                            
                             logMessage('वैद्यजी', welcomeText);
                             await speakText(welcomeText, 'mr-IN');
                             setState('CONVERSATION');
                             startRecognitionSafe();
+
                         } else {
                             if (chatHistory.length === 0) {
                                 chatHistory.push({ role: 'user', parts: [{ text: "Start session." }] });
                                 chatHistory.push({ role: 'model', parts: [{ text: `नमो धन्वन्तरये नमः ${userName}.` }] });
                             }
+                            
                             const welcomeText = `नमस्कार ${userName}, मी 'वैद्यजी' आहे. आयुर्वेदाच्या प्राचीन ग्रंथांनुसार मी तुमच्या समस्यांचे निवारण करीन. तुम्हाला काय त्रास होत आहे?`;
                             logMessage('वैद्यजी', welcomeText);
+                            
                             setState('BUSY'); 
                             await speakText(welcomeText, 'mr-IN');
                             setState('CONVERSATION');
                             startRecognitionSafe();
                         }
+
                     } else {
                         setState('LISTENING_FOR_WAKEWORD');
                         startRecognitionSafe();
                         if (conversationLog.childElementCount < 3) logMessage('माहिती', '"वैद्यजी", "आचार्य" किंवा "गुरुजी" म्हणा.');
                     }
+
                 } else {
-                    // This is "Listening Stop" button on main UI
                     setState('IDLE');
                     recognition.stop();
                     if (synth.speaking) synth.cancel();
@@ -469,45 +449,43 @@
                     talkButton.disabled = false;
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-gray-600 transition-colors';
                     endChatButton.disabled = true;
-                    toggleMediaButtons(true); // Disable all media buttons in IDLE
                     talkButton.classList.remove('bg-emerald-700', 'hover:bg-emerald-600');
                     talkButton.classList.add('bg-emerald-600', 'hover:bg-emerald-500');
                     manualNameInput.disabled = false;
                     manualAgeInput.disabled = false;
+                    toggleMediaButtons(true);
                     break;
                 case 'BUSY':
                     talkButton.textContent = 'निदान सुरू आहे...';
                     talkButton.disabled = true;
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-500 transition-colors';
                     endChatButton.disabled = false;
-                    // Enable Stop button even if busy processing, so user can cancel? 
-                    // Usually we wait, but let's keep it safe.
+                    toggleMediaButtons(false); // Enable Pause/Stop when busy (speaking)
                     break;
-                default:
+                default: // Listening states
                     talkButton.textContent = 'ऐकणे थांबवा';
                     talkButton.disabled = false;
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-emerald-500 listening-pulse transition-colors';
                     endChatButton.disabled = false;
-                    toggleMediaButtons(false); // Enable media buttons
                     talkButton.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
                     talkButton.classList.add('bg-emerald-700', 'hover:bg-emerald-600');
                     manualNameInput.disabled = true;
                     manualAgeInput.disabled = true;
+                    toggleMediaButtons(false); // Enable buttons
                     break;
             }
         }
 
         function handleSpeechEnd() {
-            if (isAppPaused) return; // Do nothing if paused
-            if (appState !== 'IDLE' && appState !== 'BUSY' && !synth.speaking) {
+            // Only restart if not paused, not busy, and app is active
+            if (appState !== 'IDLE' && appState !== 'BUSY' && !isSystemPaused && !synth.speaking) {
                 startRecognitionSafe();
+            } else if (appState === 'IDLE') {
+                setState('IDLE'); 
             }
-            else if (appState === 'IDLE') setState('IDLE'); 
         }
         
         async function handleSpeechResult(event) {
-            if (isAppPaused) return;
-
             const transcript = event.results[event.results.length - 1][0].transcript.trim();
             if (!transcript) return;
             console.log(`Heard: ${transcript}`);
@@ -515,9 +493,6 @@
             const currentState = appState;
             recognition.stop();
             setState('BUSY');
-
-            // --- 4. MIC GATING: Ensure mic is off while processing ---
-            // (Handled by recognition.stop() and waiting for await)
 
             try {
                 switch (currentState) {
@@ -571,6 +546,7 @@
                         saveChatContext();
 
                         const aiResponseText = await generateTextResponseFromChat();
+                        
                         const noBracketText = cleanBrackets(aiResponseText);
                         const cleanedResponseText = cleanTextForTTS(noBracketText);
 
@@ -583,11 +559,14 @@
                             await speakText(cleanedResponseText, 'mr-IN');
                         } catch (error) {
                             if (error.message === "Speech manually stopped") return;
-                            throw error;
+                            // Do not throw; handle gracefully
                         }
                         
-                        setState('CONVERSATION');
-                        startRecognitionSafe();
+                        // After speaking, go back to listening
+                        if(!isSystemPaused) {
+                           setState('CONVERSATION');
+                           startRecognitionSafe();
+                        }
                         break;
                 }
             } catch (error) {
@@ -596,10 +575,148 @@
             }
         }
 
+        // --- Logic: Pause / Resume ---
+        function performPause() {
+            if (isSystemPaused) return; // Already paused
+            
+            isSystemPaused = true;
+            pausedState = appState; // Save current state
+            
+            // UI Change
+            iconPause.classList.add('hidden');
+            iconPlay.classList.remove('hidden');
+            logMessage('सिस्टम', 'अ‍ॅप थांबले आहे (Pause).');
+
+            // Logic: Stop Listening
+            if (recognition) {
+                try { recognition.stop(); } catch(e){}
+            }
+
+            // Logic: Pause Speaking
+            if (synth.speaking) {
+                synth.pause();
+            }
+
+            // Set state to BUSY so listeners don't auto-restart
+            appState = 'BUSY'; 
+        }
+
+        function performResume() {
+            if (!isSystemPaused) return;
+
+            isSystemPaused = false;
+            
+            // UI Change
+            iconPlay.classList.add('hidden');
+            iconPause.classList.remove('hidden');
+            logMessage('सिस्टम', 'पुन्हा सुरू (Resume).');
+
+            // Logic: Resume Speaking if it was paused
+            if (synth.paused) {
+                synth.resume();
+                // Stay BUSY until speech ends
+            } else {
+                // If not speaking, restore previous listening state
+                if (pausedState) {
+                    setState(pausedState);
+                    startRecognitionSafe();
+                } else {
+                    // Default fallback
+                    if (systemInstruction) { setState('CONVERSATION'); startRecognitionSafe(); }
+                    else { setState('IDLE'); }
+                }
+            }
+        }
+
+        function togglePauseResume() {
+            if (isSystemPaused) {
+                performResume();
+            } else {
+                performPause();
+            }
+        }
+
+        // --- Logic: Stop Button ---
+        function stopSpeech() {
+            // 1. Stop Speaking Immediately
+            synth.cancel();
+            
+            // 2. Stop Listening
+            if (recognition) try { recognition.stop(); } catch(e){}
+            
+            // 3. Reset Pause State if active
+            if (isSystemPaused) {
+                isSystemPaused = false;
+                iconPlay.classList.add('hidden');
+                iconPause.classList.remove('hidden');
+            }
+
+            // 4. Remove last user input if AI was answering it
+            // Logic: If we are stopping while AI is speaking, it means the cycle isn't complete.
+            // However, to simply "ignore" previous input, we just ensure we go to listening mode immediately.
+            // Ideally, we pop the last 2 entries (User Input + partial/full AI response)
+            
+            if (chatHistory.length > 0) {
+                 // Check if the last entry was Model (AI). If AI was speaking, we pop AI and User.
+                 // Since we add to history BEFORE speaking, the last item is Model.
+                 const lastItem = chatHistory[chatHistory.length - 1];
+                 if (lastItem.role === 'model') {
+                     chatHistory.pop(); // Remove AI response
+                     chatHistory.pop(); // Remove User prompt triggering it
+                     saveChatContext();
+                     logMessage('सिस्टम', 'मागील संवाद रद्द केला.');
+                 }
+            }
+
+            logMessage('माहिती', 'बोलणे थांबवले. आता तुम्ही बोलू शकता.');
+
+            // 5. Allow user to provide new input
+            // Return to listening state
+            if (systemInstruction) {
+                setState('CONVERSATION');
+                setTimeout(startRecognitionSafe, 500); // Small delay to ensure mic is ready
+            } else {
+                setState('IDLE');
+            }
+        }
+
+        // --- Logic: Replay Button ---
+        function replaySpeech() {
+            if (!lastSpokenText) return;
+
+            // 1. Stop current speaking if any
+            if (synth.speaking) {
+                synth.cancel();
+            }
+            if (recognition) try { recognition.stop(); } catch(e){}
+
+            // 2. Small delay then speak again
+            setTimeout(() => {
+                setState('BUSY'); // Lock UI
+                logMessage('सिस्टम', 'पुन्हा ऐकवत आहे...');
+                speakText(lastSpokenText, 'mr-IN').then(() => {
+                     // On finish
+                     if(!isSystemPaused) {
+                         setState('CONVERSATION');
+                         startRecognitionSafe();
+                     }
+                }).catch(e => {
+                    // Handle manual stop
+                     if(!isSystemPaused) {
+                         setState('CONVERSATION');
+                         startRecognitionSafe();
+                     }
+                });
+            }, 300);
+        }
+
+        // --- Helper Functions ---
         function buildSystemPrompt() {
+            
             systemInstruction = `
                 You are "Vaidyaji" (वैद्यजी), an expert in Ayurveda and ancient Indian medicine.
                 User: ${userName}, Age: ${userAge}. 
+                
                 YOUR EXPERTISE & REFERENCES:
                 Base all your advice on these ancient texts:
                 1. Brihat Trayi (Great Triad): Charaka Samhita (Medicine), Sushruta Samhita (Surgery), Ashtanga Hridaya.
@@ -695,75 +812,35 @@
             voices = synth.getVoices();
             if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => { voices = synth.getVoices(); };
         }
-
-        // --- 3. REPLAY / REPEAT FUNCTION ---
-        function replaySpeech() {
-            // If speaking, stop and restart from beginning
-            if (synth.speaking) {
-                synth.cancel();
-            }
-            if (lastSpokenText) { 
-                recognition.stop(); 
-                setState('BUSY'); 
-                speakText(lastSpokenText); 
-            }
-        }
-
-        // --- 2. STOP FUNCTION ---
-        function stopSpeech() {
-            // Stop TTS
-            speechManuallyStopped = true; 
-            synth.cancel(); 
-            
-            // Stop STT
-            recognition.stop(); 
-
-            // Logic: Remove last history items so input is ignored
-            if (chatHistory.length >= 2) {
-                // Remove the last model response and the last user input
-                chatHistory.pop(); // Remove Model
-                chatHistory.pop(); // Remove User
-                saveChatContext();
-                logMessage('माहिती', 'मागील संवाद रद्द केला.');
-            }
-
-            // Reset Logic to listen immediately
-            setTimeout(() => {
-                speechManuallyStopped = false;
-                // Force state to conversation/listening
-                if (systemInstruction) { 
-                    setState('CONVERSATION'); 
-                    startRecognitionSafe(); 
-                } else {
-                    // Edge case if stopped during setup
-                    setState('IDLE');
-                }
-            }, 500);
-        }
         
         async function speakText(text, lang = 'mr-IN') {
-            if (isAppPaused) return;
-            
-            // --- 4. MIC PROTECTION: Ensure Mic is DEAD before Speaking ---
-            try { recognition.stop(); } catch(e) {}
-            
             if (synth.speaking) synth.cancel();
+            
+            // Critical Requirement 4: Make sure mic does not listen
+            if (recognition) try { recognition.stop(); } catch(e){}
+
             lastSpokenText = text;
             speechManuallyStopped = false;
             if (voices.length === 0) voices = synth.getVoices();
 
             return new Promise((resolve, reject) => {
                 const utterance = new SpeechSynthesisUtterance(text);
+                
+                // Start Event
                 utterance.onstart = () => { 
-                    // Double check mic is off
-                    try { recognition.stop(); } catch(e) {}
                     toggleMediaButtons(false); 
+                    // Double check mic is off
+                    if (recognition) recognition.stop();
                 };
+                
+                // End Event
                 utterance.onend = () => {
-                    toggleMediaButtons(true);
+                    toggleMediaButtons(true); // Re-enable buttons
                     if (speechManuallyStopped) reject(new Error("Speech manually stopped"));
                     else resolve();
                 };
+                
+                // Error Event
                 utterance.onerror = (e) => { 
                     toggleMediaButtons(true);
                     if (e.error === 'interrupted') resolve(); else reject(e.error); 
@@ -782,16 +859,23 @@
         }
 
         function toggleMediaButtons(disabled) {
-            // In strict sense, we only disable if app is IDLE. 
-            // If active, buttons should be clickable to control flow.
+            // Logic handled by specific state functions now, but kept for compatibility
+            // This generally enables/disables based on speaking state
+            // With Pause logic, we might want them enabled even if speaking?
+            // Actually, Pause/Stop/Replay should be ENABLED while speaking.
+            // So we invert the logic typically used in simple apps.
+            // In this specific app, buttons should be clickable while speaking to Stop/Pause it.
+            
+            // So we enable them when speaking starts
+            pauseResumeButton.disabled = false;
+            stopSpeechButton.disabled = false;
+            replayButton.disabled = false;
+            
+            // If IDLE, disable them
             if (appState === 'IDLE') {
                 pauseResumeButton.disabled = true;
                 stopSpeechButton.disabled = true;
                 replayButton.disabled = true;
-            } else {
-                pauseResumeButton.disabled = false;
-                stopSpeechButton.disabled = false;
-                replayButton.disabled = false;
             }
         }
         
@@ -828,8 +912,7 @@
                 try { 
                     wakeLock = await navigator.wakeLock.request('screen');
                     wakeLock.addEventListener('release', () => {
-                        // If released externally and we are active, try to get it back
-                        if (appState !== 'IDLE' && document.visibilityState === 'visible' && !isAppPaused) acquireWakeLock();
+                        if (appState !== 'IDLE' && document.visibilityState === 'visible') acquireWakeLock();
                     });
                 } catch (e) {} 
             }
@@ -839,9 +922,12 @@
             if (wakeLock) { try { await wakeLock.release(); wakeLock = null; } catch (e) {} }
         }
 
+        async function handleVisibilityChange() {
+            if (appState !== 'IDLE' && document.visibilityState === 'visible') await acquireWakeLock();
+        }
+
         async function endChat() {
             appState = 'IDLE'; setState('IDLE');
-            isAppPaused = false;
             speechManuallyStopped = true;
             if (synth.speaking) synth.cancel();
             if (recognition) try { recognition.stop(); } catch (e) {}
@@ -849,10 +935,6 @@
             userName = ''; userAge = 30; chatHistory = []; systemInstruction = '';
             conversationLog.innerHTML = '<div class="text-gray-400 text-center">सत्र समाप्त. सर्वे सन्तु निरामयाः.</div>';
             restartChatButton.disabled = true;
-            
-            // Reset icons
-            pauseIcon.classList.remove('hidden');
-            playIcon.classList.add('hidden');
         }
 
         async function restartChat() {
