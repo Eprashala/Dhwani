@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dhwani Security Command</title>
+    <style>
+        :root {
+            --primary-dark: #1a1a1a;
+            --accent-orange: #ff9800;
+            --accent-green: #4caf50;
+            --text-light: #ffffff;
+            --glass-bg: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--primary-dark);
+            color: var(--text-light);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-align: center;
+        }
+
+        /* --- Screens --- */
+        .screen { display: none; width: 100%; max-width: 400px; padding: 20px; box-sizing: border-box; }
+        .active { display: flex; flex-direction: column; gap: 15px; }
+
+        /* --- Forms --- */
+        input {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: none;
+            background: var(--glass-bg);
+            color: white;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        input::placeholder { color: #aaa; }
+
+        /* --- Buttons --- */
+        .btn-main {
+            padding: 15px;
+            border-radius: 8px;
+            border: none;
+            background: #2196F3;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        /* --- The Big Scan Button --- */
+        #scan-btn {
+            width: 250px;
+            height: 250px;
+            border-radius: 50%;
+            border: 8px solid #333;
+            background: #333;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 30px auto;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            cursor: pointer;
+            position: relative;
+        }
+
+        /* State: Scanning/Processing (Orange) */
+        #scan-btn.processing {
+            background: var(--accent-orange);
+            border-color: #f57c00;
+            box-shadow: 0 0 30px var(--accent-orange);
+        }
+
+        /* State: Success (Green) */
+        #scan-btn.success {
+            background: var(--accent-green);
+            border-color: #388e3c;
+            box-shadow: 0 0 30px var(--accent-green);
+        }
+
+        /* Tick Animation */
+        .tick {
+            display: none;
+            font-size: 80px;
+        }
+        #scan-btn.success .tick { display: block; }
+        #scan-btn.success .btn-text { display: none; }
+
+        /* Logs Area */
+        #status-log {
+            font-size: 12px;
+            color: #888;
+            margin-top: 20px;
+            height: 50px;
+        }
+        
+        .guard-info {
+            background: var(--glass-bg);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="login-screen" class="screen">
+        <h2>Guard Registration</h2>
+        <p style="color:#aaa; font-size: 0.9em;">First Time Setup</p>
+        
+        <input type="text" id="reg-name" placeholder="Full Name">
+        <input type="tel" id="reg-mobile" placeholder="Mobile Number">
+        <button class="btn-main" onclick="requestOTP()">Verify Mobile (Get OTP)</button>
+        
+        <div id="otp-section" style="display:none; margin-top:10px;">
+            <input type="number" id="reg-otp" placeholder="Enter OTP (Use 1234)">
+            <input type="password" id="reg-pass" placeholder="Set New Password">
+            <button class="btn-main" style="background: var(--accent-green)" onclick="completeRegistration()">Register & Login</button>
+        </div>
+        
+        <div id="login-section" style="display:none; margin-top:20px; border-top: 1px solid #444; padding-top:20px;">
+            <h3>Guard Login</h3>
+            <input type="tel" id="login-mobile" placeholder="Mobile Number">
+            <input type="password" id="login-pass" placeholder="Password">
+            <button class="btn-main" onclick="performLogin()">Login</button>
+        </div>
+    </div>
+
+    <div id="dashboard-screen" class="screen">
+        <div class="guard-info">
+            <strong>Officer:</strong> <span id="display-name">...</span><br>
+            <strong>ID:</strong> <span id="display-id">...</span>
+        </div>
+
+        <div id="scan-btn" onclick="startScanProcess()">
+            <span class="btn-text">SCAN TAG</span>
+            <span class="tick">✓</span>
+        </div>
+        
+        <p>Tap button then touch NFC Tag</p>
+        <div id="status-log">Ready to scan...</div>
+        
+        <button onclick="logout()" style="background:transparent; border:1px solid #444; color:#666; padding:10px; margin-top:30px;">Logout</button>
+    </div>
+
+<script>
+    // --- CONFIGURATION ---
+    // In production, replace this with your real server endpoint
+    const SERVER_URL = "https://jsonplaceholder.typicode.com/posts"; 
+
+    // --- STATE MANAGEMENT ---
+    let currentUser = null;
+
+    // 1. Initialization: Check if user is remembered
+    window.onload = function() {
+        const savedUser = localStorage.getItem("guard_user");
+        if (savedUser) {
+            currentUser = JSON.parse(savedUser);
+            showDashboard();
+        } else {
+            showLogin();
+        }
+    };
+
+    // --- SCREEN NAVIGATION ---
+    function showLogin() {
+        document.getElementById('login-screen').classList.add('active');
+        document.getElementById('dashboard-screen').classList.remove('active');
+    }
+
+    function showDashboard() {
+        document.getElementById('login-screen').classList.remove('active');
+        document.getElementById('dashboard-screen').classList.add('active');
+        document.getElementById('display-name').innerText = currentUser.name;
+        document.getElementById('display-id').innerText = currentUser.mobile; // Using mobile as ID for now
+    }
+
+    // --- AUTHENTICATION LOGIC ---
+    function requestOTP() {
+        // Mock OTP Logic
+        if(document.getElementById('reg-mobile').value.length < 10) {
+            alert("Please enter valid mobile"); return;
+        }
+        alert("OTP sent to mobile! (Use 1234 for demo)");
+        document.getElementById('otp-section').style.display = "block";
+    }
+
+    function completeRegistration() {
+        const otp = document.getElementById('reg-otp').value;
+        if(otp !== "1234") { alert("Wrong OTP"); return; }
+        
+        const user = {
+            name: document.getElementById('reg-name').value,
+            mobile: document.getElementById('reg-mobile').value,
+            pass: document.getElementById('reg-pass').value
+        };
+        
+        // Save to LocalStorage (Persistent Login)
+        localStorage.setItem("guard_user", JSON.stringify(user));
+        currentUser = user;
+        showDashboard();
+    }
+    
+    function logout() {
+        localStorage.removeItem("guard_user");
+        location.reload();
+    }
+
+    // --- CORE NFC & SECURITY LOGIC ---
+    
+    async function startScanProcess() {
+        const btn = document.getElementById('scan-btn');
+        const log = document.getElementById('status-log');
+
+        // Reset State
+        btn.className = ""; // Remove success/processing classes
+        log.innerText = "Initializing NFC Reader...";
+
+        // 1. Check Browser Support
+        if (!('NDEFReader' in window)) {
+            alert("Error: NFC not supported on this device/browser. Use Chrome on Android.");
+            return;
+        }
+
+        try {
+            // 2. Start NFC Reader
+            const ndef = new NDEFReader();
+            await ndef.scan();
+            log.innerText = "Scanning... Tap Tag Now.";
+
+            ndef.onreading = event => {
+                // TAG DETECTED!
+                
+                // 3. UI: Turn ORANGE immediately (Data Captured, Pending Push)
+                btn.classList.add('processing');
+                log.innerText = "Tag Read! Getting GPS...";
+
+                // Decode Data
+                const decoder = new TextDecoder();
+                let tagData = "";
+                for (const record of event.message.records) {
+                    tagData += decoder.decode(record.data) + " ";
+                }
+                const serialNumber = event.serialNumber;
+
+                // 4. Get GPS Location (Mandatory for Fraud Check)
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            // Success: We have Tag + GPS + Time
+                            const payload = {
+                                guard_id: currentUser.mobile,
+                                tag_serial: serialNumber,
+                                tag_content: tagData.trim(),
+                                timestamp: new Date().toISOString(),
+                                gps_lat: position.coords.latitude,
+                                gps_long: position.coords.longitude
+                            };
+                            
+                            // 5. Send to Server
+                            uploadData(payload);
+                        },
+                        (error) => {
+                            alert("GPS Required! Enable Location Services.");
+                            btn.classList.remove('processing');
+                        },
+                        { enableHighAccuracy: true } // Request best GPS for "Nearest Guard" logic
+                    );
+                } else {
+                    alert("Geolocation not supported.");
+                }
+            };
+
+        } catch (error) {
+            log.innerText = "Error: " + error;
+        }
+    }
+
+    function uploadData(payload) {
+        const btn = document.getElementById('scan-btn');
+        const log = document.getElementById('status-log');
+
+        log.innerText = "Pushing to Command Center...";
+
+        // SIMULATE SERVER PUSH (Fetch API)
+        fetch(SERVER_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+            headers: {
+                'Content-type': 'application/json; charset=UTF-8',
+            },
+        })
+        .then((response) => {
+            if (response.status === 201 || response.status === 200) {
+                // 6. UI: Turn GREEN (Success)
+                btn.classList.remove('processing');
+                btn.classList.add('success');
+                log.innerText = "Data Pushed Successfully!";
+                
+                // Reset button after 3 seconds for next scan
+                setTimeout(() => {
+                    btn.classList.remove('success');
+                    log.innerText = "Ready to scan...";
+                }, 3000);
+            } else {
+                throw new Error("Server rejected data");
+            }
+        })
+        .catch((err) => {
+            // Keep Orange if failed (Retry logic would go here)
+            log.innerText = "Upload Failed. Check Internet.";
+            console.error(err);
+        });
+    }
+</script>
+</body>
+</html>
