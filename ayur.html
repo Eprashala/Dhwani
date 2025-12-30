@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>श्री धन्वंतरी कृपा - वैद्यजी AI (Stable)</title>
+    <title>श्री धन्वंतरी कृपा - वैद्यजी AI (Custom Key Version)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
@@ -118,7 +118,30 @@
             <label for="remember-me-checkbox" class="text-sm text-emerald-200 cursor-pointer select-none">माहिती लक्षात ठेवा</label>
         </div>
 
-        <div id="advance-container" class="hidden"></div> 
+        <div class="w-full flex flex-col items-center justify-center mb-4 shrink-0">
+            <button id="advance-toggle-btn" class="text-xs text-emerald-500 hover:text-emerald-400 underline mb-2 focus:outline-none">
+                ▼ प्रगत सेटिंग्ज (API Key)
+            </button>
+
+            <div id="advance-container" class="hidden w-full bg-[#064e3b] border border-emerald-800 rounded-lg p-4 flex flex-col gap-3 transition-all">
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="use-custom-key-checkbox" class="custom-checkbox">
+                    <label for="use-custom-key-checkbox" class="text-sm text-emerald-200 cursor-pointer select-none">
+                        तुमची स्वतःची API Key वापरा
+                    </label>
+                </div>
+
+                <input type="text" id="custom-api-key-input" class="custom-input text-xs w-full !w-full" placeholder="API Key येथे पेस्ट करा" disabled>
+                
+                <button id="paste-key-btn" type="button" disabled class="w-full py-2 px-4 bg-emerald-900 hover:bg-emerald-800 text-white text-xs rounded transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                    पेस्ट करा
+                </button>
+
+                <a href="https://ai.google.dev/gemini-api/docs/api-key" target="_blank" class="text-center w-full py-2 bg-[#022c22] hover:bg-[#065f46] text-xs text-emerald-400 rounded transition-colors border border-emerald-800">
+                    मोफत Google Gemini API Key मिळवा ↗
+                </a>
+            </div>
+        </div>
 
         <button id="talk-button" class="w-full py-4 px-6 rounded-lg text-lg font-semibold transition-all duration-300 ease-in-out shrink-0
                        bg-emerald-600 text-white shadow-lg shadow-emerald-900/50
@@ -139,23 +162,19 @@
         // --- 1. GLOBAL VARIABLES ---
         const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
         
-        let appState = 'IDLE'; // IDLE, LISTENING, BUSY, PAUSED
+        let appState = 'IDLE'; 
         let userName = '';
         let userAge = 30; 
         let chatHistory = [];
         let systemInstruction = '';
         
-        // Audio Objects
         const synth = window.speechSynthesis;
         let recognition = null;
         let wakeLock = null;
-        
-        // State Flags
         let isGlobalPaused = false;
         let lastSpokenText = '';
         
-        // Highlighting Globals
-        window.currentUtterance = null; // Important: prevent GC
+        window.currentUtterance = null;
         let currentMessageDivId = null; 
         let currentSpansMap = [];
 
@@ -166,16 +185,58 @@
         const manualNameInput = document.getElementById('manual-name');
         const manualAgeInput = document.getElementById('manual-age');
         
-        // Buttons
         const pauseResumeButton = document.getElementById('pause-resume-button');
         const stopSpeechButton = document.getElementById('stop-speech-button');
         const replayButton = document.getElementById('replay-button');
+        
+        // API Key Elements
+        const advanceToggleBtn = document.getElementById('advance-toggle-btn');
+        const advanceContainer = document.getElementById('advance-container');
+        const useCustomKeyCheckbox = document.getElementById('use-custom-key-checkbox');
+        const customApiKeyInput = document.getElementById('custom-api-key-input');
+        const pasteKeyBtn = document.getElementById('paste-key-btn');
         
         window.onload = () => {
             if (synth.speaking) synth.cancel();
             loadUserData();
             initRecognition();
         };
+
+        // --- API KEY UI LOGIC ---
+        advanceToggleBtn.addEventListener('click', () => {
+            advanceContainer.classList.toggle('hidden');
+            advanceContainer.classList.toggle('flex');
+        });
+
+        useCustomKeyCheckbox.addEventListener('change', () => {
+            const isChecked = useCustomKeyCheckbox.checked;
+            customApiKeyInput.disabled = !isChecked;
+            pasteKeyBtn.disabled = !isChecked;
+            saveUserData(); 
+            if (isChecked) customApiKeyInput.focus();
+        });
+
+        customApiKeyInput.addEventListener('input', saveUserData);
+
+        pasteKeyBtn.addEventListener('click', async () => {
+            try {
+                const text = await navigator.clipboard.readText();
+                if(text) {
+                    customApiKeyInput.value = text;
+                    saveUserData();
+                    const originalText = pasteKeyBtn.innerHTML;
+                    pasteKeyBtn.textContent = "पेस्ट झाले!";
+                    setTimeout(() => { pasteKeyBtn.innerHTML = originalText; }, 1000);
+                }
+            } catch (err) { alert('पेस्ट करता आले नाही. कृपया टाईप करा.'); }
+        });
+
+        function getEffectiveApiKey() {
+            if (useCustomKeyCheckbox.checked && customApiKeyInput.value.trim().length > 10) {
+                return customApiKeyInput.value.trim();
+            }
+            return DEFAULT_API_KEY;
+        }
 
         function initRecognition() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -193,7 +254,6 @@
             recognition.onerror = (e) => {
                 console.log("Rec Error:", e.error);
                 if (e.error === 'no-speech' && appState === 'LISTENING') {
-                    // Just restart silently
                     try { recognition.start(); } catch(err){}
                 } else if (e.error === 'not-allowed') {
                     alert("माईकची परवानगी नाकारली आहे.");
@@ -213,10 +273,8 @@
         document.getElementById('share-button').addEventListener('click', shareChat);
 
         // --- 4. CORE LOGIC FLOW ---
-        
         async function toggleSession() {
             if (appState === 'IDLE') {
-                // START
                 const name = manualNameInput.value.trim();
                 const age = manualAgeInput.value.trim();
                 
@@ -232,53 +290,42 @@
                 
                 await acquireWakeLock();
                 
-                // Welcome Logic
                 if (chatHistory.length === 0) {
                      const welcome = `नमस्कार ${userName}, मी वैद्यजी आहे. सांगा, तुम्हाला काय त्रास होत आहे?`;
                      logMessage('वैद्यजी', welcome);
                      setState('BUSY');
-                     await speakAndRender(welcome); // Speak first
+                     await speakAndRender(welcome);
                 } else {
                      logMessage('सिस्टम', 'जुने संभाषण लोड करत आहे...');
                 }
                 
-                // After speaking/loading, start listening
                 setState('LISTENING');
                 startRecognitionSafe();
-
             } else {
-                // STOP (Back to Idle)
                 endChat();
             }
         }
 
         // --- 5. RECOGNITION HANDLERS ---
-        
         async function handleRecognitionResult(event) {
             const transcript = event.results[event.results.length - 1][0].transcript.trim();
             if (!transcript) return;
             
             console.log("User said:", transcript);
             
-            // 1. Stop Listening immediately
             recognition.stop();
-            setState('BUSY'); // UI shows busy
+            setState('BUSY');
             
-            // 2. Log User Message
             logMessage('तुम्ही', transcript);
             chatHistory.push({ role: 'user', parts: [{ text: transcript }] });
             
-            // 3. Get AI Reply
             const aiText = await getAIResponse(chatHistory);
             
-            // 4. Clean Text
             const cleanText = aiText.replace(/[\*\[\]\(\)<>`]/g, '').trim();
             chatHistory.push({ role: 'model', parts: [{ text: cleanText }] });
             
-            // 5. Speak & Highlight (Await until finished)
             await speakAndRender(cleanText);
             
-            // 6. Resume Listening ONLY after speaking is fully done
             if (!isGlobalPaused && appState !== 'IDLE') {
                 setState('LISTENING');
                 startRecognitionSafe();
@@ -286,7 +333,6 @@
         }
 
         function handleRecognitionEnd() {
-            // Check if we should restart listening
             if (appState === 'LISTENING' && !isGlobalPaused && !synth.speaking) {
                 startRecognitionSafe();
             }
@@ -294,21 +340,18 @@
 
         function startRecognitionSafe() {
             if (!recognition) return;
-            try { recognition.start(); } catch(e) { /* ignore if already started */ }
+            try { recognition.start(); } catch(e) { }
         }
 
-        // --- 6. TTS & HIGHLIGHTING (THE CORE FIX) ---
-
+        // --- 6. TTS & HIGHLIGHTING ---
         async function speakAndRender(text) {
-            // 1. Render HTML with Spans for Highlighting
             const divId = 'msg-' + Date.now();
-            currentMessageDivId = divId; // Set global target
+            currentMessageDivId = divId; 
             
             const div = document.createElement('div');
             div.id = divId;
             div.className = "mb-4 p-3 bg-emerald-900/40 rounded-lg border border-emerald-800/50";
             
-            // Create words array and map
             const words = text.split(' ');
             currentSpansMap = [];
             let charCount = 0;
@@ -328,22 +371,20 @@
             conversationLog.appendChild(div);
             conversationLog.scrollTop = conversationLog.scrollHeight;
 
-            // 2. Speak with Promise
             await speakText(text, true);
         }
 
         function speakText(text, useHighlighting) {
             return new Promise((resolve) => {
                 if (synth.speaking) synth.cancel();
-                if (recognition) try{ recognition.stop(); } catch(e){} // Ensure mic is off
+                if (recognition) try{ recognition.stop(); } catch(e){} 
 
                 const utterance = new SpeechSynthesisUtterance(text);
-                window.currentUtterance = utterance; // Anti-GC fix
+                window.currentUtterance = utterance; 
 
                 utterance.lang = 'mr-IN';
                 utterance.rate = 0.9;
                 
-                // Voice selection
                 let voices = synth.getVoices();
                 let v = voices.find(x => x.lang === 'mr-IN') || voices.find(x => x.lang === 'hi-IN');
                 if(v) utterance.voice = v;
@@ -353,11 +394,9 @@
                         const idx = event.charIndex;
                         const match = currentSpansMap.find(s => idx >= s.start && idx < s.end);
                         
-                        // Clear old
                         const old = document.querySelectorAll(`#${currentMessageDivId} .active-word`);
                         old.forEach(el => el.classList.remove('active-word'));
                         
-                        // Set new
                         if (match) {
                             const el = document.getElementById(match.id);
                             if(el) {
@@ -370,7 +409,6 @@
 
                 utterance.onend = () => {
                     window.currentUtterance = null;
-                    // Clear highlights
                     if(currentMessageDivId) {
                          const old = document.querySelectorAll(`#${currentMessageDivId} .active-word`);
                          old.forEach(el => el.classList.remove('active-word'));
@@ -379,9 +417,8 @@
                 };
                 
                 utterance.onerror = (e) => {
-                    console.log("TTS Error", e);
                     window.currentUtterance = null;
-                    resolve(); // Resolve anyway to unblock app
+                    resolve();
                 };
 
                 synth.speak(utterance);
@@ -389,20 +426,11 @@
         }
 
         // --- 7. BUTTON ACTIONS ---
-
         function forceStopAndListen() {
             if (appState === 'IDLE') return;
-            
-            // 1. Stop Speaking
             if (synth.speaking) synth.cancel();
-            
-            // 2. Stop Listening (to reset)
             if (recognition) try{ recognition.stop(); } catch(e){}
-
-            // 3. Force State
             logMessage('सिस्टम', 'थांबले. ऐकत आहे...');
-            
-            // Small delay to let browser events settle
             setTimeout(() => {
                 setState('LISTENING');
                 startRecognitionSafe();
@@ -411,18 +439,15 @@
 
         function togglePause() {
             if (isGlobalPaused) {
-                // RESUME
                 isGlobalPaused = false;
                 pauseResumeButton.classList.remove('bg-yellow-600');
                 pauseResumeButton.classList.add('bg-emerald-700');
                 logMessage('सिस्टम', 'पुन्हा सुरू.');
-                
                 if (appState !== 'IDLE') {
                     setState('LISTENING');
                     startRecognitionSafe();
                 }
             } else {
-                // PAUSE
                 isGlobalPaused = true;
                 if (synth.speaking) synth.cancel();
                 if (recognition) try{ recognition.stop(); } catch(e){}
@@ -440,7 +465,6 @@
                  newState === 'LISTENING' ? 'bg-emerald-500 listening-pulse' : 
                  newState === 'BUSY' ? 'bg-yellow-500' : 'bg-red-500');
             
-            // Button States
             talkButton.disabled = (newState !== 'IDLE');
             talkButton.textContent = (newState === 'IDLE') ? 'सल्ला घ्या' : (newState === 'BUSY' ? 'वैद्यजी विचार करत आहेत...' : 'ऐकत आहे...');
             
@@ -456,9 +480,10 @@
         }
 
         // --- 8. HELPERS ---
-        
         async function getAIResponse(history) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${DEFAULT_API_KEY}`;
+            // USING THE CUSTOM KEY IF PROVIDED
+            const apiKey = getEffectiveApiKey();
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
             try {
                 const res = await fetch(url, {
                     method: 'POST',
@@ -472,7 +497,8 @@
                 if (data.error) throw new Error(data.error.message);
                 return data.candidates[0].content.parts[0].text;
             } catch (e) {
-                return "संपर्क तुटला आहे. कृपया इंटरनेट तपासा.";
+                console.error(e);
+                return "API Key तपासा. संपर्क तुटला आहे.";
             }
         }
 
@@ -501,6 +527,17 @@
                 manualNameInput.value = localStorage.getItem('v_name') || '';
                 manualAgeInput.value = localStorage.getItem('v_age') || '';
             }
+            
+            // Load API Key Settings
+            const savedUseKey = localStorage.getItem('vaidya_useCustomKey');
+            const savedKey = localStorage.getItem('vaidya_customKey');
+
+            if (savedUseKey === 'true') {
+                useCustomKeyCheckbox.checked = true;
+                customApiKeyInput.disabled = false;
+                pasteKeyBtn.disabled = false;
+                if (savedKey) customApiKeyInput.value = savedKey;
+            }
         }
 
         function saveUserData() {
@@ -509,7 +546,15 @@
                 localStorage.setItem('v_name', userName);
                 localStorage.setItem('v_age', userAge);
             } else {
-                localStorage.clear();
+                localStorage.removeItem('v_remember');
+                localStorage.removeItem('v_name');
+                localStorage.removeItem('v_age');
+            }
+            
+            // Save API Key Settings
+            localStorage.setItem('vaidya_useCustomKey', useCustomKeyCheckbox.checked);
+            if (customApiKeyInput.value) {
+                localStorage.setItem('vaidya_customKey', customApiKeyInput.value.trim());
             }
         }
         
@@ -526,7 +571,7 @@
         }
 
         function resetChat() { endChat(); setTimeout(toggleSession, 500); }
-        async function shareChat() { /* Simple Copy */ try{await navigator.clipboard.writeText(conversationLog.innerText); alert('Copied');}catch(e){} }
+        async function shareChat() { try{await navigator.clipboard.writeText(conversationLog.innerText); alert('Copied');}catch(e){} }
     </script>
 </body>
 </html>
