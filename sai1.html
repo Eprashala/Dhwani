@@ -1,202 +1,268 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="mr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dhwani Voice Controller Demo</title>
-
+<title>श्री साईबाबा - श्रद्धा आणि सबुरी AI</title>
 <script src="https://cdn.tailwindcss.com"></script>
 
 <style>
-body {
-    background:#0f172a;
-    color:#e5e7eb;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont;
+body { font-family: 'Inter', sans-serif; }
+
+.listening-pulse {
+  animation: pulse 1.5s infinite ease-in-out;
 }
-.btn {
-    padding:14px 22px;
-    border-radius:999px;
-    font-weight:600;
-    background:#7c3aed;
-    color:white;
-}
-.btn:disabled {
-    opacity:0.4;
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(234,88,12,.7); }
+  70% { box-shadow: 0 0 0 15px rgba(234,88,12,0); }
+  100% { box-shadow: 0 0 0 0 rgba(234,88,12,0); }
 }
 </style>
 </head>
 
-<body class="flex items-center justify-center min-h-screen">
+<body class="bg-[#2a0a00] text-orange-50 flex items-center justify-center min-h-screen p-4"
+oncontextmenu="return false">
 
-<div class="bg-slate-900 rounded-xl p-6 w-full max-w-xl space-y-6">
+<div class="bg-[#431407] rounded-2xl shadow-2xl p-6 w-full max-w-2xl flex flex-col h-[95vh] border-t-4 border-orange-500 border-b-4 border-orange-800">
 
-<h1 class="text-2xl font-bold text-center">🎧 Dhwani Voice Engine</h1>
+<h1 class="text-2xl font-bold text-center mb-2">
+<span class="text-orange-400">श्री साई</span>
+<span class="text-orange-200">बाबा</span>
+<span class="text-orange-500">प्रसन्न</span>
+</h1>
 
-<div id="log" class="bg-slate-800 rounded-lg p-4 h-48 overflow-y-auto text-sm"></div>
-
-<div class="flex justify-center gap-4">
-    <button id="pauseBtn" class="btn" disabled>⏸ Pause</button>
-    <button id="stopBtn" class="btn bg-red-600" disabled>⏹ Stop</button>
+<div id="conversation-log"
+class="flex-grow overflow-y-auto bg-[#2a0a00] rounded-lg p-4 mb-4 border border-orange-900 space-y-4">
 </div>
 
-<button id="startBtn" class="btn w-full">🎤 Start Listening</button>
+<div class="flex justify-center gap-6 mb-4">
+<button id="pause-resume-button" class="p-3 rounded-full bg-orange-700 text-white" disabled>⏸</button>
+<button id="stop-speech-button" class="p-3 rounded-full bg-red-700 text-white" disabled>⏹</button>
+<button id="replay-button" class="p-3 rounded-full bg-green-700 text-white" disabled>🔁</button>
+</div>
+
+<button id="talk-button"
+class="w-full py-4 rounded-lg bg-orange-600 text-white font-bold">
+साई दर्शन सुरू करा
+</button>
 
 </div>
 
 <script>
-/* ==============================
-   MASTER MEDIA STATE
-============================== */
-let mediaState = {
-    active: false,
-    paused: false,
-    stopped: false,
-    lastState: null
-};
+/* ================= GLOBAL STATE ================= */
 
-const logBox = document.getElementById("log");
-const startBtn = document.getElementById("startBtn");
-const pauseBtn = document.getElementById("pauseBtn");
-const stopBtn  = document.getElementById("stopBtn");
+let appState = "IDLE";
 
-/* ==============================
-   LOGGING
-============================== */
-function log(msg){
-    const div = document.createElement("div");
-    div.textContent = msg;
-    logBox.appendChild(div);
-    logBox.scrollTop = logBox.scrollHeight;
-}
+let isSpeaking = false;
+let isPaused = false;
+let isListening = false;
 
-/* ==============================
-   SPEECH RECOGNITION
-============================== */
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-let recognition = null;
+let lastSpokenText = "";
+let pausedUtterance = null;
 
-if (SpeechRecognition) {
-    recognition = new SpeechRecognition();
-    recognition.lang = "en-IN";
-    recognition.continuous = false;
-    recognition.interimResults = false;
-
-    recognition.onresult = e => {
-        if (mediaState.paused || mediaState.stopped) return;
-
-        const text = e.results[0][0].transcript;
-        log("🗣 You: " + text);
-        speak("You said: " + text);
-    };
-
-    recognition.onend = () => {
-        if (mediaState.active && !mediaState.paused && !mediaState.stopped) {
-            setTimeout(() => recognition.start(), 500);
-        }
-    };
-}
-
-/* ==============================
-   SPEECH SYNTHESIS
-============================== */
 const synth = window.speechSynthesis;
+let voices = [];
 
-function speak(text) {
-    if (mediaState.stopped) return;
+const SpeechRecognition =
+  window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    if (synth.speaking) synth.cancel();
+let recognition = SpeechRecognition ? new SpeechRecognition() : null;
 
+/* ================= UI ================= */
+
+const log = document.getElementById("conversation-log");
+const talkBtn = document.getElementById("talk-button");
+const pauseBtn = document.getElementById("pause-resume-button");
+const stopBtn = document.getElementById("stop-speech-button");
+const replayBtn = document.getElementById("replay-button");
+
+/* ================= HELPERS ================= */
+
+function logMessage(sender, text) {
+  const div = document.createElement("div");
+  div.innerHTML = `<b>${sender}:</b> ${text}`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+function toggleMediaButtons(enable) {
+  pauseBtn.disabled = !enable;
+  stopBtn.disabled = !enable;
+  replayBtn.disabled = !enable;
+}
+
+/* ================= VOICES ================= */
+
+function loadVoices() {
+  voices = synth.getVoices();
+  if (synth.onvoiceschanged !== undefined) {
+    synth.onvoiceschanged = () => voices = synth.getVoices();
+  }
+}
+loadVoices();
+
+/* ================= SPEAK ================= */
+
+function speakText(text) {
+  if (synth.speaking || synth.paused) synth.cancel();
+
+  lastSpokenText = text;
+  isSpeaking = true;
+  isPaused = false;
+  isListening = false;
+  recognition?.stop();
+
+  return new Promise(resolve => {
     const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = "en-IN";
+    pausedUtterance = utter;
 
-    utter.onstart = () => {
-        mediaState.active = true;
-        pauseBtn.disabled = false;
-        stopBtn.disabled = false;
-    };
+    utter.onstart = () => toggleMediaButtons(true);
 
     utter.onend = () => {
-        if (!mediaState.paused && !mediaState.stopped) {
-            recognition.start();
-        }
+      isSpeaking = false;
+      pausedUtterance = null;
+      toggleMediaButtons(false);
+      startListeningSafe();
+      resolve();
     };
 
+    utter.onerror = () => {
+      isSpeaking = false;
+      pausedUtterance = null;
+      toggleMediaButtons(false);
+      resolve();
+    };
+
+    const voice =
+      voices.find(v => v.lang === "mr-IN") ||
+      voices.find(v => v.lang === "hi-IN");
+
+    if (voice) utter.voice = voice;
+
+    utter.lang = "mr-IN";
+    utter.rate = 0.9;
+    utter.pitch = 0.9;
+
     synth.speak(utter);
+  });
 }
 
-/* ==============================
-   START
-============================== */
-startBtn.onclick = () => {
-    mediaState.active = true;
-    mediaState.paused = false;
-    mediaState.stopped = false;
+/* ================= LISTEN ================= */
 
-    startBtn.disabled = true;
-    pauseBtn.disabled = false;
-    stopBtn.disabled  = false;
+if (recognition) {
+  recognition.lang = "mr-IN";
+  recognition.continuous = false;
+  recognition.interimResults = false;
 
-    log("🎤 Listening...");
+  recognition.onresult = e => {
+    const text = e.results[0][0].transcript;
+    logMessage("तुम्ही", text);
+    handleUserText(text);
+  };
+
+  recognition.onend = () => {
+    if (appState !== "IDLE" && !isSpeaking && !isPaused) {
+      startListeningSafe();
+    }
+  };
+}
+
+function startListeningSafe() {
+  if (!recognition || isSpeaking || isPaused) return;
+  try {
+    isListening = true;
     recognition.start();
+  } catch {}
+}
+
+/* ================= BUTTONS ================= */
+
+talkBtn.onclick = async () => {
+  if (appState === "IDLE") {
+    appState = "ACTIVE";
+    talkBtn.textContent = "ऐकणे थांबवा";
+    logMessage("साईबाबा", "ॐ साई राम. तुझी समस्या सांग.");
+    await speakText("ॐ साई राम. तुझी समस्या सांग.");
+  } else {
+    endSession();
+  }
 };
 
-/* ==============================
-   PAUSE / PLAY
-============================== */
 pauseBtn.onclick = () => {
-    if (!mediaState.active) return;
+  if (!isSpeaking && !isPaused) return;
 
-    // ---- PAUSE ----
-    if (!mediaState.paused) {
-        mediaState.paused = true;
-        mediaState.lastState = "ACTIVE";
-
-        if (recognition) recognition.stop();
-        if (synth.speaking && !synth.paused) synth.pause();
-
-        pauseBtn.textContent = "▶ Play";
-        log("⏸ Paused");
-        return;
-    }
-
-    // ---- RESUME ----
-    mediaState.paused = false;
-
-    if (synth.paused) synth.resume();
-    else recognition.start();
-
-    pauseBtn.textContent = "⏸ Pause";
-    log("▶ Resumed");
+  if (!isPaused) {
+    synth.pause();
+    recognition?.stop();
+    isPaused = true;
+  } else {
+    synth.resume();
+    isPaused = false;
+  }
 };
 
-/* ==============================
-   STOP (HARD RESET)
-============================== */
 stopBtn.onclick = () => {
-    mediaState.stopped = true;
-    mediaState.active = false;
-    mediaState.paused = false;
+  synth.cancel();
+  recognition?.stop();
 
-    if (recognition) recognition.abort();
-    if (synth.speaking || synth.paused) synth.cancel();
+  isSpeaking = false;
+  isPaused = false;
+  pausedUtterance = null;
 
-    pauseBtn.disabled = true;
-    stopBtn.disabled = true;
-    startBtn.disabled = false;
-    pauseBtn.textContent = "⏸ Pause";
-
-    log("⏹ Stopped — Fresh input allowed");
+  toggleMediaButtons(false);
+  startListeningSafe();
 };
 
-/* ==============================
-   AUTO PAUSE ON APP BACKGROUND
-============================== */
+replayBtn.onclick = () => {
+  if (!lastSpokenText) return;
+
+  synth.cancel();
+  recognition?.stop();
+
+  isPaused = false;
+  isSpeaking = false;
+
+  setTimeout(() => speakText(lastSpokenText), 200);
+};
+
+/* ================= LOGIC ================= */
+
+async function handleUserText(text) {
+  recognition.stop();
+  isListening = false;
+
+  const reply = "श्रद्धा आणि सबुरी ठेव. साई तुझ्या सोबत आहे.";
+  logMessage("साईबाबा", reply);
+  await speakText(reply);
+}
+
+function endSession() {
+  appState = "IDLE";
+  synth.cancel();
+  recognition?.stop();
+
+  isSpeaking = false;
+  isPaused = false;
+
+  talkBtn.textContent = "साई दर्शन सुरू करा";
+}
+
+/* ================= VISIBILITY ================= */
+
 document.addEventListener("visibilitychange", () => {
-    if (document.hidden && mediaState.active && !mediaState.paused) {
-        pauseBtn.click();
+  if (document.visibilityState === "hidden") {
+    if (synth.speaking) {
+      synth.pause();
+      isPaused = true;
     }
+    recognition?.stop();
+  } else {
+    if (isPaused && synth.paused) {
+      synth.resume();
+      isPaused = false;
+    }
+  }
 });
 </script>
-
 </body>
 </html>
