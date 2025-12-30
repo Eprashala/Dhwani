@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dhwani Voice Controller Demo</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+body {
+    background:#0f172a;
+    color:#e5e7eb;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont;
+}
+.btn {
+    padding:14px 22px;
+    border-radius:999px;
+    font-weight:600;
+    background:#7c3aed;
+    color:white;
+}
+.btn:disabled {
+    opacity:0.4;
+}
+</style>
+</head>
+
+<body class="flex items-center justify-center min-h-screen">
+
+<div class="bg-slate-900 rounded-xl p-6 w-full max-w-xl space-y-6">
+
+<h1 class="text-2xl font-bold text-center">🎧 Dhwani Voice Engine</h1>
+
+<div id="log" class="bg-slate-800 rounded-lg p-4 h-48 overflow-y-auto text-sm"></div>
+
+<div class="flex justify-center gap-4">
+    <button id="pauseBtn" class="btn" disabled>⏸ Pause</button>
+    <button id="stopBtn" class="btn bg-red-600" disabled>⏹ Stop</button>
+</div>
+
+<button id="startBtn" class="btn w-full">🎤 Start Listening</button>
+
+</div>
+
+<script>
+/* ==============================
+   MASTER MEDIA STATE
+============================== */
+let mediaState = {
+    active: false,
+    paused: false,
+    stopped: false,
+    lastState: null
+};
+
+const logBox = document.getElementById("log");
+const startBtn = document.getElementById("startBtn");
+const pauseBtn = document.getElementById("pauseBtn");
+const stopBtn  = document.getElementById("stopBtn");
+
+/* ==============================
+   LOGGING
+============================== */
+function log(msg){
+    const div = document.createElement("div");
+    div.textContent = msg;
+    logBox.appendChild(div);
+    logBox.scrollTop = logBox.scrollHeight;
+}
+
+/* ==============================
+   SPEECH RECOGNITION
+============================== */
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
+
+if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.lang = "en-IN";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onresult = e => {
+        if (mediaState.paused || mediaState.stopped) return;
+
+        const text = e.results[0][0].transcript;
+        log("🗣 You: " + text);
+        speak("You said: " + text);
+    };
+
+    recognition.onend = () => {
+        if (mediaState.active && !mediaState.paused && !mediaState.stopped) {
+            setTimeout(() => recognition.start(), 500);
+        }
+    };
+}
+
+/* ==============================
+   SPEECH SYNTHESIS
+============================== */
+const synth = window.speechSynthesis;
+
+function speak(text) {
+    if (mediaState.stopped) return;
+
+    if (synth.speaking) synth.cancel();
+
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = "en-IN";
+
+    utter.onstart = () => {
+        mediaState.active = true;
+        pauseBtn.disabled = false;
+        stopBtn.disabled = false;
+    };
+
+    utter.onend = () => {
+        if (!mediaState.paused && !mediaState.stopped) {
+            recognition.start();
+        }
+    };
+
+    synth.speak(utter);
+}
+
+/* ==============================
+   START
+============================== */
+startBtn.onclick = () => {
+    mediaState.active = true;
+    mediaState.paused = false;
+    mediaState.stopped = false;
+
+    startBtn.disabled = true;
+    pauseBtn.disabled = false;
+    stopBtn.disabled  = false;
+
+    log("🎤 Listening...");
+    recognition.start();
+};
+
+/* ==============================
+   PAUSE / PLAY
+============================== */
+pauseBtn.onclick = () => {
+    if (!mediaState.active) return;
+
+    // ---- PAUSE ----
+    if (!mediaState.paused) {
+        mediaState.paused = true;
+        mediaState.lastState = "ACTIVE";
+
+        if (recognition) recognition.stop();
+        if (synth.speaking && !synth.paused) synth.pause();
+
+        pauseBtn.textContent = "▶ Play";
+        log("⏸ Paused");
+        return;
+    }
+
+    // ---- RESUME ----
+    mediaState.paused = false;
+
+    if (synth.paused) synth.resume();
+    else recognition.start();
+
+    pauseBtn.textContent = "⏸ Pause";
+    log("▶ Resumed");
+};
+
+/* ==============================
+   STOP (HARD RESET)
+============================== */
+stopBtn.onclick = () => {
+    mediaState.stopped = true;
+    mediaState.active = false;
+    mediaState.paused = false;
+
+    if (recognition) recognition.abort();
+    if (synth.speaking || synth.paused) synth.cancel();
+
+    pauseBtn.disabled = true;
+    stopBtn.disabled = true;
+    startBtn.disabled = false;
+    pauseBtn.textContent = "⏸ Pause";
+
+    log("⏹ Stopped — Fresh input allowed");
+};
+
+/* ==============================
+   AUTO PAUSE ON APP BACKGROUND
+============================== */
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden && mediaState.active && !mediaState.paused) {
+        pauseBtn.click();
+    }
+});
+</script>
+
+</body>
+</html>
