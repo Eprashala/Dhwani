@@ -77,23 +77,23 @@
 
         <div class="flex justify-center gap-8 mb-4 shrink-0 bg-emerald-900/30 p-2 rounded-xl">
             <button id="pause-resume-button" class="icon-btn bg-emerald-700 hover:bg-emerald-600" title="थांबवा/पुन्हा सुरू करा" disabled>
-                <svg id="icon-play" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8 hidden">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
-                </svg>
-                <svg id="icon-pause" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+                <svg id="pause-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+                </svg>
+                <svg id="resume-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8 hidden">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
                 </svg>
             </button>
             
-            <button id="stop-speech-button" class="icon-btn bg-red-900/50 hover:bg-red-800" title="बोलणे थांबवा (नवीन इनपुट)" disabled>
+            <button id="stop-speech-button" class="icon-btn bg-red-900/50 hover:bg-red-800" title="बोलणे थांबवा आणि ऐका" disabled>
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z" />
                 </svg>
             </button>
 
-            <button id="replay-button" class="icon-btn bg-blue-900/50 hover:bg-blue-800" title="पुन्हा ऐका" disabled>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+            <button id="replay-button" class="icon-btn bg-blue-900/50 hover:bg-blue-800" title="शेवटचे उत्तर पुन्हा ऐका" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" class="w-8 h-8">
+                    <path d="M8 5v14l11-7z" />
                 </svg>
             </button>
         </div>
@@ -177,9 +177,11 @@
         const rememberMeCheckbox = document.getElementById('remember-me-checkbox');
         const manualNameInput = document.getElementById('manual-name');
         const manualAgeInput = document.getElementById('manual-age');
+        
         const pauseResumeButton = document.getElementById('pause-resume-button');
-        const iconPlay = document.getElementById('icon-play');
-        const iconPause = document.getElementById('icon-pause');
+        const pauseIcon = document.getElementById('pause-icon');
+        const resumeIcon = document.getElementById('resume-icon');
+        
         const stopSpeechButton = document.getElementById('stop-speech-button');
         const replayButton = document.getElementById('replay-button');
         const shareButton = document.getElementById('share-button');
@@ -200,9 +202,8 @@
         let systemInstruction = '';
         let recognition;
         let lastSpokenText = ''; 
-        let isPaused = false;
-        let pausedDuringSpeech = false; // Flag to track if we were speaking when paused
-        
+        let ignoreNextRecognition = false;
+        let isGlobalPaused = false;
         const synth = window.speechSynthesis;
         let voices = [];
         let wakeLock = null;
@@ -323,46 +324,98 @@
                 recognition.onend = handleSpeechEnd;
                 
                 recognition.onerror = (event) => {
-                    if (event.error === 'no-speech') {
-                         if (!isPaused && appState !== 'IDLE' && appState !== 'BUSY') {
-                            startRecognitionSafe();
-                         }
+                    if (event.error === 'no-speech' && appState !== 'IDLE' && appState !== 'BUSY' && !isGlobalPaused) {
+                        startRecognitionSafe();
                     } else if (event.error === 'not-allowed') {
                         setState('IDLE');
-                    } else if (event.error === 'aborted') {
-                        // Aborted manually
                     }
                 };
             } catch (e) { alert("माईक त्रुटी: " + e.message); }
         }
 
         function startRecognitionSafe() {
-            if (!recognition || isPaused || synth.speaking) return;
-            try { recognition.start(); } catch (e) { }
+            if (!recognition || isGlobalPaused || synth.speaking) return;
+            try { recognition.start(); } catch (e) {}
         }
 
         talkButton.addEventListener('click', toggleListening);
         pauseResumeButton.addEventListener('click', togglePauseResume);
-        stopSpeechButton.addEventListener('click', stopSpeech);
+        stopSpeechButton.addEventListener('click', stopAndListenImmediately);
         replayButton.addEventListener('click', replaySpeech);
         shareButton.addEventListener('click', shareChat);
         endChatButton.addEventListener('click', endChat);
         restartChatButton.addEventListener('click', restartChat);
         
-        // Handle background/interruption events
+        // --- 1. Global Pause on Visibility Change (Phone Call/Minimizing) ---
         document.addEventListener('visibilitychange', () => {
              if (document.hidden) {
-                 if (appState !== 'IDLE' && !isPaused) {
-                    togglePauseResume(); // Auto-pause
+                 if (appState !== 'IDLE') {
+                     activateGlobalPause();
                  }
              }
         });
-        
-        window.addEventListener('blur', () => {
-             if (appState !== 'IDLE' && !isPaused) {
-                togglePauseResume(); // Auto-pause
-             }
-        });
+
+        // --- 1. Toggle Pause Button Logic ---
+        function togglePauseResume() {
+            if (!isGlobalPaused) {
+                activateGlobalPause();
+            } else {
+                resumeGlobalSession();
+            }
+        }
+
+        function activateGlobalPause() {
+            isGlobalPaused = true;
+            synth.cancel(); // Stop speaking
+            if (recognition) try { recognition.stop(); } catch(e){}
+            
+            // UI Update
+            pauseIcon.classList.add('hidden');
+            resumeIcon.classList.remove('hidden');
+            statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-600'; // Paused color
+            logMessage('सिस्टम', 'संभाषण थांबवले आहे (Paused).');
+        }
+
+        function resumeGlobalSession() {
+            isGlobalPaused = false;
+            
+            // UI Update
+            pauseIcon.classList.remove('hidden');
+            resumeIcon.classList.add('hidden');
+            
+            // Resume Logic
+            if (systemInstruction) {
+                // If we were in a session, resume listening
+                setState('CONVERSATION'); 
+                startRecognitionSafe();
+                logMessage('सिस्टम', 'पुन्हा सुरू (Resumed).');
+            } else {
+                // If we were at start
+                setState('IDLE');
+            }
+        }
+
+
+        // --- 2. Stop Button Logic (Stop Speaking & Listen Immediately) ---
+        function stopAndListenImmediately() {
+            if (appState === 'IDLE') return;
+
+            // Stop Speaking
+            if (synth.speaking) synth.cancel();
+
+            // Stop current recognition process and Ignore its result
+            ignoreNextRecognition = true;
+            if (recognition) try { recognition.stop(); } catch(e){}
+
+            // Immediate Reset & Listen
+            setTimeout(() => {
+                ignoreNextRecognition = false;
+                setState('CONVERSATION'); // Force state to ready
+                logMessage('सिस्टम', 'ऐकत आहे...');
+                startRecognitionSafe();
+            }, 200); // Small buffer to clear flags
+        }
+
 
         async function toggleListening() {
             if (appState === 'IDLE') {
@@ -374,9 +427,6 @@
                     talkButton.textContent = "धन्वंतरी आवाहन...";
                     talkButton.disabled = true;
                     await acquireWakeLock(); 
-                    isPaused = false;
-                    pausedDuringSpeech = false;
-                    updatePauseButtonUI();
                     
                     const inputName = manualNameInput.value.trim();
                     const inputAge = manualAgeInput.value.trim();
@@ -386,7 +436,11 @@
                         userAge = parseInt(inputAge);
                         saveUserData(); 
                         buildSystemPrompt(); 
+                        
+                        // Enable buttons on start
+                        toggleMediaButtons(false);
 
+                        // जुना इतिहास तपासणे
                         const previousHistory = loadChatContext(userName);
                         
                         if (previousHistory.length > 0) {
@@ -401,8 +455,7 @@
                             
                             logMessage('वैद्यजी', welcomeText);
                             await speakText(welcomeText, 'mr-IN');
-                            setState('CONVERSATION');
-                            startRecognitionSafe();
+                            // speakText handles starting recognition after speech
 
                         } else {
                             if (chatHistory.length === 0) {
@@ -415,19 +468,18 @@
                             
                             setState('BUSY'); 
                             await speakText(welcomeText, 'mr-IN');
-                            setState('CONVERSATION');
-                            startRecognitionSafe();
                         }
 
                     } else {
                         setState('LISTENING_FOR_WAKEWORD');
                         startRecognitionSafe();
+                        toggleMediaButtons(false); // Enable stop/pause buttons
                         if (conversationLog.childElementCount < 3) logMessage('माहिती', '"वैद्यजी", "आचार्य" किंवा "गुरुजी" म्हणा.');
                     }
 
                 } else {
                     setState('IDLE');
-                    recognition.abort();
+                    recognition.stop();
                     if (synth.speaking) synth.cancel();
                     await releaseWakeLock();
                 }
@@ -444,49 +496,52 @@
                     talkButton.disabled = false;
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-gray-600 transition-colors';
                     endChatButton.disabled = true;
+                    toggleMediaButtons(true); // Disable controls in IDLE
                     talkButton.classList.remove('bg-emerald-700', 'hover:bg-emerald-600');
                     talkButton.classList.add('bg-emerald-600', 'hover:bg-emerald-500');
                     manualNameInput.disabled = false;
                     manualAgeInput.disabled = false;
-                    toggleMediaButtons(true); 
                     break;
                 case 'BUSY':
                     talkButton.textContent = 'निदान सुरू आहे...';
                     talkButton.disabled = true;
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-500 transition-colors';
                     endChatButton.disabled = false;
-                    toggleMediaButtons(false); 
                     break;
-                default: 
+                default:
                     talkButton.textContent = 'ऐकणे थांबवा';
                     talkButton.disabled = false;
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-emerald-500 listening-pulse transition-colors';
                     endChatButton.disabled = false;
+                    toggleMediaButtons(false); // Enable controls
                     talkButton.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
                     talkButton.classList.add('bg-emerald-700', 'hover:bg-emerald-600');
                     manualNameInput.disabled = true;
                     manualAgeInput.disabled = true;
-                    toggleMediaButtons(false);
                     break;
             }
         }
 
         function handleSpeechEnd() {
-            if (isPaused) return; 
-            if (appState !== 'IDLE' && appState !== 'BUSY' && !synth.speaking) {
+            // Only restart if not idle, not paused, not busy speaking
+            if (appState !== 'IDLE' && appState !== 'BUSY' && !isGlobalPaused && !synth.speaking) {
                 startRecognitionSafe();
             }
             else if (appState === 'IDLE') setState('IDLE'); 
         }
         
         async function handleSpeechResult(event) {
-            if (isPaused) return;
+            if (ignoreNextRecognition) {
+                console.log("Ignored result due to manual stop.");
+                return;
+            }
+
             const transcript = event.results[event.results.length - 1][0].transcript.trim();
             if (!transcript) return;
             console.log(`Heard: ${transcript}`);
             
             const currentState = appState;
-            recognition.abort(); 
+            recognition.stop(); // Stop listening while processing
             setState('BUSY');
 
             try {
@@ -498,7 +553,7 @@
                             logMessage('वैद्यजी', greeting);
                             await speakText(greeting, 'mr-IN');
                             setState('LISTENING_FOR_NAME');
-                            startRecognitionSafe(); 
+                            // speakText triggers restart
                         } else {
                             setState('LISTENING_FOR_WAKEWORD');
                             startRecognitionSafe();
@@ -514,7 +569,6 @@
                         logMessage('वैद्यजी', agePrompt);
                         await speakText(agePrompt, 'mr-IN');
                         setState('LISTENING_FOR_AGE');
-                        startRecognitionSafe();
                         break;
 
                     case 'LISTENING_FOR_AGE':
@@ -532,7 +586,6 @@
                         logMessage('वैद्यजी', startPrompt);
                         await speakText(startPrompt, 'mr-IN');
                         setState('CONVERSATION');
-                        startRecognitionSafe();
                         break;
 
                     case 'CONVERSATION':
@@ -550,15 +603,10 @@
 
                         logMessage('वैद्यजी', cleanedResponseText);
                         
-                        try {
-                            await speakText(cleanedResponseText, 'mr-IN');
-                        } catch (error) {
-                            if (error.message === "Speech manually stopped") return;
-                            throw error;
-                        }
+                        await speakText(cleanedResponseText, 'mr-IN');
                         
                         setState('CONVERSATION');
-                        startRecognitionSafe();
+                        // speakText will handle startRecognitionSafe
                         break;
                 }
             } catch (error) {
@@ -567,8 +615,9 @@
             }
         }
 
-        // --- Brain ---
+        // --- मुख्य लॉजिक (Brain) - वैद्यजी सिस्टम प्रॉम्प्ट ---
         function buildSystemPrompt() {
+            
             systemInstruction = `
                 You are "Vaidyaji" (वैद्यजी), an expert in Ayurveda and ancient Indian medicine.
                 User: ${userName}, Age: ${userAge}. 
@@ -592,10 +641,21 @@
                 3. Mention the **Name of the Book** from where the verse is taken.
                 4. **Exact Marathi Translation** of the verse.
                 5. **In-depth Expert Advice**: Detailed remedy, diet (Pathya-Apathya), and lifestyle changes.
+
+                EXAMPLE FORMAT (Do not copy this text, use this structure):
+                नमस्कार. आपल्या लक्षणांवरून पित्त दोषाचा प्रकोप दिसतो.
+                चरक संहितेत महर्षी चरक म्हणतात: 
+                [SANSKRIT VERSE HERE]
+                याचा अर्थ असा की... [MARATHI MEANING].
+                यावर उपाय म्हणून आपण... [DETAILED REMEDY].
+
+                TONE:
+                Calm, Healing, Authoritative, Expert, Compassionate.
             `;
             restartChatButton.disabled = false;
         }
 
+        // --- API कॉल्स ---
         async function getAIResponse(historyData) {
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
             try {
@@ -659,129 +719,46 @@
             if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => { voices = synth.getVoices(); };
         }
 
-        function togglePauseResume() {
-            if (appState === 'IDLE') return; 
-
-            isPaused = !isPaused;
-            updatePauseButtonUI();
-
-            if (isPaused) {
-                // --- PAUSE LOGIC ---
-                // We track if speech was active. We trust synth.speaking.
-                if (synth.speaking) {
-                    synth.pause();
-                    pausedDuringSpeech = true;
-                } else {
-                    pausedDuringSpeech = false;
-                }
-                
-                if (recognition) {
-                    recognition.abort(); 
-                }
-                logMessage('सिस्टम', '(संभाषण थांबवले आहे)');
-            } else {
-                // --- RESUME LOGIC ---
-                logMessage('सिस्टम', '(संभाषण सुरू केले आहे)');
-
-                if (pausedDuringSpeech) {
-                    // Try the native resume
-                    synth.resume();
-                    
-                    // CRITICAL FIX: The browser's resume() is often broken.
-                    // We check after 200ms if it's actually speaking.
-                    // If NOT, we force a complete re-read (Replay).
-                    setTimeout(() => {
-                        if (!synth.speaking && lastSpokenText) {
-                            console.warn("Native resume failed. Forcing replay.");
-                            speakText(lastSpokenText);
-                        }
-                    }, 200);
-                } else {
-                    // We were not speaking, so we must be listening.
-                    if (systemInstruction) { setState('CONVERSATION'); startRecognitionSafe(); }
-                    else { setState('LISTENING_FOR_WAKEWORD'); startRecognitionSafe(); }
-                }
-            }
-        }
-
-        function updatePauseButtonUI() {
-            if (isPaused) {
-                iconPlay.classList.remove('hidden');
-                iconPause.classList.add('hidden');
-                pauseResumeButton.classList.add('animate-pulse'); 
-            } else {
-                iconPlay.classList.add('hidden');
-                iconPause.classList.remove('hidden');
-                pauseResumeButton.classList.remove('animate-pulse');
-            }
-        }
-
-        function stopSpeech() {
-            // FORCE STOP everything
-            if (synth.speaking || synth.paused) {
-                synth.cancel();
-            }
-            if (recognition) recognition.abort();
-
-            // Clear buffers and Reset state
-            logMessage('माहिती', 'बोलणे थांबवले. आता बोला...');
-            
-            isPaused = false;
-            pausedDuringSpeech = false;
-            updatePauseButtonUI();
-
-            // IMMEDIATE RESTART of listening (ignoring previous input)
-            setTimeout(() => {
-                 if (systemInstruction) { setState('CONVERSATION'); startRecognitionSafe(); }
-                 else { setState('LISTENING_FOR_WAKEWORD'); startRecognitionSafe(); }
-            }, 500);
-        }
-
+        // --- 3. Play Last Answer Button (Replay) ---
         function replaySpeech() {
-            // 1. Kill current audio aggressively
-            if (synth.speaking || synth.paused) {
-                synth.cancel();
-            }
-            if (recognition) recognition.abort();
-
-            // 2. Start fresh
-            if (lastSpokenText) {
-                logMessage('सिस्टम', 'पुन्हा वाचत आहे...');
-                isPaused = false;
-                pausedDuringSpeech = false;
-                updatePauseButtonUI();
-                
+            if (lastSpokenText) { 
+                if (recognition) recognition.stop(); // Ensure mic is off
                 setState('BUSY'); 
-                speakText(lastSpokenText);
+                speakText(lastSpokenText); // speakText will auto-start mic on end
             }
         }
         
+        // --- Core Speech Logic with Strict Mic Control ---
         async function speakText(text, lang = 'mr-IN') {
-            if (synth.speaking) synth.cancel(); 
-            if (recognition) recognition.abort(); 
+            if (synth.speaking) synth.cancel();
+            
+            // ENSURE MIC IS OFF
+            if (recognition) try { recognition.stop(); } catch(e){}
 
             lastSpokenText = text;
-            pausedDuringSpeech = false; // Reset pause tracker on new speech
-
             if (voices.length === 0) voices = synth.getVoices();
 
             return new Promise((resolve, reject) => {
                 const utterance = new SpeechSynthesisUtterance(text);
                 
                 utterance.onstart = () => { 
-                    toggleMediaButtons(false); 
-                    if (recognition) recognition.abort();
+                    // Confirm mic is off and state is busy
+                    if (recognition) try { recognition.stop(); } catch(e){}
                 };
                 
                 utterance.onend = () => {
-                    toggleMediaButtons(true);
+                    // Speech finished -> Start Listening Automatically
+                    if (!isGlobalPaused && appState !== 'IDLE') {
+                        startRecognitionSafe();
+                    }
                     resolve();
                 };
-                
+
                 utterance.onerror = (e) => { 
-                    toggleMediaButtons(true);
-                    if (e.error === 'interrupted' || e.error === 'canceled') resolve(); 
-                    else reject(e.error); 
+                    if (!isGlobalPaused && appState !== 'IDLE') {
+                        startRecognitionSafe();
+                    }
+                    if (e.error === 'interrupted') resolve(); else reject(e.error); 
                 };
 
                 let vedicVoice = voices.find(voice => voice.lang === 'mr-IN') || 
@@ -797,15 +774,9 @@
         }
 
         function toggleMediaButtons(disabled) {
-            if (appState === 'IDLE') {
-                 pauseResumeButton.disabled = true;
-                 stopSpeechButton.disabled = true;
-                 replayButton.disabled = true;
-            } else {
-                 pauseResumeButton.disabled = false;
-                 stopSpeechButton.disabled = false;
-                 replayButton.disabled = false;
-            }
+            pauseResumeButton.disabled = disabled;
+            stopSpeechButton.disabled = disabled;
+            replayButton.disabled = disabled;
         }
         
         function logMessage(sender, message) {
@@ -857,32 +828,27 @@
 
         async function endChat() {
             appState = 'IDLE'; setState('IDLE');
-            isPaused = false;
-            pausedDuringSpeech = false;
-            updatePauseButtonUI();
-            
             if (synth.speaking) synth.cancel();
-            if (recognition) try { recognition.abort(); } catch (e) {}
+            if (recognition) try { recognition.stop(); } catch (e) {}
             await releaseWakeLock();
-            
             userName = ''; userAge = 30; chatHistory = []; systemInstruction = '';
             conversationLog.innerHTML = '<div class="text-gray-400 text-center">सत्र समाप्त. सर्वे सन्तु निरामयाः.</div>';
             restartChatButton.disabled = true;
+            isGlobalPaused = false;
         }
 
         async function restartChat() {
             if (!systemInstruction) return;
             if (synth.speaking) synth.cancel();
-            if (recognition) try { recognition.abort(); } catch(e){}
-            
+            if (recognition) try { recognition.stop(); } catch(e){}
             appState = 'IDLE'; setState('IDLE');
             await releaseWakeLock();
-            
             conversationLog.innerHTML = '';
             if(userName) {
                 localStorage.removeItem(`vaidya_history_${userName.toLowerCase()}`);
                 chatHistory = [];
             }
+            isGlobalPaused = false;
             logMessage('माहिती', `सत्र पुन्हा सुरू झाले.`);
         }
     </script>
