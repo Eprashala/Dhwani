@@ -47,21 +47,23 @@
         ::-webkit-scrollbar-thumb { background: #047857; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #059669; }
 
-        /* --- NEW STYLES FOR HIGHLIGHTING --- */
+        /* --- HIGHLIGHTING STYLES --- */
         .word-span {
-            transition: all 0.2s ease;
-            border-radius: 4px;
-            padding: 0 2px;
+            border-radius: 3px;
+            padding: 2px 4px;
+            transition: all 0.2s ease-out;
+            display: inline-block;
+            margin: 0 1px;
         }
         
         .active-word {
-            background-color: #d97706; /* Amber-600 Highlight Background */
-            color: #fff;              /* White Text */
+            background-color: #d97706; /* Amber-600 */
+            color: white;
+            transform: scale(1.15);
             font-weight: bold;
-            font-size: 1.1em;         /* Slightly larger */
-            box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
-            display: inline-block;    /* Ensures transform works */
-            transform: scale(1.05);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            z-index: 10;
+            position: relative;
         }
     </style>
 </head>
@@ -80,10 +82,10 @@
              <span class="text-xs text-emerald-300 uppercase tracking-widest">|| सर्वे सन्तु निरामयाः ||</span>
         </div>
 
-        <div id="conversation-log" class="flex-grow overflow-y-auto bg-[#022c22] rounded-lg p-4 mb-4 border border-emerald-900 space-y-4 shadow-inner min-h-[200px] scroll-smooth">
+        <div id="conversation-log" class="flex-grow overflow-y-auto bg-[#022c22] rounded-lg p-4 mb-4 border border-emerald-900 space-y-4 shadow-inner min-h-[200px] scroll-smooth relative">
             <div class="text-emerald-300/60 text-center mt-10">
                 सुरू करण्यासाठी "वैद्यजी", "आचार्य" किंवा "गुरुजी" म्हणा.<br>
-                <span class="text-sm opacity-70 text-emerald-400">मी वैद्यजी आहे. मी आपल्या प्रकृतीनुसार आणि प्राचीन ग्रंथांच्या आधारे उपचार सुचवेन.</span>
+                <span class="text-sm opacity-70 text-emerald-400">मी वैद्यजी आहे. मी आपल्या प्रकृतीनुसार उपचार सुचवेन.</span>
             </div>
         </div>
 
@@ -193,7 +195,10 @@
         const customApiKeyInput = document.getElementById('custom-api-key-input');
         const pasteKeyBtn = document.getElementById('paste-key-btn');
 
+        // IMPORTANT: If this default key is invalid, the app will fail.
+        // Users should use their own key in the Advanced Settings if needed.
         const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
+        
         let appState = 'IDLE'; 
         let userName = '';
         let userAge = 30; 
@@ -206,7 +211,10 @@
         const synth = window.speechSynthesis;
         let voices = [];
         let wakeLock = null;
-        let currentMessageDivId = null; // Track current message div for highlighting
+        
+        // Tracking active message for highlighting
+        let currentMessageDivId = null; 
+        let currentSpansMap = []; // Array of {start, end, id}
 
         window.onload = () => {
             if (synth.speaking) synth.cancel();
@@ -261,7 +269,6 @@
                     if (savedAge) manualAgeInput.value = savedAge;
                     if (savedName) talkButton.textContent = `${savedName}, सल्ला घ्या`;
                 }
-
                 const savedUseKey = localStorage.getItem('vaidya_useCustomKey');
                 const savedKey = localStorage.getItem('vaidya_customKey');
 
@@ -426,17 +433,15 @@
                             const welcomeBackPrompt = "जुना रुग्ण परत आला आहे. म्हणा 'नमस्कार वैद्यजी, मला पुन्हा त्रास होत आहे.'";
                             const tempHistory = [...chatHistory, { role: 'user', parts: [{ text: welcomeBackPrompt }] }];
                             const welcomeText = await getAIResponse(tempHistory);
-                            logMessage('वैद्यजी', welcomeText);
-                            await speakText(welcomeText, 'mr-IN', true); // Pass true to identify this is a response
+                            await processAndSpeak(welcomeText);
                         } else {
                             if (chatHistory.length === 0) {
                                 chatHistory.push({ role: 'user', parts: [{ text: "Start session." }] });
                                 chatHistory.push({ role: 'model', parts: [{ text: `नमो धन्वन्तरये नमः ${userName}.` }] });
                             }
                             const welcomeText = `नमस्कार ${userName}, मी 'वैद्यजी' आहे. आयुर्वेदाच्या प्राचीन ग्रंथांनुसार मी तुमच्या समस्यांचे निवारण करीन. तुम्हाला काय त्रास होत आहे?`;
-                            logMessage('वैद्यजी', welcomeText);
                             setState('BUSY'); 
-                            await speakText(welcomeText, 'mr-IN', true);
+                            await processAndSpeak(welcomeText);
                         }
                     } else {
                         setState('LISTENING_FOR_WAKEWORD');
@@ -511,8 +516,7 @@
                         const t = transcript.toLowerCase();
                         if (t.includes('acharya') || t.includes('vaidya') || t.includes('guruji') || t.includes('आचार्य') || t.includes('वैद्य') || t.includes('गुरुजी')) {
                             const greeting = "नमो धन्वन्तरये नमः, मी वैद्यजी आहे. कृपया तुमचे नाव सांगा.";
-                            logMessage('वैद्यजी', greeting);
-                            await speakText(greeting, 'mr-IN', true);
+                            await processAndSpeak(greeting);
                             setState('LISTENING_FOR_NAME');
                         } else {
                             setState('LISTENING_FOR_WAKEWORD');
@@ -526,8 +530,7 @@
                         manualNameInput.value = userName; 
                         
                         const agePrompt = `नमस्कार ${userName}, तुमचे वय काय आहे?`;
-                        logMessage('वैद्यजी', agePrompt);
-                        await speakText(agePrompt, 'mr-IN', true);
+                        await processAndSpeak(agePrompt);
                         setState('LISTENING_FOR_AGE');
                         break;
 
@@ -540,8 +543,7 @@
                         const history = loadChatContext(userName);
                         if(history.length > 0) chatHistory = history;
                         const startPrompt = `उत्तम. ${userAge} वर्षांच्या वयानुसार मी आयुर्वेदाच्या दृष्टीकोनातून मार्गदर्शन करीन. सांगा, तुम्हाला कोणता त्रास किंवा व्याधी आहे?`;
-                        logMessage('वैद्यजी', startPrompt);
-                        await speakText(startPrompt, 'mr-IN', true);
+                        await processAndSpeak(startPrompt);
                         setState('CONVERSATION');
                         break;
 
@@ -549,20 +551,28 @@
                         logMessage(userName || 'तुम्ही', transcript);
                         chatHistory.push({ role: 'user', parts: [{ text: transcript }] });
                         saveChatContext();
+                        
                         const aiResponseText = await generateTextResponseFromChat();
+                        
+                        // Error handling if API fails (returns empty or error string)
+                        if (!aiResponseText || aiResponseText.includes("संपर्क तुटला")) {
+                            logMessage('सिस्टम', 'API त्रुटी: कृपया API KEY तपासा.');
+                            await speakText("संपर्क तुटला आहे. कृपया तुमची API Key तपासा.", 'mr-IN', false);
+                            return;
+                        }
+
                         const noBracketText = cleanBrackets(aiResponseText);
                         const cleanedResponseText = cleanTextForTTS(noBracketText);
+                        
                         chatHistory.push({ role: 'model', parts: [{ text: cleanedResponseText }] });
                         saveChatContext();
                         
-                        // Pass 'true' to indicate this is a chat message we want to highlight
-                        logMessage('वैद्यजी', cleanedResponseText); 
-                        await speakText(cleanedResponseText, 'mr-IN', true);
-                        
+                        await processAndSpeak(cleanedResponseText);
                         setState('CONVERSATION');
                         break;
                 }
             } catch (error) {
+                console.error("Critical Error", error);
                 if (systemInstruction) { setState('CONVERSATION'); startRecognitionSafe(); }
                 else { setState('LISTENING_FOR_WAKEWORD'); startRecognitionSafe(); }
             }
@@ -588,8 +598,15 @@
                     body: JSON.stringify({ contents: historyData, systemInstruction: { parts: [{ text: systemInstruction }] } })
                 });
                 const result = await response.json();
+                if (result.error) {
+                    console.error("API Error:", result.error);
+                    return "संपर्क तुटला आहे. कृपया तुमची API Key तपासा.";
+                }
                 return result.candidates[0].content.parts[0].text.trim();
-            } catch (error) { return "संपर्क तुटला आहे. कृपया इंटरनेट तपासा."; }
+            } catch (error) { 
+                console.error("Fetch Error:", error);
+                return "संपर्क तुटला आहे. कृपया इंटरनेट तपासा."; 
+            }
         }
 
         async function generateTextResponseFromChat() { return await getAIResponse(chatHistory); }
@@ -611,63 +628,99 @@
             if (lastSpokenText) { 
                 if (recognition) recognition.stop();
                 setState('BUSY'); 
-                // Replay logic: we need to find the last AI message div to highlight again
-                // For simplicity in replay, we might just speak without highlight or recreate the div logic
-                // Here we will just speak normally as highlighting needs the div reference which might be old
+                // Just speak, no complex highlighting redo for simplicity in replay
                 speakText(lastSpokenText, 'mr-IN', false); 
             }
         }
         
-        // --- UPDATED SPEECH FUNCTION WITH HIGHLIGHTING & AUTO-CENTERING ---
-        async function speakText(text, lang = 'mr-IN', isNewMessage = false) {
+        // --- NEW: Process Text into Spans BEFORE Speaking ---
+        async function processAndSpeak(text) {
+            // 1. Create Div
+            const div = document.createElement('div');
+            const divId = 'msg-' + Date.now();
+            div.id = divId;
+            div.className = "mb-2"; // spacing
+            
+            const senderClass = 'text-emerald-500 font-bold'; 
+            
+            // 2. Format content into spans
+            // We split by spaces to create words
+            const words = text.split(' ');
+            let htmlContent = '';
+            let charCount = 0;
+            currentSpansMap = []; // Reset map
+
+            words.forEach((word, index) => {
+                const spanId = `word-${divId}-${index}`;
+                // Store start/end relative to the whole string including spaces
+                const start = charCount;
+                const end = charCount + word.length + 1; // +1 for space
+                currentSpansMap.push({ start, end, id: spanId });
+                
+                htmlContent += `<span id="${spanId}" class="word-span">${word}</span> `;
+                charCount += word.length + 1;
+            });
+
+            div.innerHTML = `<strong class="${senderClass}">वैद्यजी:</strong> <div class="text-emerald-50 text-lg leading-loose mt-1">${htmlContent}</div>`;
+            conversationLog.appendChild(div);
+            conversationLog.scrollTop = conversationLog.scrollHeight;
+            
+            // Set global ID for the speaker function to find
+            currentMessageDivId = divId;
+
+            // 3. Speak
+            await speakText(text, 'mr-IN', true);
+        }
+
+        function logMessage(sender, message) {
+            // Standard logger for non-TTS messages or errors
+            const div = document.createElement('div');
+            let senderClass = 'text-emerald-300 font-semibold';
+            let messageClass = 'text-white';
+            if (sender === 'सिस्टम') senderClass = 'text-yellow-400 font-bold';
+            
+            div.innerHTML = `<strong class="${senderClass}">${sender}:</strong> <span class="${messageClass}">${message}</span>`;
+            conversationLog.appendChild(div);
+            conversationLog.scrollTop = conversationLog.scrollHeight;
+        }
+
+        async function speakText(text, lang = 'mr-IN', useHighlighting = false) {
             if (synth.speaking) synth.cancel();
             if (recognition) try { recognition.stop(); } catch(e){}
 
             lastSpokenText = text;
             if (voices.length === 0) voices = synth.getVoices();
 
-            // Prepare for highlighting if this is a new message displayed in the log
-            let wordSpans = [];
-            if (isNewMessage && currentMessageDivId) {
-                const messageDiv = document.getElementById(currentMessageDivId);
-                const contentSpan = messageDiv.querySelector('.message-content');
-                if (contentSpan) {
-                    // Split text into words and wrap in spans
-                    const words = text.split(' ');
-                    contentSpan.innerHTML = words.map((word, index) => `<span id="word-${currentMessageDivId}-${index}" class="word-span">${word}</span>`).join(' ');
-                }
-            }
-
             return new Promise((resolve, reject) => {
                 const utterance = new SpeechSynthesisUtterance(text);
                 
-                // --- ON BOUNDARY: HIGHLIGHT LOGIC ---
-                utterance.onboundary = (event) => {
-                    if (event.name === 'word' && isNewMessage && currentMessageDivId) {
-                        // Calculate which word index corresponds to the charIndex
-                        // Simple approximation: counting spaces up to charIndex
-                        const textBefore = text.substring(0, event.charIndex);
-                        const wordIndex = textBefore.split(' ').length - 1;
-                        
-                        // Remove previous highlights in this message
-                        const prevActive = document.querySelectorAll(`#${currentMessageDivId} .active-word`);
-                        prevActive.forEach(el => el.classList.remove('active-word'));
+                if (useHighlighting && currentMessageDivId) {
+                    utterance.onboundary = (event) => {
+                        if (event.name === 'word') {
+                            const charIndex = event.charIndex;
+                            // Find the span that contains this charIndex
+                            const match = currentSpansMap.find(s => charIndex >= s.start && charIndex < s.end);
+                            
+                            // Clear previous active
+                            const prevActive = document.querySelectorAll(`#${currentMessageDivId} .active-word`);
+                            prevActive.forEach(el => el.classList.remove('active-word'));
 
-                        // Add highlight to current word
-                        const currentSpan = document.getElementById(`word-${currentMessageDivId}-${wordIndex}`);
-                        if (currentSpan) {
-                            currentSpan.classList.add('active-word');
-                            // AUTO SCROLL TO CENTER
-                            currentSpan.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+                            if (match) {
+                                const span = document.getElementById(match.id);
+                                if (span) {
+                                    span.classList.add('active-word');
+                                    span.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+                                }
+                            }
                         }
-                    }
-                };
+                    };
+                }
 
                 utterance.onstart = () => { if (recognition) try { recognition.stop(); } catch(e){} };
                 
                 utterance.onend = () => {
-                    // Clean up highlights
-                    if (currentMessageDivId) {
+                     // Clear highlights on end
+                     if (currentMessageDivId) {
                         const prevActive = document.querySelectorAll(`#${currentMessageDivId} .active-word`);
                         prevActive.forEach(el => el.classList.remove('active-word'));
                     }
@@ -694,32 +747,6 @@
             stopSpeechButton.disabled = disabled;
             replayButton.disabled = disabled;
         }
-        
-        function logMessage(sender, message) {
-            const div = document.createElement('div');
-            // Generate a unique ID for this message block
-            const divId = 'msg-' + Date.now();
-            div.id = divId;
-            
-            let senderClass = 'text-emerald-300 font-semibold';
-            let messageClass = 'text-white message-content'; // Added class for targeting
-
-            if (sender === 'वैद्यजी') { 
-                senderClass = 'text-emerald-500 font-bold'; 
-                messageClass = 'text-emerald-50 message-content leading-relaxed'; 
-                currentMessageDivId = divId; // Set as current for highlighting
-            } else if (sender === 'तुम्ही') { 
-                senderClass = 'text-blue-300 font-semibold'; 
-            }
-
-            // Initially just put text (will be replaced by spans if it's Vaidyaji speaking)
-            let formattedMessage = message.replace(/\n/g, '<br>');
-            
-            div.innerHTML = `<strong class="${senderClass}">${sender}:</strong> <span class="${messageClass}">${formattedMessage}</span>`;
-            conversationLog.appendChild(div);
-            conversationLog.scrollTop = conversationLog.scrollHeight;
-            return div;
-        }
 
         function getChatLogAsText() {
             const messages = [];
@@ -731,7 +758,7 @@
             const chatText = getChatLogAsText();
             if (!chatText.trim()) return;
             try { await navigator.share({ title: 'वैद्यजी सल्ला', text: chatText }); } 
-            catch (err) { try { await navigator.clipboard.writeText(chatText); logMessage('माहिती', 'कॉपी केले'); } catch (e) {} }
+            catch (err) { try { await navigator.clipboard.writeText(chatText); alert('कॉपी केले'); } catch (e) {} }
         }
 
         async function acquireWakeLock() {
@@ -772,7 +799,6 @@
                 chatHistory = [];
             }
             isGlobalPaused = false;
-            logMessage('माहिती', `सत्र पुन्हा सुरू झाले.`);
         }
     </script>
 </body>
