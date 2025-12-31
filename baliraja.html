@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>महर्षी पराशर - कृषी संवाद</title>
+    <style>
+        body {
+            background-color: #051a05; /* अतिशय गडद हिरवा */
+            color: #e0f2e0; /* फिकट हिरवा/पांढरा मजकूर */
+            font-family: 'Mukta', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            scroll-behavior: smooth;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 15px;
+            border-radius: 15px;
+            line-height: 1.6;
+            font-size: 18px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .user-message {
+            background-color: #1b4d1b;
+            align-self: flex-end;
+            border-bottom-right-radius: 2px;
+            border: 1px solid #2e7d2e;
+        }
+
+        .bot-message {
+            background-color: #0f2e0f;
+            align-self: flex-start;
+            border-bottom-left-radius: 2px;
+            border: 1px solid #2e7d2e;
+            color: #fffacd; /* कृिम रंग ऋषींच्या संवादासाठी */
+        }
+
+        #controls {
+            padding: 20px;
+            background-color: #0a210a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-top: 2px solid #1b4d1b;
+        }
+
+        #mic-btn {
+            background-color: #228b22;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 70px;
+            height: 70px;
+            font-size: 30px;
+            cursor: pointer;
+            box-shadow: 0 0 15px #228b22;
+            transition: transform 0.2s, background-color 0.3s;
+        }
+
+        #mic-btn:active {
+            transform: scale(0.95);
+            background-color: #186318;
+        }
+
+        #mic-btn.listening {
+            background-color: #ff4500;
+            box-shadow: 0 0 20px #ff4500;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 69, 0, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(255, 69, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 69, 0, 0); }
+        }
+
+        /* श्लोकांसाठी वेगळी स्टाईल */
+        .shloka {
+            font-weight: bold;
+            color: #ffd700;
+            display: block;
+            margin-bottom: 10px;
+            font-style: italic;
+        }
+
+        /* लोडिंग अनिमेशन */
+        .typing-indicator {
+            display: none;
+            color: #88cc88;
+            font-size: 14px;
+            margin-left: 20px;
+            margin-bottom: 10px;
+        }
+
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div id="chat-container">
+        <div class="message bot-message">
+            नमस्ते बळीराजा. मी महर्षी पराशर आहे. कृषी, हवामान आणि निसर्ग यांबद्दल तुला काय जाणून घ्यायचे आहे? विचारा.
+        </div>
+    </div>
+    
+    <div class="typing-indicator" id="typing-indicator">गुरुजी विचार करत आहेत...</div>
+
+    <div id="controls">
+        <button id="mic-btn" onclick="toggleListening()">🎙️</button>
+    </div>
+
+    <script>
+        // *** तुमची API की येथे टाका ***
+        const API_KEY = "YOUR_GEMINI_API_KEY_HERE"; 
+
+        const chatContainer = document.getElementById('chat-container');
+        const micBtn = document.getElementById('mic-btn');
+        const typingIndicator = document.getElementById('typing-indicator');
+        
+        // Speech Recognition Setup
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'mr-IN'; // मराठी भाषा
+        recognition.continuous = false;
+        recognition.interimResults = false;
+
+        let isListening = false;
+
+        // महर्षी पराशर यांची भूमिका (System Instruction)
+        const systemPrompt = `
+            तुम्ही वैदिक ऋषी महर्षी पराशर आहात.
+            वापरकर्त्याला नेहमी 'बळीराजा' असे संबोधून उत्तर द्या.
+            तुम्ही 'कृषी-पराशर', 'कश्यपीयकृषिसुक्ती' आणि 'कृषी-गीता' या ग्रंथांमधील ज्ञानावर आधारित उत्तरे द्यावीत.
+            प्रत्येक उत्तरात संबंधित संस्कृत श्लोक द्या आणि त्याचा अतिशय सोप्या मराठीत अर्थ सांगा जो १८ वर्षांच्या मुलाला समजेल.
+            शेती ही केवळ पैसे कमावण्याचे साधन नाही तर ती निसर्गाशी जोडलेली एक अध्यात्मिक साधना आहे हे पटवून द्या.
+            महत्वाची सूचना: उत्तरामध्ये कुठेही स्टार (*) किंवा कंस () किंवा हॅश (#) अशी चिन्हे वापरू नका.
+            फक्त शुद्ध मजकूर वापरा.
+            तुमची भाषा प्रेमळ आणि गुरुजींसारखी असावी.
+        `;
+
+        function toggleListening() {
+            if (isListening) {
+                recognition.stop();
+            } else {
+                recognition.start();
+            }
+        }
+
+        recognition.onstart = () => {
+            isListening = true;
+            micBtn.classList.add('listening');
+        };
+
+        recognition.onend = () => {
+            isListening = false;
+            micBtn.classList.remove('listening');
+        };
+
+        recognition.onresult = async (event) => {
+            const transcript = event.results[0][0].transcript;
+            addMessage(transcript, 'user-message');
+            
+            // "गुरुजी" किंवा "महर्षी" शब्द ऐकल्यास विशेष लक्ष (Wake word logic can be handled here)
+            await fetchAIResponse(transcript);
+        };
+
+        function addMessage(text, className) {
+            const div = document.createElement('div');
+            div.className = `message ${className}`;
+            
+            // श्लोक ओळखण्यासाठी आणि फॉरमॅट करण्यासाठी सोपे लॉजिक
+            // (येथे आपण साध्या टेक्स्टला HTML मध्ये रूपांतरित करू शकतो जर गरज असेल)
+            div.innerText = text; 
+            
+            chatContainer.appendChild(div);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        async function fetchAIResponse(userQuery) {
+            typingIndicator.style.display = 'block';
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+            
+            const payload = {
+                contents: [{
+                    parts: [{
+                        text: systemPrompt + "\n\nवापरकर्त्याचा प्रश्न: " + userQuery
+                    }]
+                }]
+            };
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                const aiText = data.candidates[0].content.parts[0].text;
+                
+                // उत्तरातील नको असलेली चिन्हे पुन्हा एकदा काढणे (Safety check)
+                const cleanText = aiText.replace(/[\*\[\]\(\)#]/g, '');
+
+                typingIndicator.style.display = 'none';
+                addMessage(cleanText, 'bot-message');
+                speakResponse(cleanText);
+
+            } catch (error) {
+                console.error('Error:', error);
+                typingIndicator.style.display = 'none';
+                addMessage("क्षमस्व बळीराजा, मला ध्यानात अडथळा आला आहे. कृपया पुन्हा विचार.", 'bot-message');
+                speakResponse("क्षमस्व बळीराजा, मला ध्यानात अडथळा आला आहे. कृपया पुन्हा विचार.");
+            }
+        }
+
+        function speakResponse(text) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'mr-IN';
+            
+            // आवाजाचा वेग आणि टोन (थोडा गंभीर आणि शांत)
+            utterance.rate = 0.9; 
+            utterance.pitch = 0.8;
+
+            window.speechSynthesis.speak(utterance);
+        }
+    </script>
+</body>
+</html>
