@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>स्वातंत्र्यवीर सावरकर - हिंदुत्व आणि विज्ञाननिष्ठ AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* थीम - गडद भगवा (Dark Saffron/Agni Gradient) */
+        .saffron-bg {
+            background: radial-gradient(circle at center, #2a0a00, #431407, #000000);
+            background-size: 200% 200%;
+            animation: gradientBG 15s ease infinite;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        /* ॲनिमेशन - अग्नीचा रंग */
+        .listening-pulse { animation: pulse 1.5s infinite ease-in-out; }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(234, 88, 12, 0.7); } /* orange-600 */
+            70% { box-shadow: 0 0 0 15px rgba(234, 88, 12, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(234, 88, 12, 0); }
+        }
+
+        .icon-btn {
+            @apply p-3 rounded-full text-white transition-all duration-200
+                   bg-orange-700 hover:bg-orange-600 shadow-lg border border-orange-500
+                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-orange-900 focus:ring-orange-500
+                   disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none;
+        }
+        
+        .utility-btn {
+            @apply w-full py-3 px-2 rounded-lg text-sm font-semibold transition-colors
+                   bg-red-900/50 text-orange-100 border border-red-800
+                   hover:bg-red-800
+                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-red-900 focus:ring-red-500
+                   disabled:bg-red-950 disabled:text-red-400 disabled:cursor-not-allowed;
+        }
+
+        .custom-checkbox {
+            @apply w-4 h-4 text-orange-500 bg-orange-950 border-orange-700 rounded focus:ring-orange-500 focus:ring-2 ring-offset-orange-900;
+        }
+        
+        .custom-input {
+            @apply block w-3/4 mx-auto text-center border-2 border-orange-800 rounded-lg p-3 outline-none transition-all font-semibold;
+            background-color: #431407 !important; /* dark-brown */
+            color: #ffedd5 !important;             /* light-orange */
+            caret-color: #ea580c !important;       /* orange-600 */
+        }
+        .custom-input::placeholder {
+            color: #fdba74 !important;
+            opacity: 0.6 !important;
+        }
+
+        /* स्क्रोलबार कस्टमायझेशन */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1a0500; }
+        ::-webkit-scrollbar-thumb { background: #ea580c; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #c2410c; }
+    </style>
+</head>
+
+<body class="saffron-bg text-orange-50 flex items-center justify-center min-h-screen p-4" oncontextmenu="return false;">
+
+    <div class="bg-black/60 backdrop-blur-md rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-2xl flex flex-col h-[95vh] md:h-auto border-t-8 border-orange-600 border-b-8 border-orange-900">
+        
+        <div class="flex items-center justify-between mb-4 shrink-0">
+            <h1 class="text-2xl md:text-3xl font-bold text-white">
+                <span class="text-orange-500">स्वातंत्र्यवीर</span> <span class="text-red-500">सावरकर</span> <span class="text-orange-300">विचार</span>
+            </h1>
+            <div id="status-indicator" class="w-4 h-4 rounded-full bg-gray-600 transition-colors border border-gray-500" title="बंद आहे"></div>
+        </div>
+        <div class="text-center mb-2">
+             <span class="text-xs text-orange-400 uppercase tracking-widest font-bold">|| ने मजसी ने परत मातृभूमीला ||</span>
+        </div>
+
+        <div id="conversation-log" class="flex-grow overflow-y-auto bg-[#1a0500]/80 rounded-lg p-4 mb-4 border-2 border-orange-900 space-y-4 shadow-inner min-h-[200px]">
+            <div class="text-orange-300/60 text-center mt-10 font-medium">
+                सुरू करण्यासाठी "तात्यासाहेब" किंवा "वीर" म्हणा.<br>
+                <span class="text-sm opacity-80 text-red-400 font-bold">अनादी मी अनंत मी, अवध्य मी भला!</span>
+            </div>
+        </div>
+
+        <div class="flex justify-center gap-8 mb-4 shrink-0 bg-orange-950/40 p-2 rounded-xl border border-orange-900">
+            <button id="pause-resume-button" class="icon-btn bg-orange-700 hover:bg-orange-600" title="थांबवा/पुन्हा सुरू करा" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+                </svg>
+            </button>
+            
+            <button id="stop-speech-button" class="icon-btn bg-red-900 hover:bg-red-800 border-red-800" title="बोलणे थांबवा" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z" />
+                </svg>
+            </button>
+
+            <button id="replay-button" class="icon-btn bg-green-900 hover:bg-green-800 border-green-800" title="पुन्हा ऐका" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                </svg>
+            </button>
+        </div>
+
+        <div class="flex flex-col gap-4 mb-4 shrink-0 w-full text-center">
+            <div class="w-full">
+                <label class="text-xs text-orange-400 font-bold mb-1 block">नाव</label>
+                <input type="text" id="manual-name" class="custom-input" placeholder="तुमचे नाव">
+            </div>
+            <div class="w-full">
+                <label class="text-xs text-orange-400 font-bold mb-1 block">वय (वर्षे)</label>
+                <input type="number" id="manual-age" class="custom-input" placeholder="उदा. २५">
+            </div>
+        </div>
+
+        <div class="flex items-center justify-center gap-2 mb-2 shrink-0">
+            <input type="checkbox" id="remember-me-checkbox" class="custom-checkbox">
+            <label for="remember-me-checkbox" class="text-sm text-orange-200 cursor-pointer select-none font-semibold">
+                माहिती लक्षात ठेवा
+            </label>
+        </div>
+
+        <div class="w-full flex flex-col items-center justify-center mb-4 shrink-0">
+            <button id="advance-toggle-btn" class="text-xs text-orange-500 hover:text-orange-400 underline mb-2 focus:outline-none font-bold">
+                ▼ प्रगत सेटिंग्ज (API Key)
+            </button>
+
+            <div id="advance-container" class="hidden w-full bg-[#2a0a00] border border-orange-800 rounded-lg p-4 flex flex-col gap-3 transition-all">
+                
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="use-custom-key-checkbox" class="custom-checkbox">
+                    <label for="use-custom-key-checkbox" class="text-sm text-orange-200 cursor-pointer select-none font-semibold">
+                        तुमची स्वतःची API Key वापरा
+                    </label>
+                </div>
+
+                <input type="text" id="custom-api-key-input" class="custom-input text-xs w-full !w-full" placeholder="API Key येथे पेस्ट करा" disabled>
+                
+                <button id="paste-key-btn" type="button" disabled class="w-full py-2 px-4 bg-orange-900 hover:bg-orange-800 text-white text-xs rounded transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-bold">
+                    पेस्ट करा
+                </button>
+
+                <a href="https://ai.google.dev/gemini-api/docs/api-key" target="_blank" class="text-center w-full py-2 bg-[#1a0500] hover:bg-[#431407] text-xs text-orange-400 rounded transition-colors border border-orange-800 font-bold">
+                    मोफत Google Gemini API Key मिळवा ↗
+                </a>
+            </div>
+        </div>
+
+        <button id="talk-button" class="w-full py-4 px-6 rounded-lg text-lg font-bold transition-all duration-300 ease-in-out shrink-0
+                       bg-gradient-to-r from-orange-700 to-red-800 text-white shadow-lg shadow-orange-900/50
+                       hover:from-orange-600 hover:to-red-700 hover:shadow-orange-500/40 hover:-translate-y-0.5
+                       focus:outline-none focus:ring-4 focus:ring-orange-500 focus:ring-opacity-50
+                       disabled:from-gray-700 disabled:to-gray-800 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-y-0 tracking-wide">
+            संवाद सुरू करा
+        </button>
+
+        <div class="mt-4 grid grid-cols-3 gap-3 shrink-0">
+            <button id="restart-chat-button" class="utility-btn" disabled>पुन्हा सुरू करा</button>
+            <button id="share-button" class="utility-btn bg-orange-900/50 hover:bg-orange-800 border-orange-800">शेअर करा</button>
+            <button id="end-chat-button" class="utility-btn text-red-200 hover:bg-red-900/40 border-red-900" disabled>थांबवा</button>
+        </div>
+
+    </div>
+
+    <script>
+        document.addEventListener('contextmenu', event => event.preventDefault());
+
+        function enterFullScreen() {
+            const elem = document.documentElement;
+            if (elem.requestFullscreen) { elem.requestFullscreen(); } 
+            else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); } 
+            else if (elem.msRequestFullscreen) { elem.msRequestFullscreen(); }
+        }
+
+        const talkButton = document.getElementById('talk-button');
+        const statusIndicator = document.getElementById('status-indicator');
+        const conversationLog = document.getElementById('conversation-log');
+        const rememberMeCheckbox = document.getElementById('remember-me-checkbox');
+        const manualNameInput = document.getElementById('manual-name');
+        const manualAgeInput = document.getElementById('manual-age');
+        const pauseResumeButton = document.getElementById('pause-resume-button');
+        const stopSpeechButton = document.getElementById('stop-speech-button');
+        const replayButton = document.getElementById('replay-button');
+        const shareButton = document.getElementById('share-button');
+        const endChatButton = document.getElementById('end-chat-button');
+        const restartChatButton = document.getElementById('restart-chat-button');
+        
+        const advanceToggleBtn = document.getElementById('advance-toggle-btn');
+        const advanceContainer = document.getElementById('advance-container');
+        const useCustomKeyCheckbox = document.getElementById('use-custom-key-checkbox');
+        const customApiKeyInput = document.getElementById('custom-api-key-input');
+        const pasteKeyBtn = document.getElementById('paste-key-btn');
+
+        const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
+        let appState = 'IDLE'; 
+        let userName = '';
+        let userAge = 25; 
+        let chatHistory = [];
+        let systemInstruction = '';
+        let recognition;
+        let lastSpokenText = ''; 
+        let speechManuallyStopped = false; 
+        const synth = window.speechSynthesis;
+        let voices = [];
+        let wakeLock = null;
+
+        window.onload = () => {
+            if (synth.speaking) synth.cancel();
+            loadUserData(); 
+            loadVoices();   
+        };
+
+        advanceToggleBtn.addEventListener('click', () => {
+            advanceContainer.classList.toggle('hidden');
+            advanceContainer.classList.toggle('flex');
+        });
+
+        useCustomKeyCheckbox.addEventListener('change', () => {
+            const isChecked = useCustomKeyCheckbox.checked;
+            customApiKeyInput.disabled = !isChecked;
+            pasteKeyBtn.disabled = !isChecked;
+            saveUserData(); 
+            if (isChecked) customApiKeyInput.focus();
+        });
+
+        customApiKeyInput.addEventListener('input', saveUserData);
+
+        pasteKeyBtn.addEventListener('click', async () => {
+            try {
+                const text = await navigator.clipboard.readText();
+                if(text) {
+                    customApiKeyInput.value = text;
+                    saveUserData();
+                    const originalText = pasteKeyBtn.innerHTML;
+                    pasteKeyBtn.textContent = "पेस्ट झाले!";
+                    setTimeout(() => { pasteKeyBtn.innerHTML = originalText; }, 1000);
+                }
+            } catch (err) { alert('पेस्ट करता आले नाही. कृपया टाईप करा.'); }
+        });
+
+        function getEffectiveApiKey() {
+            if (useCustomKeyCheckbox.checked && customApiKeyInput.value.trim().length > 10) {
+                return customApiKeyInput.value.trim();
+            }
+            return DEFAULT_API_KEY;
+        }
+
+        function loadUserData() {
+            try {
+                const savedName = localStorage.getItem('savarkar_userName');
+                const savedAge = localStorage.getItem('savarkar_userAge');
+                const savedRemember = localStorage.getItem('savarkar_remember');
+
+                if (savedRemember === 'true') {
+                    rememberMeCheckbox.checked = true;
+                    if (savedName) manualNameInput.value = savedName;
+                    if (savedAge) manualAgeInput.value = savedAge;
+                    if (savedName) talkButton.textContent = `वंदे मातरम ${savedName}`;
+                }
+
+                const savedUseKey = localStorage.getItem('savarkar_useCustomKey');
+                const savedKey = localStorage.getItem('savarkar_customKey');
+
+                if (savedUseKey === 'true') {
+                    useCustomKeyCheckbox.checked = true;
+                    customApiKeyInput.disabled = false;
+                    pasteKeyBtn.disabled = false;
+                    if (savedKey) customApiKeyInput.value = savedKey;
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function saveUserData() {
+            try {
+                if (rememberMeCheckbox.checked) {
+                    localStorage.setItem('savarkar_remember', 'true');
+                    localStorage.setItem('savarkar_userName', manualNameInput.value.trim());
+                    localStorage.setItem('savarkar_userAge', manualAgeInput.value.trim());
+                } else {
+                    localStorage.removeItem('savarkar_remember');
+                    localStorage.removeItem('savarkar_userName');
+                    localStorage.removeItem('savarkar_userAge');
+                }
+                localStorage.setItem('savarkar_useCustomKey', useCustomKeyCheckbox.checked);
+                if (customApiKeyInput.value) {
+                    localStorage.setItem('savarkar_customKey', customApiKeyInput.value.trim());
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function loadChatContext(name) {
+            const key = `savarkar_history_${name.toLowerCase()}`;
+            const savedHistory = localStorage.getItem(key);
+            try { return savedHistory ? JSON.parse(savedHistory) : []; } catch (e) { return []; }
+        }
+
+        function saveChatContext() {
+            if (!userName) return;
+            const key = `savarkar_history_${userName.toLowerCase()}`;
+            const limitedHistory = chatHistory.slice(-20); 
+            localStorage.setItem(key, JSON.stringify(limitedHistory));
+        }
+
+        manualNameInput.addEventListener('input', () => { if(rememberMeCheckbox.checked) saveUserData(); });
+        manualAgeInput.addEventListener('input', () => { if(rememberMeCheckbox.checked) saveUserData(); });
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (!SpeechRecognition) {
+            logMessage('त्रुटी', 'हा ब्राउझर सपोर्ट करत नाही. कृपया Google Chrome वापरा.');
+            talkButton.disabled = true;
+        } else {
+            try {
+                recognition = new SpeechRecognition();
+                recognition.continuous = false; 
+                recognition.interimResults = false;
+                recognition.lang = 'mr-IN'; 
+
+                recognition.onresult = handleSpeechResult;
+                recognition.onend = handleSpeechEnd;
+                
+                recognition.onerror = (event) => {
+                    if (event.error === 'no-speech' && appState !== 'IDLE' && appState !== 'BUSY') {
+                        startRecognitionSafe();
+                    } else if (event.error === 'not-allowed') {
+                        setState('IDLE');
+                    }
+                };
+            } catch (e) { alert("माईक त्रुटी: " + e.message); }
+        }
+
+        function startRecognitionSafe() {
+            if (!recognition) return;
+            try { recognition.start(); } catch (e) {}
+        }
+
+        talkButton.addEventListener('click', toggleListening);
+        pauseResumeButton.addEventListener('click', togglePauseResume);
+        stopSpeechButton.addEventListener('click', stopSpeech);
+        replayButton.addEventListener('click', replaySpeech);
+        shareButton.addEventListener('click', shareChat);
+        endChatButton.addEventListener('click', endChat);
+        restartChatButton.addEventListener('click', restartChat);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        async function toggleListening() {
+            if (appState === 'IDLE') {
+                try { enterFullScreen(); } catch(e) {}
+            }
+
+            try {
+                if (appState === 'IDLE') {
+                    talkButton.textContent = "ऐकत आहे...";
+                    talkButton.disabled = true;
+                    await acquireWakeLock(); 
+                    
+                    const inputName = manualNameInput.value.trim();
+                    const inputAge = manualAgeInput.value.trim();
+
+                    if (inputName && inputAge) {
+                        userName = inputName;
+                        userAge = parseInt(inputAge);
+                        saveUserData(); 
+                        buildSystemPrompt(); 
+
+                        // जुना इतिहास तपासणे
+                        const previousHistory = loadChatContext(userName);
+                        
+                        if (previousHistory.length > 0) {
+                            chatHistory = previousHistory;
+                            logMessage('सिस्टम', 'तात्याराव तुमचे स्मरण करत आहेत...');
+                            
+                            setState('BUSY');
+                            const welcomeBackPrompt = "User परत आला आहे. म्हणा 'वंदे मातरम'.";
+                            
+                            const tempHistory = [...chatHistory, { role: 'user', parts: [{ text: welcomeBackPrompt }] }];
+                            const welcomeText = await getAIResponse(tempHistory);
+                            
+                            logMessage('तात्याराव सावरकर', welcomeText);
+                            await speakText(welcomeText, 'mr-IN');
+                            setState('CONVERSATION');
+                            startRecognitionSafe();
+
+                        } else {
+                            if (chatHistory.length === 0) {
+                                chatHistory.push({ role: 'user', parts: [{ text: "Start session." }] });
+                                chatHistory.push({ role: 'model', parts: [{ text: `वंदे मातरम.` }] });
+                            }
+                            
+                            const welcomeText = `वंदे मातरम ${userName}. तुझ्या ${userAge} वर्षांच्या आयुष्यात तुला देशासाठी काय करायचे आहे? किंवा विज्ञाननिष्ठेबद्दल जाणून घ्यायचे आहे? बोल, मी ऐकतोय.`;
+                            logMessage('तात्याराव सावरकर', welcomeText);
+                            
+                            setState('BUSY'); 
+                            await speakText(welcomeText, 'mr-IN');
+                            setState('CONVERSATION');
+                            startRecognitionSafe();
+                        }
+
+                    } else {
+                        setState('LISTENING_FOR_WAKEWORD');
+                        startRecognitionSafe();
+                        if (conversationLog.childElementCount < 3) logMessage('माहिती', '"तात्यासाहेब" किंवा "वीर" म्हणा.');
+                    }
+
+                } else {
+                    setState('IDLE');
+                    recognition.stop();
+                    if (synth.speaking) synth.cancel();
+                    await releaseWakeLock();
+                }
+            } catch (error) {
+                setState('IDLE');
+            }
+        }
+
+        function setState(newState) {
+            appState = newState;
+            switch (newState) {
+                case 'IDLE':
+                    talkButton.textContent = 'संवाद सुरू करा';
+                    talkButton.disabled = false;
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-gray-600 transition-colors';
+                    endChatButton.disabled = true;
+                    talkButton.classList.remove('from-orange-700', 'to-red-800');
+                    talkButton.classList.add('from-orange-600', 'to-red-700');
+                    manualNameInput.disabled = false;
+                    manualAgeInput.disabled = false;
+                    break;
+                case 'BUSY':
+                    talkButton.textContent = 'विचार करत आहे...';
+                    talkButton.disabled = true;
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-500 transition-colors';
+                    endChatButton.disabled = false;
+                    break;
+                default:
+                    talkButton.textContent = 'ऐकणे थांबवा';
+                    talkButton.disabled = false;
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-orange-600 listening-pulse transition-colors';
+                    endChatButton.disabled = false;
+                    talkButton.classList.remove('from-orange-600', 'to-red-700');
+                    talkButton.classList.add('from-orange-700', 'to-red-800');
+                    manualNameInput.disabled = true;
+                    manualAgeInput.disabled = true;
+                    break;
+            }
+        }
+
+        function handleSpeechEnd() {
+            if (appState !== 'IDLE' && appState !== 'BUSY') startRecognitionSafe();
+            else if (appState === 'IDLE') setState('IDLE'); 
+        }
+        
+        async function handleSpeechResult(event) {
+            const transcript = event.results[event.results.length - 1][0].transcript.trim();
+            if (!transcript) return;
+            console.log(`Heard: ${transcript}`);
+            
+            const currentState = appState;
+            recognition.stop();
+            setState('BUSY');
+
+            try {
+                switch (currentState) {
+                    case 'LISTENING_FOR_WAKEWORD':
+                        const t = transcript.toLowerCase();
+                        if (t.includes('tatya') || t.includes('veer') || t.includes('savarkar') || t.includes('तात्या') || t.includes('वीर') || t.includes('सावरकर')) {
+                            const greeting = "वंदे मातरम. मी विनायक दामोदर सावरकर आहे. तुझे नाव काय आहे?";
+                            logMessage('तात्याराव सावरकर', greeting);
+                            await speakText(greeting, 'mr-IN');
+                            setState('LISTENING_FOR_NAME');
+                            startRecognitionSafe(); 
+                        } else {
+                            setState('LISTENING_FOR_WAKEWORD');
+                            startRecognitionSafe();
+                        }
+                        break;
+
+                    case 'LISTENING_FOR_NAME':
+                        logMessage('तुम्ही', transcript);
+                        userName = await extractNameFromTranscript(transcript);
+                        manualNameInput.value = userName; 
+                        
+                        const agePrompt = `जयोस्तुते ${userName}. तुझे वय काय आहे?`;
+                        logMessage('तात्याराव सावरकर', agePrompt);
+                        await speakText(agePrompt, 'mr-IN');
+                        setState('LISTENING_FOR_AGE');
+                        startRecognitionSafe();
+                        break;
+                    
+                    case 'LISTENING_FOR_AGE':
+                        logMessage('तुम्ही', transcript);
+                        userAge = await extractAgeFromTranscript(transcript);
+                        manualAgeInput.value = userAge; 
+                        
+                        saveUserData();
+                        buildSystemPrompt(); 
+
+                        const history = loadChatContext(userName);
+                        if(history.length > 0) chatHistory = history;
+
+                        const startPrompt = `उत्तम. ${userAge} वर्षांच्या वयात तुला राष्ट्राचे सामर्थ्य आणि विज्ञानाचे महत्त्व समजले पाहिजे. तुझा प्रश्न काय आहे?`;
+                        logMessage('तात्याराव सावरकर', startPrompt);
+                        await speakText(startPrompt, 'mr-IN');
+                        setState('CONVERSATION');
+                        startRecognitionSafe();
+                        break;
+
+                    case 'CONVERSATION':
+                        logMessage(userName || 'तुम्ही', transcript);
+                        chatHistory.push({ role: 'user', parts: [{ text: transcript }] });
+                        saveChatContext();
+
+                        const aiResponseText = await generateTextResponseFromChat();
+                        
+                        // फिल्टर
+                        const noBracketText = cleanBrackets(aiResponseText);
+                        const cleanedResponseText = cleanTextForTTS(noBracketText);
+
+                        chatHistory.push({ role: 'model', parts: [{ text: cleanedResponseText }] });
+                        saveChatContext();
+
+                        logMessage('तात्याराव सावरकर', cleanedResponseText);
+                        
+                        try {
+                            await speakText(cleanedResponseText, 'mr-IN');
+                        } catch (error) {
+                            if (error.message === "Speech manually stopped") return;
+                            throw error;
+                        }
+                        
+                        setState('CONVERSATION');
+                        startRecognitionSafe();
+                        break;
+                }
+            } catch (error) {
+                if (systemInstruction) { setState('CONVERSATION'); startRecognitionSafe(); }
+                else { setState('LISTENING_FOR_WAKEWORD'); startRecognitionSafe(); }
+            }
+        }
+
+        // --- मुख्य लॉजिक (Brain) - सावरकर सिस्टम प्रॉम्प्ट ---
+        function buildSystemPrompt() {
+            
+            let ageToneInstruction = "";
+            let conceptsToFocus = "";
+
+            if (userAge < 15) {
+                ageToneInstruction = `User is a CHILD (${userAge} years old). Speak about Bravery and Love for the Nation. Recite simple lines from 'Sagara Pran Talmalala'.`;
+                conceptsToFocus = "Focus on: Being brave like Shivaji Maharaj, loving the motherland, and physical fitness.";
+            } else if (userAge >= 15 && userAge < 25) {
+                ageToneInstruction = `User is a YOUTH (${userAge} years old). Speak with Fire about Militarization and Science.`;
+                conceptsToFocus = "Focus on: 'Hindutva' as a unifying force, destroying caste barriers (Seven Shackles), adopting modern science over superstition.";
+            } else if (userAge >= 25 && userAge < 60) {
+                ageToneInstruction = `User is a CITIZEN (${userAge} years old). Speak about Politics, Rationalism, and National Security.`;
+                conceptsToFocus = "Focus on: Definition of a Hindu (Pitrubhumi & Punyabhumi), Unity against aggression, Realpolitik, and removal of caste distinctions.";
+            } else {
+                ageToneInstruction = `User is an ELDER (${userAge} years old). Speak about History, Sacrifice, and Social Reform.`;
+                conceptsToFocus = "Focus on: The sacrifices of revolutionaries, the importance of social unity, and purified history.";
+            }
+
+            systemInstruction = `
+                You are "Swatantryaveer Vinayak Damodar Savarkar" (स्वातंत्र्यवीर सावरकर).
+                User: ${userName}, Age: ${userAge}.
+                
+                AGE CONTEXT: ${ageToneInstruction}
+                THEMES TO EMPHASIZE: ${conceptsToFocus}
+
+                YOUR CORE SOURCE:
+                Use teachings from:
+                1. "Essentials of Hindutva" (हिंदुत्व).
+                2. "Majhi Janmathep" (माझी जन्मठेप).
+                3. "Jatyuchchedak Nibandha" (Essays on Abolition of Caste).
+                4. Biography by Dhananjay Keer.
+
+                PHILOSOPHY:
+                1. **Definition of Hindu:** A Hindu is one who considers this land (from Sindhu to Sindhu) as his Fatherland (Pitrubhumi) and Holyland (Punyabhumi).
+                2. **Caste eradication:** We must break the seven shackles (Sapta Bandi) like Beti Bandi (inter-caste marriage ban) and Roti Bandi (inter-dining ban). A unified Hindu society is invincible.
+                3. **Rationalism (Vigyan Nishtha):** Throw away outdated scriptures if they contradict science. The cow is a useful animal, not a goddess to be worshipped blindly if it hinders progress.
+                4. **Strength:** Weakness is a sin. Militarization of the nation is essential for survival.
+                5. **Unity:** Hindus must unite across castes to form a strong nation capable of resisting any enemy aggression.
+
+                STRICT RULES:
+                1. OUTPUT MUST BE IN PURE, FIERY MARATHI.
+                2. **STRICTLY FORBIDDEN: Do NOT use parentheses ( ), brackets [ ], angle brackets < >, or asterisks *.**
+                3. Do NOT use shortforms.
+                4. Always end with "वंदे मातरम" or "जयोस्तुते".
+                5. QUOTE exact verses/lines from my poems or books where relevant (e.g., "Ne majasi ne...", "Jayostute...").
+                
+                RESPONSE STRUCTURE:
+                1. Acknowledge the question with intellectual sharpness.
+                2. **MANDATORY: Quote a relevant verse or definition** from my writings.
+                3. Explain the deep meaning (scientific or nationalistic).
+                4. Give a practical instruction on strength and unity.
+
+                EXAMPLE FORMAT (Do not copy text, use structure):
+                तरुणा, तुझा प्रश्न योग्य आहे.
+                माझ्या 'हिंदुत्व' ग्रंथात मी स्पष्ट केले आहे की आसिंधुसिंधुपर्यंता यस्य भारतभूमिका, पितृभूः पुण्यभूश्चैव स वै हिंदुरिति स्मृतः.
+                याचा अर्थ असा की या भारतभूमीला जो आपली पितृभूमी आणि पुण्यभूमी मानतो, तोच हिंदू.
+                आपल्यात जातीभेद मानणे हे पाप आहे. आपण एक झालो तरच शत्रूचा सामना करू शकतो. विज्ञानाची कास धर आणि सामर्थ्यवान हो.
+            `;
+            restartChatButton.disabled = false;
+        }
+
+        // --- API कॉल्स ---
+        async function getAIResponse(historyData) {
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: historyData,
+                        systemInstruction: { parts: [{ text: systemInstruction }] }
+                    })
+                });
+                const result = await response.json();
+                return result.candidates[0].content.parts[0].text.trim();
+            } catch (error) { return "संपर्क तुटला आहे. वंदे मातरम म्हणा आणि पुन्हा प्रयत्न करा."; }
+        }
+
+        async function generateTextResponseFromChat() { return await getAIResponse(chatHistory); }
+
+        async function extractNameFromTranscript(transcript) {
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: `Extract First Name from audio: "${transcript}". Return ONLY the name in Marathi script. If unclear return "देशभक्त".` }] }] })
+                });
+                const result = await response.json();
+                let name = result.candidates[0].content.parts[0].text.trim();
+                return (name.length < 2) ? "देशभक्त" : name.replace(/['".]/g, '');
+            } catch (error) { return "देशभक्त"; }
+        }
+
+        async function extractAgeFromTranscript(transcript) {
+             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
+             try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: `Extract age number from: "${transcript}". Return ONLY digits. Default 25.` }] }] })
+                });
+                const result = await response.json();
+                let age = parseInt(result.candidates[0].content.parts[0].text.trim());
+                return isNaN(age) ? 25 : age;
+            } catch (e) { return 25; }
+        }
+
+        function cleanBrackets(text) {
+             return text.replace(/[\*\[\]\(\)<>`]/g, '')
+                        .replace(/\(.*?\)/g, '')
+                        .replace(/\[.*?\]/g, '')
+                        .replace(/<.*?>/g, '');
+        }
+
+        function cleanTextForTTS(text) {
+            let cleaned = text.replace(/[\*#`<>]/g, '').trim();
+            return cleaned;
+        }
+
+        function loadVoices() {
+            voices = synth.getVoices();
+            if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => { voices = synth.getVoices(); };
+        }
+
+        function togglePauseResume() {
+            if (synth.paused) synth.resume();
+            else if (synth.speaking) { synth.pause(); recognition.stop(); setState('BUSY'); }
+        }
+
+        function stopSpeech() {
+            if (!synth.speaking) return;
+            speechManuallyStopped = true; 
+            synth.cancel(); 
+            recognition.stop(); 
+            toggleMediaButtons(true);
+            logMessage('माहिती', 'थांबले.');
+            setTimeout(() => {
+                speechManuallyStopped = false;
+                if (appState !== 'IDLE') {
+                    if (systemInstruction) { setState('CONVERSATION'); startRecognitionSafe(); }
+                    else { setState('LISTENING_FOR_WAKEWORD'); startRecognitionSafe(); }
+                }
+            }, 1500);
+        }
+
+        function replaySpeech() {
+            if (lastSpokenText) { recognition.stop(); setState('BUSY'); speakText(lastSpokenText); }
+        }
+        
+        async function speakText(text, lang = 'mr-IN') {
+            if (synth.speaking) synth.cancel();
+            lastSpokenText = text;
+            speechManuallyStopped = false;
+            if (voices.length === 0) voices = synth.getVoices();
+
+            return new Promise((resolve, reject) => {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.onstart = () => { toggleMediaButtons(false); };
+                utterance.onend = () => {
+                    toggleMediaButtons(true);
+                    if (speechManuallyStopped) reject(new Error("Speech manually stopped"));
+                    else resolve();
+                };
+                utterance.onerror = (e) => { 
+                    toggleMediaButtons(true);
+                    if (e.error === 'interrupted') resolve(); else reject(e.error); 
+                };
+
+                let vedicVoice = voices.find(voice => voice.lang === 'mr-IN') || 
+                                 voices.find(voice => voice.lang === 'hi-IN');
+                                 
+                if (vedicVoice) utterance.voice = vedicVoice;
+                utterance.lang = 'mr-IN'; 
+                utterance.rate = 1.0; // सावकरकरांचा आवाज खणखणीत असावा
+                utterance.pitch = 0.9; 
+                
+                synth.speak(utterance);
+            });
+        }
+
+        function toggleMediaButtons(disabled) {
+            pauseResumeButton.disabled = disabled;
+            stopSpeechButton.disabled = disabled;
+            replayButton.disabled = disabled;
+        }
+        
+        function logMessage(sender, message) {
+            const div = document.createElement('div');
+            let senderClass = 'text-orange-300 font-semibold';
+            let messageClass = 'text-white';
+
+            if (sender === 'तात्याराव सावरकर') { senderClass = 'text-orange-500 font-bold'; messageClass = 'text-orange-50'; }
+            else if (sender === 'तुम्ही') { senderClass = 'text-blue-300 font-semibold'; }
+
+            let formattedMessage = message.replace(/\n/g, '<br>');
+            
+            div.innerHTML = `<strong class="${senderClass}">${sender}:</strong> <span class="${messageClass}">${formattedMessage}</span>`;
+            conversationLog.appendChild(div);
+            conversationLog.scrollTop = conversationLog.scrollHeight;
+        }
+
+        function getChatLogAsText() {
+            const messages = [];
+            conversationLog.querySelectorAll('div').forEach(div => { if (div.textContent) messages.push(div.textContent); });
+            return messages.join('\n');
+        }
+
+        async function shareChat() {
+            const chatText = getChatLogAsText();
+            if (!chatText.trim()) return;
+            try { await navigator.share({ title: 'सावरकर विचार', text: chatText }); } 
+            catch (err) { try { await navigator.clipboard.writeText(chatText); logMessage('माहिती', 'कॉपी केले'); } catch (e) {} }
+        }
+
+        async function acquireWakeLock() {
+            if ('wakeLock' in navigator) { 
+                try { 
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    wakeLock.addEventListener('release', () => {
+                        if (appState !== 'IDLE' && document.visibilityState === 'visible') acquireWakeLock();
+                    });
+                } catch (e) {} 
+            }
+        }
+
+        async function releaseWakeLock() {
+            if (wakeLock) { try { await wakeLock.release(); wakeLock = null; } catch (e) {} }
+        }
+
+        async function handleVisibilityChange() {
+            if (appState !== 'IDLE' && document.visibilityState === 'visible') await acquireWakeLock();
+        }
+
+        async function endChat() {
+            appState = 'IDLE'; setState('IDLE');
+            speechManuallyStopped = true;
+            if (synth.speaking) synth.cancel();
+            if (recognition) try { recognition.stop(); } catch (e) {}
+            await releaseWakeLock();
+            userName = ''; userAge = 25; chatHistory = []; systemInstruction = '';
+            conversationLog.innerHTML = '<div class="text-gray-400 text-center">वंदे मातरम.</div>';
+            restartChatButton.disabled = true;
+        }
+
+        async function restartChat() {
+            if (!systemInstruction) return;
+            if (synth.speaking) synth.cancel();
+            if (recognition) try { recognition.stop(); } catch(e){}
+            appState = 'IDLE'; setState('IDLE');
+            await releaseWakeLock();
+            conversationLog.innerHTML = '';
+            if(userName) {
+                localStorage.removeItem(`savarkar_history_${userName.toLowerCase()}`);
+                chatHistory = [];
+            }
+            logMessage('माहिती', `सत्र पुन्हा सुरू झाले.`);
+        }
+    </script>
+</body>
+</html>
