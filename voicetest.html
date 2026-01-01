@@ -3,304 +3,336 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Voice Console Pro</title>
+    <title>Android Native Voice Console</title>
     <style>
         :root {
-            --bg-color: #000000;
-            --term-green: #00ff41;
-            --term-dim: #008F11;
-            --ui-border: #333;
-            --header-height: 120px;
-            --footer-height: 70px;
+            --bg: #000000;
+            --term-green: #0f0;
+            --term-dim: #005500;
+            --ui-gray: #222;
+            --border: #444;
+            --header-h: 130px; /* Space for controls */
+            --footer-h: 60px;  /* Space for input */
         }
 
         * { box-sizing: border-box; }
 
         body {
-            background-color: var(--bg-color);
+            background-color: var(--bg);
             color: var(--term-green);
             font-family: 'Courier New', Courier, monospace;
             margin: 0;
             padding: 0;
-            height: 100%;
+            height: 100vh; /* dynamic viewport height handled by script */
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
 
-        /* --- HEADER --- */
-        #controls {
+        /* --- 1. FIXED CONTROL PANEL (Top) --- */
+        #header {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
-            height: var(--header-height);
+            height: var(--header-h);
             background: #111;
-            border-bottom: 1px solid var(--ui-border);
+            border-bottom: 1px solid var(--border);
             padding: 10px;
-            z-index: 100;
+            z-index: 50;
             display: flex;
             flex-direction: column;
             gap: 8px;
         }
 
-        /* Top Row: Dropdown + Install Link */
-        .voice-row {
+        .status-line {
+            font-size: 12px;
+            color: #888;
             display: flex;
-            gap: 5px;
+            justify-content: space-between;
         }
 
+        /* Voice Dropdown */
         select {
-            flex: 1;
+            width: 100%;
             background: #000;
             color: var(--term-green);
             border: 1px solid var(--term-dim);
-            padding: 8px;
-            font-size: 16px;
+            padding: 10px;
+            font-size: 16px; /* Prevents zoom on focus */
             border-radius: 4px;
             outline: none;
         }
 
-        #btn-install {
-            background: #222;
-            color: #aaa;
-            border: 1px solid #444;
-            padding: 0 10px;
-            border-radius: 4px;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            font-weight: bold;
-        }
-
-        /* Bottom Row: Controls */
-        .btn-group {
+        /* Buttons */
+        .btn-row {
             display: flex;
             gap: 5px;
-            height: 45px;
+            height: 40px;
         }
 
         button {
             flex: 1;
-            background: #222;
-            border: 1px solid var(--term-dim);
+            background: var(--ui-gray);
+            border: 1px solid var(--border);
             color: white;
-            border-radius: 4px;
             font-weight: bold;
-            font-size: 14px;
+            font-family: inherit;
+            border-radius: 4px;
             text-transform: uppercase;
+            font-size: 14px;
         }
 
         button:active { background: var(--term-dim); }
 
-        /* --- CONSOLE OUTPUT --- */
-        #console-output {
+        /* --- 2. SCROLLABLE CONSOLE (Middle) --- */
+        #console {
             position: absolute;
-            top: var(--header-height);
-            bottom: var(--footer-height);
+            top: var(--header-h);
+            bottom: var(--footer-h);
             left: 0;
             right: 0;
             overflow-y: auto;
-            padding: 20px;
+            padding: 15px;
+            background: #000;
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 10px;
         }
 
-        .log-entry {
-            font-size: 1.1rem;
-            line-height: 1.5;
+        .entry {
             padding: 10px;
-            border-left: 2px solid #333;
-            color: #ccc; /* Default dim color */
-            transition: all 0.3s;
+            border-left: 3px solid #333;
+            color: #ccc;
+            line-height: 1.4;
+            font-size: 18px; /* Larger text for reading */
+            background: rgba(255,255,255,0.05);
         }
 
-        /* Highlight style when reading */
-        .log-entry.active-reading {
+        /* The "Reading Now" Highlight */
+        .entry.active {
+            border-left: 5px solid var(--term-green);
             color: var(--term-green);
-            border-left: 4px solid var(--term-green);
-            background: rgba(0, 255, 65, 0.05);
+            background: rgba(0, 255, 0, 0.1);
+            box-shadow: 0 0 10px rgba(0,255,0,0.2);
             font-weight: bold;
-            text-shadow: 0 0 5px rgba(0, 255, 65, 0.5);
         }
 
-        /* --- FOOTER INPUT --- */
-        #input-area {
+        /* --- 3. FIXED INPUT (Bottom) --- */
+        #footer {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
-            height: var(--footer-height);
+            height: var(--footer-h);
             background: #111;
-            border-top: 1px solid var(--ui-border);
-            padding: 10px;
-            z-index: 100;
+            border-top: 1px solid var(--border);
+            padding: 8px;
+            z-index: 50;
         }
 
-        #command-input {
+        input {
             width: 100%;
             height: 100%;
             background: #000;
-            border: 1px solid var(--term-dim);
+            border: 1px solid #444;
             color: white;
             padding: 10px;
+            font-family: inherit;
             font-size: 16px;
-            border-radius: 4px;
             outline: none;
+            border-radius: 4px;
         }
 
-        #command-input:focus { box-shadow: 0 0 5px var(--term-dim); }
+        input:focus { border-color: var(--term-green); }
 
     </style>
 </head>
 <body>
 
-    <div id="controls">
-        <div class="voice-row">
-            <select id="voice-select"><option value="-1">Loading...</option></select>
-            <a id="btn-install" href="https://play.google.com/store/apps/details?id=com.google.android.tts" target="_blank">Install Voices</a>
+    <div id="header">
+        <div class="status-line">
+            <span id="status-text">Scanning for voices...</span>
+            <a href="#" onclick="window.speechSynthesis.cancel(); alert('To install more voices: \nGo to Android Settings -> Accessibility -> Text-to-Speech Output -> Install Voice Data')" style="color:#666; text-decoration:none;">[?]</a>
         </div>
         
-        <div class="btn-group">
-            <button id="btn-play">▶ Play</button>
-            <button id="btn-pause">⏸ Pause</button>
-            <button id="btn-stop">⏹ Stop</button>
+        <select id="voice-select">
+            <option value="-1">Loading System Voices...</option>
+        </select>
+        
+        <div class="btn-row">
+            <button id="btn-play">Play / Resume</button>
+            <button id="btn-pause">Pause</button>
+            <button id="btn-stop">Stop</button>
         </div>
     </div>
 
-    <div id="console-output">
+    <div id="console">
         </div>
 
-    <div id="input-area">
-        <input type="text" id="command-input" placeholder="Type text here..." autocomplete="off">
+    <div id="footer">
+        <input type="text" id="input-box" placeholder="Type here..." autocomplete="off">
     </div>
 
 <script>
+    // --- NATIVE ANDROID INTEGRATION ---
     const synth = window.speechSynthesis;
     const voiceSelect = document.getElementById('voice-select');
-    const inputField = document.getElementById('command-input');
-    const outputDiv = document.getElementById('console-output');
+    const statusText = document.getElementById('status-text');
+    const consoleDiv = document.getElementById('console');
+    const inputBox = document.getElementById('input-box');
     
     let voices = [];
-    let lastText = "";      // Stores the last typed text
-    let lastUiElement = null; // Stores the DOM element of the last text
+    let lastText = "";
+    let lastUiElement = null;
     let isPaused = false;
+    let voiceLoadAttempts = 0;
 
-    // --- 1. LOAD VOICES ---
+    // --- 1. VOICE LOADING LOGIC ---
     function loadVoices() {
+        // Query the Android System
         voices = synth.getVoices();
-        if(voices.length > 0) {
-            voiceSelect.innerHTML = '';
-            // Sort English/Hindi to top
-            voices.sort((a,b) => (a.lang.includes('IN') || a.lang.includes('en')) ? -1 : 1);
-            
-            voices.forEach((v, i) => {
-                const opt = document.createElement('option');
-                opt.value = i; // Store index
-                opt.textContent = `${v.name.slice(0, 25)} (${v.lang})`;
-                voiceSelect.appendChild(opt);
-            });
-        }
-    }
-    loadVoices();
-    if(speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = loadVoices;
 
-    // --- 2. SPEAK FUNCTION ---
+        // If Android returns empty list, retry a few times (common Android bug)
+        if (voices.length === 0) {
+            if (voiceLoadAttempts < 10) {
+                voiceLoadAttempts++;
+                setTimeout(loadVoices, 200); // Retry every 200ms
+                return;
+            } else {
+                statusText.textContent = "No voices found. Check Android TTS settings.";
+                voiceSelect.innerHTML = "<option>No voices detected</option>";
+                return;
+            }
+        }
+
+        // Voices Found! Sort them by LANGUAGE ID so 'hi-IN' are together
+        statusText.textContent = `System Ready: ${voices.length} voices found.`;
+        voiceSelect.innerHTML = "";
+
+        voices.sort((a, b) => {
+            return a.lang.localeCompare(b.lang);
+        });
+
+        // Populate Dropdown
+        voices.forEach((voice, index) => {
+            const option = document.createElement('option');
+            option.value = index; // We use the index to retrieve the object later
+            // Format: [hi-IN] Voice Name
+            option.textContent = `[${voice.lang}] ${voice.name.replace('Android Text-to-speech Engine', '').trim()}`;
+            
+            // Auto-select English or Hindi as default if available
+            if (voice.default) option.selected = true;
+            
+            voiceSelect.appendChild(option);
+        });
+    }
+
+    // Initialize Loading
+    loadVoices();
+    // This event is CRITICAL for Android Chrome
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+        speechSynthesis.onvoiceschanged = loadVoices;
+    }
+
+    // --- 2. SPEAKING LOGIC ---
     function speak(text, uiEl) {
-        // Stop any current speech
-        synth.cancel();
+        synth.cancel(); // Stop anything currently playing
         isPaused = false;
         
-        // Remove old highlights
-        document.querySelectorAll('.active-reading').forEach(e => e.classList.remove('active-reading'));
-
-        if(!text) return;
+        // Clear previous highlights
+        document.querySelectorAll('.active').forEach(el => el.classList.remove('active'));
 
         const utter = new SpeechSynthesisUtterance(text);
         
-        // Voice Selection logic
-        const index = parseInt(voiceSelect.value);
-        if(voices[index]) utter.voice = voices[index];
+        // Get the specific voice object using the Index
+        const selectedIndex = parseInt(voiceSelect.value);
+        if (voices[selectedIndex]) {
+            utter.voice = voices[selectedIndex];
+            utter.lang = voices[selectedIndex].lang; // Ensure language matches
+        }
 
-        // Highlight Events
+        // Event: Reading Starts
         utter.onstart = () => {
-            if(uiEl) {
-                uiEl.classList.add('active-reading');
-                uiEl.scrollIntoView({behavior: "smooth", block: "center"});
+            if (uiEl) {
+                uiEl.classList.add('active');
+                uiEl.scrollIntoView({ behavior: "smooth", block: "center" });
             }
         };
-        
+
+        // Event: Reading Ends
         utter.onend = () => {
-            if(uiEl) uiEl.classList.remove('active-reading');
+            if (uiEl) uiEl.classList.remove('active');
             isPaused = false;
+        };
+
+        utter.onerror = (e) => {
+            console.error(e);
+            statusText.textContent = "Error: Voice engine failed.";
         };
 
         synth.speak(utter);
     }
 
-    // --- 3. INPUT HANDLER ---
-    inputField.addEventListener('keydown', (e) => {
-        if(e.key === 'Enter') {
-            const text = inputField.value.trim();
-            if(!text) return;
-
-            // 1. Clear Console if you only want 1 message at a time? 
-            // The prompt said "nothing else", but usually chat bots keep history.
-            // If you want to CLEAR history every time, uncomment the next line:
-            // outputDiv.innerHTML = ''; 
-
-            // 2. Create UI Element
-            const div = document.createElement('div');
-            div.className = 'log-entry';
-            div.textContent = text; // Pure text, no timestamp
-            outputDiv.appendChild(div);
-            
-            // 3. Update State variables
-            lastText = text;
-            lastUiElement = div;
-
-            // 4. Speak
-            speak(text, div);
-
-            // 5. Cleanup
-            inputField.value = '';
-            setTimeout(() => outputDiv.scrollTop = outputDiv.scrollHeight, 50);
-            inputField.focus();
-        }
-    });
-
-    // --- 4. BUTTONS ---
-    
-    // PLAY: Resume if paused, OR re-read last text if stopped
-    document.getElementById('btn-play').onclick = () => {
+    // --- 3. BUTTON CONTROLS ---
+    document.getElementById('btn-play').addEventListener('click', () => {
         if (isPaused) {
             synth.resume();
             isPaused = false;
         } else if (!synth.speaking && lastText) {
-            // Nothing is speaking, but we have text on screen -> Read it again
+            // Re-read the last message if nothing is happening
             speak(lastText, lastUiElement);
         }
-    };
+    });
 
-    // PAUSE: Standard pause
-    document.getElementById('btn-pause').onclick = () => {
+    document.getElementById('btn-pause').addEventListener('click', () => {
         if (synth.speaking && !synth.paused) {
             synth.pause();
             isPaused = true;
         }
-    };
+    });
 
-    // STOP: Cancel everything
-    document.getElementById('btn-stop').onclick = () => {
+    document.getElementById('btn-stop').addEventListener('click', () => {
         synth.cancel();
         isPaused = false;
-        document.querySelectorAll('.active-reading').forEach(e => e.classList.remove('active-reading'));
-    };
+        document.querySelectorAll('.active').forEach(el => el.classList.remove('active'));
+    });
 
-    // Resize fix
+    // --- 4. INPUT HANDLING ---
+    inputBox.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            const text = inputBox.value.trim();
+            if (!text) return;
+
+            // Create Visual Entry
+            const div = document.createElement('div');
+            div.className = 'entry';
+            div.textContent = text;
+            consoleDiv.appendChild(div);
+
+            // Save state
+            lastText = text;
+            lastUiElement = div;
+
+            // Trigger Speak
+            speak(text, div);
+
+            // Reset Input
+            inputBox.value = '';
+            
+            // Force focus back (Android keyboard management)
+            inputBox.focus();
+            
+            // Scroll to bottom
+            setTimeout(() => {
+                consoleDiv.scrollTop = consoleDiv.scrollHeight;
+            }, 100);
+        }
+    });
+
+    // Layout Fix for Android Resize (Keyboard open/close)
     window.addEventListener('resize', () => {
-        outputDiv.scrollTop = outputDiv.scrollHeight;
+        consoleDiv.scrollTop = consoleDiv.scrollHeight;
     });
 
 </script>
