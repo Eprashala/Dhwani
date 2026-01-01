@@ -3,20 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Voice Console Android Fixed</title>
+    <title>Voice Console Final Fix</title>
     <style>
         :root {
             --bg-color: #0d1117;
             --term-green: #00ff41;
-            --term-text: #e6edf3; /* Brighter white for readability */
+            --term-text: #e6edf3;
             --ui-border: #30363d;
-            --btn-bg: #21262d;
-            --input-bg: #161b22;
+            --header-height: 110px; /* Space for controls */
+            --footer-height: 70px;  /* Space for input */
         }
 
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
 
         body {
             background-color: var(--bg-color);
@@ -24,163 +22,133 @@
             font-family: 'Courier New', Courier, monospace;
             margin: 0;
             padding: 0;
-            /* FIX 2: Use Dynamic Viewport Height for Android Chrome */
-            height: 100dvh; 
-            width: 100vw;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden; /* Lock the body scroll */
+            height: 100%;
+            overflow: hidden; /* Prevent body scroll */
         }
 
-        /* --- CONTROL PANEL --- */
+        /* --- 1. FIXED HEADER (Top) --- */
         #controls {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--header-height);
             background: #161b22;
-            padding: 10px;
             border-bottom: 1px solid var(--ui-border);
-            flex-shrink: 0; /* Never shrink this area */
+            padding: 10px;
+            z-index: 100;
             display: flex;
             flex-direction: column;
             gap: 8px;
-            z-index: 10;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
 
         select {
             background: #0d1117;
             color: white;
-            border: 1px solid var(--ui-border);
-            padding: 10px;
-            border-radius: 4px;
+            border: 1px solid #30363d;
+            padding: 8px;
             width: 100%;
-            font-size: 16px; /* 16px prevents iOS/Android zoom on focus */
-            outline: none;
+            font-size: 16px;
+            border-radius: 4px;
         }
 
         .btn-group {
             display: flex;
-            gap: 8px;
+            gap: 5px;
+            height: 40px;
         }
 
         button {
             flex: 1;
-            padding: 12px 5px;
-            border: 1px solid var(--ui-border);
-            border-radius: 4px;
-            background: var(--btn-bg);
+            background: #21262d;
+            border: 1px solid #30363d;
             color: white;
+            border-radius: 4px;
             font-weight: bold;
-            font-size: 14px;
-            text-transform: uppercase;
         }
 
-        #btn-play { color: #4caf50; }
-        #btn-pause { color: #ffc107; }
-        #btn-stop { color: #f44336; }
-
-        /* --- CONSOLE OUTPUT --- */
+        /* --- 2. SCROLLABLE CONTENT (Middle) --- */
         #console-output {
-            /* FIX 3: Flex configuration to handle scrolling properly */
-            flex-grow: 1;
-            flex-basis: 0;
-            min-height: 0; 
-            
-            padding: 15px;
+            position: absolute;
+            top: var(--header-height);
+            bottom: var(--footer-height); /* Stop before the input box */
+            left: 0;
+            right: 0;
             overflow-y: auto;
+            padding: 15px;
             display: flex;
             flex-direction: column;
             gap: 15px;
-            scroll-behavior: smooth;
-            background: black; /* Darker background for contrast */
+            /* Smooth scroll looks nice but can be buggy with keyboard */
+            scroll-behavior: auto; 
         }
 
         .log-entry {
-            display: flex;
-            gap: 8px;
-            padding: 8px;
+            padding: 10px;
             border-left: 3px solid #333;
             background: rgba(255, 255, 255, 0.05);
-            border-radius: 0 4px 4px 0;
         }
-
+        
         .log-entry.active-reading {
-            background: rgba(0, 255, 65, 0.15);
-            border-left: 3px solid var(--term-green);
-            box-shadow: 0 0 10px rgba(0,255,65,0.2);
+            border-left-color: var(--term-green);
+            background: rgba(0, 255, 65, 0.1);
+            box-shadow: 0 0 15px rgba(0,255,65,0.1);
         }
 
-        .timestamp {
-            color: #8b949e;
-            font-size: 0.75em;
-            min-width: 60px;
-            padding-top: 3px;
-        }
+        .timestamp { color: #8b949e; font-size: 0.7em; margin-right: 8px; }
+        .message { color: var(--term-text); word-wrap: break-word; }
 
-        .message {
-            color: var(--term-text);
-            word-break: break-word;
-            line-height: 1.4;
-        }
-
-        /* --- INPUT AREA --- */
+        /* --- 3. FIXED FOOTER (Bottom) --- */
         #input-area {
-            background: var(--input-bg);
-            padding: 10px;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: var(--footer-height);
+            background: #161b22;
             border-top: 1px solid var(--ui-border);
-            flex-shrink: 0; /* Ensure this never collapses */
+            padding: 10px;
             display: flex;
             align-items: center;
-            gap: 10px;
-            
-            /* FIX 4: Handle gesture navigation bars at bottom */
-            padding-bottom: calc(10px + env(safe-area-inset-bottom)); 
-        }
-
-        .prompt-char {
-            color: var(--term-green);
-            font-weight: bold;
-            font-size: 1.2rem;
+            z-index: 100;
         }
 
         #command-input {
-            background: rgba(255,255,255,0.1); /* Lighter bg for visibility */
-            border: 1px solid #30363d;
+            width: 100%;
+            padding: 12px;
             border-radius: 4px;
+            border: 1px solid #30363d;
+            background: #0d1117;
             color: white;
-            padding: 10px;
-            font-family: inherit;
-            font-size: 16px;
-            flex: 1;
+            font-size: 16px; /* Prevents zoom on focus */
             outline: none;
         }
-        
-        #command-input:focus {
-            border-color: var(--term-green);
-            background: rgba(0,0,0,0.3);
-        }
+
+        #command-input:focus { border-color: var(--term-green); }
+
     </style>
 </head>
 <body>
 
     <div id="controls">
-        <select id="voice-select">
-            <option value="">Detecting Voices...</option>
-        </select>
+        <select id="voice-select"><option>Loading...</option></select>
         <div class="btn-group">
-            <button id="btn-play">Play</button>
-            <button id="btn-pause">Pause</button>
-            <button id="btn-stop">Stop</button>
+            <button id="btn-play" style="color:#4caf50">PLAY</button>
+            <button id="btn-pause" style="color:#ffc107">PAUSE</button>
+            <button id="btn-stop" style="color:#f44336">STOP</button>
         </div>
     </div>
 
     <div id="console-output">
         <div class="log-entry">
             <span class="timestamp">[SYS]</span>
-            <span class="message">Android Mode Active. Ready.</span>
+            <span class="message">Terminal Ready.</span>
         </div>
     </div>
 
     <div id="input-area">
-        <span class="prompt-char">&gt;</span>
-        <input type="text" id="command-input" placeholder="Type here..." autocomplete="off">
+        <input type="text" id="command-input" placeholder="Type message..." autocomplete="off">
     </div>
 
 <script>
@@ -188,103 +156,84 @@
     const voiceSelect = document.getElementById('voice-select');
     const inputField = document.getElementById('command-input');
     const outputDiv = document.getElementById('console-output');
-    
     let voices = [];
     let isPaused = false;
 
-    // --- 1. ROBUST VOICE LOADING ---
-    function populateVoiceList() {
+    // --- VOICE LOGIC ---
+    function loadVoices() {
         voices = synth.getVoices();
         if(voices.length > 0) {
             voiceSelect.innerHTML = '';
-            // Sort Hindi/Indian English to top for convenience
-            voices.sort((a, b) => {
-                if(a.lang.includes('IN') && !b.lang.includes('IN')) return -1;
-                return 0;
-            });
-
-            voices.forEach((voice) => {
-                const option = document.createElement('option');
-                option.textContent = `${voice.name.slice(0, 20)}.. (${voice.lang})`; // Truncate long names
-                option.setAttribute('data-name', voice.name);
-                voiceSelect.appendChild(option);
+            // Sort India/English to top
+            voices.sort((a,b) => (a.lang.includes('IN') || a.lang.includes('en')) ? -1 : 1);
+            voices.forEach(v => {
+                const opt = document.createElement('option');
+                opt.textContent = `${v.name.substr(0,25)} (${v.lang})`;
+                opt.setAttribute('data-name', v.name);
+                voiceSelect.appendChild(opt);
             });
         }
     }
-    
-    // Attempt load immediately and on event (Android needs both)
-    populateVoiceList();
-    if (speechSynthesis.onvoiceschanged !== undefined) {
-        speechSynthesis.onvoiceschanged = populateVoiceList;
+    loadVoices();
+    if(speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = loadVoices;
+
+    // --- OUTPUT LOGIC ---
+    function log(text) {
+        const div = document.createElement('div');
+        div.className = 'log-entry';
+        const time = new Date().toLocaleTimeString().slice(0,5);
+        div.innerHTML = `<span class="timestamp">[${time}]</span><span class="message">${text}</span>`;
+        outputDiv.appendChild(div);
+        
+        // Force scroll to bottom immediately
+        setTimeout(() => outputDiv.scrollTop = outputDiv.scrollHeight, 50);
+        return div;
     }
 
-    // --- 2. LOGIC ---
-    function createLogEntry(text) {
-        const entry = document.createElement('div');
-        entry.className = 'log-entry';
-        const time = new Date().toLocaleTimeString([], { hour12: false, hour:'2-digit', minute:'2-digit' });
-        entry.innerHTML = `<span class="timestamp">[${time}]</span><span class="message">${text}</span>`;
-        outputDiv.appendChild(entry);
-        outputDiv.scrollTop = outputDiv.scrollHeight;
-        return entry;
-    }
-
-    function speak(text, logElement) {
-        synth.cancel(); // Always clear previous
-        isPaused = false;
-
-        const utterThis = new SpeechSynthesisUtterance(text);
-        const selectedName = voiceSelect.selectedOptions[0]?.getAttribute('data-name');
-        if (selectedName) {
-            const foundVoice = voices.find(v => v.name === selectedName);
-            if(foundVoice) utterThis.voice = foundVoice;
-        }
-
-        utterThis.onstart = () => {
-            document.querySelectorAll('.log-entry').forEach(el => el.classList.remove('active-reading'));
-            logElement.classList.add('active-reading');
-            logElement.scrollIntoView({ behavior: "smooth", block: "center" });
-        };
-
-        utterThis.onend = () => {
-            logElement.classList.remove('active-reading');
-        };
-
-        synth.speak(utterThis);
-    }
-
-    // --- 3. CONTROLS ---
-    document.getElementById('btn-play').addEventListener('click', () => {
-        if(isPaused) { synth.resume(); isPaused = false; }
-    });
-    
-    document.getElementById('btn-pause').addEventListener('click', () => {
-        if(synth.speaking && !synth.paused) { synth.pause(); isPaused = true; }
-    });
-
-    document.getElementById('btn-stop').addEventListener('click', () => {
+    // --- SPEAK LOGIC ---
+    function speak(text, uiEl) {
         synth.cancel();
         isPaused = false;
-        document.querySelectorAll('.active-reading').forEach(el => el.classList.remove('active-reading'));
-    });
+        
+        const utter = new SpeechSynthesisUtterance(text);
+        const vName = voiceSelect.selectedOptions[0]?.getAttribute('data-name');
+        if(vName) utter.voice = voices.find(v => v.name === vName);
 
-    // --- 4. INPUT ---
+        utter.onstart = () => {
+            document.querySelectorAll('.active-reading').forEach(e => e.classList.remove('active-reading'));
+            uiEl.classList.add('active-reading');
+            uiEl.scrollIntoView({behavior: "smooth", block: "center"});
+        };
+        utter.onend = () => uiEl.classList.remove('active-reading');
+        
+        synth.speak(utter);
+    }
+
+    // --- CONTROLS ---
+    document.getElementById('btn-play').onclick = () => { if(isPaused) synth.resume(); };
+    document.getElementById('btn-pause').onclick = () => { if(synth.speaking) { synth.pause(); isPaused=true; }};
+    document.getElementById('btn-stop').onclick = () => { synth.cancel(); isPaused=false; };
+
+    // --- INPUT ---
     inputField.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            const text = inputField.value.trim();
-            if(!text) return;
-            const logEl = createLogEntry(text);
-            speak(text, logEl);
+        if(e.key === 'Enter') {
+            const txt = inputField.value.trim();
+            if(!txt) return;
+            const uiEl = log(txt);
+            speak(txt, uiEl);
             inputField.value = '';
-            // Note: On Android, keeping focus might keep the keyboard open covering the text.
-            // If you prefer the keyboard to close, uncomment the line below:
-            // inputField.blur(); 
+            
+            // KEY FIX: Keep focus on input for rapid chatting
+            inputField.focus(); 
         }
     });
 
-    // Initial fix for some Androids that don't trigger resize immediately
+    // --- ANDROID KEYBOARD FIX ---
+    // When keyboard opens, window resizes. We must ensure we scroll to bottom.
     window.addEventListener('resize', () => {
         outputDiv.scrollTop = outputDiv.scrollHeight;
+        // Ensure input stays visible
+        document.getElementById('input-area').scrollIntoView();
     });
 
 </script>
