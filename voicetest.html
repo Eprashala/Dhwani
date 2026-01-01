@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Voice Console Hierarchical</title>
+    <title>Voice Console Ultimate</title>
     <style>
         :root {
             --bg: #000000;
             --term-green: #00ff41;
-            --term-dim: #004400;
+            --term-dim: #005500;
             --border: #333;
-            --header-h: 150px; /* Slightly taller for 2 rows of dropdowns */
+            --header-h: 160px; /* Taller for 2 dropdowns */
             --footer-h: 60px;
         }
 
@@ -21,21 +21,20 @@
             color: var(--term-green);
             font-family: 'Courier New', Courier, monospace;
             margin: 0;
-            padding: 0;
             height: 100vh;
             overflow: hidden;
             display: flex;
             flex-direction: column;
         }
 
-        /* --- HEADER --- */
+        /* --- 1. FIXED HEADER --- */
         #header {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             height: var(--header-h);
-            background: #0a0a0a;
+            background: #111;
             border-bottom: 1px solid var(--border);
             padding: 10px;
             z-index: 50;
@@ -44,54 +43,50 @@
             justify-content: space-evenly;
         }
 
-        /* The Grid for Dropdowns */
-        .select-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr; /* Side by side */
-            gap: 8px;
+        .label {
+            font-size: 10px;
+            color: #888;
+            margin-bottom: 2px;
+            text-transform: uppercase;
         }
 
+        /* Two Dropdowns Logic */
         select {
-            background: #111;
+            width: 100%;
+            background: #000;
             color: white;
             border: 1px solid #444;
             padding: 8px;
-            font-size: 14px;
+            font-size: 16px;
             border-radius: 4px;
-            width: 100%;
             outline: none;
+            margin-bottom: 5px;
         }
         
         select:focus { border-color: var(--term-green); }
-
-        /* Label for "scanning" */
-        #status-bar {
-            font-size: 11px;
-            color: #666;
-            text-align: center;
-        }
 
         /* Buttons */
         .btn-row {
             display: flex;
             gap: 5px;
             height: 35px;
+            margin-top: 5px;
         }
 
         button {
             flex: 1;
             background: #222;
             border: 1px solid #444;
-            color: #ddd;
+            color: var(--term-green);
             font-weight: bold;
             border-radius: 4px;
             text-transform: uppercase;
             font-size: 13px;
         }
-        
-        button:active { background: var(--term-green); color: black; }
 
-        /* --- CONSOLE (Middle) --- */
+        button:active { background: var(--term-dim); color: white; }
+
+        /* --- 2. CONSOLE --- */
         #console {
             position: absolute;
             top: var(--header-h);
@@ -100,6 +95,7 @@
             right: 0;
             overflow-y: auto;
             padding: 15px;
+            background: #000;
             display: flex;
             flex-direction: column;
             gap: 12px;
@@ -108,11 +104,10 @@
         .entry {
             padding: 10px;
             border-left: 3px solid #333;
-            color: #aaa;
+            color: #bbb;
             font-size: 18px;
+            background: rgba(255,255,255,0.05);
             line-height: 1.4;
-            background: rgba(255,255,255,0.03);
-            transition: all 0.2s;
         }
 
         .entry.active {
@@ -120,17 +115,17 @@
             color: var(--term-green);
             background: rgba(0, 255, 65, 0.1);
             font-weight: bold;
-            box-shadow: 0 0 15px rgba(0, 255, 65, 0.1);
+            box-shadow: 0 0 15px rgba(0,255,65,0.1);
         }
 
-        /* --- INPUT (Bottom) --- */
+        /* --- 3. FOOTER --- */
         #footer {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
             height: var(--footer-h);
-            background: #0a0a0a;
+            background: #111;
             border-top: 1px solid var(--border);
             padding: 8px;
             z-index: 50;
@@ -140,35 +135,37 @@
             width: 100%;
             height: 100%;
             background: #000;
-            border: 1px solid #333;
+            border: 1px solid #444;
             color: white;
             padding: 10px;
             font-size: 16px;
-            border-radius: 4px;
             outline: none;
+            border-radius: 4px;
         }
-
-        input:focus { border-color: var(--term-green); }
-
     </style>
 </head>
 <body>
 
     <div id="header">
-        <div id="status-bar">Initializing Voice Engine...</div>
         
-        <select id="lang-select">
-            <option value="">1. Select Language</option>
-        </select>
+        <div>
+            <div class="label">Step 1: Select Language</div>
+            <select id="lang-select">
+                <option>Loading Languages...</option>
+            </select>
+        </div>
 
-        <select id="voice-select">
-            <option value="">2. Select Voice Variant</option>
-        </select>
-
+        <div>
+            <div class="label">Step 2: Select Voice Variant</div>
+            <select id="voice-select">
+                <option>Wait for language selection...</option>
+            </select>
+        </div>
+        
         <div class="btn-row">
-            <button id="btn-play">▶ Play</button>
-            <button id="btn-pause">⏸ Pause</button>
-            <button id="btn-stop">⏹ Stop</button>
+            <button id="btn-play">Play</button>
+            <button id="btn-pause">Pause</button>
+            <button id="btn-stop">Stop</button>
         </div>
     </div>
 
@@ -182,111 +179,93 @@
     const synth = window.speechSynthesis;
     const langSelect = document.getElementById('lang-select');
     const voiceSelect = document.getElementById('voice-select');
-    const statusText = document.getElementById('status-bar');
     const consoleDiv = document.getElementById('console');
     const inputBox = document.getElementById('input-box');
-
-    // Global State
-    let allVoices = [];      // Raw list from Android
-    let voicesByLang = {};   // Structured Object { "hi-IN": [VoiceA, VoiceB] }
+    
+    let allVoices = [];
+    let uniqueLanguages = [];
     let lastText = "";
     let lastUiElement = null;
     let isPaused = false;
-    let loadAttempts = 0;
 
-    // --- 1. VOICE SCANNER (Hierarchical Logic) ---
-    function scanVoices() {
+    // --- 1. VOICE LOADING & PARSING ---
+    function loadVoices() {
         allVoices = synth.getVoices();
-
-        // Android Retry Logic
+        
         if (allVoices.length === 0) {
-            if (loadAttempts < 10) {
-                loadAttempts++;
-                statusText.textContent = `Scanning... (${loadAttempts})`;
-                setTimeout(scanVoices, 300);
-                return;
-            }
-            statusText.textContent = "Error: No voices found on device.";
+            setTimeout(loadVoices, 200); // Retry for Android
             return;
         }
 
-        statusText.textContent = "System Ready.";
-        organizeVoices(allVoices);
+        // 1. Extract Unique Languages (e.g., "en-US", "hi-IN")
+        const langSet = new Set();
+        allVoices.forEach(v => langSet.add(v.lang));
+        uniqueLanguages = Array.from(langSet).sort();
+
+        // 2. Populate Language Dropdown (Step 1)
+        langSelect.innerHTML = '';
+        
+        // Priority Sort: Move 'en' and 'hi' (Hindi) to top for convenience
+        uniqueLanguages.sort((a, b) => {
+            const priorityA = (a.startsWith('hi') || a.startsWith('en')) ? 0 : 1;
+            const priorityB = (b.startsWith('hi') || b.startsWith('en')) ? 0 : 1;
+            if (priorityA !== priorityB) return priorityA - priorityB;
+            return a.localeCompare(b);
+        });
+
+        uniqueLanguages.forEach(langCode => {
+            const opt = document.createElement('option');
+            opt.value = langCode;
+            opt.textContent = getReadableLangName(langCode);
+            langSelect.appendChild(opt);
+        });
+
+        // 3. Trigger initial population of variants
+        populateVariants();
     }
 
-    // Convert flat list to structured categories
-    function organizeVoices(voiceList) {
-        voicesByLang = {}; // Reset
+    // --- 2. POPULATE VARIANTS (Step 2) ---
+    function populateVariants() {
+        const selectedLang = langSelect.value;
+        voiceSelect.innerHTML = '';
 
-        voiceList.forEach((voice, index) => {
-            const langCode = voice.lang; 
-            if (!voicesByLang[langCode]) {
-                voicesByLang[langCode] = [];
-            }
-            // Store the original index so we can recall it later
-            voicesByLang[langCode].push({
-                obj: voice,
-                originalIndex: index,
-                displayName: voice.name.replace("Android Text-to-speech Engine", "").replace("Network", "Net").trim()
-            });
+        // Filter voices that match the selected language
+        const variants = allVoices.filter(v => v.lang === selectedLang);
+
+        variants.forEach((v, index) => {
+            const opt = document.createElement('option');
+            // We store the GLOBAL name to find it easily later
+            opt.value = v.name; 
+            
+            // Clean up the name for display (Remove "Android Text-to-speech...")
+            let cleanName = v.name.replace('Android Text-to-speech Engine', '').replace('Google', '').trim();
+            if(!cleanName) cleanName = `Voice ${index + 1}`;
+            
+            opt.textContent = cleanName;
+            voiceSelect.appendChild(opt);
         });
-
-        populateLanguageDropdown();
     }
 
-    function populateLanguageDropdown() {
-        langSelect.innerHTML = "";
-        
-        // Sort languages alphabetically
-        const languages = Object.keys(voicesByLang).sort();
-        
-        // Prioritize English/Hindi for convenience if checking locally
-        languages.sort((a,b) => {
-            if(a.includes('IN') || a.includes('hi')) return -1;
-            return 0;
-        });
-
-        languages.forEach(lang => {
-            const option = document.createElement('option');
-            option.value = lang;
-            // Show how many voices exist for this language
-            option.textContent = `${lang} [${voicesByLang[lang].length} voices]`;
-            langSelect.appendChild(option);
-        });
-
-        // Trigger voice population for the first language
-        if (languages.length > 0) {
-            populateVoiceDropdown(languages[0]);
+    // Helper: Convert "hi-IN" -> "Hindi (India)" if browser supports it
+    function getReadableLangName(code) {
+        try {
+            const regionNames = new Intl.DisplayNames(['en'], {type: 'language'});
+            return `${regionNames.of(code)} [${code}]`;
+        } catch (e) {
+            return code; // Fallback if API not supported
         }
     }
 
-    function populateVoiceDropdown(selectedLang) {
-        voiceSelect.innerHTML = "";
-        const variants = voicesByLang[selectedLang];
+    // Event Listener: When Language changes, update Voices
+    langSelect.addEventListener('change', populateVariants);
 
-        variants.forEach((v) => {
-            const option = document.createElement('option');
-            // We use the ORIGINAL INDEX from the main list as the value
-            // This ensures 100% accuracy when calling synth
-            option.value = v.originalIndex; 
-            option.textContent = v.displayName || "Unknown Variant";
-            voiceSelect.appendChild(option);
-        });
-    }
-
-    // EVENT: When Language Changes -> Update Voice List
-    langSelect.addEventListener('change', (e) => {
-        populateVoiceDropdown(e.target.value);
-    });
-
-    // Start Scanning
-    scanVoices();
+    // Initial Load
+    loadVoices();
     if (speechSynthesis.onvoiceschanged !== undefined) {
-        speechSynthesis.onvoiceschanged = scanVoices;
+        speechSynthesis.onvoiceschanged = loadVoices;
     }
 
-
-    // --- 2. SPEAK LOGIC ---
+    // --- 3. SPEAKING LOGIC ---
     function speak(text, uiEl) {
         synth.cancel();
         isPaused = false;
@@ -294,11 +273,13 @@
 
         const utter = new SpeechSynthesisUtterance(text);
         
-        // KEY LOGIC: Get the voice by the global index stored in the dropdown value
-        const globalIndex = parseInt(voiceSelect.value);
-        
-        if (allVoices[globalIndex]) {
-            utter.voice = allVoices[globalIndex];
+        // FIND THE SELECTED VOICE
+        const selectedVoiceName = voiceSelect.value;
+        const targetVoice = allVoices.find(v => v.name === selectedVoiceName);
+
+        if (targetVoice) {
+            utter.voice = targetVoice;
+            utter.lang = targetVoice.lang;
         }
 
         utter.onstart = () => {
@@ -316,57 +297,43 @@
         synth.speak(utter);
     }
 
-    // --- 3. CONTROLS ---
-    document.getElementById('btn-play').addEventListener('click', () => {
-        if(isPaused) {
-            synth.resume();
-            isPaused = false;
-        } else if (!synth.speaking && lastText) {
-            speak(lastText, lastUiElement);
-        }
-    });
-
-    document.getElementById('btn-pause').addEventListener('click', () => {
-        if(synth.speaking && !synth.paused) {
-            synth.pause();
-            isPaused = true;
-        }
-    });
-
-    document.getElementById('btn-stop').addEventListener('click', () => {
-        synth.cancel();
-        isPaused = false;
-        document.querySelectorAll('.active').forEach(e => e.classList.remove('active'));
-    });
-
-    // --- 4. INPUT ---
+    // --- 4. CONTROLS & INPUT ---
     inputBox.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
-            const txt = inputBox.value.trim();
-            if (!txt) return;
+            const text = inputBox.value.trim();
+            if (!text) return;
 
             const div = document.createElement('div');
             div.className = 'entry';
-            div.textContent = txt;
+            div.textContent = text;
             consoleDiv.appendChild(div);
 
-            lastText = txt;
+            lastText = text;
             lastUiElement = div;
 
-            speak(txt, div);
+            speak(text, div);
 
             inputBox.value = '';
             inputBox.focus();
-            
-            // Auto scroll
             setTimeout(() => consoleDiv.scrollTop = consoleDiv.scrollHeight, 100);
         }
     });
 
-    // Fix viewport height on mobile resize
-    window.addEventListener('resize', () => {
-        consoleDiv.scrollTop = consoleDiv.scrollHeight;
-    });
+    // Button Logic
+    document.getElementById('btn-play').onclick = () => {
+        if(isPaused) synth.resume();
+        else if(!synth.speaking && lastText) speak(lastText, lastUiElement);
+    };
+    document.getElementById('btn-pause').onclick = () => {
+        if(synth.speaking && !synth.paused) { synth.pause(); isPaused = true; }
+    };
+    document.getElementById('btn-stop').onclick = () => {
+        synth.cancel(); isPaused = false;
+        document.querySelectorAll('.active').forEach(e => e.classList.remove('active'));
+    };
+
+    // Android Resize Fix
+    window.addEventListener('resize', () => consoleDiv.scrollTop = consoleDiv.scrollHeight);
 
 </script>
 </body>
