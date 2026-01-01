@@ -3,14 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice Command Console</title>
+    <title>Voice Command Console Pro</title>
     <style>
-        /* EXPERT CSS: Matrix/Terminal Theme */
+        /* --- CORE THEME --- */
         :root {
             --bg-color: #0d1117;
             --term-green: #00ff41;
             --term-dim: #008F11;
+            --term-highlight: #1f6feb; /* Blue highlight for active reading */
             --ui-border: #30363d;
+            --btn-bg: #21262d;
+            --btn-active: #238636;
+            --btn-danger: #da3633;
         }
 
         body {
@@ -21,15 +25,16 @@
             display: flex;
             flex-direction: column;
             height: 100vh;
-            overflow: hidden;
+            overflow: hidden; /* Prevent body scroll, handle in console-output */
         }
 
-        /* Top Control Bar */
+        /* --- CONTROL PANEL (Top) --- */
         #controls {
             background: #161b22;
             padding: 10px;
             border-bottom: 1px solid var(--ui-border);
             display: flex;
+            flex-direction: column; /* Stacked for mobile */
             gap: 10px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.5);
             z-index: 10;
@@ -39,40 +44,86 @@
             background: #0d1117;
             color: var(--term-green);
             border: 1px solid var(--term-dim);
-            padding: 8px;
+            padding: 12px; /* Larger touch target */
             border-radius: 4px;
             width: 100%;
             font-family: inherit;
             outline: none;
+            font-size: 1rem;
         }
 
-        /* The Chat/Console Output Area */
+        /* Button Row */
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+        }
+
+        button {
+            flex: 1; /* Equal width */
+            padding: 12px;
+            border: 1px solid var(--ui-border);
+            border-radius: 6px;
+            background: var(--btn-bg);
+            color: white;
+            font-family: inherit;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+        }
+
+        button:active { transform: scale(0.96); }
+        
+        #btn-play { color: var(--term-green); border-color: var(--term-dim); }
+        #btn-pause { color: #e3b341; border-color: #e3b341; }
+        #btn-stop { color: var(--btn-danger); border-color: var(--btn-danger); }
+
+        /* --- CONSOLE OUTPUT --- */
         #console-output {
             flex: 1;
             padding: 20px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 15px;
             scroll-behavior: smooth;
+            padding-bottom: 80px; /* Space for scrolling */
         }
 
         .log-entry {
             display: flex;
             gap: 10px;
+            padding: 10px;
+            border-left: 3px solid transparent;
+            transition: all 0.3s ease;
+            opacity: 0.7; /* Dim inactive text slightly */
+        }
+
+        /* The Active Reading State */
+        .log-entry.active-reading {
+            opacity: 1;
+            background: rgba(31, 111, 235, 0.15); /* Subtle blue glow */
+            border-left: 3px solid var(--term-green);
+            box-shadow: 0 0 15px rgba(0, 255, 65, 0.1);
+            border-radius: 0 4px 4px 0;
+            transform: scale(1.02); /* Slight pop */
         }
 
         .timestamp {
             color: var(--term-dim);
             font-size: 0.8em;
-            min-width: 80px;
+            min-width: 70px;
+            flex-shrink: 0;
         }
 
         .message {
             word-break: break-word;
+            line-height: 1.5;
         }
 
-        /* The Typing Area */
+        /* --- INPUT AREA (Bottom) --- */
         #input-area {
             background: #161b22;
             padding: 15px;
@@ -85,6 +136,7 @@
             color: var(--term-green);
             margin-right: 10px;
             font-weight: bold;
+            font-size: 1.2rem;
         }
 
         #command-input {
@@ -96,11 +148,6 @@
             flex: 1;
             outline: none;
         }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-thumb { background: var(--term-dim); border-radius: 4px; }
-        ::-webkit-scrollbar-track { background: var(--bg-color); }
     </style>
 </head>
 <body>
@@ -109,115 +156,81 @@
         <select id="voice-select">
             <option value="">Loading voices...</option>
         </select>
+        <div class="btn-group">
+            <button id="btn-play">▶ Play</button>
+            <button id="btn-pause">⏸ Pause</button>
+            <button id="btn-stop">⏹ Stop</button>
+        </div>
     </div>
 
     <div id="console-output">
         <div class="log-entry">
-            <span class="timestamp">[SYSTEM]</span>
-            <span class="message">Console initialized. Waiting for speech engine...</span>
+            <span class="timestamp">[SYS]</span>
+            <span class="message">System Ready. Select voice and type below.</span>
         </div>
     </div>
 
     <div id="input-area">
         <span class="prompt-char">&gt;</span>
-        <input type="text" id="command-input" placeholder="Type here and press Enter..." autocomplete="off" autofocus>
+        <input type="text" id="command-input" placeholder="Type message..." autocomplete="off">
     </div>
 
 <script>
-    // --- EXPERT JAVASCRIPT LOGIC ---
+    // --- ANDROID/WEB SPEECH API LOGIC ---
 
     const synth = window.speechSynthesis;
     const voiceSelect = document.getElementById('voice-select');
     const inputField = document.getElementById('command-input');
     const outputDiv = document.getElementById('console-output');
+    
+    // Button References
+    const btnPlay = document.getElementById('btn-play');
+    const btnPause = document.getElementById('btn-pause');
+    const btnStop = document.getElementById('btn-stop');
 
     let voices = [];
+    let currentUtterance = null; 
+    let isPaused = false;
 
-    /**
-     * 1. LOAD VOICES
-     * Mobile browsers load voices asynchronously. 
-     * We must wait for 'onvoiceschanged' event.
-     */
+    // --- 1. VOICE LOADING (Mobile Optimized) ---
     function populateVoiceList() {
         voices = synth.getVoices();
-
-        // Clear existing options
         voiceSelect.innerHTML = '';
 
         if(voices.length === 0) {
             let option = document.createElement('option');
-            option.textContent = "No voices found (Wait...)";
+            option.textContent = "Waiting for voices...";
             voiceSelect.appendChild(option);
             return;
         }
 
-        // Sort voices: English/local first, then others
+        // Sort: Local voices usually sound better on mobile
         voices.sort((a, b) => {
             const aName = a.name.toUpperCase();
             const bName = b.name.toUpperCase();
             if (a.lang.startsWith('en') && !b.lang.startsWith('en')) return -1;
-            if (aName < bName) return -1;
-            if (aName > bName) return 1;
-            return 0;
+            return aName.localeCompare(bName);
         });
 
         voices.forEach((voice) => {
             const option = document.createElement('option');
-            // Format: "Voice Name (Language Code)"
             option.textContent = `${voice.name} (${voice.lang})`;
-            option.setAttribute('data-lang', voice.lang);
             option.setAttribute('data-name', voice.name);
             voiceSelect.appendChild(option);
         });
-
-        logToConsole("System", `${voices.length} voices loaded successfully.`);
     }
 
-    // Trigger initial load (for desktop) and listener (for mobile)
     populateVoiceList();
     if (speechSynthesis.onvoiceschanged !== undefined) {
         speechSynthesis.onvoiceschanged = populateVoiceList;
     }
 
-    /**
-     * 2. SPEAK FUNCTION
-     */
-    function speak(text) {
-        if (synth.speaking) {
-            console.error('speechSynthesis.speaking');
-            return;
-        }
-
-        if (text !== '') {
-            const utterThis = new SpeechSynthesisUtterance(text);
-            
-            // Get selected voice name
-            const selectedOption = voiceSelect.selectedOptions[0].getAttribute('data-name');
-            
-            // Find the voice object in our array
-            for (let i = 0; i < voices.length; i++) {
-                if (voices[i].name === selectedOption) {
-                    utterThis.voice = voices[i];
-                    break;
-                }
-            }
-
-            // Optional: Adjust pitch/rate slightly for "robot" feel
-            utterThis.pitch = 1; 
-            utterThis.rate = 1;
-
-            synth.speak(utterThis);
-        }
-    }
-
-    /**
-     * 3. CONSOLE UTILITIES
-     */
-    function logToConsole(source, text) {
+    // --- 2. CORE UTILITIES ---
+    
+    function createLogEntry(text, source = "USER") {
         const entry = document.createElement('div');
         entry.className = 'log-entry';
-
-        const time = new Date().toLocaleTimeString([], { hour12: false });
+        const time = new Date().toLocaleTimeString([], { hour12: false, hour:'2-digit', minute:'2-digit' });
         
         entry.innerHTML = `
             <span class="timestamp">[${time}]</span>
@@ -225,26 +238,108 @@
         `;
         
         outputDiv.appendChild(entry);
-        // Auto-scroll to bottom
+        // Scroll bottom immediately on creation
         outputDiv.scrollTop = outputDiv.scrollHeight;
+        
+        return entry; // Return reference for highlighting later
     }
 
-    /**
-     * 4. INPUT HANDLER
-     */
+    // --- 3. SPEECH LOGIC WITH HIGHLIGHTING ---
+
+    function speak(text, logElement) {
+        // Cancel any current speech before starting new (standard console behavior)
+        if (synth.speaking) {
+            synth.cancel();
+        }
+
+        const utterThis = new SpeechSynthesisUtterance(text);
+        
+        // Voice Selection
+        const selectedName = voiceSelect.selectedOptions[0]?.getAttribute('data-name');
+        if (selectedName) {
+            const foundVoice = voices.find(v => v.name === selectedName);
+            if(foundVoice) utterThis.voice = foundVoice;
+        }
+
+        // --- EVENT: START (Highlight & Center) ---
+        utterThis.onstart = () => {
+            // Remove highlight from all other entries
+            document.querySelectorAll('.log-entry').forEach(el => el.classList.remove('active-reading'));
+            
+            // Highlight current
+            logElement.classList.add('active-reading');
+            
+            // CENTER THE TEXT
+            logElement.scrollIntoView({ behavior: "smooth", block: "center" });
+            
+            isPaused = false;
+        };
+
+        // --- EVENT: END (Remove Highlight) ---
+        utterThis.onend = () => {
+            logElement.classList.remove('active-reading');
+            isPaused = false;
+        };
+
+        utterThis.onerror = (e) => {
+            console.error("Speech Error:", e);
+            logElement.classList.remove('active-reading');
+            isPaused = false;
+        };
+
+        currentUtterance = utterThis;
+        synth.speak(utterThis);
+    }
+
+    // --- 4. BUTTON CONTROLS ---
+
+    // PLAY / RESUME
+    btnPlay.addEventListener('click', () => {
+        if (isPaused) {
+            synth.resume();
+            isPaused = false;
+        } else {
+            // If nothing is paused, maybe user wants to re-read the last message? 
+            // For now, resume is mostly for un-pausing.
+            if(synth.paused) synth.resume(); 
+        }
+    });
+
+    // PAUSE
+    btnPause.addEventListener('click', () => {
+        if (synth.speaking && !synth.paused) {
+            synth.pause();
+            isPaused = true;
+        }
+    });
+
+    // STOP
+    btnStop.addEventListener('click', () => {
+        if (synth.speaking || synth.paused) {
+            synth.cancel();
+            isPaused = false;
+            // Remove highlights manually since onend might not fire on cancel
+            document.querySelectorAll('.log-entry').forEach(el => el.classList.remove('active-reading'));
+        }
+    });
+
+    // --- 5. INPUT HANDLING ---
     inputField.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
-            const text = inputField.value;
+            const text = inputField.value.trim();
             if(!text) return;
 
-            // 1. Print to console
-            logToConsole("User", text);
+            // 1. Create UI Element
+            const logEl = createLogEntry(text);
             
-            // 2. Speak the text
-            speak(text);
+            // 2. Trigger Speak with reference to UI Element
+            speak(text, logEl);
 
-            // 3. Clear input
+            // 3. Reset
             inputField.value = '';
+            // Keep focus on mobile requires care, usually better to blur if keyboard hides content, 
+            // but for a chat app, keeping focus is standard.
+            inputField.focus();
         }
     });
 
