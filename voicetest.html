@@ -2,238 +2,250 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Voice Console Final Fix</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Command Console</title>
     <style>
+        /* EXPERT CSS: Matrix/Terminal Theme */
         :root {
             --bg-color: #0d1117;
             --term-green: #00ff41;
-            --term-text: #e6edf3;
+            --term-dim: #008F11;
             --ui-border: #30363d;
-            --header-height: 110px; /* Space for controls */
-            --footer-height: 70px;  /* Space for input */
         }
-
-        * { box-sizing: border-box; }
 
         body {
             background-color: var(--bg-color);
             color: var(--term-green);
             font-family: 'Courier New', Courier, monospace;
             margin: 0;
-            padding: 0;
-            height: 100%;
-            overflow: hidden; /* Prevent body scroll */
-        }
-
-        /* --- 1. FIXED HEADER (Top) --- */
-        #controls {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: var(--header-height);
-            background: #161b22;
-            border-bottom: 1px solid var(--ui-border);
-            padding: 10px;
-            z-index: 100;
             display: flex;
             flex-direction: column;
-            gap: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Top Control Bar */
+        #controls {
+            background: #161b22;
+            padding: 10px;
+            border-bottom: 1px solid var(--ui-border);
+            display: flex;
+            gap: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            z-index: 10;
         }
 
         select {
             background: #0d1117;
-            color: white;
-            border: 1px solid #30363d;
+            color: var(--term-green);
+            border: 1px solid var(--term-dim);
             padding: 8px;
+            border-radius: 4px;
             width: 100%;
-            font-size: 16px;
-            border-radius: 4px;
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 5px;
-            height: 40px;
-        }
-
-        button {
-            flex: 1;
-            background: #21262d;
-            border: 1px solid #30363d;
-            color: white;
-            border-radius: 4px;
-            font-weight: bold;
-        }
-
-        /* --- 2. SCROLLABLE CONTENT (Middle) --- */
-        #console-output {
-            position: absolute;
-            top: var(--header-height);
-            bottom: var(--footer-height); /* Stop before the input box */
-            left: 0;
-            right: 0;
-            overflow-y: auto;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            /* Smooth scroll looks nice but can be buggy with keyboard */
-            scroll-behavior: auto; 
-        }
-
-        .log-entry {
-            padding: 10px;
-            border-left: 3px solid #333;
-            background: rgba(255, 255, 255, 0.05);
-        }
-        
-        .log-entry.active-reading {
-            border-left-color: var(--term-green);
-            background: rgba(0, 255, 65, 0.1);
-            box-shadow: 0 0 15px rgba(0,255,65,0.1);
-        }
-
-        .timestamp { color: #8b949e; font-size: 0.7em; margin-right: 8px; }
-        .message { color: var(--term-text); word-wrap: break-word; }
-
-        /* --- 3. FIXED FOOTER (Bottom) --- */
-        #input-area {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: var(--footer-height);
-            background: #161b22;
-            border-top: 1px solid var(--ui-border);
-            padding: 10px;
-            display: flex;
-            align-items: center;
-            z-index: 100;
-        }
-
-        #command-input {
-            width: 100%;
-            padding: 12px;
-            border-radius: 4px;
-            border: 1px solid #30363d;
-            background: #0d1117;
-            color: white;
-            font-size: 16px; /* Prevents zoom on focus */
+            font-family: inherit;
             outline: none;
         }
 
-        #command-input:focus { border-color: var(--term-green); }
+        /* The Chat/Console Output Area */
+        #console-output {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            scroll-behavior: smooth;
+        }
 
+        .log-entry {
+            display: flex;
+            gap: 10px;
+        }
+
+        .timestamp {
+            color: var(--term-dim);
+            font-size: 0.8em;
+            min-width: 80px;
+        }
+
+        .message {
+            word-break: break-word;
+        }
+
+        /* The Typing Area */
+        #input-area {
+            background: #161b22;
+            padding: 15px;
+            border-top: 1px solid var(--ui-border);
+            display: flex;
+            align-items: center;
+        }
+
+        .prompt-char {
+            color: var(--term-green);
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        #command-input {
+            background: transparent;
+            border: none;
+            color: white;
+            font-family: inherit;
+            font-size: 16px;
+            flex: 1;
+            outline: none;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-thumb { background: var(--term-dim); border-radius: 4px; }
+        ::-webkit-scrollbar-track { background: var(--bg-color); }
     </style>
 </head>
 <body>
 
     <div id="controls">
-        <select id="voice-select"><option>Loading...</option></select>
-        <div class="btn-group">
-            <button id="btn-play" style="color:#4caf50">PLAY</button>
-            <button id="btn-pause" style="color:#ffc107">PAUSE</button>
-            <button id="btn-stop" style="color:#f44336">STOP</button>
-        </div>
+        <select id="voice-select">
+            <option value="">Loading voices...</option>
+        </select>
     </div>
 
     <div id="console-output">
         <div class="log-entry">
-            <span class="timestamp">[SYS]</span>
-            <span class="message">Terminal Ready.</span>
+            <span class="timestamp">[SYSTEM]</span>
+            <span class="message">Console initialized. Waiting for speech engine...</span>
         </div>
     </div>
 
     <div id="input-area">
-        <input type="text" id="command-input" placeholder="Type message..." autocomplete="off">
+        <span class="prompt-char">&gt;</span>
+        <input type="text" id="command-input" placeholder="Type here and press Enter..." autocomplete="off" autofocus>
     </div>
 
 <script>
+    // --- EXPERT JAVASCRIPT LOGIC ---
+
     const synth = window.speechSynthesis;
     const voiceSelect = document.getElementById('voice-select');
     const inputField = document.getElementById('command-input');
     const outputDiv = document.getElementById('console-output');
+
     let voices = [];
-    let isPaused = false;
 
-    // --- VOICE LOGIC ---
-    function loadVoices() {
+    /**
+     * 1. LOAD VOICES
+     * Mobile browsers load voices asynchronously. 
+     * We must wait for 'onvoiceschanged' event.
+     */
+    function populateVoiceList() {
         voices = synth.getVoices();
-        if(voices.length > 0) {
-            voiceSelect.innerHTML = '';
-            // Sort India/English to top
-            voices.sort((a,b) => (a.lang.includes('IN') || a.lang.includes('en')) ? -1 : 1);
-            voices.forEach(v => {
-                const opt = document.createElement('option');
-                opt.textContent = `${v.name.substr(0,25)} (${v.lang})`;
-                opt.setAttribute('data-name', v.name);
-                voiceSelect.appendChild(opt);
-            });
+
+        // Clear existing options
+        voiceSelect.innerHTML = '';
+
+        if(voices.length === 0) {
+            let option = document.createElement('option');
+            option.textContent = "No voices found (Wait...)";
+            voiceSelect.appendChild(option);
+            return;
         }
-    }
-    loadVoices();
-    if(speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = loadVoices;
 
-    // --- OUTPUT LOGIC ---
-    function log(text) {
-        const div = document.createElement('div');
-        div.className = 'log-entry';
-        const time = new Date().toLocaleTimeString().slice(0,5);
-        div.innerHTML = `<span class="timestamp">[${time}]</span><span class="message">${text}</span>`;
-        outputDiv.appendChild(div);
-        
-        // Force scroll to bottom immediately
-        setTimeout(() => outputDiv.scrollTop = outputDiv.scrollHeight, 50);
-        return div;
-    }
+        // Sort voices: English/local first, then others
+        voices.sort((a, b) => {
+            const aName = a.name.toUpperCase();
+            const bName = b.name.toUpperCase();
+            if (a.lang.startsWith('en') && !b.lang.startsWith('en')) return -1;
+            if (aName < bName) return -1;
+            if (aName > bName) return 1;
+            return 0;
+        });
 
-    // --- SPEAK LOGIC ---
-    function speak(text, uiEl) {
-        synth.cancel();
-        isPaused = false;
-        
-        const utter = new SpeechSynthesisUtterance(text);
-        const vName = voiceSelect.selectedOptions[0]?.getAttribute('data-name');
-        if(vName) utter.voice = voices.find(v => v.name === vName);
+        voices.forEach((voice) => {
+            const option = document.createElement('option');
+            // Format: "Voice Name (Language Code)"
+            option.textContent = `${voice.name} (${voice.lang})`;
+            option.setAttribute('data-lang', voice.lang);
+            option.setAttribute('data-name', voice.name);
+            voiceSelect.appendChild(option);
+        });
 
-        utter.onstart = () => {
-            document.querySelectorAll('.active-reading').forEach(e => e.classList.remove('active-reading'));
-            uiEl.classList.add('active-reading');
-            uiEl.scrollIntoView({behavior: "smooth", block: "center"});
-        };
-        utter.onend = () => uiEl.classList.remove('active-reading');
-        
-        synth.speak(utter);
+        logToConsole("System", `${voices.length} voices loaded successfully.`);
     }
 
-    // --- CONTROLS ---
-    document.getElementById('btn-play').onclick = () => { if(isPaused) synth.resume(); };
-    document.getElementById('btn-pause').onclick = () => { if(synth.speaking) { synth.pause(); isPaused=true; }};
-    document.getElementById('btn-stop').onclick = () => { synth.cancel(); isPaused=false; };
+    // Trigger initial load (for desktop) and listener (for mobile)
+    populateVoiceList();
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+        speechSynthesis.onvoiceschanged = populateVoiceList;
+    }
 
-    // --- INPUT ---
-    inputField.addEventListener('keydown', (e) => {
-        if(e.key === 'Enter') {
-            const txt = inputField.value.trim();
-            if(!txt) return;
-            const uiEl = log(txt);
-            speak(txt, uiEl);
-            inputField.value = '';
+    /**
+     * 2. SPEAK FUNCTION
+     */
+    function speak(text) {
+        if (synth.speaking) {
+            console.error('speechSynthesis.speaking');
+            return;
+        }
+
+        if (text !== '') {
+            const utterThis = new SpeechSynthesisUtterance(text);
             
-            // KEY FIX: Keep focus on input for rapid chatting
-            inputField.focus(); 
-        }
-    });
+            // Get selected voice name
+            const selectedOption = voiceSelect.selectedOptions[0].getAttribute('data-name');
+            
+            // Find the voice object in our array
+            for (let i = 0; i < voices.length; i++) {
+                if (voices[i].name === selectedOption) {
+                    utterThis.voice = voices[i];
+                    break;
+                }
+            }
 
-    // --- ANDROID KEYBOARD FIX ---
-    // When keyboard opens, window resizes. We must ensure we scroll to bottom.
-    window.addEventListener('resize', () => {
+            // Optional: Adjust pitch/rate slightly for "robot" feel
+            utterThis.pitch = 1; 
+            utterThis.rate = 1;
+
+            synth.speak(utterThis);
+        }
+    }
+
+    /**
+     * 3. CONSOLE UTILITIES
+     */
+    function logToConsole(source, text) {
+        const entry = document.createElement('div');
+        entry.className = 'log-entry';
+
+        const time = new Date().toLocaleTimeString([], { hour12: false });
+        
+        entry.innerHTML = `
+            <span class="timestamp">[${time}]</span>
+            <span class="message">${text}</span>
+        `;
+        
+        outputDiv.appendChild(entry);
+        // Auto-scroll to bottom
         outputDiv.scrollTop = outputDiv.scrollHeight;
-        // Ensure input stays visible
-        document.getElementById('input-area').scrollIntoView();
+    }
+
+    /**
+     * 4. INPUT HANDLER
+     */
+    inputField.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            const text = inputField.value;
+            if(!text) return;
+
+            // 1. Print to console
+            logToConsole("User", text);
+            
+            // 2. Speak the text
+            speak(text);
+
+            // 3. Clear input
+            inputField.value = '';
+        }
     });
 
 </script>
