@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Voice Console Final Fix</title>
+    <title>Voice Console Pro</title>
     <style>
         :root {
-            --bg-color: #0d1117;
+            --bg-color: #000000;
             --term-green: #00ff41;
-            --term-text: #e6edf3;
-            --ui-border: #30363d;
-            --header-height: 110px;
+            --term-dim: #008F11;
+            --ui-border: #333;
+            --header-height: 120px;
             --footer-height: 70px;
         }
 
@@ -26,14 +26,14 @@
             overflow: hidden;
         }
 
-        /* --- FIXED HEADER --- */
+        /* --- HEADER --- */
         #controls {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             height: var(--header-height);
-            background: #161b22;
+            background: #111;
             border-bottom: 1px solid var(--ui-border);
             padding: 10px;
             z-index: 100;
@@ -42,32 +42,58 @@
             gap: 8px;
         }
 
-        select {
-            background: #0d1117;
-            color: white;
-            border: 1px solid #30363d;
-            padding: 8px;
-            width: 100%;
-            font-size: 16px;
-            border-radius: 4px;
+        /* Top Row: Dropdown + Install Link */
+        .voice-row {
+            display: flex;
+            gap: 5px;
         }
 
+        select {
+            flex: 1;
+            background: #000;
+            color: var(--term-green);
+            border: 1px solid var(--term-dim);
+            padding: 8px;
+            font-size: 16px;
+            border-radius: 4px;
+            outline: none;
+        }
+
+        #btn-install {
+            background: #222;
+            color: #aaa;
+            border: 1px solid #444;
+            padding: 0 10px;
+            border-radius: 4px;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        /* Bottom Row: Controls */
         .btn-group {
             display: flex;
             gap: 5px;
-            height: 40px;
+            height: 45px;
         }
 
         button {
             flex: 1;
-            background: #21262d;
-            border: 1px solid #30363d;
+            background: #222;
+            border: 1px solid var(--term-dim);
             color: white;
             border-radius: 4px;
             font-weight: bold;
+            font-size: 14px;
+            text-transform: uppercase;
         }
 
-        /* --- SCROLLABLE CONTENT --- */
+        button:active { background: var(--term-dim); }
+
+        /* --- CONSOLE OUTPUT --- */
         #console-output {
             position: absolute;
             top: var(--header-height);
@@ -75,76 +101,79 @@
             left: 0;
             right: 0;
             overflow-y: auto;
-            padding: 15px;
+            padding: 20px;
             display: flex;
             flex-direction: column;
             gap: 15px;
         }
 
         .log-entry {
+            font-size: 1.1rem;
+            line-height: 1.5;
             padding: 10px;
-            border-left: 3px solid #333;
-            background: rgba(255, 255, 255, 0.05);
-            margin-bottom: 10px; /* Space between messages */
+            border-left: 2px solid #333;
+            color: #ccc; /* Default dim color */
+            transition: all 0.3s;
         }
-        
+
+        /* Highlight style when reading */
         .log-entry.active-reading {
-            border-left-color: var(--term-green);
-            background: rgba(0, 255, 65, 0.1);
-            box-shadow: 0 0 15px rgba(0,255,65,0.1);
+            color: var(--term-green);
+            border-left: 4px solid var(--term-green);
+            background: rgba(0, 255, 65, 0.05);
+            font-weight: bold;
+            text-shadow: 0 0 5px rgba(0, 255, 65, 0.5);
         }
 
-        .timestamp { color: #8b949e; font-size: 0.7em; display: block; margin-bottom: 4px;}
-        .message { color: var(--term-text); word-wrap: break-word; line-height: 1.4; }
-        .debug-info { font-size: 0.6em; color: #555; margin-top: 5px; font-style: italic;}
-
-        /* --- FIXED FOOTER --- */
+        /* --- FOOTER INPUT --- */
         #input-area {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
             height: var(--footer-height);
-            background: #161b22;
+            background: #111;
             border-top: 1px solid var(--ui-border);
             padding: 10px;
-            display: flex;
-            align-items: center;
             z-index: 100;
         }
 
         #command-input {
             width: 100%;
-            padding: 12px;
-            border-radius: 4px;
-            border: 1px solid #30363d;
-            background: #0d1117;
+            height: 100%;
+            background: #000;
+            border: 1px solid var(--term-dim);
             color: white;
+            padding: 10px;
             font-size: 16px;
+            border-radius: 4px;
             outline: none;
         }
+
+        #command-input:focus { box-shadow: 0 0 5px var(--term-dim); }
+
     </style>
 </head>
 <body>
 
     <div id="controls">
-        <select id="voice-select"><option value="-1">Loading Voices...</option></select>
+        <div class="voice-row">
+            <select id="voice-select"><option value="-1">Loading...</option></select>
+            <a id="btn-install" href="https://play.google.com/store/apps/details?id=com.google.android.tts" target="_blank">Install Voices</a>
+        </div>
+        
         <div class="btn-group">
-            <button id="btn-play" style="color:#4caf50">PLAY</button>
-            <button id="btn-pause" style="color:#ffc107">PAUSE</button>
-            <button id="btn-stop" style="color:#f44336">STOP</button>
+            <button id="btn-play">▶ Play</button>
+            <button id="btn-pause">⏸ Pause</button>
+            <button id="btn-stop">⏹ Stop</button>
         </div>
     </div>
 
     <div id="console-output">
-        <div class="log-entry">
-            <span class="timestamp">[SYS]</span>
-            <span class="message">System Ready.</span>
         </div>
-    </div>
 
     <div id="input-area">
-        <input type="text" id="command-input" placeholder="Type here..." autocomplete="off">
+        <input type="text" id="command-input" placeholder="Type text here..." autocomplete="off">
     </div>
 
 <script>
@@ -153,116 +182,123 @@
     const inputField = document.getElementById('command-input');
     const outputDiv = document.getElementById('console-output');
     
-    let voices = []; 
+    let voices = [];
+    let lastText = "";      // Stores the last typed text
+    let lastUiElement = null; // Stores the DOM element of the last text
     let isPaused = false;
 
-    // --- 1. ROBUST VOICE LOADING (INDEX BASED) ---
+    // --- 1. LOAD VOICES ---
     function loadVoices() {
         voices = synth.getVoices();
-        
         if(voices.length > 0) {
             voiceSelect.innerHTML = '';
+            // Sort English/Hindi to top
+            voices.sort((a,b) => (a.lang.includes('IN') || a.lang.includes('en')) ? -1 : 1);
             
-            // Sort voices (Local/English first)
-            voices.sort((a,b) => {
-                const aName = a.name.toUpperCase();
-                const bName = b.name.toUpperCase();
-                if(a.lang.includes('IN') || a.lang.includes('en')) return -1;
-                return aName.localeCompare(bName);
-            });
-
-            // Populate Dropdown
-            voices.forEach((voice, index) => {
+            voices.forEach((v, i) => {
                 const opt = document.createElement('option');
-                // THE FIX: Value is the INDEX (0, 1, 2...), not the string
-                opt.value = index; 
-                
-                // Display text can be truncated safely now
-                let label = `${voice.name.slice(0,25)} (${voice.lang})`;
-                if(voice.default) label += ' [DEFAULT]';
-                opt.textContent = label;
-                
+                opt.value = i; // Store index
+                opt.textContent = `${v.name.slice(0, 25)} (${v.lang})`;
                 voiceSelect.appendChild(opt);
             });
         }
     }
-
-    // Android needs immediate execution AND event listener
     loadVoices();
-    if (speechSynthesis.onvoiceschanged !== undefined) {
-        speechSynthesis.onvoiceschanged = loadVoices;
-    }
+    if(speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = loadVoices;
 
-    // --- 2. OUTPUT LOGIC ---
-    function log(text, voiceNameUsed = "") {
-        const div = document.createElement('div');
-        div.className = 'log-entry';
-        const time = new Date().toLocaleTimeString().slice(0,5);
-        
-        let html = `<span class="timestamp">[${time}]</span><span class="message">${text}</span>`;
-        if(voiceNameUsed) {
-            html += `<div class="debug-info">Voice: ${voiceNameUsed}</div>`;
-        }
-        
-        div.innerHTML = html;
-        outputDiv.appendChild(div);
-        setTimeout(() => outputDiv.scrollTop = outputDiv.scrollHeight, 50);
-        return div;
-    }
-
-    // --- 3. SPEAK LOGIC (THE CORE FIX) ---
+    // --- 2. SPEAK FUNCTION ---
     function speak(text, uiEl) {
+        // Stop any current speech
         synth.cancel();
         isPaused = false;
         
+        // Remove old highlights
+        document.querySelectorAll('.active-reading').forEach(e => e.classList.remove('active-reading'));
+
+        if(!text) return;
+
         const utter = new SpeechSynthesisUtterance(text);
         
-        // --- KEY FIX: GET VOICE BY INDEX ---
-        const selectedIndex = parseInt(voiceSelect.value); // Get number from dropdown
-        
-        if (selectedIndex >= 0 && voices[selectedIndex]) {
-            utter.voice = voices[selectedIndex];
-            utter.lang = voices[selectedIndex].lang; // Explicitly set lang to match voice
-            
-            // Update the UI log with the ACTUAL voice name being used
-            uiEl.querySelector('.debug-info').textContent = `Voice: ${voices[selectedIndex].name}`;
-        } else {
-            uiEl.querySelector('.debug-info').textContent = `Voice: System Default (Selection Failed)`;
-        }
+        // Voice Selection logic
+        const index = parseInt(voiceSelect.value);
+        if(voices[index]) utter.voice = voices[index];
 
+        // Highlight Events
         utter.onstart = () => {
-            document.querySelectorAll('.active-reading').forEach(e => e.classList.remove('active-reading'));
-            uiEl.classList.add('active-reading');
-            uiEl.scrollIntoView({behavior: "smooth", block: "center"});
+            if(uiEl) {
+                uiEl.classList.add('active-reading');
+                uiEl.scrollIntoView({behavior: "smooth", block: "center"});
+            }
         };
         
-        utter.onend = () => uiEl.classList.remove('active-reading');
-        utter.onerror = (e) => console.error("Speech Error:", e);
+        utter.onend = () => {
+            if(uiEl) uiEl.classList.remove('active-reading');
+            isPaused = false;
+        };
 
         synth.speak(utter);
     }
 
-    // --- 4. CONTROLS ---
-    document.getElementById('btn-play').onclick = () => { if(isPaused) synth.resume(); };
-    document.getElementById('btn-pause').onclick = () => { if(synth.speaking) { synth.pause(); isPaused=true; }};
-    document.getElementById('btn-stop').onclick = () => { synth.cancel(); isPaused=false; };
-
-    // --- 5. INPUT ---
+    // --- 3. INPUT HANDLER ---
     inputField.addEventListener('keydown', (e) => {
         if(e.key === 'Enter') {
-            const txt = inputField.value.trim();
-            if(!txt) return;
+            const text = inputField.value.trim();
+            if(!text) return;
+
+            // 1. Clear Console if you only want 1 message at a time? 
+            // The prompt said "nothing else", but usually chat bots keep history.
+            // If you want to CLEAR history every time, uncomment the next line:
+            // outputDiv.innerHTML = ''; 
+
+            // 2. Create UI Element
+            const div = document.createElement('div');
+            div.className = 'log-entry';
+            div.textContent = text; // Pure text, no timestamp
+            outputDiv.appendChild(div);
             
-            // Create log with placeholder for voice info
-            const uiEl = log(txt, "Selecting..."); 
-            speak(txt, uiEl);
-            
+            // 3. Update State variables
+            lastText = text;
+            lastUiElement = div;
+
+            // 4. Speak
+            speak(text, div);
+
+            // 5. Cleanup
             inputField.value = '';
-            inputField.focus(); 
+            setTimeout(() => outputDiv.scrollTop = outputDiv.scrollHeight, 50);
+            inputField.focus();
         }
     });
 
-    // Resize handler
+    // --- 4. BUTTONS ---
+    
+    // PLAY: Resume if paused, OR re-read last text if stopped
+    document.getElementById('btn-play').onclick = () => {
+        if (isPaused) {
+            synth.resume();
+            isPaused = false;
+        } else if (!synth.speaking && lastText) {
+            // Nothing is speaking, but we have text on screen -> Read it again
+            speak(lastText, lastUiElement);
+        }
+    };
+
+    // PAUSE: Standard pause
+    document.getElementById('btn-pause').onclick = () => {
+        if (synth.speaking && !synth.paused) {
+            synth.pause();
+            isPaused = true;
+        }
+    };
+
+    // STOP: Cancel everything
+    document.getElementById('btn-stop').onclick = () => {
+        synth.cancel();
+        isPaused = false;
+        document.querySelectorAll('.active-reading').forEach(e => e.classList.remove('active-reading'));
+    };
+
+    // Resize fix
     window.addEventListener('resize', () => {
         outputDiv.scrollTop = outputDiv.scrollHeight;
     });
