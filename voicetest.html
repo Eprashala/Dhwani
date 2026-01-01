@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Command Console</title>
+    <style>
+        /* EXPERT CSS: Matrix/Terminal Theme */
+        :root {
+            --bg-color: #0d1117;
+            --term-green: #00ff41;
+            --term-dim: #008F11;
+            --ui-border: #30363d;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--term-green);
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Top Control Bar */
+        #controls {
+            background: #161b22;
+            padding: 10px;
+            border-bottom: 1px solid var(--ui-border);
+            display: flex;
+            gap: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+
+        select {
+            background: #0d1117;
+            color: var(--term-green);
+            border: 1px solid var(--term-dim);
+            padding: 8px;
+            border-radius: 4px;
+            width: 100%;
+            font-family: inherit;
+            outline: none;
+        }
+
+        /* The Chat/Console Output Area */
+        #console-output {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            scroll-behavior: smooth;
+        }
+
+        .log-entry {
+            display: flex;
+            gap: 10px;
+        }
+
+        .timestamp {
+            color: var(--term-dim);
+            font-size: 0.8em;
+            min-width: 80px;
+        }
+
+        .message {
+            word-break: break-word;
+        }
+
+        /* The Typing Area */
+        #input-area {
+            background: #161b22;
+            padding: 15px;
+            border-top: 1px solid var(--ui-border);
+            display: flex;
+            align-items: center;
+        }
+
+        .prompt-char {
+            color: var(--term-green);
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        #command-input {
+            background: transparent;
+            border: none;
+            color: white;
+            font-family: inherit;
+            font-size: 16px;
+            flex: 1;
+            outline: none;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-thumb { background: var(--term-dim); border-radius: 4px; }
+        ::-webkit-scrollbar-track { background: var(--bg-color); }
+    </style>
+</head>
+<body>
+
+    <div id="controls">
+        <select id="voice-select">
+            <option value="">Loading voices...</option>
+        </select>
+    </div>
+
+    <div id="console-output">
+        <div class="log-entry">
+            <span class="timestamp">[SYSTEM]</span>
+            <span class="message">Console initialized. Waiting for speech engine...</span>
+        </div>
+    </div>
+
+    <div id="input-area">
+        <span class="prompt-char">&gt;</span>
+        <input type="text" id="command-input" placeholder="Type here and press Enter..." autocomplete="off" autofocus>
+    </div>
+
+<script>
+    // --- EXPERT JAVASCRIPT LOGIC ---
+
+    const synth = window.speechSynthesis;
+    const voiceSelect = document.getElementById('voice-select');
+    const inputField = document.getElementById('command-input');
+    const outputDiv = document.getElementById('console-output');
+
+    let voices = [];
+
+    /**
+     * 1. LOAD VOICES
+     * Mobile browsers load voices asynchronously. 
+     * We must wait for 'onvoiceschanged' event.
+     */
+    function populateVoiceList() {
+        voices = synth.getVoices();
+
+        // Clear existing options
+        voiceSelect.innerHTML = '';
+
+        if(voices.length === 0) {
+            let option = document.createElement('option');
+            option.textContent = "No voices found (Wait...)";
+            voiceSelect.appendChild(option);
+            return;
+        }
+
+        // Sort voices: English/local first, then others
+        voices.sort((a, b) => {
+            const aName = a.name.toUpperCase();
+            const bName = b.name.toUpperCase();
+            if (a.lang.startsWith('en') && !b.lang.startsWith('en')) return -1;
+            if (aName < bName) return -1;
+            if (aName > bName) return 1;
+            return 0;
+        });
+
+        voices.forEach((voice) => {
+            const option = document.createElement('option');
+            // Format: "Voice Name (Language Code)"
+            option.textContent = `${voice.name} (${voice.lang})`;
+            option.setAttribute('data-lang', voice.lang);
+            option.setAttribute('data-name', voice.name);
+            voiceSelect.appendChild(option);
+        });
+
+        logToConsole("System", `${voices.length} voices loaded successfully.`);
+    }
+
+    // Trigger initial load (for desktop) and listener (for mobile)
+    populateVoiceList();
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+        speechSynthesis.onvoiceschanged = populateVoiceList;
+    }
+
+    /**
+     * 2. SPEAK FUNCTION
+     */
+    function speak(text) {
+        if (synth.speaking) {
+            console.error('speechSynthesis.speaking');
+            return;
+        }
+
+        if (text !== '') {
+            const utterThis = new SpeechSynthesisUtterance(text);
+            
+            // Get selected voice name
+            const selectedOption = voiceSelect.selectedOptions[0].getAttribute('data-name');
+            
+            // Find the voice object in our array
+            for (let i = 0; i < voices.length; i++) {
+                if (voices[i].name === selectedOption) {
+                    utterThis.voice = voices[i];
+                    break;
+                }
+            }
+
+            // Optional: Adjust pitch/rate slightly for "robot" feel
+            utterThis.pitch = 1; 
+            utterThis.rate = 1;
+
+            synth.speak(utterThis);
+        }
+    }
+
+    /**
+     * 3. CONSOLE UTILITIES
+     */
+    function logToConsole(source, text) {
+        const entry = document.createElement('div');
+        entry.className = 'log-entry';
+
+        const time = new Date().toLocaleTimeString([], { hour12: false });
+        
+        entry.innerHTML = `
+            <span class="timestamp">[${time}]</span>
+            <span class="message">${text}</span>
+        `;
+        
+        outputDiv.appendChild(entry);
+        // Auto-scroll to bottom
+        outputDiv.scrollTop = outputDiv.scrollHeight;
+    }
+
+    /**
+     * 4. INPUT HANDLER
+     */
+    inputField.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            const text = inputField.value;
+            if(!text) return;
+
+            // 1. Print to console
+            logToConsole("User", text);
+            
+            // 2. Speak the text
+            speak(text);
+
+            // 3. Clear input
+            inputField.value = '';
+        }
+    });
+
+</script>
+</body>
+</html>
