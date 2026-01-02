@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF विश्लेषक - AI सर</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* थीम - बहुरंगी (Multicolour/Spectrum Theme) */
+        .multi-bg {
+            background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        /* ॲनिमेशन - रंगीत स्पंदने */
+        .listening-pulse { animation: pulse 1.5s infinite ease-in-out; }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(255, 255, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+        }
+
+        .icon-btn {
+            @apply p-3 rounded-full text-white transition-all duration-200
+                   bg-indigo-600 hover:bg-indigo-500 shadow-lg border border-white/20
+                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-purple-900 focus:ring-white
+                   disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none;
+        }
+        
+        .utility-btn {
+            @apply w-full py-3 px-2 rounded-lg text-sm font-semibold transition-colors
+                   bg-white/10 text-white border border-white/20 backdrop-blur-sm
+                   hover:bg-white/20
+                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-white
+                   disabled:bg-black/20 disabled:text-gray-400 disabled:cursor-not-allowed;
+        }
+
+        .custom-checkbox {
+            @apply w-4 h-4 text-pink-600 bg-white/10 border-white/30 rounded focus:ring-pink-500 focus:ring-2 ring-offset-gray-900;
+        }
+        
+        .custom-input {
+            @apply block w-3/4 mx-auto text-center border border-white/30 rounded-lg p-3 outline-none transition-all;
+            background-color: rgba(0, 0, 0, 0.3) !important;
+            color: #fff !important;
+            caret-color: #fff !important;
+        }
+        .custom-input::placeholder {
+            color: rgba(255, 255, 255, 0.7) !important;
+        }
+        
+        .file-upload-wrapper {
+            @apply w-full relative border-2 border-dashed border-white/40 rounded-lg p-4 text-center hover:bg-white/5 transition-colors cursor-pointer;
+        }
+
+        /* स्क्रोलबार कस्टमायझेशन */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.4); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.6); }
+    </style>
+</head>
+
+<body class="multi-bg text-white flex items-center justify-center min-h-screen p-4" oncontextmenu="return false;">
+
+    <div class="bg-black/40 backdrop-blur-xl rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-2xl flex flex-col h-[95vh] md:h-auto border border-white/20">
+        
+        <div class="flex items-center justify-between mb-4 shrink-0">
+            <h1 class="text-2xl md:text-3xl font-bold text-white drop-shadow-md">
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-400 to-cyan-300">PDF विश्लेषक</span> <span class="text-sm align-top opacity-80">- Sir AI</span>
+            </h1>
+            <div id="status-indicator" class="w-4 h-4 rounded-full bg-gray-400 transition-colors shadow-inner" title="विश्रांती"></div>
+        </div>
+
+        <div class="mb-4 shrink-0">
+            <label for="pdf-upload" class="file-upload-wrapper block">
+                <input type="file" id="pdf-upload" accept="application/pdf" class="hidden">
+                <div class="flex flex-col items-center justify-center text-gray-200">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8 mb-2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                    </svg>
+                    <span id="file-label" class="text-sm font-medium">तुमची PDF फाईल येथे अपलोड करा</span>
+                    <span id="page-count-label" class="text-xs text-gray-400 mt-1 hidden"></span>
+                </div>
+            </label>
+            <div id="loading-bar-container" class="w-full bg-gray-700 rounded-full h-1.5 mt-2 hidden">
+                <div id="loading-bar" class="bg-gradient-to-r from-blue-400 to-pink-400 h-1.5 rounded-full" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <div id="conversation-log" class="flex-grow overflow-y-auto bg-black/20 rounded-lg p-4 mb-4 border border-white/10 space-y-4 shadow-inner min-h-[150px]">
+            <div class="text-white/60 text-center mt-8">
+                PDF अपलोड करा आणि प्रश्न विचारण्यासाठी<br>
+                <span class="font-bold text-yellow-300">"Sir"</span> किंवा <span class="font-bold text-yellow-300">"सर"</span> म्हणा.<br>
+                <span class="text-sm opacity-70">मी केवळ पुस्तकातील माहिती सांगेन.</span>
+            </div>
+        </div>
+
+        <div class="flex justify-center gap-8 mb-4 shrink-0 bg-white/5 p-2 rounded-xl border border-white/10">
+            <button id="pause-resume-button" class="icon-btn bg-blue-600 hover:bg-blue-500" title="थांबवा/पुन्हा सुरू करा" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+                </svg>
+            </button>
+            
+            <button id="stop-speech-button" class="icon-btn bg-red-600 hover:bg-red-500" title="बोलणे थांबवा" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z" />
+                </svg>
+            </button>
+
+            <button id="replay-button" class="icon-btn bg-green-600 hover:bg-green-500" title="पुन्हा ऐका" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                </svg>
+            </button>
+        </div>
+
+        <div class="flex flex-col gap-4 mb-4 shrink-0 w-full text-center">
+            <div class="w-full flex gap-4">
+                <div class="w-1/2">
+                    <label class="text-xs text-gray-300 mb-1 block">नाव</label>
+                    <input type="text" id="manual-name" class="custom-input" placeholder="तुमचे नाव">
+                </div>
+                <div class="w-1/2">
+                    <label class="text-xs text-gray-300 mb-1 block">वय</label>
+                    <input type="number" id="manual-age" class="custom-input" placeholder="उदा. 20">
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-center gap-2 mb-2 shrink-0">
+            <input type="checkbox" id="remember-me-checkbox" class="custom-checkbox">
+            <label for="remember-me-checkbox" class="text-sm text-gray-200 cursor-pointer select-none">
+                माहिती लक्षात ठेवा
+            </label>
+        </div>
+
+        <div class="w-full flex flex-col items-center justify-center mb-4 shrink-0">
+            <button id="advance-toggle-btn" class="text-xs text-blue-300 hover:text-blue-200 underline mb-2 focus:outline-none">
+                ▼ प्रगत सेटिंग्ज (API Key)
+            </button>
+
+            <div id="advance-container" class="hidden w-full bg-black/40 border border-white/20 rounded-lg p-4 flex flex-col gap-3 transition-all">
+                
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="use-custom-key-checkbox" class="custom-checkbox">
+                    <label for="use-custom-key-checkbox" class="text-sm text-gray-200 cursor-pointer select-none">
+                        तुमची स्वतःची API Key वापरा
+                    </label>
+                </div>
+
+                <input type="text" id="custom-api-key-input" class="custom-input text-xs w-full !w-full" placeholder="API Key येथे पेस्ट करा" disabled>
+                
+                <button id="paste-key-btn" type="button" disabled class="w-full py-2 px-4 bg-white/10 hover:bg-white/20 text-white text-xs rounded transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                    पेस्ट करा
+                </button>
+
+                <a href="https://ai.google.dev/gemini-api/docs/api-key" target="_blank" class="text-center w-full py-2 bg-black/20 hover:bg-blue-900/40 text-xs text-blue-300 rounded transition-colors border border-blue-500/30">
+                    मोफत Google Gemini API Key मिळवा ↗
+                </a>
+            </div>
+        </div>
+
+        <button id="talk-button" class="w-full py-4 px-6 rounded-lg text-lg font-semibold transition-all duration-300 ease-in-out shrink-0
+                       bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-900/50
+                       hover:from-purple-500 hover:to-blue-500 hover:shadow-purple-500/50 hover:-translate-y-0.5
+                       focus:outline-none focus:ring-4 focus:ring-purple-500 focus:ring-opacity-50
+                       disabled:from-gray-700 disabled:to-gray-800 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-y-0">
+            सरांशी संवाद साधा
+        </button>
+
+        <div class="mt-4 grid grid-cols-3 gap-3 shrink-0">
+            <button id="restart-chat-button" class="utility-btn" disabled>पुन्हा सुरू करा</button>
+            <button id="share-button" class="utility-btn">शेअर करा</button>
+            <button id="end-chat-button" class="utility-btn text-red-300 hover:bg-red-900/30 hover:text-red-200" disabled>थांबवा</button>
+        </div>
+
+    </div>
+
+    <script>
+        document.addEventListener('contextmenu', event => event.preventDefault());
+
+        // --- PDF Handling Variables ---
+        let pdfDoc = null;
+        let pdfTextContent = ""; // Stores the entire text extracted from PDF
+        const pdfUploadInput = document.getElementById('pdf-upload');
+        const fileLabel = document.getElementById('file-label');
+        const pageCountLabel = document.getElementById('page-count-label');
+        const loadingBarContainer = document.getElementById('loading-bar-container');
+        const loadingBar = document.getElementById('loading-bar');
+
+        // --- Core Chat Variables ---
+        const talkButton = document.getElementById('talk-button');
+        const statusIndicator = document.getElementById('status-indicator');
+        const conversationLog = document.getElementById('conversation-log');
+        const rememberMeCheckbox = document.getElementById('remember-me-checkbox');
+        const manualNameInput = document.getElementById('manual-name');
+        const manualAgeInput = document.getElementById('manual-age');
+        
+        // --- Buttons ---
+        const pauseResumeButton = document.getElementById('pause-resume-button');
+        const stopSpeechButton = document.getElementById('stop-speech-button');
+        const replayButton = document.getElementById('replay-button');
+        const shareButton = document.getElementById('share-button');
+        const endChatButton = document.getElementById('end-chat-button');
+        const restartChatButton = document.getElementById('restart-chat-button');
+        
+        // --- Settings ---
+        const advanceToggleBtn = document.getElementById('advance-toggle-btn');
+        const advanceContainer = document.getElementById('advance-container');
+        const useCustomKeyCheckbox = document.getElementById('use-custom-key-checkbox');
+        const customApiKeyInput = document.getElementById('custom-api-key-input');
+        const pasteKeyBtn = document.getElementById('paste-key-btn');
+
+        const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
+        let appState = 'IDLE'; 
+        let userName = '';
+        let userAge = 25; 
+        let chatHistory = [];
+        let systemInstruction = '';
+        let recognition;
+        let lastSpokenText = ''; 
+        let speechManuallyStopped = false; 
+        const synth = window.speechSynthesis;
+        let voices = [];
+        let wakeLock = null;
+
+        // --- Initialization ---
+        window.onload = () => {
+            if (synth.speaking) synth.cancel();
+            loadUserData(); 
+            loadVoices();   
+        };
+
+        // --- PDF Parsing Logic ---
+        pdfUploadInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (file.type !== 'application/pdf') {
+                alert('कृपया फक्त PDF फाईल अपलोड करा.');
+                return;
+            }
+
+            fileLabel.textContent = `वाचत आहे: ${file.name}...`;
+            loadingBarContainer.classList.remove('hidden');
+            loadingBar.style.width = '0%';
+            pdfTextContent = ""; // Reset context
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
+                
+                const totalPages = pdfDoc.numPages;
+                let fullText = "";
+
+                for (let i = 1; i <= totalPages; i++) {
+                    const page = await pdfDoc.getPage(i);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map(item => item.str).join(' ');
+                    
+                    // Add Page Marker for the AI
+                    fullText += `\n[PAGE ${i} START]\n${pageText}\n[PAGE ${i} END]\n`;
+                    
+                    // Update Progress
+                    const progress = Math.round((i / totalPages) * 100);
+                    loadingBar.style.width = `${progress}%`;
+                }
+
+                pdfTextContent = fullText;
+                fileLabel.textContent = `अपलोड पूर्ण: ${file.name}`;
+                pageCountLabel.textContent = `${totalPages} पाने वाचली.`;
+                pageCountLabel.classList.remove('hidden');
+                
+                // Trigger system prompt rebuild with new context
+                if (userName) buildSystemPrompt(); 
+                
+                logMessage('सिस्टम', `PDF यशस्वीरित्या वाचली (${totalPages} पाने). आता तुम्ही या पुस्तकातील माहिती विचारू शकता.`);
+
+            } catch (error) {
+                console.error(error);
+                fileLabel.textContent = "त्रुटी: फाईल वाचता आली नाही.";
+                alert("PDF वाचताना त्रुटी आली. कृपया दुसरी फाईल वापरून पहा.");
+            } finally {
+                setTimeout(() => loadingBarContainer.classList.add('hidden'), 1000);
+            }
+        });
+
+        // --- Event Listeners ---
+        advanceToggleBtn.addEventListener('click', () => {
+            advanceContainer.classList.toggle('hidden');
+            advanceContainer.classList.toggle('flex');
+        });
+
+        useCustomKeyCheckbox.addEventListener('change', () => {
+            const isChecked = useCustomKeyCheckbox.checked;
+            customApiKeyInput.disabled = !isChecked;
+            pasteKeyBtn.disabled = !isChecked;
+            saveUserData(); 
+            if (isChecked) customApiKeyInput.focus();
+        });
+
+        customApiKeyInput.addEventListener('input', saveUserData);
+
+        pasteKeyBtn.addEventListener('click', async () => {
+            try {
+                const text = await navigator.clipboard.readText();
+                if(text) {
+                    customApiKeyInput.value = text;
+                    saveUserData();
+                }
+            } catch (err) { alert('पेस्ट परमिशन नाकारली.'); }
+        });
+
+        function getEffectiveApiKey() {
+            if (useCustomKeyCheckbox.checked && customApiKeyInput.value.trim().length > 10) {
+                return customApiKeyInput.value.trim();
+            }
+            return DEFAULT_API_KEY;
+        }
+
+        // --- Storage Logic ---
+        function loadUserData() {
+            try {
+                const savedName = localStorage.getItem('sir_userName');
+                const savedAge = localStorage.getItem('sir_userAge');
+                const savedRemember = localStorage.getItem('sir_remember');
+
+                if (savedRemember === 'true') {
+                    rememberMeCheckbox.checked = true;
+                    if (savedName) manualNameInput.value = savedName;
+                    if (savedAge) manualAgeInput.value = savedAge;
+                    if (savedName) talkButton.textContent = `नमस्ते ${savedName}, विचारा`;
+                }
+                
+                const savedUseKey = localStorage.getItem('sir_useCustomKey');
+                const savedKey = localStorage.getItem('sir_customKey');
+                if (savedUseKey === 'true') {
+                    useCustomKeyCheckbox.checked = true;
+                    customApiKeyInput.disabled = false;
+                    pasteKeyBtn.disabled = false;
+                    if(savedKey) customApiKeyInput.value = savedKey;
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function saveUserData() {
+            try {
+                if (rememberMeCheckbox.checked) {
+                    localStorage.setItem('sir_remember', 'true');
+                    localStorage.setItem('sir_userName', manualNameInput.value.trim());
+                    localStorage.setItem('sir_userAge', manualAgeInput.value.trim());
+                } else {
+                    localStorage.removeItem('sir_remember');
+                    localStorage.removeItem('sir_userName');
+                    localStorage.removeItem('sir_userAge');
+                }
+                localStorage.setItem('sir_useCustomKey', useCustomKeyCheckbox.checked);
+                if (customApiKeyInput.value) localStorage.setItem('sir_customKey', customApiKeyInput.value.trim());
+            } catch (e) { console.error(e); }
+        }
+
+        // --- Speech Recognition ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (!SpeechRecognition) {
+            logMessage('त्रुटी', 'हा ब्राउझर सपोर्ट करत नाही. कृपया Google Chrome वापरा.');
+            talkButton.disabled = true;
+        } else {
+            try {
+                recognition = new SpeechRecognition();
+                recognition.continuous = false; 
+                recognition.interimResults = false;
+                recognition.lang = 'mr-IN'; // Marathi input
+
+                recognition.onresult = handleSpeechResult;
+                recognition.onend = handleSpeechEnd;
+                recognition.onerror = (event) => {
+                    if (event.error === 'no-speech' && appState !== 'IDLE' && appState !== 'BUSY') {
+                        startRecognitionSafe();
+                    } else if (event.error === 'not-allowed') {
+                        setState('IDLE');
+                    }
+                };
+            } catch (e) { alert("Mic Error: " + e.message); }
+        }
+
+        function startRecognitionSafe() {
+            if (!recognition) return;
+            try { recognition.start(); } catch (e) {}
+        }
+
+        // --- UI Interactions ---
+        talkButton.addEventListener('click', toggleListening);
+        pauseResumeButton.addEventListener('click', togglePauseResume);
+        stopSpeechButton.addEventListener('click', stopSpeech);
+        replayButton.addEventListener('click', replaySpeech);
+        endChatButton.addEventListener('click', endChat);
+        restartChatButton.addEventListener('click', restartChat);
+        
+        async function toggleListening() {
+            if (appState === 'IDLE') {
+                try { 
+                    const elem = document.documentElement;
+                    if (elem.requestFullscreen) elem.requestFullscreen();
+                } catch(e) {}
+            }
+
+            try {
+                if (appState === 'IDLE') {
+                    if (!pdfTextContent) {
+                        alert("कृपया आधी PDF फाईल अपलोड करा.");
+                        return;
+                    }
+
+                    talkButton.textContent = "प्रतीक्षा करत आहे...";
+                    talkButton.disabled = true;
+                    await acquireWakeLock(); 
+                    
+                    const inputName = manualNameInput.value.trim();
+                    const inputAge = manualAgeInput.value.trim();
+
+                    if (inputName && inputAge) {
+                        userName = inputName;
+                        userAge = parseInt(inputAge);
+                        saveUserData(); 
+                        buildSystemPrompt(); 
+
+                        // Welcome User
+                        const welcomeText = `नमस्ते ${userName}. मी तुमचा सहाय्यक 'सर' आहे. तुम्ही अपलोड केलेल्या फाईल बद्दल काय जाणून घेऊ इच्छिता?`;
+                        logMessage('Sir', welcomeText);
+                        
+                        setState('BUSY'); 
+                        await speakText(welcomeText, 'mr-IN');
+                        setState('CONVERSATION');
+                        startRecognitionSafe();
+                    } else {
+                        setState('LISTENING_FOR_WAKEWORD');
+                        startRecognitionSafe();
+                        logMessage('माहिती', '"Sir" किंवा "सर" म्हणा.');
+                    }
+
+                } else {
+                    setState('IDLE');
+                    recognition.stop();
+                    if (synth.speaking) synth.cancel();
+                    await releaseWakeLock();
+                }
+            } catch (error) {
+                setState('IDLE');
+            }
+        }
+
+        function setState(newState) {
+            appState = newState;
+            switch (newState) {
+                case 'IDLE':
+                    talkButton.textContent = 'संवाद साधा';
+                    talkButton.disabled = false;
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-gray-400';
+                    endChatButton.disabled = true;
+                    talkButton.classList.remove('from-purple-700', 'to-blue-700');
+                    talkButton.classList.add('from-purple-600', 'to-blue-600');
+                    manualNameInput.disabled = false;
+                    manualAgeInput.disabled = false;
+                    break;
+                case 'BUSY':
+                    talkButton.textContent = 'विश्लेषण सुरू आहे...';
+                    talkButton.disabled = true;
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-400';
+                    endChatButton.disabled = false;
+                    break;
+                default: // Listening states
+                    talkButton.textContent = 'ऐकणे थांबवा';
+                    talkButton.disabled = false;
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-green-400 listening-pulse';
+                    endChatButton.disabled = false;
+                    talkButton.classList.remove('from-purple-600', 'to-blue-600');
+                    talkButton.classList.add('from-purple-700', 'to-blue-700');
+                    manualNameInput.disabled = true;
+                    manualAgeInput.disabled = true;
+                    break;
+            }
+        }
+
+        function handleSpeechEnd() {
+            if (appState !== 'IDLE' && appState !== 'BUSY') startRecognitionSafe();
+            else if (appState === 'IDLE') setState('IDLE'); 
+        }
+        
+        async function handleSpeechResult(event) {
+            const transcript = event.results[event.results.length - 1][0].transcript.trim();
+            if (!transcript) return;
+            console.log(`Heard: ${transcript}`);
+            
+            const currentState = appState;
+            recognition.stop();
+            setState('BUSY');
+
+            try {
+                if (currentState === 'LISTENING_FOR_WAKEWORD') {
+                    const t = transcript.toLowerCase();
+                    if (t.includes('sir') || t.includes('सर') || t.includes('guruji')) {
+                        const greeting = "होय सर. मी ऐकत आहे. तुमचे नाव काय आहे?";
+                        logMessage('Sir', greeting);
+                        await speakText(greeting, 'mr-IN');
+                        setState('LISTENING_FOR_NAME');
+                        startRecognitionSafe(); 
+                    } else {
+                        setState('LISTENING_FOR_WAKEWORD');
+                        startRecognitionSafe();
+                    }
+                }
+                else if (currentState === 'LISTENING_FOR_NAME') {
+                    logMessage('तुम्ही', transcript);
+                    userName = transcript; 
+                    manualNameInput.value = userName;
+                    const agePrompt = `नमस्ते ${userName}. तुमचे वय काय आहे?`;
+                    logMessage('Sir', agePrompt);
+                    await speakText(agePrompt, 'mr-IN');
+                    setState('LISTENING_FOR_AGE');
+                    startRecognitionSafe();
+                }
+                else if (currentState === 'LISTENING_FOR_AGE') {
+                    logMessage('तुम्ही', transcript);
+                    userAge = parseInt(transcript.replace(/\D/g,'')) || 25;
+                    manualAgeInput.value = userAge;
+                    saveUserData();
+                    buildSystemPrompt(); 
+
+                    const startPrompt = "धन्यवाद. आता तुम्ही अपलोड केलेल्या PDF मधील कोणताही प्रश्न विचारू शकता.";
+                    logMessage('Sir', startPrompt);
+                    await speakText(startPrompt, 'mr-IN');
+                    setState('CONVERSATION');
+                    startRecognitionSafe();
+                }
+                else if (currentState === 'CONVERSATION') {
+                    logMessage(userName || 'तुम्ही', transcript);
+                    chatHistory.push({ role: 'user', parts: [{ text: transcript }] });
+
+                    const aiResponseText = await getAIResponse(chatHistory);
+                    
+                    // Cleanup text
+                    const cleanText = cleanTextForTTS(aiResponseText);
+                    chatHistory.push({ role: 'model', parts: [{ text: cleanText }] });
+
+                    logMessage('Sir', cleanText);
+                    try {
+                        await speakText(cleanText, 'mr-IN');
+                    } catch (error) {
+                        if (error.message === "Speech manually stopped") return;
+                    }
+                    setState('CONVERSATION');
+                    startRecognitionSafe();
+                }
+            } catch (error) {
+                if (systemInstruction) { setState('CONVERSATION'); startRecognitionSafe(); }
+                else { setState('LISTENING_FOR_WAKEWORD'); startRecognitionSafe(); }
+            }
+        }
+
+        // --- BRAIN: System Prompt ---
+        function buildSystemPrompt() {
+            // Include PDF content in the prompt
+            const pdfContext = pdfTextContent ? `\nDOCUMENT CONTENT (Pages marked): \n${pdfTextContent}` : "\nNO PDF UPLOADED YET.";
+
+            systemInstruction = `
+                You are a helpful expert assistant addressed as "Sir".
+                User Name: ${userName}, Age: ${userAge}.
+                
+                YOUR TASK:
+                Answer questions based ONLY on the provided DOCUMENT CONTENT.
+                
+                DOCUMENT CONTENT:
+                ${pdfContext}
+                
+                INSTRUCTIONS:
+                1. **Source of Truth**: Answer ONLY using facts from the document above. If the info is not in the document, say "This information is not in the uploaded PDF."
+                2. **Language**: Answer in MARATHI by default. Only speak English if the user explicitly asks for it.
+                3. **Tone**: Educational, encouraging, like a professor explaining to a student of age ${userAge}.
+                4. **Formatting**:
+                   - DO NOT use brackets ( ), [ ], { }, or asterisks *.
+                   - DO NOT use shortforms.
+                   - Speak in full sentences.
+                5. **Citations**:
+                   - You MUST mention the specific PAGE NUMBER where the information is found.
+                   - Quote exact verses/sentences from the text to support your answer.
+                6. **Explanation**:
+                   - First, give the exact text from the book with page number.
+                   - Then, provide a deep explanation in simple Marathi suited for age ${userAge}.
+                
+                Example Answer Format:
+                पान क्रमांक ५ वर असे लिहिले आहे की डीसी मोटर विद्युत ऊर्जेचे यांत्रिक ऊर्जेमध्ये रूपांतर करते. 
+                याचा अर्थ असा की जेव्हा आपण मोटरला वीज देतो तेव्हा ती गोल फिरते आणि काम करते.
+            `;
+            restartChatButton.disabled = false;
+        }
+
+        // --- API Call ---
+        async function getAIResponse(historyData) {
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${getEffectiveApiKey()}`;
+            try {
+                // Flash model is used for larger context window (PDF content)
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: historyData,
+                        systemInstruction: { parts: [{ text: systemInstruction }] }
+                    })
+                });
+                const result = await response.json();
+                if(result.error) throw new Error(result.error.message);
+                return result.candidates[0].content.parts[0].text.trim();
+            } catch (error) { return "सर्व्हरशी संपर्क तुटला आहे. कृपया पुन्हा प्रयत्न करा."; }
+        }
+
+        // --- Utils ---
+        function cleanTextForTTS(text) {
+            return text.replace(/[\*\[\]\(\)<>`]/g, '')
+                       .replace(/\(.*?\)/g, '')
+                       .replace(/page/gi, 'पान क्रमांक')
+                       .trim();
+        }
+
+        function loadVoices() {
+            voices = synth.getVoices();
+            if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => { voices = synth.getVoices(); };
+        }
+
+        function togglePauseResume() {
+            if (synth.paused) synth.resume();
+            else if (synth.speaking) { synth.pause(); recognition.stop(); setState('BUSY'); }
+        }
+
+        function stopSpeech() {
+            if (!synth.speaking) return;
+            speechManuallyStopped = true; 
+            synth.cancel(); 
+            recognition.stop(); 
+            toggleMediaButtons(true);
+            setTimeout(() => {
+                speechManuallyStopped = false;
+                if (appState !== 'IDLE') {
+                    setState(systemInstruction ? 'CONVERSATION' : 'LISTENING_FOR_WAKEWORD');
+                    startRecognitionSafe();
+                }
+            }, 1000);
+        }
+
+        function replaySpeech() {
+            if (lastSpokenText) { recognition.stop(); setState('BUSY'); speakText(lastSpokenText); }
+        }
+        
+        async function speakText(text, lang = 'mr-IN') {
+            if (synth.speaking) synth.cancel();
+            lastSpokenText = text;
+            speechManuallyStopped = false;
+            if (voices.length === 0) voices = synth.getVoices();
+
+            return new Promise((resolve, reject) => {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.onstart = () => { toggleMediaButtons(false); };
+                utterance.onend = () => {
+                    toggleMediaButtons(true);
+                    if (speechManuallyStopped) reject(new Error("Speech manually stopped"));
+                    else resolve();
+                };
+                utterance.onerror = (e) => { 
+                    toggleMediaButtons(true);
+                    if (e.error === 'interrupted') resolve(); else reject(e.error); 
+                };
+
+                // Try to find a Marathi or Hindi voice
+                let voice = voices.find(v => v.lang === 'mr-IN') || voices.find(v => v.lang === 'hi-IN');
+                if (voice) utterance.voice = voice;
+                
+                utterance.lang = 'mr-IN'; 
+                utterance.rate = 1.0; 
+                utterance.pitch = 1.0; 
+                synth.speak(utterance);
+            });
+        }
+
+        function toggleMediaButtons(disabled) {
+            pauseResumeButton.disabled = disabled;
+            stopSpeechButton.disabled = disabled;
+            replayButton.disabled = disabled;
+        }
+        
+        function logMessage(sender, message) {
+            const div = document.createElement('div');
+            let senderClass = 'text-purple-300 font-semibold';
+            let messageClass = 'text-white';
+
+            if (sender === 'Sir') { senderClass = 'text-yellow-400 font-bold'; messageClass = 'text-gray-100'; }
+            else if (sender === 'तुम्ही') { senderClass = 'text-green-300 font-semibold'; }
+
+            let formattedMessage = message.replace(/\n/g, '<br>');
+            div.innerHTML = `<strong class="${senderClass}">${sender}:</strong> <span class="${messageClass}">${formattedMessage}</span>`;
+            conversationLog.appendChild(div);
+            conversationLog.scrollTop = conversationLog.scrollHeight;
+        }
+
+        async function acquireWakeLock() {
+            if ('wakeLock' in navigator) { 
+                try { 
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    wakeLock.addEventListener('release', () => {
+                        if (appState !== 'IDLE' && document.visibilityState === 'visible') acquireWakeLock();
+                    });
+                } catch (e) {} 
+            }
+        }
+
+        async function releaseWakeLock() {
+            if (wakeLock) { try { await wakeLock.release(); wakeLock = null; } catch (e) {} }
+        }
+
+        async function endChat() {
+            appState = 'IDLE'; setState('IDLE');
+            speechManuallyStopped = true;
+            if (synth.speaking) synth.cancel();
+            if (recognition) try { recognition.stop(); } catch (e) {}
+            await releaseWakeLock();
+            userName = ''; chatHistory = []; pdfTextContent = '';
+            fileLabel.textContent = "तुमची PDF फाईल येथे अपलोड करा";
+            pageCountLabel.classList.add('hidden');
+            conversationLog.innerHTML = '<div class="text-white/60 text-center">संवाद संपला.</div>';
+            restartChatButton.disabled = true;
+        }
+
+        async function restartChat() {
+            if (!systemInstruction) return;
+            if (synth.speaking) synth.cancel();
+            appState = 'IDLE'; setState('IDLE');
+            conversationLog.innerHTML = '';
+            chatHistory = [];
+            logMessage('माहिती', `सत्र पुन्हा सुरू झाले. PDF संदर्भात प्रश्न विचारा.`);
+        }
+    </script>
+</body>
+</html>
