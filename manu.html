@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>महर्षी भृगू - मनुस्मृती आणि सनातन धर्म AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Noto Serif Devanagari', 'Inter', serif; }
+        
+        /* थीम - प्राचीन भारत (Ancient India - Multicolored) */
+        /* गडद मरून (Maroon), वन हिरवा (Forest Green), आणि मातीचा रंग (Earth) */
+        .ancient-bg {
+            background: radial-gradient(circle at center, #2c0b0e, #1a2f1c, #1f1505, #000000);
+            background-size: 300% 300%;
+            animation: ancientGradient 20s ease infinite;
+        }
+
+        @keyframes ancientGradient {
+            0% { background-position: 0% 50%; }
+            25% { background-position: 50% 100%; }
+            50% { background-position: 100% 50%; }
+            75% { background-position: 50% 0%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        /* ॲनिमेशन - यज्ञाचा प्रकाश */
+        .listening-pulse { animation: pulse 2s infinite ease-in-out; }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.6); } /* Golden Glow */
+            70% { box-shadow: 0 0 0 15px rgba(234, 179, 8, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0); }
+        }
+
+        /* बटन्स - नवरत्न आणि धातूंचे रंग */
+        .icon-btn {
+            @apply p-3 rounded-full text-white transition-all duration-200
+                   shadow-lg border border-yellow-600
+                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500
+                   disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none;
+        }
+        
+        .utility-btn {
+            @apply w-full py-3 px-2 rounded-lg text-sm font-semibold transition-colors
+                   text-yellow-100 border border-yellow-800
+                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-600
+                   disabled:opacity-50 disabled:cursor-not-allowed;
+            background-color: #3e2723; /* Dark Wood */
+        }
+        .utility-btn:hover { background-color: #5d4037; }
+
+        .custom-checkbox {
+            @apply w-4 h-4 text-yellow-600 bg-yellow-950 border-yellow-700 rounded focus:ring-yellow-500 focus:ring-2 ring-offset-gray-900;
+        }
+        
+        .custom-input {
+            @apply block w-3/4 mx-auto text-center border-2 border-yellow-700 rounded-lg p-3 outline-none transition-all font-semibold;
+            background-color: #271c19 !important; /* Very dark wood */
+            color: #fef3c7 !important;             /* Parchment text */
+            caret-color: #d97706 !important;       /* Amber cursor */
+        }
+        .custom-input::placeholder {
+            color: #b45309 !important;
+            opacity: 0.7 !important;
+        }
+
+        /* स्क्रोलबार - तांब्याच्या रंगासारखा */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1a0500; }
+        ::-webkit-scrollbar-thumb { background: #b45309; border-radius: 4px; border: 1px solid #78350f; }
+        ::-webkit-scrollbar-thumb:hover { background: #d97706; }
+
+        .chat-font { font-family: 'Noto Serif Devanagari', serif; }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body class="ancient-bg text-yellow-50 flex items-center justify-center min-h-screen p-4" oncontextmenu="return false;">
+
+    <div class="bg-black/60 backdrop-blur-md rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-2xl flex flex-col h-[95vh] md:h-auto border-t-8 border-yellow-700 border-b-8 border-red-900 border-x-2 border-green-900">
+        
+        <div class="flex items-center justify-between mb-4 shrink-0 border-b border-yellow-900/50 pb-2">
+            <h1 class="text-2xl md:text-3xl font-bold text-white chat-font">
+                <span class="text-yellow-500">महर्षी</span> <span class="text-red-400">भृगू</span> <span class="text-green-400 text-lg md:text-xl block md:inline">- मनुस्मृती ज्ञान</span>
+            </h1>
+            <div id="status-indicator" class="w-4 h-4 rounded-full bg-gray-600 transition-colors border border-gray-500" title="मौन"></div>
+        </div>
+        <div class="text-center mb-2">
+             <span class="text-xs text-yellow-600 uppercase tracking-widest font-bold">|| ॐ मनुर्भव जनया दैव्यं जनम् ||</span>
+        </div>
+
+        <div id="conversation-log" class="flex-grow overflow-y-auto bg-[#18100c]/90 rounded-lg p-4 mb-4 border-2 border-yellow-800 space-y-4 shadow-inner min-h-[200px] chat-font">
+            <div class="text-yellow-200/60 text-center mt-10 font-medium">
+                सुरू करण्यासाठी "गुरुजी" किंवा "महर्षी" म्हणा.<br>
+                <span class="text-sm opacity-80 text-red-300 font-bold mt-2 block">धर्मो रक्षति रक्षितः</span>
+            </div>
+        </div>
+
+        <div class="flex justify-center gap-8 mb-4 shrink-0 bg-[#2b1d1a]/60 p-2 rounded-xl border border-yellow-900">
+            <button id="pause-resume-button" class="icon-btn bg-yellow-700 hover:bg-yellow-600" title="थांबवा/पुन्हा सुरू करा" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+                </svg>
+            </button>
+            
+            <button id="stop-speech-button" class="icon-btn bg-red-800 hover:bg-red-700 border-red-600" title="बोलणे थांबवा" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z" />
+                </svg>
+            </button>
+
+            <button id="replay-button" class="icon-btn bg-green-800 hover:bg-green-700 border-green-600" title="पुन्हा ऐका" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                </svg>
+            </button>
+        </div>
+
+        <div class="flex flex-col gap-4 mb-4 shrink-0 w-full text-center">
+            <div class="w-full">
+                <label class="text-xs text-yellow-500 font-bold mb-1 block">शिष्याचे नाव</label>
+                <input type="text" id="manual-name" class="custom-input" placeholder="तुमचे नाव">
+            </div>
+            <div class="w-full">
+                <label class="text-xs text-yellow-500 font-bold mb-1 block">वय (वर्षे)</label>
+                <input type="number" id="manual-age" class="custom-input" placeholder="उदा. २५">
+            </div>
+        </div>
+
+        <div class="flex items-center justify-center gap-2 mb-2 shrink-0">
+            <input type="checkbox" id="remember-me-checkbox" class="custom-checkbox">
+            <label for="remember-me-checkbox" class="text-sm text-yellow-200 cursor-pointer select-none font-semibold">
+                माहिती स्मरणात ठेवा
+            </label>
+        </div>
+
+        <div class="w-full flex flex-col items-center justify-center mb-4 shrink-0">
+            <button id="advance-toggle-btn" class="text-xs text-yellow-600 hover:text-yellow-400 underline mb-2 focus:outline-none font-bold">
+                ▼ प्रगत सेटिंग्ज (API Key)
+            </button>
+
+            <div id="advance-container" class="hidden w-full bg-[#1e140f] border border-yellow-800 rounded-lg p-4 flex flex-col gap-3 transition-all">
+                
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="use-custom-key-checkbox" class="custom-checkbox">
+                    <label for="use-custom-key-checkbox" class="text-sm text-yellow-200 cursor-pointer select-none font-semibold">
+                        स्वतःची API Key वापरा
+                    </label>
+                </div>
+
+                <input type="text" id="custom-api-key-input" class="custom-input text-xs w-full !w-full" placeholder="API Key येथे पेस्ट करा" disabled>
+                
+                <button id="paste-key-btn" type="button" disabled class="w-full py-2 px-4 bg-yellow-900 hover:bg-yellow-800 text-white text-xs rounded transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-bold">
+                    पेस्ट करा
+                </button>
+
+                <a href="https://ai.google.dev/gemini-api/docs/api-key" target="_blank" class="text-center w-full py-2 bg-[#2c1a15] hover:bg-[#3e231c] text-xs text-yellow-400 rounded transition-colors border border-yellow-800 font-bold">
+                    Google Gemini API Key मिळवा ↗
+                </a>
+            </div>
+        </div>
+
+        <button id="talk-button" class="w-full py-4 px-6 rounded-lg text-lg font-bold transition-all duration-300 ease-in-out shrink-0
+                       bg-gradient-to-r from-yellow-700 via-orange-800 to-red-900 text-white shadow-lg shadow-yellow-900/40
+                       hover:from-yellow-600 hover:via-orange-700 hover:to-red-800 hover:shadow-yellow-500/30 hover:-translate-y-0.5
+                       focus:outline-none focus:ring-4 focus:ring-yellow-500 focus:ring-opacity-50
+                       disabled:from-gray-700 disabled:to-gray-800 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-y-0 tracking-wide border border-yellow-600/30">
+            संवाद साधा (प्रारंभ)
+        </button>
+
+        <div class="mt-4 grid grid-cols-3 gap-3 shrink-0">
+            <button id="restart-chat-button" class="utility-btn" disabled>पुन्हा प्रारंभ</button>
+            <button id="share-button" class="utility-btn bg-yellow-900/40 hover:bg-yellow-800 border-yellow-800 text-yellow-200">ज्ञान वाटा</button>
+            <button id="end-chat-button" class="utility-btn !text-red-300 !border-red-800 hover:!bg-red-900/30" disabled>विश्राम</button>
+        </div>
+
+    </div>
+
+    <script>
+        document.addEventListener('contextmenu', event => event.preventDefault());
+
+        function enterFullScreen() {
+            const elem = document.documentElement;
+            if (elem.requestFullscreen) { elem.requestFullscreen(); } 
+            else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); } 
+            else if (elem.msRequestFullscreen) { elem.msRequestFullscreen(); }
+        }
+
+        const talkButton = document.getElementById('talk-button');
+        const statusIndicator = document.getElementById('status-indicator');
+        const conversationLog = document.getElementById('conversation-log');
+        const rememberMeCheckbox = document.getElementById('remember-me-checkbox');
+        const manualNameInput = document.getElementById('manual-name');
+        const manualAgeInput = document.getElementById('manual-age');
+        const pauseResumeButton = document.getElementById('pause-resume-button');
+        const stopSpeechButton = document.getElementById('stop-speech-button');
+        const replayButton = document.getElementById('replay-button');
+        const shareButton = document.getElementById('share-button');
+        const endChatButton = document.getElementById('end-chat-button');
+        const restartChatButton = document.getElementById('restart-chat-button');
+        
+        const advanceToggleBtn = document.getElementById('advance-toggle-btn');
+        const advanceContainer = document.getElementById('advance-container');
+        const useCustomKeyCheckbox = document.getElementById('use-custom-key-checkbox');
+        const customApiKeyInput = document.getElementById('custom-api-key-input');
+        const pasteKeyBtn = document.getElementById('paste-key-btn');
+
+        const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
+        let appState = 'IDLE'; 
+        let userName = '';
+        let userAge = 25; 
+        let chatHistory = [];
+        let systemInstruction = '';
+        let recognition;
+        let lastSpokenText = ''; 
+        let speechManuallyStopped = false; 
+        const synth = window.speechSynthesis;
+        let voices = [];
+        let wakeLock = null;
+
+        window.onload = () => {
+            if (synth.speaking) synth.cancel();
+            loadUserData(); 
+            loadVoices();   
+        };
+
+        advanceToggleBtn.addEventListener('click', () => {
+            advanceContainer.classList.toggle('hidden');
+            advanceContainer.classList.toggle('flex');
+        });
+
+        useCustomKeyCheckbox.addEventListener('change', () => {
+            const isChecked = useCustomKeyCheckbox.checked;
+            customApiKeyInput.disabled = !isChecked;
+            pasteKeyBtn.disabled = !isChecked;
+            saveUserData(); 
+            if (isChecked) customApiKeyInput.focus();
+        });
+
+        customApiKeyInput.addEventListener('input', saveUserData);
+
+        pasteKeyBtn.addEventListener('click', async () => {
+            try {
+                const text = await navigator.clipboard.readText();
+                if(text) {
+                    customApiKeyInput.value = text;
+                    saveUserData();
+                    const originalText = pasteKeyBtn.innerHTML;
+                    pasteKeyBtn.textContent = "पेस्ट झाले!";
+                    setTimeout(() => { pasteKeyBtn.innerHTML = originalText; }, 1000);
+                }
+            } catch (err) { alert('पेस्ट करता आले नाही. कृपया टाईप करा.'); }
+        });
+
+        function getEffectiveApiKey() {
+            if (useCustomKeyCheckbox.checked && customApiKeyInput.value.trim().length > 10) {
+                return customApiKeyInput.value.trim();
+            }
+            return DEFAULT_API_KEY;
+        }
+
+        function loadUserData() {
+            try {
+                const savedName = localStorage.getItem('manu_userName');
+                const savedAge = localStorage.getItem('manu_userAge');
+                const savedRemember = localStorage.getItem('manu_remember');
+
+                if (savedRemember === 'true') {
+                    rememberMeCheckbox.checked = true;
+                    if (savedName) manualNameInput.value = savedName;
+                    if (savedAge) manualAgeInput.value = savedAge;
+                    if (savedName) talkButton.textContent = `नमो नमः ${savedName}`;
+                }
+
+                const savedUseKey = localStorage.getItem('manu_useCustomKey');
+                const savedKey = localStorage.getItem('manu_customKey');
+
+                if (savedUseKey === 'true') {
+                    useCustomKeyCheckbox.checked = true;
+                    customApiKeyInput.disabled = false;
+                    pasteKeyBtn.disabled = false;
+                    if (savedKey) customApiKeyInput.value = savedKey;
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function saveUserData() {
+            try {
+                if (rememberMeCheckbox.checked) {
+                    localStorage.setItem('manu_remember', 'true');
+                    localStorage.setItem('manu_userName', manualNameInput.value.trim());
+                    localStorage.setItem('manu_userAge', manualAgeInput.value.trim());
+                } else {
+                    localStorage.removeItem('manu_remember');
+                    localStorage.removeItem('manu_userName');
+                    localStorage.removeItem('manu_userAge');
+                }
+                localStorage.setItem('manu_useCustomKey', useCustomKeyCheckbox.checked);
+                if (customApiKeyInput.value) {
+                    localStorage.setItem('manu_customKey', customApiKeyInput.value.trim());
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function loadChatContext(name) {
+            const key = `manu_history_${name.toLowerCase()}`;
+            const savedHistory = localStorage.getItem(key);
+            try { return savedHistory ? JSON.parse(savedHistory) : []; } catch (e) { return []; }
+        }
+
+        function saveChatContext() {
+            if (!userName) return;
+            const key = `manu_history_${userName.toLowerCase()}`;
+            const limitedHistory = chatHistory.slice(-20); 
+            localStorage.setItem(key, JSON.stringify(limitedHistory));
+        }
+
+        manualNameInput.addEventListener('input', () => { if(rememberMeCheckbox.checked) saveUserData(); });
+        manualAgeInput.addEventListener('input', () => { if(rememberMeCheckbox.checked) saveUserData(); });
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (!SpeechRecognition) {
+            logMessage('त्रुटी', 'हा ब्राउझर सपोर्ट करत नाही. कृपया Google Chrome वापरा.');
+            talkButton.disabled = true;
+        } else {
+            try {
+                recognition = new SpeechRecognition();
+                recognition.continuous = false; 
+                recognition.interimResults = false;
+                recognition.lang = 'mr-IN'; 
+
+                recognition.onresult = handleSpeechResult;
+                recognition.onend = handleSpeechEnd;
+                
+                recognition.onerror = (event) => {
+                    if (event.error === 'no-speech' && appState !== 'IDLE' && appState !== 'BUSY') {
+                        startRecognitionSafe();
+                    } else if (event.error === 'not-allowed') {
+                        setState('IDLE');
+                    }
+                };
+            } catch (e) { alert("माईक त्रुटी: " + e.message); }
+        }
+
+        function startRecognitionSafe() {
+            if (!recognition) return;
+            try { recognition.start(); } catch (e) {}
+        }
+
+        talkButton.addEventListener('click', toggleListening);
+        pauseResumeButton.addEventListener('click', togglePauseResume);
+        stopSpeechButton.addEventListener('click', stopSpeech);
+        replayButton.addEventListener('click', replaySpeech);
+        shareButton.addEventListener('click', shareChat);
+        endChatButton.addEventListener('click', endChat);
+        restartChatButton.addEventListener('click', restartChat);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        async function toggleListening() {
+            if (appState === 'IDLE') {
+                try { enterFullScreen(); } catch(e) {}
+            }
+
+            try {
+                if (appState === 'IDLE') {
+                    talkButton.textContent = "श्रवण करत आहे...";
+                    talkButton.disabled = true;
+                    await acquireWakeLock(); 
+                    
+                    const inputName = manualNameInput.value.trim();
+                    const inputAge = manualAgeInput.value.trim();
+
+                    if (inputName && inputAge) {
+                        userName = inputName;
+                        userAge = parseInt(inputAge);
+                        saveUserData(); 
+                        buildSystemPrompt(); 
+
+                        const previousHistory = loadChatContext(userName);
+                        
+                        if (previousHistory.length > 0) {
+                            chatHistory = previousHistory;
+                            logMessage('सिस्टम', 'महर्षी ध्यान लावून स्मरणात आहेत...');
+                            
+                            setState('BUSY');
+                            const welcomeBackPrompt = "User परत आला आहे. म्हणा 'कल्याणमस्तु'.";
+                            
+                            const tempHistory = [...chatHistory, { role: 'user', parts: [{ text: welcomeBackPrompt }] }];
+                            const welcomeText = await getAIResponse(tempHistory);
+                            
+                            logMessage('महर्षी भृगू', welcomeText);
+                            await speakText(welcomeText, 'mr-IN');
+                            setState('CONVERSATION');
+                            startRecognitionSafe();
+
+                        } else {
+                            if (chatHistory.length === 0) {
+                                chatHistory.push({ role: 'user', parts: [{ text: "Start session." }] });
+                                chatHistory.push({ role: 'model', parts: [{ text: `धर्मो रक्षति रक्षितः` }] });
+                            }
+                            
+                            const welcomeText = `आयुष्यमान भव ${userName}. तुझे वय ${userAge} वर्षे आहे. मनुस्मृतीच्या आधारे धर्माचे ज्ञान घेण्यासाठी तू आला आहेस. तुझा प्रश्न विचार.`;
+                            logMessage('महर्षी भृगू', welcomeText);
+                            
+                            setState('BUSY'); 
+                            await speakText(welcomeText, 'mr-IN');
+                            setState('CONVERSATION');
+                            startRecognitionSafe();
+                        }
+
+                    } else {
+                        setState('LISTENING_FOR_WAKEWORD');
+                        startRecognitionSafe();
+                        if (conversationLog.childElementCount < 3) logMessage('माहिती', '"गुरुजी" किंवा "महर्षी" म्हणा.');
+                    }
+
+                } else {
+                    setState('IDLE');
+                    recognition.stop();
+                    if (synth.speaking) synth.cancel();
+                    await releaseWakeLock();
+                }
+            } catch (error) {
+                setState('IDLE');
+            }
+        }
+
+        function setState(newState) {
+            appState = newState;
+            switch (newState) {
+                case 'IDLE':
+                    talkButton.textContent = 'संवाद साधा (प्रारंभ)';
+                    talkButton.disabled = false;
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-gray-600 transition-colors';
+                    endChatButton.disabled = true;
+                    talkButton.classList.remove('from-yellow-700', 'to-red-900');
+                    talkButton.classList.add('from-yellow-600', 'to-red-800');
+                    manualNameInput.disabled = false;
+                    manualAgeInput.disabled = false;
+                    break;
+                case 'BUSY':
+                    talkButton.textContent = 'चिंतन करत आहे...';
+                    talkButton.disabled = true;
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-400 transition-colors';
+                    endChatButton.disabled = false;
+                    break;
+                default:
+                    talkButton.textContent = 'श्रवण थांबवा';
+                    talkButton.disabled = false;
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-500 listening-pulse transition-colors';
+                    endChatButton.disabled = false;
+                    talkButton.classList.remove('from-yellow-600', 'to-red-800');
+                    talkButton.classList.add('from-yellow-700', 'to-red-900');
+                    manualNameInput.disabled = true;
+                    manualAgeInput.disabled = true;
+                    break;
+            }
+        }
+
+        function handleSpeechEnd() {
+            if (appState !== 'IDLE' && appState !== 'BUSY') startRecognitionSafe();
+            else if (appState === 'IDLE') setState('IDLE'); 
+        }
+        
+        async function handleSpeechResult(event) {
+            const transcript = event.results[event.results.length - 1][0].transcript.trim();
+            if (!transcript) return;
+            console.log(`Heard: ${transcript}`);
+            
+            const currentState = appState;
+            recognition.stop();
+            setState('BUSY');
+
+            try {
+                switch (currentState) {
+                    case 'LISTENING_FOR_WAKEWORD':
+                        const t = transcript.toLowerCase();
+                        if (t.includes('guruji') || t.includes('maharishi') || t.includes('bhrigu') || t.includes('गुरुजी') || t.includes('महर्षी') || t.includes('भृगू')) {
+                            const greeting = "नमो नमः. मी महर्षी भृगू आहे. मी तुला मनुस्मृतीचे ज्ञान देईन. तुझे नाव काय आहे?";
+                            logMessage('महर्षी भृगू', greeting);
+                            await speakText(greeting, 'mr-IN');
+                            setState('LISTENING_FOR_NAME');
+                            startRecognitionSafe(); 
+                        } else {
+                            setState('LISTENING_FOR_WAKEWORD');
+                            startRecognitionSafe();
+                        }
+                        break;
+
+                    case 'LISTENING_FOR_NAME':
+                        logMessage('तुम्ही', transcript);
+                        userName = await extractNameFromTranscript(transcript);
+                        manualNameInput.value = userName; 
+                        
+                        const agePrompt = `कल्याणमस्तु ${userName}. तुझे वय काय आहे?`;
+                        logMessage('महर्षी भृगू', agePrompt);
+                        await speakText(agePrompt, 'mr-IN');
+                        setState('LISTENING_FOR_AGE');
+                        startRecognitionSafe();
+                        break;
+                    
+                    case 'LISTENING_FOR_AGE':
+                        logMessage('तुम्ही', transcript);
+                        userAge = await extractAgeFromTranscript(transcript);
+                        manualAgeInput.value = userAge; 
+                        
+                        saveUserData();
+                        buildSystemPrompt(); 
+
+                        const history = loadChatContext(userName);
+                        if(history.length > 0) chatHistory = history;
+
+                        const startPrompt = `${userAge} वर्षे वयाच्या मनुष्याने धर्माचे पालन कसे करावे, हे जाणून घेण्यासाठी काय प्रश्न आहे?`;
+                        logMessage('महर्षी भृगू', startPrompt);
+                        await speakText(startPrompt, 'mr-IN');
+                        setState('CONVERSATION');
+                        startRecognitionSafe();
+                        break;
+
+                    case 'CONVERSATION':
+                        logMessage(userName || 'तुम्ही', transcript);
+                        chatHistory.push({ role: 'user', parts: [{ text: transcript }] });
+                        saveChatContext();
+
+                        const aiResponseText = await generateTextResponseFromChat();
+                        
+                        // फिल्टर
+                        const noBracketText = cleanBrackets(aiResponseText);
+                        const cleanedResponseText = cleanTextForTTS(noBracketText);
+
+                        chatHistory.push({ role: 'model', parts: [{ text: cleanedResponseText }] });
+                        saveChatContext();
+
+                        logMessage('महर्षी भृगू', cleanedResponseText);
+                        
+                        try {
+                            await speakText(cleanedResponseText, 'mr-IN');
+                        } catch (error) {
+                            if (error.message === "Speech manually stopped") return;
+                            throw error;
+                        }
+                        
+                        setState('CONVERSATION');
+                        startRecognitionSafe();
+                        break;
+                }
+            } catch (error) {
+                if (systemInstruction) { setState('CONVERSATION'); startRecognitionSafe(); }
+                else { setState('LISTENING_FOR_WAKEWORD'); startRecognitionSafe(); }
+            }
+        }
+
+        // --- मुख्य लॉजिक (Brain) - महर्षी भृगू सिस्टम प्रॉम्प्ट ---
+        function buildSystemPrompt() {
+            
+            let ageToneInstruction = "";
+            let conceptsToFocus = "";
+
+            if (userAge < 15) {
+                ageToneInstruction = `User is a CHILD (Balak, ${userAge} years). Focus on Obedience to parents (Matru Devo Bhava), Discipline (Brahmacharya), and Truthfulness.`;
+                conceptsToFocus = "Teach basic ethics: respecting elders, speaking truth, studying hard.";
+            } else if (userAge >= 15 && userAge < 25) {
+                ageToneInstruction = `User is a STUDENT (Brahmachari, ${userAge} years). Focus on Self-control (Indriya Nigraha), Studying Vedas/Knowledge, and avoiding distractions.`;
+                conceptsToFocus = "Focus on: Controlling senses, chastity, service to the Guru, and preparation for future responsibilities.";
+            } else if (userAge >= 25 && userAge < 60) {
+                ageToneInstruction = `User is a HOUSEHOLDER (Grihastha, ${userAge} years). Focus on Family Duties, Karma, Social Order (Varna), and Righteous Wealth (Artha).`;
+                conceptsToFocus = "Focus on: Duties towards family, guests (Atithi), society, upholding the Varna system for social order, and gender roles within the family.";
+            } else {
+                ageToneInstruction = `User is an ELDER (Vanaprasthi, ${userAge} years). Focus on Detachment, Spiritual Knowledge, and passing wisdom to the next generation.`;
+                conceptsToFocus = "Focus on: Renunciation, meditation, and preparing for the final journey.";
+            }
+
+            systemInstruction = `
+                You are "Maharishi Bhrigu" (महर्षी भृगू), the one who listened to Manu and is now reciting the "Manusmriti" to the user.
+                User Name: ${userName}, Age: ${userAge}.
+                
+                YOUR PERSONA:
+                You are an ancient, authoritative, and wise Vedic Sage. You believe in the eternal laws of Dharma as written in Manusmriti.
+                
+                CONTEXT: ${ageToneInstruction}
+                THEMES: ${conceptsToFocus}
+
+                CORE TEACHINGS TO UPHOLD (Manusmriti Based):
+                1. **Dharma (Duty):** Everyone has a specific duty based on their nature and station in life.
+                2. **Social Order (Varna):** Society is structured like a body. The hierarchy is essential for order. Explain duties of Brahmins (Knowledge), Kshatriyas (Protection), Vaishyas (Trade), Shudras (Service) strictly as per ancient text context.
+                3. **Gender Roles:** Women are to be honored in the family (Yatra naryastu pujyante...), but they must be protected by Father in childhood, Husband in youth, and Son in old age.
+                4. **Justice (Danda):** The King (or State) must use Danda (Punishment) to keep the world in order. Without fear of punishment, the strong would roast the weak.
+                5. **Virtues:** Ahimsa (Non-violence), Satya (Truth), Asteya (Non-stealing), Shoucham (Purity), Indriya-nigraha (Control of senses).
+
+                STRICT RESPONSE RULES:
+                1. **LANGUAGE:** PURE MARATHI (Sanskritized/Gravid Marathi). Use words like 'वत्स', 'बाळ', 'कल्याणमस्तु', 'सावधान'.
+                2. **FORMAT:** - First, quote a relevant **Sanskrit Verse (Shloka)** from Manusmriti (or broadly Dharmashastra) related to the question.
+                   - Then, explain it in Marathi deeply.
+                   - Finally, give a practical instruction for the user's age.
+                3. **RESTRICTIONS:** - **NO Markdown symbols** like *, **, #, >, [ ], ( ). 
+                   - NO Shortforms. 
+                   - NO English words.
+                4. **TONE:** Do not be apologetic about the ancient rules. State them as they are in the text, as universal laws of that time.
+
+                EXAMPLE RESPONSE STRUCTURE (Do not use brackets in output):
+                वत्स तुझा प्रश्न योग्य आहे
+                मनुस्मृती मध्ये श्लोक आहे
+                धृतिः क्षमा दमोऽस्तेयं शौचमिन्द्रियनिग्रहः
+                याचा अर्थ असा की धैर्य क्षमा आणि इंद्रिय निग्रह हे धर्माचे लक्षण आहे
+                हे मानवा तू तुझ्या वयानुसार या गुणांचे पालन कर आणि समाज व्यवस्था टिकव
+                
+                Always end with a blessing like "कल्याणमस्तु" or "धर्मो रक्षति रक्षितः".
+            `;
+            restartChatButton.disabled = false;
+        }
+
+        // --- API कॉल्स ---
+        async function getAIResponse(historyData) {
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: historyData,
+                        systemInstruction: { parts: [{ text: systemInstruction }] }
+                    })
+                });
+                const result = await response.json();
+                return result.candidates[0].content.parts[0].text.trim();
+            } catch (error) { return "संपर्क तुटला आहे. ॐ नमः शिवाय म्हणा आणि पुन्हा प्रयत्न करा."; }
+        }
+
+        async function generateTextResponseFromChat() { return await getAIResponse(chatHistory); }
+
+        async function extractNameFromTranscript(transcript) {
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: `Extract First Name from audio: "${transcript}". Return ONLY the name in Marathi script. If unclear return "शिष्य".` }] }] })
+                });
+                const result = await response.json();
+                let name = result.candidates[0].content.parts[0].text.trim();
+                return (name.length < 2) ? "शिष्य" : name.replace(/['".]/g, '');
+            } catch (error) { return "शिष्य"; }
+        }
+
+        async function extractAgeFromTranscript(transcript) {
+             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
+             try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: `Extract age number from: "${transcript}". Return ONLY digits. Default 25.` }] }] })
+                });
+                const result = await response.json();
+                let age = parseInt(result.candidates[0].content.parts[0].text.trim());
+                return isNaN(age) ? 25 : age;
+            } catch (e) { return 25; }
+        }
+
+        function cleanBrackets(text) {
+             // Remove all brackets, asterisks, and special markdown chars
+             return text.replace(/[\*\[\]\(\)<>`#]/g, '')
+                        .replace(/\{.*?\}/g, '');
+        }
+
+        function cleanTextForTTS(text) {
+            let cleaned = text.replace(/[\*#`<>]/g, '').trim();
+            return cleaned;
+        }
+
+        function loadVoices() {
+            voices = synth.getVoices();
+            if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => { voices = synth.getVoices(); };
+        }
+
+        function togglePauseResume() {
+            if (synth.paused) synth.resume();
+            else if (synth.speaking) { synth.pause(); recognition.stop(); setState('BUSY'); }
+        }
+
+        function stopSpeech() {
+            if (!synth.speaking) return;
+            speechManuallyStopped = true; 
+            synth.cancel(); 
+            recognition.stop(); 
+            toggleMediaButtons(true);
+            logMessage('माहिती', 'शांत.');
+            setTimeout(() => {
+                speechManuallyStopped = false;
+                if (appState !== 'IDLE') {
+                    if (systemInstruction) { setState('CONVERSATION'); startRecognitionSafe(); }
+                    else { setState('LISTENING_FOR_WAKEWORD'); startRecognitionSafe(); }
+                }
+            }, 1500);
+        }
+
+        function replaySpeech() {
+            if (lastSpokenText) { recognition.stop(); setState('BUSY'); speakText(lastSpokenText); }
+        }
+        
+        async function speakText(text, lang = 'mr-IN') {
+            if (synth.speaking) synth.cancel();
+            lastSpokenText = text;
+            speechManuallyStopped = false;
+            if (voices.length === 0) voices = synth.getVoices();
+
+            return new Promise((resolve, reject) => {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.onstart = () => { toggleMediaButtons(false); };
+                utterance.onend = () => {
+                    toggleMediaButtons(true);
+                    if (speechManuallyStopped) reject(new Error("Speech manually stopped"));
+                    else resolve();
+                };
+                utterance.onerror = (e) => { 
+                    toggleMediaButtons(true);
+                    if (e.error === 'interrupted') resolve(); else reject(e.error); 
+                };
+
+                // पुरुषाचा आवाज (साधूसारखा गंभीर) निवडण्याचा प्रयत्न
+                let vedicVoice = voices.find(voice => voice.lang === 'mr-IN' && voice.name.includes('Male')) || 
+                                 voices.find(voice => voice.lang === 'hi-IN' && voice.name.includes('Male')) ||
+                                 voices.find(voice => voice.lang === 'mr-IN');
+                                 
+                if (vedicVoice) utterance.voice = vedicVoice;
+                utterance.lang = 'mr-IN'; 
+                utterance.rate = 0.85; // सावकाश, गंभीर आवाज
+                utterance.pitch = 0.7; // खोल आवाज (Deep voice for Sage)
+                
+                synth.speak(utterance);
+            });
+        }
+
+        function toggleMediaButtons(disabled) {
+            pauseResumeButton.disabled = disabled;
+            stopSpeechButton.disabled = disabled;
+            replayButton.disabled = disabled;
+        }
+        
+        function logMessage(sender, message) {
+            const div = document.createElement('div');
+            let senderClass = 'text-yellow-300 font-semibold';
+            let messageClass = 'text-white';
+
+            if (sender === 'महर्षी भृगू') { senderClass = 'text-yellow-500 font-bold'; messageClass = 'text-yellow-50'; }
+            else if (sender === 'तुम्ही') { senderClass = 'text-green-300 font-semibold'; }
+
+            let formattedMessage = message.replace(/\n/g, '<br>');
+            
+            div.innerHTML = `<strong class="${senderClass}">${sender}:</strong> <span class="${messageClass}">${formattedMessage}</span>`;
+            conversationLog.appendChild(div);
+            conversationLog.scrollTop = conversationLog.scrollHeight;
+        }
+
+        function getChatLogAsText() {
+            const messages = [];
+            conversationLog.querySelectorAll('div').forEach(div => { if (div.textContent) messages.push(div.textContent); });
+            return messages.join('\n');
+        }
+
+        async function shareChat() {
+            const chatText = getChatLogAsText();
+            if (!chatText.trim()) return;
+            try { await navigator.share({ title: 'मनुस्मृती ज्ञान', text: chatText }); } 
+            catch (err) { try { await navigator.clipboard.writeText(chatText); logMessage('माहिती', 'पाठ कॉपी केली'); } catch (e) {} }
+        }
+
+        async function acquireWakeLock() {
+            if ('wakeLock' in navigator) { 
+                try { 
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    wakeLock.addEventListener('release', () => {
+                        if (appState !== 'IDLE' && document.visibilityState === 'visible') acquireWakeLock();
+                    });
+                } catch (e) {} 
+            }
+        }
+
+        async function releaseWakeLock() {
+            if (wakeLock) { try { await wakeLock.release(); wakeLock = null; } catch (e) {} }
+        }
+
+        async function handleVisibilityChange() {
+            if (appState !== 'IDLE' && document.visibilityState === 'visible') await acquireWakeLock();
+        }
+
+        async function endChat() {
+            appState = 'IDLE'; setState('IDLE');
+            speechManuallyStopped = true;
+            if (synth.speaking) synth.cancel();
+            if (recognition) try { recognition.stop(); } catch (e) {}
+            await releaseWakeLock();
+            userName = ''; userAge = 25; chatHistory = []; systemInstruction = '';
+            conversationLog.innerHTML = '<div class="text-gray-400 text-center">शुभं भवतु.</div>';
+            restartChatButton.disabled = true;
+        }
+
+        async function restartChat() {
+            if (!systemInstruction) return;
+            if (synth.speaking) synth.cancel();
+            if (recognition) try { recognition.stop(); } catch(e){}
+            appState = 'IDLE'; setState('IDLE');
+            await releaseWakeLock();
+            conversationLog.innerHTML = '';
+            if(userName) {
+                localStorage.removeItem(`manu_history_${userName.toLowerCase()}`);
+                chatHistory = [];
+            }
+            logMessage('माहिती', `अध्ययन पुन्हा सुरू झाले.`);
+        }
+    </script>
+</body>
+</html>
