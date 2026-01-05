@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dhwani Jr - Original Voice Mode</title>
+    <title>Dhwani Jr - Marathi & English Mode</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Comic+Neue:wght@700&display=swap" rel="stylesheet">
     <style>
@@ -111,7 +111,7 @@
 
     <script>
         /* ==========================================================================
-           LOGIC: Std 1 Syllabus + ORIGINAL VOICE LOGIC (Dhwani.html)
+           LOGIC: Std 1 Syllabus + MARATHI TEACHING + ORIGINAL VOICE
            ========================================================================== */
         const SYLLABUS = {
             "english": { name: "English Balbharati", book_link: "https://ebooks.ebalbharati.in/pdfs/103030001.pdf", chapters: ["Unit 1: A Happy Song", "Unit 1: Nature", "Unit 2: Rain", "Unit 2: Things in my Classroom", "Unit 3: Toto - The Hen", "Unit 4: Greeting Cards", "Unit 5: The Monkey and the Log", "Unit 6: Alphabet Song", "Unit 7: Traffic Rules", "Unit 8: The Sun and the Wind"] },
@@ -181,13 +181,20 @@
         function buildSystemPrompt() {
             const subject = SYLLABUS[subjectSelect.value].name;
             const chapter = chapterSelect.value;
+            // MODIFIED PROMPT: Teach in Marathi + English
             systemInstruction = `
-            You are "Dhwani Teacher," a very loving and soft-spoken primary teacher.
-            Student Age: 5 Years old (Std 1). Subject: ${subject}. Chapter: ${chapter}.
-            TEACHING RULES:
-            1. **Format:** Use VERY simple English. Short sentences.
+            You are "Dhwani Teacher," a very loving primary teacher for Std 1 (Age 5).
+            Subject: ${subject}. Chapter: ${chapter}.
+            
+            **LANGUAGE INSTRUCTION:**
+            - You must explain EVERYTHING in **MARATHI** (मराठी) first, then simple English.
+            - Example: "Cat means मांजर" (Cat म्हणजे मांजर).
+            - Keep the Marathi simple and sweet.
+
+            **TEACHING RULES:**
+            1. **Format:** Short sentences. Mix Marathi and English.
             2. **Style:** Be cheerful! Use emojis 🌟.
-            3. **Pattern:** Explain concept (3 lines) -> Fun Summary -> Ask 1 easy question.
+            3. **Pattern:** Explain concept in Marathi (3 lines) -> Fun Summary -> Ask 1 easy question in Marathi.
             4. **Formatting:** Use **Bold** for main words. 
             5. **Ending:** Always add: [🔗 Show Picture](https://www.google.com/search?q=${subject}+${chapter}+cartoon&tbm=isch).
             `;
@@ -197,7 +204,7 @@
         if (SpeechRecognition) {
             recognition = new SpeechRecognition();
             recognition.continuous = false;
-            recognition.lang = 'en-IN'; 
+            recognition.lang = 'mr-IN'; // CHANGED TO LISTEN IN MARATHI/INDIAN ENGLISH
             recognition.onresult = handleSpeechResult;
             recognition.onend = () => { if(appState === 'LISTENING') recognition.start(); else setState('IDLE'); };
         }
@@ -208,7 +215,8 @@
                 talkButton.disabled = true;
                 setState('BUSY');
                 if (chatHistory.length === 0) {
-                    chatHistory.push({ role: 'user', parts: [{ text: "Hello Teacher!" }] });
+                    // Trigger first message from AI
+                    chatHistory.push({ role: 'user', parts: [{ text: "Namaskar Teacher! I am ready." }] });
                     const response = await getAIResponse(chatHistory);
                     chatHistory.push({ role: 'model', parts: [{ text: response }] });
                     logMessage('Dhwani', response);
