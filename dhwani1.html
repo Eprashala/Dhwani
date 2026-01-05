@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dhwani Junior - No Emojis in Audio</title>
+    <title>Dhwani Jr - Marathi Accent Mode</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Comic+Neue:wght@700&display=swap" rel="stylesheet">
     <style>
@@ -111,7 +111,7 @@
 
     <script>
         /* ==========================================================================
-           LOGIC: Std 1 Syllabus, Soft Female Voice, NO EMOJI READING
+           LOGIC: Std 1 Syllabus, MARATHI ACCENT, NO EMOJIS
            ========================================================================== */
         const SYLLABUS = {
             "english": { name: "English Balbharati", book_link: "https://ebooks.ebalbharati.in/pdfs/103030001.pdf", chapters: ["Unit 1: A Happy Song", "Unit 1: Nature", "Unit 2: Rain", "Unit 2: Things in my Classroom", "Unit 3: Toto - The Hen", "Unit 4: Greeting Cards", "Unit 5: The Monkey and the Log", "Unit 6: Alphabet Song", "Unit 7: Traffic Rules", "Unit 8: The Sun and the Wind"] },
@@ -234,44 +234,43 @@
         function startListeningSafe() { try { recognition.start(); } catch(e){} }
         function stopAll() { setState('IDLE'); recognition.stop(); synth.cancel(); }
 
-        // --- TTS LOGIC: SUPER CLEAN FILTER ---
+        // --- TTS LOGIC: MARATHI ACCENT HACK & CLEANER ---
         async function speakText(text) {
             if (synth.speaking) synth.cancel();
             
-            // 1. ADVANCED CLEANER
-            // \p{Extended_Pictographic} catches all Emoji ranges (Think face, Rainbow, etc.)
-            // We also strip markdown links and special characters
+            // CLEAN FILTER: Strips Emojis (All types) & Markdown
             let speakableText = text
-                .replace(/\[.*?\]\(.*?\)/g, "") // Remove Markdown Links
-                .replace(/https?:\/\/\S+/g, "") // Remove URLs
-                .replace(/\p{Extended_Pictographic}/gu, "") // Remove ALL Emojis (Rainbow, Faces, etc.)
-                .replace(/[*#_`~>]/g, "") // Remove Markdown Symbols
-                .replace(/\s+/g, " ") // Collapse spaces
+                .replace(/\[.*?\]\(.*?\)/g, "") // Links
+                .replace(/https?:\/\/\S+/g, "") // URLs
+                .replace(/\p{Extended_Pictographic}/gu, "") // All Emojis
+                .replace(/[*#_`~>]/g, "") // Symbols
+                .replace(/\s+/g, " ")
                 .trim();
             
-            lastSpokenText = text; // Keep emojis for display
+            lastSpokenText = text; 
 
             return new Promise((resolve) => {
                 const utterance = new SpeechSynthesisUtterance(speakableText);
                 
-                // Voice Priority: Google India -> Microsoft India -> Any English India
-                let selectedVoice = voices.find(v => v.name.includes("Google English India")) || 
-                                    voices.find(v => v.name.includes("Microsoft Heera")) || 
+                // ACCENT HACK: 
+                // We prioritize 'mr-IN' (Marathi) voice. 
+                // When a Marathi engine reads English text, it naturally applies a Marathi accent.
+                let selectedVoice = voices.find(v => v.lang === 'mr-IN') || 
+                                    voices.find(v => v.lang === 'hi-IN') || 
                                     voices.find(v => v.lang === 'en-IN');
                 
                 if (selectedVoice) utterance.voice = selectedVoice;
                 
-                utterance.rate = 0.8; // Slow for kids
-                utterance.pitch = 1.1; // Soft tone
-                utterance.onend = resolve; 
-                utterance.onerror = resolve;
+                utterance.rate = 0.8; 
+                utterance.pitch = 1.1; 
+                utterance.onend = resolve; utterance.onerror = resolve;
                 synth.speak(utterance);
             });
         }
 
         function logMessage(sender, msg) {
             const div = document.createElement('div');
-            // Format for DISPLAY: Keep bold and links
+            // Format for DISPLAY
             let displayHtml = msg.replace(/\[(.*?)\]\((.*?)\)/g, '<br><a href="$2" target="_blank" class="inline-block mt-2 bg-blue-100 text-blue-600 px-3 py-1 rounded-full text-sm border-2 border-blue-200">🔗 $1</a>')
                                .replace(/\*\*(.*?)\*\*/g, '<span class="text-indigo-700 font-black">$1</span>')
                                .replace(/\n/g, '<br>');
