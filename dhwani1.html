@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dhwani Junior - Mobile Fix</title>
+    <title>Dhwani Junior - No Emojis in Audio</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Comic+Neue:wght@700&display=swap" rel="stylesheet">
     <style>
@@ -13,13 +13,13 @@
             background-color: #fdf6e3; 
             background-image: linear-gradient(#e5e7eb 1px, transparent 1px);
             background-size: 100% 2rem; 
-            overscroll-behavior: none; /* Prevents pull-to-refresh on mobile */
+            overscroll-behavior: none; 
         }
 
         /* TEXTBOOK FORMATTING */
         .textbook-text {
             font-family: 'Comic Neue', cursive; 
-            font-size: 1.25rem; /* Slightly smaller for mobile readability */
+            font-size: 1.25rem; 
             line-height: 1.6;  
             font-weight: 700;  
             color: #2c3e50;
@@ -111,7 +111,7 @@
 
     <script>
         /* ==========================================================================
-           LOGIC: Std 1 Syllabus, Soft Female Voice, Symbol Cleaning
+           LOGIC: Std 1 Syllabus, Soft Female Voice, NO EMOJI READING
            ========================================================================== */
         const SYLLABUS = {
             "english": { name: "English Balbharati", book_link: "https://ebooks.ebalbharati.in/pdfs/103030001.pdf", chapters: ["Unit 1: A Happy Song", "Unit 1: Nature", "Unit 2: Rain", "Unit 2: Things in my Classroom", "Unit 3: Toto - The Hen", "Unit 4: Greeting Cards", "Unit 5: The Monkey and the Log", "Unit 6: Alphabet Song", "Unit 7: Traffic Rules", "Unit 8: The Sun and the Wind"] },
@@ -234,24 +234,37 @@
         function startListeningSafe() { try { recognition.start(); } catch(e){} }
         function stopAll() { setState('IDLE'); recognition.stop(); synth.cancel(); }
 
-        // --- TTS LOGIC: CLEAN & SOFT VOICE ---
+        // --- TTS LOGIC: SUPER CLEAN FILTER ---
         async function speakText(text) {
             if (synth.speaking) synth.cancel();
             
-            // CLEAN FILTER: Remove symbols/links for speech
-            let speakableText = text.replace(/\[.*?\]\(.*?\)/g, "").replace(/https?:\/\/\S+/g, "")
-                .replace(/[*#_`~>]/g, "").replace(/[\u{1F600}-\u{1F6FF}]/gu, "").trim();
-            lastSpokenText = text; 
+            // 1. ADVANCED CLEANER
+            // \p{Extended_Pictographic} catches all Emoji ranges (Think face, Rainbow, etc.)
+            // We also strip markdown links and special characters
+            let speakableText = text
+                .replace(/\[.*?\]\(.*?\)/g, "") // Remove Markdown Links
+                .replace(/https?:\/\/\S+/g, "") // Remove URLs
+                .replace(/\p{Extended_Pictographic}/gu, "") // Remove ALL Emojis (Rainbow, Faces, etc.)
+                .replace(/[*#_`~>]/g, "") // Remove Markdown Symbols
+                .replace(/\s+/g, " ") // Collapse spaces
+                .trim();
+            
+            lastSpokenText = text; // Keep emojis for display
 
             return new Promise((resolve) => {
                 const utterance = new SpeechSynthesisUtterance(speakableText);
+                
+                // Voice Priority: Google India -> Microsoft India -> Any English India
                 let selectedVoice = voices.find(v => v.name.includes("Google English India")) || 
                                     voices.find(v => v.name.includes("Microsoft Heera")) || 
                                     voices.find(v => v.lang === 'en-IN');
+                
                 if (selectedVoice) utterance.voice = selectedVoice;
-                utterance.rate = 0.8; 
-                utterance.pitch = 1.1; 
-                utterance.onend = resolve; utterance.onerror = resolve;
+                
+                utterance.rate = 0.8; // Slow for kids
+                utterance.pitch = 1.1; // Soft tone
+                utterance.onend = resolve; 
+                utterance.onerror = resolve;
                 synth.speak(utterance);
             });
         }
