@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dhwani Junior - Std 1 Teacher</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        /* --- CHILD FRIENDLY UI --- */
+        body { 
+            font-family: 'Fredoka', sans-serif; 
+            background-color: #FFFBEB; 
+            background-image: radial-gradient(#FCD34D 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        .listening-pulse { animation: pulse 1.5s infinite ease-in-out; }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(236, 72, 153, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0); }
+        }
+        .fun-btn {
+            @apply shadow-[0_4px_0_rgb(0,0,0,0.2)] active:shadow-none active:translate-y-[4px] transition-all;
+        }
+        /* Scrollbar */
+        #conversation-log::-webkit-scrollbar { width: 10px; }
+        #conversation-log::-webkit-scrollbar-track { background: #FEF3C7; border-radius: 10px; }
+        #conversation-log::-webkit-scrollbar-thumb { background: #F59E0B; border-radius: 10px; }
+        
+        .kids-select {
+            @apply w-full p-3 rounded-xl border-2 border-indigo-200 text-indigo-900 font-bold focus:border-pink-400 focus:outline-none bg-white;
+        }
+    </style>
+</head>
+
+<body class="flex items-center justify-center min-h-screen p-2 md:p-4 select-none">
+
+    <div class="bg-white rounded-3xl shadow-2xl border-4 border-indigo-100 p-4 md:p-6 w-full max-w-2xl flex flex-col h-[95vh] md:h-auto relative overflow-hidden">
+        
+        <div class="flex items-center justify-between mb-4 z-10">
+            <h1 class="text-3xl font-bold text-indigo-600 tracking-wide">
+                🎨 Dhwani <span class="text-pink-500">Junior</span>
+            </h1>
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Std 1</span>
+                <div id="status-indicator" class="w-5 h-5 rounded-full bg-gray-300 border-2 border-white shadow-sm" title="Offline"></div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4 z-10 bg-indigo-50 p-3 rounded-2xl border border-indigo-100">
+            <div>
+                <label class="text-xs font-bold text-indigo-400 ml-2 uppercase">Subject (विषय)</label>
+                <select id="subject-select" class="kids-select"></select>
+            </div>
+            <div>
+                <label class="text-xs font-bold text-indigo-400 ml-2 uppercase">Chapter (धडा)</label>
+                <select id="chapter-select" class="kids-select"></select>
+            </div>
+        </div>
+
+        <div id="conversation-log" class="flex-grow overflow-y-auto bg-white rounded-2xl p-4 mb-4 border-2 border-dashed border-gray-200 space-y-4 min-h-[250px] relative">
+            <div class="text-center mt-10 opacity-60">
+                <p class="text-4xl mb-2">🏫</p>
+                <p class="text-gray-500 font-bold">Choose a subject &<br>Press Start Class!</p>
+            </div>
+        </div>
+
+        <div class="flex justify-center gap-6 mb-4 z-10">
+            <button id="pause-resume-button" class="p-3 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 fun-btn" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" /></svg>
+            </button>
+            <button id="stop-speech-button" class="p-3 rounded-full bg-red-100 text-red-600 hover:bg-red-200 fun-btn" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z" /></svg>
+            </button>
+            <button id="replay-button" class="p-3 rounded-full bg-green-100 text-green-600 hover:bg-green-200 fun-btn" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+            </button>
+        </div>
+
+        <div class="flex items-center justify-center gap-2 mb-3 z-10">
+            <input type="checkbox" id="remember-me-checkbox" class="w-5 h-5 text-pink-500 rounded border-gray-300 focus:ring-pink-500">
+            <label for="remember-me-checkbox" class="text-sm font-bold text-gray-600 cursor-pointer">
+                Remember what we learned? (Memory)
+            </label>
+        </div>
+
+        <button id="talk-button" class="w-full py-4 px-6 rounded-2xl text-xl font-bold text-white shadow-lg transition-all duration-300 shrink-0 z-10
+                       bg-gradient-to-r from-pink-500 to-rose-500 fun-btn
+                       disabled:opacity-50 disabled:cursor-not-allowed">
+            Start Class 🎒
+        </button>
+
+        <div class="mt-4 grid grid-cols-3 gap-3 shrink-0 z-10">
+            <button id="restart-chat-button" class="py-2 rounded-lg bg-gray-100 text-gray-600 text-xs font-bold hover:bg-gray-200 fun-btn">Refresh</button>
+            <button id="share-button" class="py-2 rounded-lg bg-indigo-100 text-indigo-600 text-xs font-bold hover:bg-indigo-200 fun-btn">Share</button>
+            <button id="end-chat-button" class="py-2 rounded-lg bg-red-50 text-red-400 text-xs font-bold hover:bg-red-100 fun-btn" disabled>End</button>
+        </div>
+
+        <div class="mt-4 w-full flex flex-col items-center z-10">
+            <button id="advance-toggle-btn" class="text-[10px] text-gray-400 hover:text-gray-600 uppercase tracking-widest font-bold mb-2">▼ Teacher Settings</button>
+            <div id="advance-container" class="hidden w-full bg-gray-50 border border-gray-200 rounded-lg p-3 flex-col gap-2">
+                <input type="checkbox" id="use-custom-key-checkbox"> <label class="text-xs">Use Custom Key</label>
+                <input type="text" id="custom-api-key-input" class="w-full p-2 text-xs border rounded bg-white" placeholder="Paste Gemini API Key">
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        /* ==========================================================================
+           1. SYLLABUS DATA (Maharashtra Board Std 1 - English Medium)
+           ========================================================================== */
+        const SYLLABUS = {
+            "english": {
+                name: "English Balbharati",
+                book_link: "https://ebooks.ebalbharati.in/pdfs/103030001.pdf",
+                chapters: ["Unit 1: A Happy Song", "Unit 1: Nature", "Unit 2: Rain", "Unit 2: Things in my Classroom", "Unit 3: Toto - The Hen", "Unit 4: Greeting Cards", "Unit 5: The Monkey and the Log", "Unit 6: Alphabet Song", "Unit 7: Traffic Rules", "Unit 8: The Sun and the Wind"]
+            },
+            "maths": {
+                name: "Mathematics",
+                book_link: "https://ebooks.ebalbharati.in/pdfs/103030004.pdf",
+                chapters: ["Small - Big", "Behind - In front of", "Above - Below", "One - Many", "Understand 1 to 9", "Introduction to Zero", "Less - More", "Increasing - Decreasing Order", "Let's Add", "Let's Subtract"]
+            },
+            "marathi": {
+                name: "Marathi Balbharati",
+                book_link: "https://ebooks.ebalbharati.in/pdfs/101000543.pdf",
+                chapters: ["भाग १: सरी (गाणे)", "भाग १: दोघेही जिंकू", "भाग १: खेळ खेळूया", "भाग २: फळांचा राजा", "भाग २: पक्ष्यांचे जग", "भाग ३: ओळख आपली", "भाग ३: अंक गाणे", "भाग ३: बाजार"]
+            },
+            "playdolearn": {
+                name: "Play, Do, Learn",
+                book_link: "https://ebooks.ebalbharati.in/pdfs/103000620.pdf",
+                chapters: ["Health & Hygiene", "Different Games", "Paper Work", "Clay Work", "Our Surroundings", "Animals & Birds", "Water"]
+            }
+        };
+
+        /* ==========================================================================
+           2. VARIABLES & CONFIG (Exact Logic from Dhwani.html)
+           ========================================================================== */
+        const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
+        
+        let appState = 'IDLE'; 
+        let chatHistory = []; 
+        let systemInstruction = '';
+        let recognition;
+        let lastSpokenText = ''; 
+        let speechManuallyStopped = false; 
+        const synth = window.speechSynthesis;
+        let voices = [];
+        let wakeLock = null;
+
+        const subjectSelect = document.getElementById('subject-select');
+        const chapterSelect = document.getElementById('chapter-select');
+        const talkButton = document.getElementById('talk-button');
+        const conversationLog = document.getElementById('conversation-log');
+        const statusIndicator = document.getElementById('status-indicator');
+        const rememberMeCheckbox = document.getElementById('remember-me-checkbox');
+        
+        // --- INITIALIZATION ---
+        window.onload = () => {
+            populateSubjects();
+            loadUserData();
+            loadVoices();
+        };
+
+        function populateSubjects() {
+            subjectSelect.innerHTML = '';
+            for (let key in SYLLABUS) {
+                let option = document.createElement('option');
+                option.value = key; option.text = SYLLABUS[key].name;
+                subjectSelect.add(option);
+            }
+            populateChapters();
+        }
+
+        subjectSelect.addEventListener('change', populateChapters);
+        function populateChapters() {
+            const subKey = subjectSelect.value;
+            chapterSelect.innerHTML = '';
+            SYLLABUS[subKey].chapters.forEach(chap => {
+                let option = document.createElement('option');
+                option.value = chap; option.text = chap;
+                chapterSelect.add(option);
+            });
+        }
+
+        // --- 3. THE EAR (Speech Recognition) ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.lang = 'en-IN'; // Standard 1 English Medium
+            recognition.onresult = handleSpeechResult;
+            recognition.onend = handleSpeechEnd;
+            recognition.onerror = (e) => { if(appState !== 'IDLE') startRecognitionSafe(); };
+        } else { alert("Use Chrome browser."); }
+
+        function startRecognitionSafe() { try { recognition.start(); } catch (e) {} }
+
+        // --- 4. THE BRAIN (Gemini API - Exact Logic) ---
+        
+        // This prompts the AI based on your requirements
+        function buildSystemPrompt() {
+            const subject = SYLLABUS[subjectSelect.value].name;
+            const chapter = chapterSelect.value;
+            const book = SYLLABUS[subjectSelect.value].book_link;
+
+            // Strict teaching pattern: Teach -> Summary -> Q&A
+            systemInstruction = `
+            You are "Dhwani Junior," a primary teacher for Standard 1 (Age 6).
+            Subject: ${subject}. Chapter: ${chapter}. Book Link: ${book}.
+            
+            TEACHING PATTERN (Follow Strictly):
+            1. TEACH: Explain the chapter concepts simply (max 4 sentences).
+            2. SUMMARY: Give a 1-line summary.
+            3. Q&A: Ask ONE simple question to the child.
+            
+            STYLE: Use emojis 🌟. Be very kind.
+            Extra Resource: Always end with: [🔗 Click for Images](https://www.google.com/search?q=${subject}+${chapter}+kids&tbm=isch).
+            `;
+        }
+
+        async function getAIResponse(historyData) {
+            // *** CRITICAL FIX: USING THE EXACT MODEL URL FROM YOUR WORKING FILE ***
+            const apiKey = getEffectiveApiKey();
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: historyData,
+                        systemInstruction: { parts: [{ text: systemInstruction }] }
+                    })
+                });
+                const result = await response.json();
+                if(result.error) throw new Error(result.error.message);
+                return result.candidates[0].content.parts[0].text.trim();
+            } catch (error) {
+                console.error("API Error:", error);
+                return "My internet is weak or the API key is wrong. Please check settings.";
+            }
+        }
+
+        function getEffectiveApiKey() {
+            const input = document.getElementById('custom-api-key-input');
+            const check = document.getElementById('use-custom-key-checkbox');
+            if (check.checked && input.value.length > 10) return input.value.trim();
+            return DEFAULT_API_KEY;
+        }
+
+        // --- 5. INTERACTION FLOW ---
+        talkButton.addEventListener('click', toggleListening);
+        
+        async function toggleListening() {
+            if (appState === 'IDLE') {
+                talkButton.textContent = "Teacher is Preparing... 📚";
+                talkButton.disabled = true;
+                
+                buildSystemPrompt(); // Update prompt based on dropdowns
+                
+                // Memory Logic
+                if (rememberMeCheckbox.checked) {
+                    const saved = localStorage.getItem('dhwani_jr_history');
+                    if(saved) chatHistory = JSON.parse(saved);
+                } else {
+                    chatHistory = [];
+                }
+                
+                // If new chat, trigger greeting
+                if(chatHistory.length === 0) {
+                    chatHistory.push({ role: 'user', parts: [{ text: "Hello Teacher, start the class." }] });
+                    const response = await getAIResponse(chatHistory);
+                    chatHistory.push({ role: 'model', parts: [{ text: response }] });
+                    logMessage('Dhwani', response);
+                    await speakText(response);
+                } else {
+                    // Resume
+                    logMessage('System', 'Resuming class...');
+                    startRecognitionSafe();
+                }
+
+                setState('LISTENING');
+                startRecognitionSafe();
+            } else {
+                // STOP
+                setState('IDLE');
+                recognition.stop();
+                if(synth.speaking) synth.cancel();
+            }
+        }
+
+        async function handleSpeechResult(event) {
+            const transcript = event.results[event.results.length - 1][0].transcript.trim();
+            if (!transcript) return;
+            
+            recognition.stop();
+            setState('BUSY');
+            logMessage('Student', transcript);
+
+            chatHistory.push({ role: 'user', parts: [{ text: transcript }] });
+            if(rememberMeCheckbox.checked) localStorage.setItem('dhwani_jr_history', JSON.stringify(chatHistory.slice(-10)));
+
+            const response = await getAIResponse(chatHistory);
+            
+            chatHistory.push({ role: 'model', parts: [{ text: response }] });
+            if(rememberMeCheckbox.checked) localStorage.setItem('dhwani_jr_history', JSON.stringify(chatHistory.slice(-10)));
+
+            logMessage('Dhwani', response);
+            await speakText(response);
+
+            setState('LISTENING');
+            startRecognitionSafe();
+        }
+
+        function handleSpeechEnd() {
+            if (appState === 'LISTENING') startRecognitionSafe();
+            else if (appState === 'IDLE') setState('IDLE');
+        }
+
+        function setState(newState) {
+            appState = newState;
+            if (newState === 'IDLE') {
+                talkButton.textContent = "Start Class 🎒";
+                talkButton.disabled = false;
+                statusIndicator.className = "w-5 h-5 rounded-full bg-gray-300";
+                subjectSelect.disabled = false; chapterSelect.disabled = false;
+                document.getElementById('end-chat-button').disabled = true;
+            } else if (newState === 'BUSY') {
+                talkButton.textContent = "Thinking... 🤔";
+                talkButton.disabled = true;
+                statusIndicator.className = "w-5 h-5 rounded-full bg-yellow-400 animate-bounce";
+            } else {
+                talkButton.textContent = "Stop Class 🛑";
+                talkButton.disabled = false;
+                statusIndicator.className = "w-5 h-5 rounded-full bg-pink-500 listening-pulse";
+                subjectSelect.disabled = true; chapterSelect.disabled = true;
+                document.getElementById('end-chat-button').disabled = false;
+            }
+        }
+
+        // --- 6. TTS & UTILS ---
+        function loadVoices() { voices = synth.getVoices(); if(synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => voices = synth.getVoices(); }
+
+        async function speakText(text) {
+            if (synth.speaking) synth.cancel();
+            
+            // Clean markdown
+            let clean = text.replace(/\[.*?\]\(.*?\)/g, "").replace(/[\*#`_]/g, '').trim();
+            
+            return new Promise((resolve) => {
+                const utt = new SpeechSynthesisUtterance(clean);
+                utt.onend = resolve; utt.onerror = resolve;
+                utt.rate = 0.85; // Kid friendly speed
+                
+                // Voice selection
+                let v = voices.find(v => v.lang === 'en-IN'); 
+                if(subjectSelect.value === 'marathi') {
+                    v = voices.find(v => v.lang === 'mr-IN') || v;
+                    utt.rate = 0.75;
+                }
+                if(v) utt.voice = v;
+                
+                synth.speak(utt);
+            });
+        }
+
+        function logMessage(sender, msg) {
+            const div = document.createElement('div');
+            let formatted = msg.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" class="text-blue-600 underline font-bold">$1</a>')
+                               .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+            
+            if (sender === 'Dhwani') {
+                div.innerHTML = `<div class="bg-indigo-100 text-indigo-900 px-4 py-2 rounded-lg mb-2 shadow"><b class="text-indigo-500 text-xs block">TEACHER</b>${formatted}</div>`;
+            } else if (sender === 'Student') {
+                div.innerHTML = `<div class="bg-pink-100 text-pink-900 px-4 py-2 rounded-lg mb-2 shadow text-right"><b class="text-pink-500 text-xs block">STUDENT</b>${formatted}</div>`;
+            } else {
+                 div.innerHTML = `<div class="text-center text-gray-400 text-xs my-2">${msg}</div>`;
+            }
+            conversationLog.appendChild(div);
+            conversationLog.scrollTop = conversationLog.scrollHeight;
+        }
+
+        function loadUserData() {
+            document.getElementById('advance-toggle-btn').onclick = () => document.getElementById('advance-container').classList.toggle('hidden');
+            document.getElementById('restart-chat-button').onclick = () => { conversationLog.innerHTML = ''; localStorage.removeItem('dhwani_jr_history'); };
+            document.getElementById('end-chat-button').onclick = () => { setState('IDLE'); recognition.stop(); synth.cancel(); };
+            document.getElementById('pause-resume-button').onclick = () => { if(synth.speaking) synth.pause(); else synth.resume(); };
+            document.getElementById('stop-speech-button').onclick = () => { synth.cancel(); recognition.stop(); setState('IDLE'); };
+            document.getElementById('replay-button').onclick = () => speakText(conversationLog.lastChild.innerText);
+        }
+    </script>
+</body>
+</html>
