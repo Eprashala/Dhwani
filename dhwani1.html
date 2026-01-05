@@ -2,153 +2,125 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dhwani Junior - Std 1 Textbook Mode</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dhwani Junior - Mobile Fix</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Comic+Neue:wght@700&display=swap" rel="stylesheet">
     <style>
         /* --- CHILD TEXTBOOK UI --- */
         body { 
             font-family: 'Fredoka', sans-serif; 
-            background-color: #fdf6e3; /* Warm paper color */
+            background-color: #fdf6e3; 
             background-image: linear-gradient(#e5e7eb 1px, transparent 1px);
-            background-size: 100% 2rem; /* Lined notebook paper effect */
+            background-size: 100% 2rem; 
+            overscroll-behavior: none; /* Prevents pull-to-refresh on mobile */
         }
 
-        /* TEXTBOOK FORMATTING FOR CONSOLE */
+        /* TEXTBOOK FORMATTING */
         .textbook-text {
-            font-family: 'Comic Neue', cursive; /* Looks like primary book text */
-            font-size: 1.4rem; /* BIG TEXT */
-            line-height: 1.8;  /* Spaced out for reading */
-            font-weight: 700;  /* Bold */
+            font-family: 'Comic Neue', cursive; 
+            font-size: 1.25rem; /* Slightly smaller for mobile readability */
+            line-height: 1.6;  
+            font-weight: 700;  
             color: #2c3e50;
         }
 
-        /* Highlight keywords nicely */
-        .highlight-word { color: #d35400; text-decoration: underline; text-decoration-color: #f1c40f; text-decoration-thickness: 3px; }
-
-        /* The Pulse Animation */
         .listening-pulse { animation: pulse 1.5s infinite ease-in-out; }
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.7); }
-            70% { box-shadow: 0 0 0 20px rgba(236, 72, 153, 0); }
+            70% { box-shadow: 0 0 0 15px rgba(236, 72, 153, 0); }
             100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0); }
         }
 
-        /* Fun Buttons */
         .fun-btn {
-            @apply shadow-[0_4px_0_rgb(0,0,0,0.2)] active:shadow-none active:translate-y-[4px] transition-all transform hover:scale-105;
+            @apply shadow-[0_4px_0_rgb(0,0,0,0.2)] active:shadow-none active:translate-y-[4px] transition-all;
         }
 
-        /* Custom Scrollbar */
-        #conversation-log::-webkit-scrollbar { width: 12px; }
+        #conversation-log::-webkit-scrollbar { width: 8px; }
         #conversation-log::-webkit-scrollbar-track { background: #fff8dc; }
-        #conversation-log::-webkit-scrollbar-thumb { background: #f39c12; border-radius: 10px; border: 2px solid #fff8dc; }
+        #conversation-log::-webkit-scrollbar-thumb { background: #f39c12; border-radius: 10px; }
         
         .kids-select {
-            @apply w-full p-4 text-lg rounded-2xl border-4 border-indigo-200 text-indigo-900 font-bold focus:border-pink-400 focus:outline-none bg-white shadow-sm cursor-pointer;
+            @apply w-full p-2 text-base rounded-xl border-2 border-indigo-200 text-indigo-900 font-bold focus:border-pink-400 focus:outline-none bg-white shadow-sm;
         }
     </style>
 </head>
 
-<body class="flex items-center justify-center min-h-screen p-2 md:p-4 select-none">
+<body class="flex flex-col items-center justify-center h-[100dvh] p-2 bg-yellow-50 overflow-hidden">
 
-    <div class="bg-white rounded-[2rem] shadow-2xl border-8 border-yellow-300 p-4 md:p-6 w-full max-w-3xl flex flex-col h-[95vh] relative overflow-hidden">
+    <div class="bg-white rounded-2xl shadow-xl border-4 border-yellow-300 w-full max-w-lg flex flex-col h-full relative overflow-hidden">
         
-        <div class="flex items-center justify-between mb-4 z-10 px-2">
+        <div class="flex items-center justify-between p-3 z-10 bg-white border-b border-gray-100 shrink-0">
             <div>
-                <h1 class="text-4xl font-bold text-indigo-600 tracking-wide drop-shadow-sm">
-                    👩‍🏫 Dhwani <span class="text-pink-500">Teacher</span>
+                <h1 class="text-2xl font-bold text-indigo-600 tracking-wide">
+                    👩‍🏫 Dhwani <span class="text-pink-500">Jr.</span>
                 </h1>
-                <p class="text-gray-400 text-sm font-bold tracking-widest ml-1">STD 1 • MAHARASHTRA BOARD</p>
             </div>
-            <div id="status-indicator" class="w-6 h-6 rounded-full bg-gray-300 border-4 border-gray-100 shadow-md transition-colors" title="Offline"></div>
+            <div id="status-indicator" class="w-4 h-4 rounded-full bg-gray-300 border-2 border-gray-100 shadow-md" title="Offline"></div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 z-10 bg-blue-50 p-4 rounded-3xl border-2 border-blue-100">
+        <div class="grid grid-cols-2 gap-2 p-2 z-10 bg-blue-50 border-b border-blue-100 shrink-0">
             <div>
-                <label class="text-xs font-bold text-blue-400 ml-4 uppercase tracking-wider">Subject</label>
                 <select id="subject-select" class="kids-select"></select>
             </div>
             <div>
-                <label class="text-xs font-bold text-blue-400 ml-4 uppercase tracking-wider">Chapter</label>
                 <select id="chapter-select" class="kids-select"></select>
             </div>
         </div>
 
-        <div id="conversation-log" class="flex-grow overflow-y-auto bg-yellow-50 rounded-3xl p-6 mb-4 border-4 border-dashed border-yellow-200 space-y-6 min-h-[300px] relative shadow-inner">
-            <div class="text-center mt-20 opacity-40">
-                <p class="text-6xl mb-4">📖</p>
-                <p class="text-2xl font-bold text-gray-500">Select a Subject to Start!</p>
+        <div id="conversation-log" class="flex-1 min-h-0 overflow-y-auto bg-yellow-50 p-4 space-y-4 relative">
+            <div class="text-center mt-10 opacity-40">
+                <p class="text-5xl mb-2">📖</p>
+                <p class="text-lg font-bold text-gray-500">Ready to learn!</p>
             </div>
         </div>
 
-        <div class="flex justify-center gap-6 mb-4 z-10">
-            <button id="pause-resume-button" class="p-4 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 fun-btn" disabled title="Pause">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="w-8 h-8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" /></svg>
-            </button>
-            <button id="stop-speech-button" class="p-4 rounded-full bg-red-100 text-red-600 hover:bg-red-200 fun-btn" disabled title="Stop">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="w-8 h-8"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z" /></svg>
-            </button>
-            <button id="replay-button" class="p-4 rounded-full bg-green-100 text-green-600 hover:bg-green-200 fun-btn" disabled title="Repeat">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" class="w-8 h-8"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
-            </button>
-        </div>
-
-        <button id="talk-button" class="w-full py-5 px-6 rounded-2xl text-2xl font-bold text-white shadow-xl transition-all duration-300 shrink-0 z-10
-                       bg-gradient-to-r from-pink-500 to-rose-500 fun-btn
-                       disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wider">
-            Start Class 🎒
-        </button>
-
-        <div class="mt-4 flex justify-between items-center z-10 px-2">
-            <button id="restart-chat-button" class="text-gray-400 font-bold hover:text-gray-600 text-sm">↺ RESTART</button>
+        <div class="p-3 bg-white border-t-2 border-gray-100 shrink-0 z-20 flex flex-col gap-2">
             
-            <div class="flex items-center gap-2">
-                 <input type="checkbox" id="remember-me-checkbox" class="w-5 h-5 text-pink-500 rounded focus:ring-pink-500">
-                 <label for="remember-me-checkbox" class="text-sm font-bold text-gray-400 cursor-pointer">Memory</label>
+            <div class="flex justify-center gap-4">
+                <button id="pause-resume-button" class="p-3 rounded-full bg-blue-100 text-blue-600 fun-btn" disabled><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" /></svg></button>
+                <button id="stop-speech-button" class="p-3 rounded-full bg-red-100 text-red-600 fun-btn" disabled><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z" /></svg></button>
+                <button id="replay-button" class="p-3 rounded-full bg-green-100 text-green-600 fun-btn" disabled><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg></button>
             </div>
 
-            <button id="advance-toggle-btn" class="text-gray-400 font-bold hover:text-gray-600 text-sm">⚙️ SETTINGS</button>
-        </div>
+            <button id="talk-button" class="w-full py-3 px-6 rounded-xl text-xl font-bold text-white shadow-lg transition-all 
+                        bg-gradient-to-r from-pink-500 to-rose-500 fun-btn
+                        disabled:opacity-50 uppercase tracking-wider">
+                Start Class 🎒
+            </button>
 
-        <div id="advance-container" class="hidden mt-2 w-full bg-gray-50 border border-gray-200 rounded-lg p-3 flex-col gap-2">
-            <input type="checkbox" id="use-custom-key-checkbox"> <label class="text-xs text-gray-500">Use Custom Key</label>
-            <input type="text" id="custom-api-key-input" class="w-full p-2 text-xs border rounded bg-white" placeholder="Paste Gemini API Key">
+            <div class="flex justify-between items-center px-1">
+                <button id="restart-chat-button" class="text-gray-400 font-bold text-xs p-2">↺ RESTART</button>
+                <div class="flex items-center gap-1">
+                    <input type="checkbox" id="remember-me-checkbox" class="w-4 h-4 text-pink-500 rounded">
+                    <label for="remember-me-checkbox" class="text-xs font-bold text-gray-400">Memory</label>
+                </div>
+                <button id="advance-toggle-btn" class="text-indigo-400 font-bold text-xs p-2 bg-indigo-50 rounded">⚙️ API KEY</button>
+            </div>
+
+            <div id="advance-container" class="hidden w-full bg-gray-50 border rounded p-2 flex-col gap-2">
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="use-custom-key-checkbox" class="w-4 h-4">
+                    <label class="text-xs font-bold text-gray-500">Use Custom Key</label>
+                </div>
+                <input type="text" id="custom-api-key-input" class="w-full p-2 text-xs border rounded" placeholder="Paste Gemini Key here">
+            </div>
         </div>
 
     </div>
 
     <script>
         /* ==========================================================================
-           1. SYLLABUS DATA (Maharashtra Board Std 1 - English Medium)
+           LOGIC: Std 1 Syllabus, Soft Female Voice, Symbol Cleaning
            ========================================================================== */
         const SYLLABUS = {
-            "english": {
-                name: "English Balbharati",
-                book_link: "https://ebooks.ebalbharati.in/pdfs/103030001.pdf",
-                chapters: ["Unit 1: A Happy Song", "Unit 1: Nature", "Unit 2: Rain", "Unit 2: Things in my Classroom", "Unit 3: Toto - The Hen", "Unit 4: Greeting Cards", "Unit 5: The Monkey and the Log", "Unit 6: Alphabet Song", "Unit 7: Traffic Rules", "Unit 8: The Sun and the Wind"]
-            },
-            "maths": {
-                name: "Mathematics",
-                book_link: "https://ebooks.ebalbharati.in/pdfs/103030004.pdf",
-                chapters: ["Small - Big", "Behind - In front of", "Above - Below", "One - Many", "Understand 1 to 9", "Introduction to Zero", "Less - More", "Increasing - Decreasing Order", "Let's Add", "Let's Subtract"]
-            },
-            "marathi": {
-                name: "Marathi Balbharati",
-                book_link: "https://ebooks.ebalbharati.in/pdfs/101000543.pdf",
-                chapters: ["भाग १: सरी (गाणे)", "भाग १: दोघेही जिंकू", "भाग १: खेळ खेळूया", "भाग २: फळांचा राजा", "भाग २: पक्ष्यांचे जग", "भाग ३: ओळख आपली", "भाग ३: अंक गाणे", "भाग ३: बाजार"]
-            },
-            "playdolearn": {
-                name: "Play, Do, Learn",
-                book_link: "https://ebooks.ebalbharati.in/pdfs/103000620.pdf",
-                chapters: ["Health & Hygiene", "Different Games", "Paper Work", "Clay Work", "Our Surroundings", "Animals & Birds", "Water"]
-            }
+            "english": { name: "English Balbharati", book_link: "https://ebooks.ebalbharati.in/pdfs/103030001.pdf", chapters: ["Unit 1: A Happy Song", "Unit 1: Nature", "Unit 2: Rain", "Unit 2: Things in my Classroom", "Unit 3: Toto - The Hen", "Unit 4: Greeting Cards", "Unit 5: The Monkey and the Log", "Unit 6: Alphabet Song", "Unit 7: Traffic Rules", "Unit 8: The Sun and the Wind"] },
+            "maths": { name: "Mathematics", book_link: "https://ebooks.ebalbharati.in/pdfs/103030004.pdf", chapters: ["Small - Big", "Behind - In front of", "Above - Below", "One - Many", "Understand 1 to 9", "Introduction to Zero", "Less - More", "Increasing - Decreasing Order", "Let's Add", "Let's Subtract"] },
+            "marathi": { name: "Marathi Balbharati", book_link: "https://ebooks.ebalbharati.in/pdfs/101000543.pdf", chapters: ["भाग १: सरी (गाणे)", "भाग १: दोघेही जिंकू", "भाग १: खेळ खेळूया", "भाग २: फळांचा राजा", "भाग २: पक्ष्यांचे जग", "भाग ३: ओळख आपली", "भाग ३: अंक गाणे", "भाग ३: बाजार"] },
+            "playdolearn": { name: "Play, Do, Learn", book_link: "https://ebooks.ebalbharati.in/pdfs/103000620.pdf", chapters: ["Health & Hygiene", "Different Games", "Paper Work", "Clay Work", "Our Surroundings", "Animals & Birds", "Water"] }
         };
 
         const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
-        
-        // GLOBAL VARIABLES
         let appState = 'IDLE'; 
         let chatHistory = []; 
         let systemInstruction = '';
@@ -157,22 +129,17 @@
         const synth = window.speechSynthesis;
         let voices = [];
         
-        // DOM ELEMENTS
         const talkButton = document.getElementById('talk-button');
         const conversationLog = document.getElementById('conversation-log');
         const statusIndicator = document.getElementById('status-indicator');
         const subjectSelect = document.getElementById('subject-select');
         const chapterSelect = document.getElementById('chapter-select');
 
-        // --- INIT ---
         window.onload = () => {
             populateSubjects();
             loadUserData();
-            // Force load voices
             voices = synth.getVoices();
-            if(voices.length === 0) {
-                 synth.onvoiceschanged = () => { voices = synth.getVoices(); };
-            }
+            if(voices.length === 0) synth.onvoiceschanged = () => { voices = synth.getVoices(); };
         };
 
         function populateSubjects() {
@@ -195,51 +162,37 @@
             });
         }
 
-        // --- BRAIN: GEMINI API ---
         async function getAIResponse(historyData) {
             buildSystemPrompt();
             const apiKey = getEffectiveApiKey();
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-            
             try {
                 const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: historyData,
-                        systemInstruction: { parts: [{ text: systemInstruction }] }
-                    })
+                    body: JSON.stringify({ contents: historyData, systemInstruction: { parts: [{ text: systemInstruction }] } })
                 });
                 const result = await response.json();
                 if(result.error) throw new Error(result.error.message);
                 return result.candidates[0].content.parts[0].text.trim();
-            } catch (error) {
-                console.error(error);
-                return "My internet is a bit weak. Please try again!";
-            }
+            } catch (error) { return "Check internet or API key."; }
         }
 
         function buildSystemPrompt() {
             const subject = SYLLABUS[subjectSelect.value].name;
             const chapter = chapterSelect.value;
-            // Enhanced prompt for 5-year-olds
             systemInstruction = `
             You are "Dhwani Teacher," a very loving and soft-spoken primary teacher.
-            Student Age: 5 Years old (Std 1).
-            Subject: ${subject}. Chapter: ${chapter}.
-            
+            Student Age: 5 Years old (Std 1). Subject: ${subject}. Chapter: ${chapter}.
             TEACHING RULES:
             1. **Format:** Use VERY simple English. Short sentences.
-            2. **Style:** Be cheerful! Use emojis like 🌟, 🎈, 🍎.
-            3. **Pattern:** - Explain the topic in 3 simple sentences. 
-               - Give a 1-line fun summary.
-               - Ask 1 easy question.
-            4. **Formatting:** IMPORTANT! Use **Bold** for main words. 
-            5. **Ending:** Always add: [🔗 Show me a Picture](https://www.google.com/search?q=${subject}+${chapter}+cartoon&tbm=isch).
+            2. **Style:** Be cheerful! Use emojis 🌟.
+            3. **Pattern:** Explain concept (3 lines) -> Fun Summary -> Ask 1 easy question.
+            4. **Formatting:** Use **Bold** for main words. 
+            5. **Ending:** Always add: [🔗 Show Picture](https://www.google.com/search?q=${subject}+${chapter}+cartoon&tbm=isch).
             `;
         }
 
-        // --- SPEECH RECOGNITION ---
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
             recognition = new SpeechRecognition();
@@ -249,157 +202,89 @@
             recognition.onend = () => { if(appState === 'LISTENING') recognition.start(); else setState('IDLE'); };
         }
 
-        // --- MAIN LOGIC ---
         talkButton.addEventListener('click', async () => {
             if (appState === 'IDLE') {
-                talkButton.textContent = "Teacher is Preparing... 🎈";
+                talkButton.textContent = "Loading... 🎈";
                 talkButton.disabled = true;
                 setState('BUSY');
-                
-                // Greeting Start
                 if (chatHistory.length === 0) {
-                    chatHistory.push({ role: 'user', parts: [{ text: "Hello Teacher, I am ready!" }] });
+                    chatHistory.push({ role: 'user', parts: [{ text: "Hello Teacher!" }] });
                     const response = await getAIResponse(chatHistory);
                     chatHistory.push({ role: 'model', parts: [{ text: response }] });
-                    
                     logMessage('Dhwani', response);
                     await speakText(response);
-                } else {
-                    // Resume
-                    startListeningSafe();
-                }
+                } else { startListeningSafe(); }
                 setState('LISTENING');
-            } else {
-                stopAll();
-            }
+            } else { stopAll(); }
         });
 
         async function handleSpeechResult(event) {
             const transcript = event.results[event.results.length - 1][0].transcript.trim();
             if (!transcript) return;
-
-            recognition.stop();
-            setState('BUSY');
+            recognition.stop(); setState('BUSY');
             logMessage('Student', transcript);
-
             chatHistory.push({ role: 'user', parts: [{ text: transcript }] });
             const response = await getAIResponse(chatHistory);
             chatHistory.push({ role: 'model', parts: [{ text: response }] });
-
             logMessage('Dhwani', response);
             await speakText(response);
-            
-            setState('LISTENING');
-            startListeningSafe();
+            setState('LISTENING'); startListeningSafe();
         }
 
         function startListeningSafe() { try { recognition.start(); } catch(e){} }
         function stopAll() { setState('IDLE'); recognition.stop(); synth.cancel(); }
 
-        // --- PERFECTED TTS LOGIC (Soft Female, 0.8x, No Symbols) ---
+        // --- TTS LOGIC: CLEAN & SOFT VOICE ---
         async function speakText(text) {
             if (synth.speaking) synth.cancel();
-
-            // 1. CLEANING FILTER (Removes symbols, markdown, links)
-            let speakableText = text
-                .replace(/\[.*?\]\(.*?\)/g, "") // Remove Markdown links [Link](url)
-                .replace(/https?:\/\/\S+/g, "") // Remove raw URLs
-                .replace(/[*#_`~>]/g, "")       // Remove Markdown symbols (*, #, etc)
-                .replace(/[\u{1F600}-\u{1F6FF}]/gu, "") // Remove Emojis
-                .replace(/\s+/g, " ")           // Collapse multiple spaces
-                .trim();
             
-            lastSpokenText = text; // Store original for display, but speak cleaned
+            // CLEAN FILTER: Remove symbols/links for speech
+            let speakableText = text.replace(/\[.*?\]\(.*?\)/g, "").replace(/https?:\/\/\S+/g, "")
+                .replace(/[*#_`~>]/g, "").replace(/[\u{1F600}-\u{1F6FF}]/gu, "").trim();
+            lastSpokenText = text; 
 
             return new Promise((resolve) => {
                 const utterance = new SpeechSynthesisUtterance(speakableText);
-                
-                // 2. VOICE SELECTION (Prioritize Indian English Female)
-                let selectedVoice = null;
-                
-                // Best choices for Indian English Female
-                const preferredVoices = [
-                    "Google English India", 
-                    "Microsoft Heera", 
-                    "Veena", 
-                    "Rishi" // Sometimes generic
-                ];
-
-                for (let name of preferredVoices) {
-                    selectedVoice = voices.find(v => v.name.includes(name));
-                    if (selectedVoice) break;
-                }
-
-                // Fallback to any en-IN or hi-IN
-                if (!selectedVoice) selectedVoice = voices.find(v => v.lang === 'en-IN');
-                if (!selectedVoice) selectedVoice = voices.find(v => v.lang === 'hi-IN');
-
+                let selectedVoice = voices.find(v => v.name.includes("Google English India")) || 
+                                    voices.find(v => v.name.includes("Microsoft Heera")) || 
+                                    voices.find(v => v.lang === 'en-IN');
                 if (selectedVoice) utterance.voice = selectedVoice;
-
-                // 3. SPEED & PITCH (Soft Spoken Teacher)
-                utterance.rate = 0.8;  // Slow for 5 year olds
-                utterance.pitch = 1.1; // Slightly higher/softer pitch
-
-                utterance.onend = resolve;
-                utterance.onerror = resolve;
+                utterance.rate = 0.8; 
+                utterance.pitch = 1.1; 
+                utterance.onend = resolve; utterance.onerror = resolve;
                 synth.speak(utterance);
             });
         }
 
-        // --- UI FORMATTING (Big Text Book Style) ---
         function logMessage(sender, msg) {
             const div = document.createElement('div');
-            
-            // Format Markdown for DISPLAY (Keep bold, links, etc.)
-            let displayHtml = msg
-                .replace(/\[(.*?)\]\((.*?)\)/g, '<br><a href="$2" target="_blank" class="inline-block mt-2 bg-blue-100 text-blue-600 px-3 py-1 rounded-full text-lg border-2 border-blue-200 hover:bg-blue-200">🔗 $1</a>')
-                .replace(/\*\*(.*?)\*\*/g, '<span class="text-indigo-700 font-black text-2xl">$1</span>') // BIG BOLD
-                .replace(/\n/g, '<br>');
+            // Format for DISPLAY: Keep bold and links
+            let displayHtml = msg.replace(/\[(.*?)\]\((.*?)\)/g, '<br><a href="$2" target="_blank" class="inline-block mt-2 bg-blue-100 text-blue-600 px-3 py-1 rounded-full text-sm border-2 border-blue-200">🔗 $1</a>')
+                               .replace(/\*\*(.*?)\*\*/g, '<span class="text-indigo-700 font-black">$1</span>')
+                               .replace(/\n/g, '<br>');
 
             if (sender === 'Dhwani') {
-                div.innerHTML = `
-                    <div class="flex flex-col items-start w-full">
-                        <div class="bg-white p-6 rounded-tr-3xl rounded-br-3xl rounded-bl-3xl border-4 border-indigo-100 shadow-lg max-w-full">
-                            <span class="text-sm font-bold text-indigo-400 uppercase tracking-widest mb-2 block">👩‍🏫 Teacher</span>
-                            <div class="textbook-text leading-relaxed">
-                                ${displayHtml}
-                            </div>
-                        </div>
-                    </div>`;
+                div.innerHTML = `<div class="bg-white p-4 rounded-tr-2xl rounded-br-2xl rounded-bl-2xl border-2 border-indigo-100 shadow-sm"><span class="text-xs font-bold text-indigo-400 block mb-1">👩‍🏫 TEACHER</span><div class="textbook-text leading-snug">${displayHtml}</div></div>`;
             } else {
-                div.innerHTML = `
-                    <div class="flex flex-col items-end w-full mt-4">
-                        <div class="bg-pink-50 p-4 rounded-tl-3xl rounded-bl-3xl rounded-br-3xl border-4 border-pink-100 shadow-sm max-w-[80%]">
-                            <span class="text-sm font-bold text-pink-400 uppercase tracking-widest mb-1 block text-right">👶 Me</span>
-                            <div class="text-xl font-bold text-gray-700 text-right font-comic">
-                                ${msg}
-                            </div>
-                        </div>
-                    </div>`;
+                div.innerHTML = `<div class="bg-pink-50 p-3 rounded-tl-2xl rounded-bl-2xl rounded-br-2xl border-2 border-pink-100 shadow-sm ml-auto max-w-[85%] text-right"><span class="text-xs font-bold text-pink-400 block mb-1">👶 ME</span><div class="text-lg font-bold text-gray-700 font-comic">${msg}</div></div>`;
             }
             conversationLog.appendChild(div);
             conversationLog.scrollTop = conversationLog.scrollHeight;
         }
 
-        // --- UTILS ---
         function setState(st) {
             appState = st;
             if(st === 'IDLE') {
-                talkButton.textContent = "Start Class 🎒";
-                talkButton.disabled = false;
-                statusIndicator.className = "w-6 h-6 rounded-full bg-gray-300 border-4 border-gray-100";
+                talkButton.textContent = "Start Class 🎒"; talkButton.disabled = false;
+                statusIndicator.className = "w-4 h-4 rounded-full bg-gray-300 border-2 border-gray-100";
                 talkButton.classList.replace('bg-rose-500', 'bg-gradient-to-r');
-                document.getElementById('end-chat-button').disabled = true;
             } else if (st === 'BUSY') {
-                talkButton.textContent = "Thinking... 🤔";
-                talkButton.disabled = true;
-                statusIndicator.className = "w-6 h-6 rounded-full bg-yellow-400 border-4 border-white animate-bounce";
+                talkButton.textContent = "Thinking... 🤔"; talkButton.disabled = true;
+                statusIndicator.className = "w-4 h-4 rounded-full bg-yellow-400 animate-bounce";
             } else {
-                talkButton.textContent = "STOP CLASS 🛑";
-                talkButton.disabled = false;
-                talkButton.classList.remove('bg-gradient-to-r');
-                talkButton.classList.add('bg-rose-500');
-                statusIndicator.className = "w-6 h-6 rounded-full bg-pink-500 border-4 border-white listening-pulse";
+                talkButton.textContent = "STOP CLASS 🛑"; talkButton.disabled = false;
+                talkButton.classList.replace('bg-gradient-to-r', 'bg-rose-500');
+                statusIndicator.className = "w-4 h-4 rounded-full bg-pink-500 listening-pulse";
             }
         }
 
