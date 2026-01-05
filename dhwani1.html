@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dhwani Jr - Marathi Accent Mode</title>
+    <title>Dhwani Jr - Original Voice Mode</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Comic+Neue:wght@700&display=swap" rel="stylesheet">
     <style>
@@ -111,7 +111,7 @@
 
     <script>
         /* ==========================================================================
-           LOGIC: Std 1 Syllabus, MARATHI ACCENT, NO EMOJIS
+           LOGIC: Std 1 Syllabus + ORIGINAL VOICE LOGIC (Dhwani.html)
            ========================================================================== */
         const SYLLABUS = {
             "english": { name: "English Balbharati", book_link: "https://ebooks.ebalbharati.in/pdfs/103030001.pdf", chapters: ["Unit 1: A Happy Song", "Unit 1: Nature", "Unit 2: Rain", "Unit 2: Things in my Classroom", "Unit 3: Toto - The Hen", "Unit 4: Greeting Cards", "Unit 5: The Monkey and the Log", "Unit 6: Alphabet Song", "Unit 7: Traffic Rules", "Unit 8: The Sun and the Wind"] },
@@ -234,36 +234,36 @@
         function startListeningSafe() { try { recognition.start(); } catch(e){} }
         function stopAll() { setState('IDLE'); recognition.stop(); synth.cancel(); }
 
-        // --- TTS LOGIC: MARATHI ACCENT HACK & CLEANER ---
+        // --- TTS LOGIC: RESTORED EXACTLY FROM Dhwani.html ---
         async function speakText(text) {
             if (synth.speaking) synth.cancel();
             
-            // CLEAN FILTER: Strips Emojis (All types) & Markdown
+            // CLEAN FILTER: Only removing emojis/markdown for cleaner speech
             let speakableText = text
                 .replace(/\[.*?\]\(.*?\)/g, "") // Links
                 .replace(/https?:\/\/\S+/g, "") // URLs
-                .replace(/\p{Extended_Pictographic}/gu, "") // All Emojis
+                .replace(/\p{Extended_Pictographic}/gu, "") // Emojis
                 .replace(/[*#_`~>]/g, "") // Symbols
                 .replace(/\s+/g, " ")
                 .trim();
             
             lastSpokenText = text; 
+            if (voices.length === 0) voices = synth.getVoices();
 
             return new Promise((resolve) => {
                 const utterance = new SpeechSynthesisUtterance(speakableText);
                 
-                // ACCENT HACK: 
-                // We prioritize 'mr-IN' (Marathi) voice. 
-                // When a Marathi engine reads English text, it naturally applies a Marathi accent.
-                let selectedVoice = voices.find(v => v.lang === 'mr-IN') || 
-                                    voices.find(v => v.lang === 'hi-IN') || 
-                                    voices.find(v => v.lang === 'en-IN');
+                // === EXACT LOGIC FROM Dhwani.html START ===
+                let marathiVoice = voices.find(voice => voice.lang === 'mr-IN') || voices.find(voice => voice.lang === 'hi-IN');
+                if (marathiVoice) utterance.voice = marathiVoice;
+                utterance.lang = 'mr-IN';
                 
-                if (selectedVoice) utterance.voice = selectedVoice;
-                
-                utterance.rate = 0.8; 
-                utterance.pitch = 1.1; 
-                utterance.onend = resolve; utterance.onerror = resolve;
+                // Fixed Age Logic (Child < 7)
+                utterance.rate = 0.7; 
+                // === EXACT LOGIC FROM Dhwani.html END ===
+
+                utterance.onend = resolve; 
+                utterance.onerror = resolve;
                 synth.speak(utterance);
             });
         }
