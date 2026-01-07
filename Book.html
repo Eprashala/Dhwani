@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ध्वनी - आपले वैयक्तिक ग्रंथ मार्गदर्शक</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Mukta:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Mukta', sans-serif; }
+        
+        /* थीम - ज्ञान (Knowledge/Wisdom Gradient) */
+        .knowledge-bg {
+            background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #172554 100%);
+            min-height: 100vh;
+        }
+
+        /* ॲनिमेशन - ध्वनी लहरी */
+        .listening-pulse { animation: wave 1.5s infinite ease-in-out; }
+        @keyframes wave {
+            0% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.7); } 
+            70% { box-shadow: 0 0 0 15px rgba(96, 165, 250, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0); }
+        }
+
+        .input-group {
+            @apply transition-all duration-300 ease-in-out;
+        }
+
+        .custom-input {
+            @apply block w-full bg-slate-800 text-blue-100 border border-blue-700 rounded-lg p-3 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all placeholder-blue-300/50;
+        }
+
+        .chat-bubble-user {
+            @apply bg-blue-600 text-white rounded-tl-xl rounded-tr-xl rounded-bl-xl p-3 mb-2 self-end max-w-[85%] ml-auto shadow-md;
+        }
+        
+        .chat-bubble-ai {
+            @apply bg-slate-700 text-blue-50 rounded-tl-xl rounded-tr-xl rounded-br-xl p-4 mb-2 self-start max-w-[95%] shadow-md border-l-4 border-blue-400;
+        }
+
+        /* स्क्रोलबार */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 3px; }
+    </style>
+</head>
+
+<body class="knowledge-bg flex items-center justify-center p-4">
+
+    <div class="bg-slate-900/90 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col h-[90vh] border border-blue-800 relative overflow-hidden">
+        
+        <div class="p-4 border-b border-blue-800 bg-slate-900/50 flex justify-between items-center shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-lg">ध</div>
+                <div>
+                    <h1 class="text-xl font-bold text-blue-100">ध्वनी AI</h1>
+                    <p class="text-xs text-blue-400">ग्रंथ मार्गदर्शक</p>
+                </div>
+            </div>
+            <div id="status-dot" class="w-3 h-3 rounded-full bg-gray-500 transition-colors"></div>
+        </div>
+
+        <div id="chat-container" class="flex-grow overflow-y-auto p-4 space-y-4">
+            <div class="text-center mt-10 opacity-70">
+                <p class="text-blue-200 text-lg">नमस्कार! मी ध्वनी.</p>
+                <p class="text-sm text-blue-400">आपल्या ज्ञानाच्या प्रवासात मी मदत करेन.</p>
+            </div>
+        </div>
+
+        <div class="p-4 bg-slate-900 border-t border-blue-800 shrink-0 flex flex-col gap-3">
+            
+            <div id="setup-panel" class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
+                <div class="input-group">
+                    <label class="text-xs text-blue-400 ml-1">तुमचे नाव</label>
+                    <input type="text" id="user-name" class="custom-input" placeholder="नाव सांगा...">
+                </div>
+                <div class="input-group">
+                    <label class="text-xs text-blue-400 ml-1">तुमचे वय</label>
+                    <input type="number" id="user-age" class="custom-input" placeholder="वय (उदा. 14 किंवा 35)">
+                </div>
+                <div class="input-group md:col-span-2">
+                    <label class="text-xs text-blue-400 ml-1">पुस्तकाचे नाव आणि तपशील</label>
+                    <textarea id="book-details" rows="2" class="custom-input resize-none" placeholder="उदा. श्रीमद्भगवद्गीता (गीता प्रेस आवृत्ती) किंवा डॉ. आंबेडकरांचे चरित्र..."></textarea>
+                </div>
+            </div>
+
+            <div class="flex gap-2 items-center">
+                <div class="flex-grow relative">
+                    <input type="text" id="text-input" class="custom-input !rounded-full pl-4 pr-10" placeholder="येथे लिहा किंवा माईक वापरा..." disabled>
+                </div>
+                
+                <button id="mic-btn" class="p-4 rounded-full bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/50 transition-all flex items-center justify-center group">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6 group-hover:scale-110 transition-transform">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                    </svg>
+                </button>
+                
+                <button id="send-btn" class="p-4 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg transition-all hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="flex justify-center mt-2">
+                <button id="settings-toggle" class="text-xs text-blue-500 hover:text-blue-300 underline">API Key सेटिंग्स</button>
+            </div>
+            <div id="api-container" class="hidden mt-2">
+                <input type="text" id="api-key-input" class="custom-input text-xs" placeholder="तुमची Google Gemini API Key येथे पेस्ट करा">
+                <p class="text-[10px] text-gray-400 mt-1 text-center">तुमची की केवळ तुमच्या ब्राउझरमध्ये सेव्ह केली जाते.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- कॉन्फिगरेशन आणि व्हेरिएबल्स ---
+        const els = {
+            chatContainer: document.getElementById('chat-container'),
+            userName: document.getElementById('user-name'),
+            userAge: document.getElementById('user-age'),
+            bookDetails: document.getElementById('book-details'),
+            textInput: document.getElementById('text-input'),
+            micBtn: document.getElementById('mic-btn'),
+            sendBtn: document.getElementById('send-btn'),
+            statusDot: document.getElementById('status-dot'),
+            settingsToggle: document.getElementById('settings-toggle'),
+            apiContainer: document.getElementById('api-container'),
+            apiKeyInput: document.getElementById('api-key-input')
+        };
+
+        let state = {
+            step: 'INIT', // INIT, NAME_ASKED, AGE_ASKED, BOOK_ASKED, READY
+            isListening: false,
+            isSpeaking: false,
+            transcript: '',
+            history: []
+        };
+
+        const synth = window.speechSynthesis;
+        let recognition;
+        
+        // --- API Key व्यवस्थापन ---
+        const DEFAULT_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; // डेमो की (वापरकर्त्याने स्वतःची की टाकणे अपेक्षित आहे)
+        
+        els.settingsToggle.addEventListener('click', () => {
+            els.apiContainer.classList.toggle('hidden');
+        });
+
+        els.apiKeyInput.value = localStorage.getItem('dhwani_api_key') || '';
+        els.apiKeyInput.addEventListener('input', (e) => {
+            localStorage.setItem('dhwani_api_key', e.target.value.trim());
+        });
+
+        function getApiKey() {
+            return els.apiKeyInput.value.trim() || DEFAULT_KEY;
+        }
+
+        // --- स्पीच रेकग्निशन सेटअप ---
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'mr-IN';
+
+            recognition.onstart = () => {
+                state.isListening = true;
+                els.micBtn.classList.add('listening-pulse', 'bg-red-600');
+                els.statusDot.className = "w-3 h-3 rounded-full bg-red-500 animate-pulse";
+                els.textInput.placeholder = "मी ऐकत आहे...";
+            };
+
+            recognition.onend = () => {
+                state.isListening = false;
+                els.micBtn.classList.remove('listening-pulse', 'bg-red-600');
+                els.statusDot.className = "w-3 h-3 rounded-full bg-gray-500";
+                els.textInput.placeholder = "येथे लिहा किंवा माईक वापरा...";
+                // आपोआप सबमिट करा जर इनपुट असेल
+                if (els.textInput.value.trim().length > 0) {
+                    handleInteraction();
+                }
+            };
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                els.textInput.value = transcript;
+            };
+        } else {
+            alert("तुमचा ब्राउझर व्हॉइस इनपुटला सपोर्ट करत नाही. कृपया Chrome वापरा.");
+        }
+
+        // --- स्पीच सिंथेसिस (TTS) ---
+        function speak(text) {
+            if (synth.speaking) synth.cancel();
+            
+            // मजकूर शुद्ध करा (कंस, चिन्हे काढा)
+            const cleanText = text.replace(/[\*\[\]\(\)<>`_]/g, '')
+                                  .replace(/Click to.*?/g, ''); 
+
+            const utterance = new SpeechSynthesisUtterance(cleanText);
+            
+            // वयानुसार गती आणि आवाज
+            const age = parseInt(els.userAge.value) || 25;
+            utterance.lang = 'mr-IN'; // मराठी
+            
+            if (age < 12) {
+                utterance.rate = 0.85; // मुलांसाठी हळू
+                utterance.pitch = 1.1; // थोडा प्रेमळ आवाज
+            } else {
+                utterance.rate = 1.0;  // प्रौढांसाठी सामान्य
+                utterance.pitch = 1.0;
+            }
+
+            utterance.onstart = () => { els.statusDot.className = "w-3 h-3 rounded-full bg-green-500 animate-pulse"; };
+            utterance.onend = () => { els.statusDot.className = "w-3 h-3 rounded-full bg-gray-500"; };
+
+            synth.speak(utterance);
+        }
+
+        // --- मुख्य लॉजिक (Flow Control) ---
+
+        async function initDhwani() {
+            // सुरुवातीला - नाव विचारा
+            addMessage('ai', 'नमस्कार! मी ध्वनी. तुमचे नाव काय आहे?');
+            await speak("नमस्कार! मी ध्वनी. तुमचे नाव काय आहे?");
+            state.step = 'NAME_ASKED';
+        }
+
+        async function handleInteraction() {
+            const input = els.textInput.value.trim();
+            if (!input && state.step !== 'READY') return; 
+
+            // 1. नाव घेण्याची पायरी
+            if (state.step === 'NAME_ASKED') {
+                els.userName.value = input;
+                addMessage('user', input);
+                els.textInput.value = '';
+                
+                const response = `नमस्ते ${input}, तुमचे वय काय आहे?`;
+                addMessage('ai', response);
+                await speak(response);
+                state.step = 'AGE_ASKED';
+                return;
+            }
+
+            // 2. वय घेण्याची पायरी
+            if (state.step === 'AGE_ASKED') {
+                // वय अंकात रूपांतरित करा (मराठी/इंग्रजी अंकांसाठी साधा प्रयत्न)
+                const ageNum = input.match(/\d+/); 
+                els.userAge.value = ageNum ? ageNum[0] : input;
+                addMessage('user', input);
+                els.textInput.value = '';
+
+                const response = "आज तुम्हाला कोणते पुस्तक समजून घ्यायचे आहे?";
+                addMessage('ai', response);
+                await speak(response);
+                state.step = 'BOOK_ASKED';
+                els.bookDetails.focus();
+                return;
+            }
+
+            // 3. पुस्तक घेण्याची पायरी
+            if (state.step === 'BOOK_ASKED') {
+                els.bookDetails.value = input;
+                addMessage('user', input);
+                els.textInput.value = '';
+
+                const name = els.userName.value;
+                const book = els.bookDetails.value;
+                
+                const response = `नमस्कार ${name}, तुम्हाला ${book} बद्दल काय माहिती पाहिजे?`;
+                addMessage('ai', response);
+                await speak(response);
+                
+                state.step = 'READY';
+                els.textInput.disabled = false;
+                els.textInput.focus();
+                
+                // मॅन्युअल इनपुट असल्यास त्वरित 'READY' करा
+                checkManualInputs();
+                return;
+            }
+
+            // 4. मुख्य संभाषण (Main Chat)
+            if (state.step === 'READY') {
+                addMessage('user', input);
+                els.textInput.value = '';
+                
+                // लोडिंग इंडिकेटर
+                const loadingId = addMessage('ai', 'सर्च करत आहे...');
+                
+                // AI ला विनंती पाठवा
+                const aiResponse = await fetchGeminiResponse(input);
+                
+                // लोडिंग काढून उत्तर द्या
+                document.getElementById(loadingId).innerHTML = formatResponse(aiResponse);
+                await speak(aiResponse);
+            }
+        }
+
+        // जर वापरकर्त्याने थेट फॉर्म भरला तर
+        function checkManualInputs() {
+            if (els.userName.value && els.userAge.value && els.bookDetails.value && state.step !== 'READY') {
+                // फॉर्म भरलेला आहे, आता फक्त प्रश्न विचारा
+                const name = els.userName.value;
+                const book = els.bookDetails.value;
+                // जर सिस्टमने अजून विचारले नसेल तर
+                if (state.step === 'INIT') {
+                     const response = `नमस्कार ${name}, तुम्हाला ${book} बद्दल काय माहिती पाहिजे?`;
+                     addMessage('ai', response);
+                     speak(response);
+                     state.step = 'READY';
+                     els.textInput.disabled = false;
+                }
+            }
+        }
+
+        // --- AI जनरेशन (Gemini API) ---
+        async function fetchGeminiResponse(query) {
+            const name = els.userName.value;
+            const age = parseInt(els.userAge.value);
+            const book = els.bookDetails.value;
+            const apiKey = getApiKey();
+
+            // वयानुसार सूचना (System Prompt Logic)
+            let toneInstruction = "";
+            if (age < 15) {
+                toneInstruction = "User is a CHILD. Explain simply, like a story. Use easy Marathi words. Speak slowly and lovingly.";
+            } else {
+                toneInstruction = "User is an ADULT/MATURE. Give deep, philosophical, and analytical explanation. Use formal and pure Marathi.";
+            }
+
+            const systemPrompt = `
+                You are Dhwani, an expert text scholar and programmer.
+                Current Book Context: "${book}".
+                User: ${name}, Age: ${age}.
+                
+                INSTRUCTIONS:
+                1. Answer ONLY based on the core philosophy and content of the book "${book}".
+                2. ${toneInstruction}
+                3. **CITATION RULE:** You MUST provide the exact Chapter (Adhyay), Verse (Shloka), or Page Reference from the book before explaining.
+                4. **FORMATTING RULE:** Do NOT use symbols like *, #, (), [], or markdown bolding in a way that breaks speech. Keep text clean but structured.
+                5. LANGUAGE: Marathi (unless asked for English/Hindi).
+                6. Do not use shortforms.
+                
+                Structure:
+                - Reference: (e.g., अध्याय ४, श्लोक ७)
+                - Sanskrit/Original Quote (if applicable/known).
+                - Deep Explanation in Marathi matching user's age.
+            `;
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [
+                            { role: "user", parts: [{ text: systemPrompt + "\n\nUser Question: " + query }] }
+                        ]
+                    })
+                });
+
+                const data = await response.json();
+                return data.candidates[0].content.parts[0].text;
+
+            } catch (error) {
+                console.error(error);
+                return "माफ करा, संपर्क तुटला आहे. कृपया पुन्हा प्रयत्न करा.";
+            }
+        }
+
+        // --- UI मदतनीस ---
+        function addMessage(role, text) {
+            const div = document.createElement('div');
+            const id = 'msg-' + Date.now();
+            div.id = id;
+            div.className = role === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai';
+            
+            // AI उत्तरांसाठी फॉरमॅटिंग
+            if (role === 'ai') {
+                div.innerHTML = formatResponse(text);
+            } else {
+                div.textContent = text;
+            }
+            
+            els.chatContainer.appendChild(div);
+            els.chatContainer.scrollTop = els.chatContainer.scrollHeight;
+            return id;
+        }
+
+        function formatResponse(text) {
+            // Newlines ला <br> मध्ये बदला आणि सोपे फॉरमॅटिंग
+            return text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        }
+
+        // --- इव्हेंट लिसनर्स ---
+        els.micBtn.addEventListener('click', () => {
+            if (state.isListening) recognition.stop();
+            else recognition.start();
+        });
+
+        els.textInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleInteraction();
+        });
+        
+        // मॅन्युअल इनपुट मॉनिटरिंग
+        [els.userName, els.userAge, els.bookDetails].forEach(input => {
+            input.addEventListener('blur', checkManualInputs);
+        });
+
+        // स्टार्टअप
+        window.onload = () => {
+            setTimeout(initDhwani, 1000);
+        };
+
+    </script>
+</body>
+</html>
