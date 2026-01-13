@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>मुख्य निवडणूक अधिकारी - साहेब AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* थीम - लोकशाही (Democracy Blue with Tricolor Hints) */
+        .democracy-bg {
+            background: radial-gradient(circle at top, #1e3a8a, #0f172a, #020617);
+            background-size: 200% 200%;
+            animation: gradientBG 15s ease infinite;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        /* ॲनिमेशन - अधिकृत अलर्ट */
+        .listening-pulse { animation: pulse 1.5s infinite ease-in-out; }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(234, 88, 12, 0.7); } /* orange-600 (Saffron) */
+            70% { box-shadow: 0 0 0 15px rgba(234, 88, 12, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(234, 88, 12, 0); }
+        }
+
+        .icon-btn {
+            @apply p-3 rounded-full text-white transition-all duration-200
+                   bg-slate-700 hover:bg-slate-600 shadow-lg border border-slate-500
+                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-slate-500
+                   disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none;
+        }
+        
+        .utility-btn {
+            @apply w-full py-3 px-2 rounded-lg text-sm font-semibold transition-colors
+                   bg-blue-900 text-blue-100 border border-blue-700
+                   hover:bg-blue-800
+                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-blue-900 focus:ring-blue-500
+                   disabled:bg-slate-900 disabled:text-slate-500 disabled:cursor-not-allowed;
+        }
+
+        .custom-checkbox {
+            @apply w-4 h-4 text-orange-600 bg-slate-950 border-slate-700 rounded focus:ring-orange-500 focus:ring-2 ring-offset-slate-900;
+        }
+        
+        .custom-input {
+            @apply block w-3/4 mx-auto text-center border border-slate-700 rounded-lg p-3 outline-none transition-all;
+            background-color: #0f172a !important; /* slate-900 */
+            color: #e2e8f0 !important;             /* slate-200 */
+            caret-color: #f97316 !important;       /* orange-500 */
+        }
+        .custom-input::placeholder {
+            color: #94a3b8 !important;
+            opacity: 0.6 !important;
+        }
+
+        /* स्क्रोलबार कस्टमायझेशन */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #020617; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    </style>
+</head>
+
+<body class="democracy-bg text-slate-50 flex items-center justify-center min-h-screen p-4" oncontextmenu="return false;">
+
+    <div class="bg-[#0f172a]/90 backdrop-blur-md rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-2xl flex flex-col h-[95vh] md:h-auto border-t-4 border-orange-500 border-b-4 border-green-600">
+        
+        <div class="flex items-center justify-between mb-4 shrink-0">
+            <div class="flex flex-col">
+                <h1 class="text-2xl md:text-3xl font-bold text-white tracking-wide">
+                    <span class="text-orange-500">मुख्य</span> <span class="text-white">निवडणूक</span> <span class="text-green-500">अधिकारी</span>
+                </h1>
+                <span class="text-xs text-blue-300 font-semibold mt-1">AI सहाय्यक (CEO Maharashtra & ECI)</span>
+            </div>
+            <div id="status-indicator" class="w-4 h-4 rounded-full bg-gray-600 transition-colors" title="बंद आहे"></div>
+        </div>
+        <div class="text-center mb-2 border-b border-slate-700 pb-2">
+             <span class="text-xs text-slate-400 uppercase tracking-widest">|| सशक्त लोकशाही - सर्वांसाठी सहभाग ||</span>
+        </div>
+
+        <div id="conversation-log" class="flex-grow overflow-y-auto bg-[#020617]/60 rounded-lg p-4 mb-4 border border-slate-800 space-y-4 shadow-inner min-h-[200px]">
+            <div class="text-slate-400 text-center mt-10">
+                सुरू करण्यासाठी <span class="text-orange-400 font-bold">"साहेब"</span> म्हणा.<br>
+                <span class="text-sm opacity-70 text-blue-300">"मतदार राजा, जागा हो!"</span>
+            </div>
+        </div>
+
+        <div class="flex justify-center gap-8 mb-4 shrink-0 bg-slate-800/30 p-2 rounded-xl border border-slate-700/50">
+            <button id="pause-resume-button" class="icon-btn bg-blue-700 hover:bg-blue-600" title="थांबवा/पुन्हा सुरू करा" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
+                </svg>
+            </button>
+            
+            <button id="stop-speech-button" class="icon-btn bg-red-900/50 hover:bg-red-800 border-red-800" title="बोलणे थांबवा" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z" />
+                </svg>
+            </button>
+
+            <button id="replay-button" class="icon-btn bg-green-900/50 hover:bg-green-800 border-green-800" title="पुन्हा ऐका" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                </svg>
+            </button>
+        </div>
+
+        <div class="flex flex-col gap-4 mb-4 shrink-0 w-full text-center">
+            <div class="w-full">
+                <label class="text-xs text-blue-300 mb-1 block">नागरिकाचे नाव</label>
+                <input type="text" id="manual-name" class="custom-input" placeholder="तुमचे नाव">
+            </div>
+            <div class="w-full">
+                <label class="text-xs text-blue-300 mb-1 block">वय (वर्षे)</label>
+                <input type="number" id="manual-age" class="custom-input" placeholder="उदा. १८">
+            </div>
+        </div>
+
+        <div class="flex items-center justify-center gap-2 mb-2 shrink-0">
+            <input type="checkbox" id="remember-me-checkbox" class="custom-checkbox">
+            <label for="remember-me-checkbox" class="text-sm text-slate-300 cursor-pointer select-none">
+                माहिती लक्षात ठेवा
+            </label>
+        </div>
+
+        <div class="w-full flex flex-col items-center justify-center mb-4 shrink-0">
+            <button id="advance-toggle-btn" class="text-xs text-slate-500 hover:text-slate-300 underline mb-2 focus:outline-none">
+                ▼ प्रगत सेटिंग्ज (API Key)
+            </button>
+
+            <div id="advance-container" class="hidden w-full bg-[#020617] border border-slate-700 rounded-lg p-4 flex flex-col gap-3 transition-all">
+                
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="use-custom-key-checkbox" class="custom-checkbox">
+                    <label for="use-custom-key-checkbox" class="text-sm text-slate-300 cursor-pointer select-none">
+                        तुमची स्वतःची API Key वापरा
+                    </label>
+                </div>
+
+                <input type="text" id="custom-api-key-input" class="custom-input text-xs w-full !w-full" placeholder="API Key येथे पेस्ट करा" disabled>
+                
+                <button id="paste-key-btn" type="button" disabled class="w-full py-2 px-4 bg-blue-900 hover:bg-blue-800 text-white text-xs rounded transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                    </svg>
+                    पेस्ट करा
+                </button>
+
+                <a href="https://ai.google.dev/gemini-api/docs/api-key" target="_blank" class="text-center w-full py-2 bg-[#020617] hover:bg-[#1e3a8a] text-xs text-blue-300 rounded transition-colors border border-blue-900">
+                    मोफत Google Gemini API Key मिळवा ↗
+                </a>
+            </div>
+        </div>
+
+        <button id="talk-button" class="w-full py-4 px-6 rounded-lg text-lg font-semibold transition-all duration-300 ease-in-out shrink-0
+                       bg-gradient-to-r from-orange-700 via-white/10 to-green-800 text-white shadow-lg shadow-blue-900/50
+                       hover:from-orange-600 hover:to-green-700 hover:shadow-orange-500/20 hover:-translate-y-0.5
+                       focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50
+                       disabled:from-gray-700 disabled:to-gray-800 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-y-0 border border-white/20">
+            'साहेब' यांच्याशी संवाद साधा
+        </button>
+
+        <div class="mt-4 grid grid-cols-3 gap-3 shrink-0">
+            <button id="restart-chat-button" class="utility-btn" disabled>पुन्हा सुरू करा</button>
+            <button id="share-button" class="utility-btn bg-slate-800 text-slate-300 border-slate-600 hover:bg-slate-700">शेअर करा</button>
+            <button id="end-chat-button" class="utility-btn text-red-200 bg-red-900/30 hover:bg-red-900/50 border-red-900" disabled>थांबवा</button>
+        </div>
+
+    </div>
+
+    <script>
+        document.addEventListener('contextmenu', event => event.preventDefault());
+
+        function enterFullScreen() {
+            const elem = document.documentElement;
+            if (elem.requestFullscreen) { elem.requestFullscreen(); } 
+            else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); } 
+            else if (elem.msRequestFullscreen) { elem.msRequestFullscreen(); }
+        }
+
+        const talkButton = document.getElementById('talk-button');
+        const statusIndicator = document.getElementById('status-indicator');
+        const conversationLog = document.getElementById('conversation-log');
+        const rememberMeCheckbox = document.getElementById('remember-me-checkbox');
+        const manualNameInput = document.getElementById('manual-name');
+        const manualAgeInput = document.getElementById('manual-age');
+        const pauseResumeButton = document.getElementById('pause-resume-button');
+        const stopSpeechButton = document.getElementById('stop-speech-button');
+        const replayButton = document.getElementById('replay-button');
+        const shareButton = document.getElementById('share-button');
+        const endChatButton = document.getElementById('end-chat-button');
+        const restartChatButton = document.getElementById('restart-chat-button');
+        
+        const advanceToggleBtn = document.getElementById('advance-toggle-btn');
+        const advanceContainer = document.getElementById('advance-container');
+        const useCustomKeyCheckbox = document.getElementById('use-custom-key-checkbox');
+        const customApiKeyInput = document.getElementById('custom-api-key-input');
+        const pasteKeyBtn = document.getElementById('paste-key-btn');
+
+        const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
+        let appState = 'IDLE'; 
+        let userName = '';
+        let userAge = 18; 
+        let chatHistory = [];
+        let systemInstruction = '';
+        let recognition;
+        let lastSpokenText = ''; 
+        let speechManuallyStopped = false; 
+        const synth = window.speechSynthesis;
+        let voices = [];
+        let wakeLock = null;
+
+        window.onload = () => {
+            if (synth.speaking) synth.cancel();
+            loadUserData(); 
+            loadVoices();   
+        };
+
+        advanceToggleBtn.addEventListener('click', () => {
+            advanceContainer.classList.toggle('hidden');
+            advanceContainer.classList.toggle('flex');
+        });
+
+        useCustomKeyCheckbox.addEventListener('change', () => {
+            const isChecked = useCustomKeyCheckbox.checked;
+            customApiKeyInput.disabled = !isChecked;
+            pasteKeyBtn.disabled = !isChecked;
+            saveUserData(); 
+            if (isChecked) customApiKeyInput.focus();
+        });
+
+        customApiKeyInput.addEventListener('input', saveUserData);
+
+        pasteKeyBtn.addEventListener('click', async () => {
+            try {
+                const text = await navigator.clipboard.readText();
+                if(text) {
+                    customApiKeyInput.value = text;
+                    saveUserData();
+                    const originalText = pasteKeyBtn.innerHTML;
+                    pasteKeyBtn.textContent = "पेस्ट झाले!";
+                    setTimeout(() => { pasteKeyBtn.innerHTML = originalText; }, 1000);
+                }
+            } catch (err) { alert('पेस्ट करता आले नाही. कृपया टाईप करा.'); }
+        });
+
+        function getEffectiveApiKey() {
+            if (useCustomKeyCheckbox.checked && customApiKeyInput.value.trim().length > 10) {
+                return customApiKeyInput.value.trim();
+            }
+            return DEFAULT_API_KEY;
+        }
+
+        function loadUserData() {
+            try {
+                const savedName = localStorage.getItem('ceo_userName');
+                const savedAge = localStorage.getItem('ceo_userAge');
+                const savedRemember = localStorage.getItem('ceo_remember');
+
+                if (savedRemember === 'true') {
+                    rememberMeCheckbox.checked = true;
+                    if (savedName) manualNameInput.value = savedName;
+                    if (savedAge) manualAgeInput.value = savedAge;
+                    if (savedName) talkButton.textContent = `नमस्ते ${savedName}`;
+                }
+
+                const savedUseKey = localStorage.getItem('ceo_useCustomKey');
+                const savedKey = localStorage.getItem('ceo_customKey');
+
+                if (savedUseKey === 'true') {
+                    useCustomKeyCheckbox.checked = true;
+                    customApiKeyInput.disabled = false;
+                    pasteKeyBtn.disabled = false;
+                    if (savedKey) customApiKeyInput.value = savedKey;
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function saveUserData() {
+            try {
+                if (rememberMeCheckbox.checked) {
+                    localStorage.setItem('ceo_remember', 'true');
+                    localStorage.setItem('ceo_userName', manualNameInput.value.trim());
+                    localStorage.setItem('ceo_userAge', manualAgeInput.value.trim());
+                } else {
+                    localStorage.removeItem('ceo_remember');
+                    localStorage.removeItem('ceo_userName');
+                    localStorage.removeItem('ceo_userAge');
+                }
+                localStorage.setItem('ceo_useCustomKey', useCustomKeyCheckbox.checked);
+                if (customApiKeyInput.value) {
+                    localStorage.setItem('ceo_customKey', customApiKeyInput.value.trim());
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        function loadChatContext(name) {
+            const key = `ceo_history_${name.toLowerCase()}`;
+            const savedHistory = localStorage.getItem(key);
+            try { return savedHistory ? JSON.parse(savedHistory) : []; } catch (e) { return []; }
+        }
+
+        function saveChatContext() {
+            if (!userName) return;
+            const key = `ceo_history_${userName.toLowerCase()}`;
+            const limitedHistory = chatHistory.slice(-20); 
+            localStorage.setItem(key, JSON.stringify(limitedHistory));
+        }
+
+        manualNameInput.addEventListener('input', () => { if(rememberMeCheckbox.checked) saveUserData(); });
+        manualAgeInput.addEventListener('input', () => { if(rememberMeCheckbox.checked) saveUserData(); });
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (!SpeechRecognition) {
+            logMessage('त्रुटी', 'हा ब्राउझर सपोर्ट करत नाही. कृपया Google Chrome वापरा.');
+            talkButton.disabled = true;
+        } else {
+            try {
+                recognition = new SpeechRecognition();
+                recognition.continuous = false; 
+                recognition.interimResults = false;
+                recognition.lang = 'mr-IN'; 
+
+                recognition.onresult = handleSpeechResult;
+                recognition.onend = handleSpeechEnd;
+                
+                recognition.onerror = (event) => {
+                    if (event.error === 'no-speech' && appState !== 'IDLE' && appState !== 'BUSY') {
+                        startRecognitionSafe();
+                    } else if (event.error === 'not-allowed') {
+                        setState('IDLE');
+                    }
+                };
+            } catch (e) { alert("माईक त्रुटी: " + e.message); }
+        }
+
+        function startRecognitionSafe() {
+            if (!recognition) return;
+            try { recognition.start(); } catch (e) {}
+        }
+
+        talkButton.addEventListener('click', toggleListening);
+        pauseResumeButton.addEventListener('click', togglePauseResume);
+        stopSpeechButton.addEventListener('click', stopSpeech);
+        replayButton.addEventListener('click', replaySpeech);
+        shareButton.addEventListener('click', shareChat);
+        endChatButton.addEventListener('click', endChat);
+        restartChatButton.addEventListener('click', restartChat);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        async function toggleListening() {
+            if (appState === 'IDLE') {
+                try { enterFullScreen(); } catch(e) {}
+            }
+
+            try {
+                if (appState === 'IDLE') {
+                    talkButton.textContent = "ऐकत आहे...";
+                    talkButton.disabled = true;
+                    await acquireWakeLock(); 
+                    
+                    const inputName = manualNameInput.value.trim();
+                    const inputAge = manualAgeInput.value.trim();
+
+                    if (inputName && inputAge) {
+                        userName = inputName;
+                        userAge = parseInt(inputAge);
+                        saveUserData(); 
+                        buildSystemPrompt(); 
+
+                        // जुना इतिहास तपासणे
+                        const previousHistory = loadChatContext(userName);
+                        
+                        if (previousHistory.length > 0) {
+                            chatHistory = previousHistory;
+                            logMessage('सिस्टम', 'साहेब माहिती तपासत आहेत...');
+                            
+                            setState('BUSY');
+                            const welcomeBackPrompt = "नागरिक परत आला आहे. त्यांचे स्वागत करा आणि मतदानाबद्दल विचारा.";
+                            
+                            const tempHistory = [...chatHistory, { role: 'user', parts: [{ text: welcomeBackPrompt }] }];
+                            const welcomeText = await getAIResponse(tempHistory);
+                            
+                            logMessage('मुख्य निवडणूक अधिकारी', welcomeText);
+                            await speakText(welcomeText, 'mr-IN');
+                            setState('CONVERSATION');
+                            startRecognitionSafe();
+
+                        } else {
+                            if (chatHistory.length === 0) {
+                                chatHistory.push({ role: 'user', parts: [{ text: "Start session." }] });
+                                chatHistory.push({ role: 'model', parts: [{ text: `नमस्कार.` }] });
+                            }
+                            
+                            const welcomeText = `नमस्कार ${userName}. मी मुख्य निवडणूक अधिकारी बोलतोय. लोकशाहीच्या या उत्सवात आपले स्वागत आहे. आपले वय ${userAge} वर्षे आहे. मी आपली काय मदत करू शकतो?`;
+                            logMessage('मुख्य निवडणूक अधिकारी', welcomeText);
+                            
+                            setState('BUSY'); 
+                            await speakText(welcomeText, 'mr-IN');
+                            setState('CONVERSATION');
+                            startRecognitionSafe();
+                        }
+
+                    } else {
+                        setState('LISTENING_FOR_WAKEWORD');
+                        startRecognitionSafe();
+                        if (conversationLog.childElementCount < 3) logMessage('माहिती', '"साहेब" म्हणा.');
+                    }
+
+                } else {
+                    setState('IDLE');
+                    recognition.stop();
+                    if (synth.speaking) synth.cancel();
+                    await releaseWakeLock();
+                }
+            } catch (error) {
+                setState('IDLE');
+            }
+        }
+
+        function setState(newState) {
+            appState = newState;
+            switch (newState) {
+                case 'IDLE':
+                    talkButton.textContent = "'साहेब' यांच्याशी संवाद साधा";
+                    talkButton.disabled = false;
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-gray-600 transition-colors';
+                    endChatButton.disabled = true;
+                    talkButton.classList.remove('from-blue-700', 'to-indigo-900');
+                    talkButton.classList.add('from-orange-700', 'to-green-800'); // Tricolor gradient
+                    manualNameInput.disabled = false;
+                    manualAgeInput.disabled = false;
+                    break;
+                case 'BUSY':
+                    talkButton.textContent = 'प्रक्रिया सुरू आहे...';
+                    talkButton.disabled = true;
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-500 transition-colors';
+                    endChatButton.disabled = false;
+                    break;
+                default:
+                    talkButton.textContent = 'ऐकणे थांबवा';
+                    talkButton.disabled = false;
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-orange-500 listening-pulse transition-colors';
+                    endChatButton.disabled = false;
+                    talkButton.classList.remove('from-orange-700', 'to-green-800');
+                    talkButton.classList.add('from-blue-700', 'to-indigo-900');
+                    manualNameInput.disabled = true;
+                    manualAgeInput.disabled = true;
+                    break;
+            }
+        }
+
+        function handleSpeechEnd() {
+            if (appState !== 'IDLE' && appState !== 'BUSY') startRecognitionSafe();
+            else if (appState === 'IDLE') setState('IDLE'); 
+        }
+        
+        async function handleSpeechResult(event) {
+            const transcript = event.results[event.results.length - 1][0].transcript.trim();
+            if (!transcript) return;
+            console.log(`Heard: ${transcript}`);
+            
+            const currentState = appState;
+            recognition.stop();
+            setState('BUSY');
+
+            try {
+                switch (currentState) {
+                    case 'LISTENING_FOR_WAKEWORD':
+                        const t = transcript.toLowerCase();
+                        if (t.includes('saheb') || t.includes('साहेब') || t.includes('sir') || t.includes('adhikari')) {
+                            const greeting = "नमस्कार. मुख्य निवडणूक अधिकारी कार्यालयात आपले स्वागत आहे. कृपया आपले नाव सांगा.";
+                            logMessage('मुख्य निवडणूक अधिकारी', greeting);
+                            await speakText(greeting, 'mr-IN');
+                            setState('LISTENING_FOR_NAME');
+                            startRecognitionSafe(); 
+                        } else {
+                            setState('LISTENING_FOR_WAKEWORD');
+                            startRecognitionSafe();
+                        }
+                        break;
+
+                    case 'LISTENING_FOR_NAME':
+                        logMessage('तुम्ही', transcript);
+                        userName = await extractNameFromTranscript(transcript);
+                        manualNameInput.value = userName; 
+                        
+                        const agePrompt = `धन्यवाद ${userName}. मतदानाची पात्रता तपासण्यासाठी कृपया आपले वय सांगा.`;
+                        logMessage('मुख्य निवडणूक अधिकारी', agePrompt);
+                        await speakText(agePrompt, 'mr-IN');
+                        setState('LISTENING_FOR_AGE');
+                        startRecognitionSafe();
+                        break;
+                    
+                    case 'LISTENING_FOR_AGE':
+                        logMessage('तुम्ही', transcript);
+                        userAge = await extractAgeFromTranscript(transcript);
+                        manualAgeInput.value = userAge; 
+                        
+                        saveUserData();
+                        buildSystemPrompt(); 
+
+                        const history = loadChatContext(userName);
+                        if(history.length > 0) chatHistory = history;
+
+                        let startPrompt = "";
+                        if (userAge < 18) {
+                             startPrompt = `अरे, तुमचे वय ${userAge} आहे. तुम्ही अद्याप मतदान करू शकत नाही, पण भविष्यातील मतदार म्हणून तुम्ही नोंदणीबद्दल जाणून घेऊ शकता. बोला, काय प्रश्न आहे?`;
+                        } else {
+                             startPrompt = `उत्तम. ${userAge} वर्षे वय असल्याने तुम्ही जबाबदार मतदार आहात. मतदान यादीत नाव तपासणे किंवा मतदान केंद्राची माहिती, मी काय मदत करू?`;
+                        }
+
+                        logMessage('मुख्य निवडणूक अधिकारी', startPrompt);
+                        await speakText(startPrompt, 'mr-IN');
+                        setState('CONVERSATION');
+                        startRecognitionSafe();
+                        break;
+
+                    case 'CONVERSATION':
+                        logMessage(userName || 'तुम्ही', transcript);
+                        chatHistory.push({ role: 'user', parts: [{ text: transcript }] });
+                        saveChatContext();
+
+                        const aiResponseText = await generateTextResponseFromChat();
+                        
+                        // फिल्टर
+                        const noBracketText = cleanBrackets(aiResponseText);
+                        const cleanedResponseText = cleanTextForTTS(noBracketText);
+
+                        chatHistory.push({ role: 'model', parts: [{ text: cleanedResponseText }] });
+                        saveChatContext();
+
+                        logMessage('मुख्य निवडणूक अधिकारी', cleanedResponseText);
+                        
+                        try {
+                            await speakText(cleanedResponseText, 'mr-IN');
+                        } catch (error) {
+                            if (error.message === "Speech manually stopped") return;
+                            throw error;
+                        }
+                        
+                        setState('CONVERSATION');
+                        startRecognitionSafe();
+                        break;
+                }
+            } catch (error) {
+                if (systemInstruction) { setState('CONVERSATION'); startRecognitionSafe(); }
+                else { setState('LISTENING_FOR_WAKEWORD'); startRecognitionSafe(); }
+            }
+        }
+
+        // --- मुख्य लॉजिक (Brain) - निवडणूक अधिकारी सिस्टम प्रॉम्प्ट ---
+        function buildSystemPrompt() {
+            
+            let ageInstruction = "";
+            if (userAge < 18) {
+                ageInstruction = `User is MINOR (${userAge} years). Explain that voting age is 18. Encourage them to pre-register (Form 6) if they are 17+. Focus on civic education.`;
+            } else {
+                ageInstruction = `User is VOTER (${userAge} years). Focus on checking name in electoral roll, finding polling station, and ethical voting.`;
+            }
+
+            systemInstruction = `
+                You are "Saheb", the Chief Election Officer (CEO) of Maharashtra/India AI Assistant.
+                User Name: ${userName}, Age: ${userAge}.
+                
+                CONTEXT: ${ageInstruction}
+
+                YOUR MANDATE & KNOWLEDGE BASE:
+                1. **Websites to Reference:**
+                   - https://ceoelection.maharashtra.gov.in/ (CEO Maharashtra)
+                   - https://voters.eci.gov.in/ (NVSP / Voter Portal for Registration)
+                   - https://www.eci.gov.in (Election Commission of India)
+                   - https://ecisveep.nic.in/ (Voter Education)
+                   - cVIGIL App (For reporting malpractice).
+
+                CORE PRINCIPLES:
+                1. **Ethical Voting:** Strictly warn against accepting bribes, liquor, or gifts. "Note nehi, Vote dya".
+                2. **Registration:** Guide to Form 6 (New Voter), Form 7 (Deletion), Form 8 (Correction).
+                3. **Identity:** Mention EPIC Card, but clarify that name in Voter List is mandatory even if you have the card.
+                4. **Help:** Mention Helpline 1950.
+
+                STRICT RULES:
+                1. **LANGUAGE:** PURE MARATHI (Formal yet accessible). Use terms like 'मतदार राजा', 'लोकशाही', 'आचारसंहिता'.
+                2. **ACCURACY:** Do not hallucinate election dates. If asked for specific live dates, ask them to check the website. Give general process steps accurately.
+                3. **NO formatting characters:** Do NOT use asterisks *, brackets [], or parens ().
+                4. **Tone:** Authoritative, Polite, Encouraging, Non-partisan (Neutral).
+
+                EXAMPLE RESPONSE FORMAT:
+                नमस्कार ${userName}.
+                मतदार यादीत नाव तपासण्यासाठी आपण https://voters.eci.gov.in/ या संकेतस्थळाला भेट द्यावी.
+                लक्षात ठेवा, मतदानाचा अधिकार हा पवित्र आहे. कोणाच्याही दबावाला किंवा आमिषाला बळी पडू नका.
+                आपण जबाबदार नागरिक आहात. आणखी काही माहिती हवी आहे का?
+            `;
+            restartChatButton.disabled = false;
+        }
+
+        // --- API कॉल्स ---
+        async function getAIResponse(historyData) {
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: historyData,
+                        systemInstruction: { parts: [{ text: systemInstruction }] }
+                    })
+                });
+                const result = await response.json();
+                return result.candidates[0].content.parts[0].text.trim();
+            } catch (error) { return "संपर्क त्रुटी. कृपया इंटरनेट तपासा किंवा पुन्हा प्रयत्न करा."; }
+        }
+
+        async function generateTextResponseFromChat() { return await getAIResponse(chatHistory); }
+
+        async function extractNameFromTranscript(transcript) {
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: `Extract First Name from audio: "${transcript}". Return ONLY the name in Marathi script. If unclear return "नागरिक".` }] }] })
+                });
+                const result = await response.json();
+                let name = result.candidates[0].content.parts[0].text.trim();
+                return (name.length < 2) ? "नागरिक" : name.replace(/['".]/g, '');
+            } catch (error) { return "नागरिक"; }
+        }
+
+        async function extractAgeFromTranscript(transcript) {
+             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
+             try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: `Extract age number from: "${transcript}". Return ONLY digits. Default 18.` }] }] })
+                });
+                const result = await response.json();
+                let age = parseInt(result.candidates[0].content.parts[0].text.trim());
+                return isNaN(age) ? 18 : age;
+            } catch (e) { return 18; }
+        }
+
+        function cleanBrackets(text) {
+             return text.replace(/[\*\[\]\(\)<>`]/g, '')
+                        .replace(/\(.*?\)/g, '')
+                        .replace(/\[.*?\]/g, '')
+                        .replace(/<.*?>/g, '');
+        }
+
+        function cleanTextForTTS(text) {
+            let cleaned = text.replace(/[\*#`<>]/g, '').trim();
+            // URLs TTS मध्ये वाचताना विचित्र वाटतात, म्हणून त्या काढणे किंवा 'संकेतस्थळ' असे वाचणे
+            cleaned = cleaned.replace(/https?:\/\/[^\s]+/g, 'संकेतस्थळ'); 
+            return cleaned;
+        }
+
+        function loadVoices() {
+            voices = synth.getVoices();
+            if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => { voices = synth.getVoices(); };
+        }
+
+        function togglePauseResume() {
+            if (synth.paused) synth.resume();
+            else if (synth.speaking) { synth.pause(); recognition.stop(); setState('BUSY'); }
+        }
+
+        function stopSpeech() {
+            if (!synth.speaking) return;
+            speechManuallyStopped = true; 
+            synth.cancel(); 
+            recognition.stop(); 
+            toggleMediaButtons(true);
+            logMessage('माहिती', 'थांबले.');
+            setTimeout(() => {
+                speechManuallyStopped = false;
+                if (appState !== 'IDLE') {
+                    if (systemInstruction) { setState('CONVERSATION'); startRecognitionSafe(); }
+                    else { setState('LISTENING_FOR_WAKEWORD'); startRecognitionSafe(); }
+                }
+            }, 1500);
+        }
+
+        function replaySpeech() {
+            if (lastSpokenText) { recognition.stop(); setState('BUSY'); speakText(lastSpokenText); }
+        }
+        
+        async function speakText(text, lang = 'mr-IN') {
+            if (synth.speaking) synth.cancel();
+            lastSpokenText = text;
+            speechManuallyStopped = false;
+            if (voices.length === 0) voices = synth.getVoices();
+
+            return new Promise((resolve, reject) => {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.onstart = () => { toggleMediaButtons(false); };
+                utterance.onend = () => {
+                    toggleMediaButtons(true);
+                    if (speechManuallyStopped) reject(new Error("Speech manually stopped"));
+                    else resolve();
+                };
+                utterance.onerror = (e) => { 
+                    toggleMediaButtons(true);
+                    if (e.error === 'interrupted') resolve(); else reject(e.error); 
+                };
+
+                let marathiVoice = voices.find(voice => voice.lang === 'mr-IN') || 
+                                 voices.find(voice => voice.lang === 'hi-IN');
+                                 
+                if (marathiVoice) utterance.voice = marathiVoice;
+                utterance.lang = 'mr-IN'; 
+                utterance.rate = 1.0; // Normal speed for official info
+                utterance.pitch = 1.0; // Normal pitch
+                
+                synth.speak(utterance);
+            });
+        }
+
+        function toggleMediaButtons(disabled) {
+            pauseResumeButton.disabled = disabled;
+            stopSpeechButton.disabled = disabled;
+            replayButton.disabled = disabled;
+        }
+        
+        function logMessage(sender, message) {
+            const div = document.createElement('div');
+            let senderClass = 'text-blue-300 font-semibold';
+            let messageClass = 'text-white';
+
+            if (sender === 'मुख्य निवडणूक अधिकारी') { senderClass = 'text-orange-400 font-bold'; messageClass = 'text-slate-50'; }
+            else if (sender === 'तुम्ही') { senderClass = 'text-green-400 font-semibold'; }
+
+            let formattedMessage = message.replace(/\n/g, '<br>');
+            // Linkify URLs in text display
+            formattedMessage = formattedMessage.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" class="text-blue-400 underline hover:text-blue-300">$1</a>');
+
+            div.innerHTML = `<strong class="${senderClass}">${sender}:</strong> <span class="${messageClass}">${formattedMessage}</span>`;
+            conversationLog.appendChild(div);
+            conversationLog.scrollTop = conversationLog.scrollHeight;
+        }
+
+        function getChatLogAsText() {
+            const messages = [];
+            conversationLog.querySelectorAll('div').forEach(div => { if (div.textContent) messages.push(div.textContent); });
+            return messages.join('\n');
+        }
+
+        async function shareChat() {
+            const chatText = getChatLogAsText();
+            if (!chatText.trim()) return;
+            try { await navigator.share({ title: 'निवडणूक माहिती संवाद', text: chatText }); } 
+            catch (err) { try { await navigator.clipboard.writeText(chatText); logMessage('माहिती', 'कॉपी केले'); } catch (e) {} }
+        }
+
+        async function acquireWakeLock() {
+            if ('wakeLock' in navigator) { 
+                try { 
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    wakeLock.addEventListener('release', () => {
+                        if (appState !== 'IDLE' && document.visibilityState === 'visible') acquireWakeLock();
+                    });
+                } catch (e) {} 
+            }
+        }
+
+        async function releaseWakeLock() {
+            if (wakeLock) { try { await wakeLock.release(); wakeLock = null; } catch (e) {} }
+        }
+
+        async function handleVisibilityChange() {
+            if (appState !== 'IDLE' && document.visibilityState === 'visible') await acquireWakeLock();
+        }
+
+        async function endChat() {
+            appState = 'IDLE'; setState('IDLE');
+            speechManuallyStopped = true;
+            if (synth.speaking) synth.cancel();
+            if (recognition) try { recognition.stop(); } catch (e) {}
+            await releaseWakeLock();
+            userName = ''; userAge = 18; chatHistory = []; systemInstruction = '';
+            conversationLog.innerHTML = '<div class="text-gray-400 text-center">जय हिंद. मतदान नक्की करा.</div>';
+            restartChatButton.disabled = true;
+        }
+
+        async function restartChat() {
+            if (!systemInstruction) return;
+            if (synth.speaking) synth.cancel();
+            if (recognition) try { recognition.stop(); } catch(e){}
+            appState = 'IDLE'; setState('IDLE');
+            await releaseWakeLock();
+            conversationLog.innerHTML = '';
+            if(userName) {
+                localStorage.removeItem(`ceo_history_${userName.toLowerCase()}`);
+                chatHistory = [];
+            }
+            logMessage('माहिती', `सत्र पुन्हा सुरू झाले.`);
+        }
+    </script>
+</body>
+</html>
