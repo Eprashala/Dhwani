@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Eprashala Key Generator</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #222; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .card { background: #333; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 400px; text-align: center; border: 1px solid #444; }
+        h2 { color: #FF9800; margin-top: 0; }
+        input, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 5px; border: none; font-size: 16px; box-sizing: border-box; }
+        input { background: #444; color: white; border: 1px solid #555; text-align: center; }
+        button { background: #FF9800; color: white; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:hover { background: #F57C00; }
+        .result-box { background: #111; padding: 15px; margin-top: 15px; border-radius: 5px; word-break: break-all; font-family: monospace; border: 1px dashed #555; display: none; }
+        label { display: block; text-align: left; font-size: 14px; color: #aaa; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <div id="loginScreen" class="card">
+        <h2>🔐 Admin Login</h2>
+        <input type="password" id="adminPass" placeholder="Enter Password">
+        <button onclick="login()">Login</button>
+    </div>
+
+    <div id="genScreen" class="card" style="display:none;">
+        <h2>🔑 Key Generator</h2>
+        
+        <label>Client Device ID:</label>
+        <input type="text" id="deviceID" placeholder="e.g. A1B2C3D4E5F6" oninput="this.value = this.value.toUpperCase()">
+        
+        <label>License Expiry Date:</label>
+        <input type="date" id="expiryDate">
+        <div style="font-size: 12px; color: #888; text-align: left; margin-bottom: 10px;">
+            * Default (Today) = <b>Lifetime License</b>
+        </div>
+
+        <button onclick="generateKey()">Generate Registration Key</button>
+        
+        <div id="resultArea" class="result-box">
+            <div style="color:#FF9800; font-size:12px; margin-bottom:5px;">SEND THIS KEY TO STUDENT:</div>
+            <div id="finalKey" style="color:#0f0; font-size:14px;"></div>
+            <button onclick="copyKey()" style="margin-top:10px; background:#4CAF50; padding:5px;">Copy</button>
+        </div>
+    </div>
+
+    <script>
+        const SECRET = "Eprashala_Secret_2026"; // MUST MATCH index.html EXACTLY
+
+        // Set default date to today
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('expiryDate').value = today;
+
+        function login() {
+            if(document.getElementById('adminPass').value === "Domarp@123") {
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('genScreen').style.display = 'block';
+            } else {
+                alert("Wrong Password");
+            }
+        }
+
+        async function generateKey() {
+            const id = document.getElementById('deviceID').value.trim().toUpperCase();
+            const dateInput = document.getElementById('expiryDate').value;
+            
+            if(id.length < 5) { alert("Invalid Device ID"); return; }
+
+            // Logic: If date is today, it's PERMANENT. Else it's the specific date.
+            // Note: We compare strings "YYYY-MM-DD"
+            let expiryPayload = (dateInput === today) ? "PERMANENT" : dateInput;
+
+            // 1. Create Signature: SHA256( DeviceID + Payload + SECRET )
+            const rawString = id + expiryPayload + SECRET;
+            const msgBuffer = new TextEncoder().encode(rawString);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16).toUpperCase();
+
+            // 2. Pack Data: Payload | Signature
+            const rawKey = expiryPayload + "|" + signature;
+            
+            // 3. Encode to Base64 to make it look like a single key
+            const finalKey = btoa(rawKey);
+
+            document.getElementById('resultArea').style.display = 'block';
+            document.getElementById('finalKey').innerText = finalKey;
+        }
+
+        function copyKey() {
+            navigator.clipboard.writeText(document.getElementById('finalKey').innerText);
+            alert("Copied!");
+        }
+    </script>
+</body>
+</html>
