@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dhwani AI Teacher</title>
+    <style>
+        :root { --primary: #FF9800; --bg: #f4f4f9; --user-msg: #e3f2fd; --ai-msg: #fff; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; background: var(--bg); }
+        
+        /* Header */
+        header { background: var(--primary); color: white; padding: 15px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .title { font-size: 18px; font-weight: bold; display: flex; align-items: center; gap: 10px; }
+        .settings-btn { background: none; border: none; color: white; font-size: 20px; cursor: pointer; }
+
+        /* Chat Area */
+        #chat-container { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 15px; scroll-behavior: smooth; }
+        
+        .message { max-width: 85%; padding: 12px 16px; border-radius: 15px; line-height: 1.5; font-size: 15px; position: relative; animation: fadeIn 0.3s ease; }
+        .message.user { align-self: flex-end; background: var(--user-msg); border-bottom-right-radius: 2px; color: #333; border: 1px solid #bbdefb; }
+        .message.ai { align-self: flex-start; background: var(--ai-msg); border-bottom-left-radius: 2px; color: #222; border: 1px solid #ddd; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        
+        /* Interactive Elements inside Chat */
+        .quiz-option { display: block; width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ccc; border-radius: 5px; background: #fafafa; cursor: pointer; text-align: left; }
+        .quiz-option:hover { background: #eee; }
+        .ref-image { max-width: 100%; border-radius: 8px; margin-top: 5px; border: 1px solid #ddd; }
+        .video-link { display: inline-block; margin-top: 5px; color: #d32f2f; text-decoration: none; font-weight: bold; }
+
+        /* Input Area */
+        .input-area { background: white; padding: 10px; display: flex; gap: 10px; border-top: 1px solid #ddd; align-items: center; }
+        input[type="text"] { flex: 1; padding: 12px; border-radius: 25px; border: 1px solid #ccc; outline: none; font-size: 16px; }
+        .icon-btn { width: 45px; height: 45px; border-radius: 50%; border: none; background: var(--primary); color: white; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .icon-btn:hover { transform: scale(1.05); }
+        .icon-btn.mic.listening { background: #d32f2f; animation: pulse 1.5s infinite; }
+
+        /* Modal */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center; }
+        .modal-content { background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 350px; }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(211, 47, 47, 0); } 100% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0); } }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="title">🤖 Dhwani AI <span id="grade-badge" style="font-size:12px; background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:10px;">Offline</span></div>
+    <button class="settings-btn" onclick="openSettings()">⚙️</button>
+</header>
+
+<div id="chat-container"></div>
+
+<div class="input-area">
+    <button class="icon-btn mic" id="micBtn" onclick="toggleVoice()">🎙️</button>
+    <input type="text" id="userInput" placeholder="Type or speak (Marathi/English)..." onkeydown="if(event.key==='Enter') sendMessage()">
+    <button class="icon-btn" onclick="sendMessage()">➤</button>
+</div>
+
+<div id="settingsModal" class="modal">
+    <div class="modal-content">
+        <h3>Settings</h3>
+        <p style="font-size:13px; color:#666;">Enter Google Gemini API Key to enable AI features.</p>
+        <input type="password" id="apiKeyInput" placeholder="Paste API Key here..." style="width:100%; padding:10px; margin-bottom:10px; box-sizing: border-box;">
+        <button onclick="saveSettings()" style="width:100%; padding:10px; background:var(--primary); color:white; border:none; border-radius:5px; cursor:pointer;">Save & Start</button>
+        <p style="font-size:11px; margin-top:10px;"><a href="https://aistudio.google.com/app/apikey" target="_blank">Get Free Key Here</a></p>
+    </div>
+</div>
+
+<script>
+    // --- CONFIGURATION ---
+    const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+    let API_KEY = localStorage.getItem("dhwani_api_key");
+    
+    // Parse URL Params from Index.html
+    const urlParams = new URLSearchParams(window.location.search);
+    const contextStr = urlParams.get('context') || "General Knowledge";
+    const userName = urlParams.get('user') || "Student";
+    
+    // Extract Grade/Subject from path if possible (e.g. "Root/Std 10/Science")
+    const pathParts = contextStr.split('/');
+    const detectedStd = pathParts.find(p => p.toLowerCase().includes('std') || p.toLowerCase().includes('class')) || "Primary";
+    const detectedSub = pathParts.find(p => !p.includes('root') && !p.includes('std') && !p.includes('class')) || "General";
+
+    // System Prompt
+    const SYSTEM_PROMPT = `
+    You are 'Dhwani', a kind and expert school teacher. 
+    User Context: Student Name: ${userName}. Current Topic/Path: ${contextStr}.
+    Standard: ${detectedStd}. Subject: ${detectedSub}.
+    
+    Instructions:
+    1. Language: Speak primarily in Marathi, but explain complex English terms in English if needed. Mixed (Hinglish/Marathlish) is okay if helpful.
+    2. Tone: Encouraging, patient, adapted to a child of approximately 10-16 years old (based on Standard).
+    3. Methodology: 
+       - First, explain the concept based on the textbook context provided (${contextStr}).
+       - Give practical, real-world examples.
+       - Ask a follow-up question to check understanding.
+       - If the student answers correctly, offer a short "Quiz" (2-3 questions) or a "Fun Fact".
+    4. formatting: Use <b>bold</b> for key terms. You can use Markdown.
+    5. Formatting: If relevant, suggest a  or [Video of X] tag at the end of your response, where X is the specific topic.
+    
+    Start the conversation by introducing yourself as Dhwani, acknowledging the current topic (${contextStr}), and asking what they want to learn about it.
+    `;
+
+    // --- CHAT LOGIC ---
+    let chatHistory = [
+        { role: "user", parts: [{ text: SYSTEM_PROMPT }] } // System instruction injected as first user message context
+    ];
+
+    window.onload = () => {
+        if (!API_KEY) {
+            openSettings();
+        } else {
+            document.getElementById('grade-badge').innerText = `${detectedStd} | ${detectedSub}`;
+            // Initial Greeting (Local, not API)
+            addMessage("ai", `Namaskar ${userName}! Mi Dhwani. <br>Aapan sadhya <b>${contextStr}</b> abhyasat aahat. <br>Tumhala ya vishaya var kay mahiti pahije?`);
+        }
+    };
+
+    function addMessage(role, text) {
+        const div = document.createElement('div');
+        div.className = `message ${role}`;
+        
+        // Process Markdown-like formatting
+        let formatted = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+        formatted = formatted.replace(/\n/g, '<br>');
+        
+        // Process Image Tags  -> Placeholders for now (Real search requires Custom Search API)
+        // Since this is a static file, we use a generic placeholder service or logic.
+        formatted = formatted.replace(/\/g, (match, query) => {
+            const safeQuery = encodeURIComponent(query);
+            return `<img class="ref-image" src="https://image.pollinations.ai/prompt/${safeQuery}?width=300&height=200&nologo=true" alt="${query}">`;
+        });
+
+        div.innerHTML = formatted;
+        document.getElementById('chat-container').appendChild(div);
+        document.getElementById('chat-container').scrollTop = document.getElementById('chat-container').scrollHeight;
+
+        if (role === 'ai') speak(text.replace(/<[^>]*>?/gm, '')); // Read out loud (strip HTML)
+    }
+
+    async function sendMessage() {
+        const input = document.getElementById('userInput');
+        const text = input.value.trim();
+        if (!text) return;
+        
+        if (!API_KEY) { alert("Please set API Key in settings."); return; }
+
+        input.value = '';
+        addMessage("user", text);
+        chatHistory.push({ role: "user", parts: [{ text: text }] });
+
+        // Show typing indicator
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'message ai';
+        loadingDiv.innerText = "Thinking...";
+        loadingDiv.id = "loading-msg";
+        document.getElementById('chat-container').appendChild(loadingDiv);
+
+        try {
+            const response = await fetch(`${API_URL}?key=${API_KEY}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ contents: chatHistory })
+            });
+            
+            const data = await response.json();
+            const aiText = data.candidates[0].content.parts[0].text;
+            
+            document.getElementById('loading-msg').remove();
+            
+            chatHistory.push({ role: "model", parts: [{ text: aiText }] });
+            addMessage("ai", aiText);
+
+        } catch (error) {
+            document.getElementById('loading-msg').innerText = "Error connecting to AI. Check Key/Internet.";
+            console.error(error);
+        }
+    }
+
+    // --- VOICE LOGIC (Web Speech API) ---
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = 'mr-IN'; // Marathi India
+    recognition.continuous = false;
+    let isListening = false;
+
+    function toggleVoice() {
+        if (isListening) {
+            recognition.stop();
+        } else {
+            recognition.start();
+            document.getElementById('micBtn').classList.add('listening');
+            isListening = true;
+        }
+    }
+
+    recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById('userInput').value = transcript;
+        setTimeout(sendMessage, 500); // Auto send after speaking
+    };
+
+    recognition.onend = () => {
+        document.getElementById('micBtn').classList.remove('listening');
+        isListening = false;
+    };
+
+    function speak(text) {
+        window.speechSynthesis.cancel();
+        // Fallback logic for mixed languages
+        const utterance = new SpeechSynthesisUtterance(text);
+        // Try to find a Marathi voice, else Hindi, else Default
+        const voices = window.speechSynthesis.getVoices();
+        const mrVoice = voices.find(v => v.lang.includes('mr')) || voices.find(v => v.lang.includes('hi'));
+        if (mrVoice) utterance.voice = mrVoice;
+        utterance.rate = 0.9;
+        window.speechSynthesis.speak(utterance);
+    }
+
+    // --- SETTINGS ---
+    function openSettings() { document.getElementById('settingsModal').style.display = 'flex'; }
+    function saveSettings() {
+        const key = document.getElementById('apiKeyInput').value;
+        if (key) {
+            localStorage.setItem("dhwani_api_key", key);
+            API_KEY = key;
+            document.getElementById('settingsModal').style.display = 'none';
+            // Reload to init chat properly
+            if(chatHistory.length === 1) window.onload();
+        }
+    }
+</script>
+
+</body>
+</html>
