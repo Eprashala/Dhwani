@@ -22,7 +22,7 @@
         .message.ai { align-self: flex-start; background: var(--ai-msg); border-bottom-left-radius: 2px; color: #222; border: 1px solid #ddd; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         
         /* Interactive Elements inside Chat */
-        .ref-image { max-width: 100%; border-radius: 8px; margin-top: 5px; border: 1px solid #ddd; }
+        .ref-image { max-width: 100%; border-radius: 8px; margin-top: 5px; border: 1px solid #ddd; display: block; }
 
         /* Input Area */
         .input-area { background: white; padding: 10px; display: flex; gap: 10px; border-top: 1px solid #ddd; align-items: center; }
@@ -43,7 +43,7 @@
 <body>
 
 <header>
-    <div class="title">🤖 Dhwani AI <span id="grade-badge" style="font-size:12px; background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:10px;">Offline</span></div>
+    <div class="title">🤖 Dhwani AI <span id="grade-badge" style="font-size:12px; background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:10px;">Connecting...</span></div>
     <button class="settings-btn" onclick="openSettings()" title="Settings">⚙️</button>
 </header>
 
@@ -67,8 +67,44 @@
 </div>
 
 <script>
-    // --- 1. SETTINGS & INIT ---
-    // Defined at top to ensure availability
+    // --- 1. CONFIGURATION & STATE ---
+    const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+    let API_KEY = localStorage.getItem("dhwani_api_key");
+    
+    // Parse Parameters from Eprashala LMS
+    const urlParams = new URLSearchParams(window.location.search);
+    const contextStr = urlParams.get('context') || "General Knowledge";
+    const userName = urlParams.get('user') || "Student";
+    
+    // Basic context detection logic
+    const pathParts = contextStr.split('/');
+    const detectedStd = pathParts.find(p => p.toLowerCase().includes('std') || p.toLowerCase().includes('class')) || "Classroom";
+    const detectedSub = pathParts.find(p => !p.includes('root') && !p.toLowerCase().includes('std') && !p.toLowerCase().includes('class')) || "General";
+
+    const SYSTEM_PROMPT = `
+    You are 'Dhwani', a kind and expert school teacher. 
+    User Context: Student Name: ${userName}. Current Topic/Path: ${contextStr}.
+    Standard: ${detectedStd}. Subject: ${detectedSub}.
+    
+    Instructions:
+    1. Language: Speak primarily in Marathi, but explain complex English terms in English.
+    2. Tone: Encouraging, patient, adapted to a child (10-16 years).
+    3. Methodology: 
+       - Explain the concept based on the textbook context (${contextStr}).
+       - Give practical examples.
+       - Ask a follow-up question.
+       - If appropriate, offer a "Fun Fact".
+    4. Formatting: Use <b>bold</b> for key terms. Break lines for readability.
+    5. Multimedia: If relevant, suggest an image tag exactly like this:  at the end.
+    
+    Start by introducing yourself as Dhwani, acknowledging the topic (${contextStr}), and asking what they want to learn.
+    `;
+
+    let chatHistory = [
+        { role: "user", parts: [{ text: SYSTEM_PROMPT }] }
+    ];
+
+    // --- 2. SETTINGS UI FUNCTIONS ---
     function openSettings() { 
         document.getElementById('settingsModal').style.display = 'flex'; 
     }
@@ -91,49 +127,12 @@
         }
     }
 
-    // --- 2. CONFIGURATION ---
-    const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
-    let API_KEY = localStorage.getItem("dhwani_api_key");
-    
-    const urlParams = new URLSearchParams(window.location.search);
-    const contextStr = urlParams.get('context') || "General Knowledge";
-    const userName = urlParams.get('user') || "Student";
-    
-    const pathParts = contextStr.split('/');
-    const detectedStd = pathParts.find(p => p.toLowerCase().includes('std') || p.toLowerCase().includes('class')) || "Primary";
-    const detectedSub = pathParts.find(p => !p.includes('root') && !p.includes('std') && !p.includes('class')) || "General";
-
-    const SYSTEM_PROMPT = `
-    You are 'Dhwani', a kind and expert school teacher. 
-    User Context: Student Name: ${userName}. Current Topic/Path: ${contextStr}.
-    Standard: ${detectedStd}. Subject: ${detectedSub}.
-    
-    Instructions:
-    1. Language: Speak primarily in Marathi, but explain complex English terms in English.
-    2. Tone: Encouraging, patient, adapted to a child (10-16 years).
-    3. Methodology: 
-       - Explain the concept based on the textbook context (${contextStr}).
-       - Give practical examples.
-       - Ask a follow-up question.
-       - If appropriate, offer a "Fun Fact".
-    4. Formatting: Use <b>bold</b> for key terms. Break lines for readability.
-    5. Multimedia: If relevant, suggest an image tag: 
-
-[Image of X]
- at the end.
-    
-    Start by introducing yourself as Dhwani, acknowledging the topic (${contextStr}), and asking what they want to learn.
-    `;
-
-    let chatHistory = [
-        { role: "user", parts: [{ text: SYSTEM_PROMPT }] }
-    ];
-
     // --- 3. LIFECYCLE ---
     window.onload = () => {
+        // Update badge based on context
         document.getElementById('grade-badge').innerText = `${detectedStd} | ${detectedSub}`;
+        
         if (!API_KEY) {
-            // Delay slightly to ensure UI is ready
             setTimeout(openSettings, 500);
         } else {
             initChat();
@@ -152,7 +151,7 @@
         
         let formatted = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
         
-        // Image Placeholder Logic
+        // --- FIX: Correct Regex for Image Tags ---
         formatted = formatted.replace(/\/g, (match, query) => {
             const safeQuery = encodeURIComponent(query);
             return `<img class="ref-image" src="https://image.pollinations.ai/prompt/${safeQuery}?width=300&height=200&nologo=true" alt="${query}">`;
@@ -163,7 +162,11 @@
         container.appendChild(div);
         container.scrollTop = container.scrollHeight;
 
-        if (role === 'ai') speak(text.replace(/<[^>]*>?/gm, '').replace(/\/g, ''));
+        // Strip HTML and Image tags for speech
+        if (role === 'ai') {
+            const cleanText = text.replace(/<[^>]*>?/gm, '').replace(/\/g, '');
+            speak(cleanText);
+        }
     }
 
     async function sendMessage() {
@@ -238,7 +241,7 @@
                 isListening = false;
             };
         } else {
-            console.warn("Web Speech API not supported in this browser.");
+            console.warn("Web Speech API not supported.");
             document.getElementById('micBtn').style.display = 'none';
         }
     } catch(e) {
