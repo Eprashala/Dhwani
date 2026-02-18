@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shiv-Kavi Samvad | Veer Ras AI</title>
+    <title>Shiv-Kavi Samvad | AI Maratha History</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Gotu&family=Yatra+One&family=Inter:wght@400;600&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
-        .marathi-font { font-family: 'Gotu', sans-serif; } 
+        .marathi-font { font-family: 'Gotu', sans-serif; } /* Gotu looks more like historical calligraphy */
         .royal-font { font-family: 'Yatra One', cursive; }
         
         /* Pulse Animation - Saffron when waiting, Red when processing */
@@ -51,9 +51,9 @@
         /* UI: High Contrast Inputs */
         .custom-input {
             @apply block w-3/4 mx-auto text-center border border-stone-500 rounded-lg p-3 outline-none transition-all;
-            background-color: #1c1917 !important; 
+            background-color: #1c1917 !important; /* Stone-900 */
             color: #ffffff !important;             
-            caret-color: #f97316 !important;    
+            caret-color: #f97316 !important; /* Orange-500 */      
         }
 
         /* Scrollbar customization */
@@ -75,13 +75,13 @@
         <div class="flex items-center justify-between mb-4 shrink-0">
             <h1 class="text-2xl md:text-3xl font-bold text-white flex items-center gap-2 royal-font tracking-wide">
                 <span class="text-orange-500 text-4xl">🚩</span>
-                <span>महाराजांची  <span class="text-orange-500"> शौर्य गाथा🚩</span></span>
+                <span>शिव-कवी <span class="text-orange-500">संवाद</span></span>
             </h1>
             <div id="status-indicator" class="w-4 h-4 rounded-full bg-stone-600 transition-colors" title="Offline"></div>
         </div>
 
         <div id="conversation-log" class="flex-grow overflow-y-auto bg-stone-900/80 rounded-lg p-4 mb-4 border border-stone-700 space-y-4 shadow-inner min-h-[200px] marathi-font text-lg">
-            <div id="welcome-message" class="text-stone-400 text-center mt-10 font-sans">
+            <div class="text-stone-400 text-center mt-10 font-sans">
                 To Start, Say: <br>
                 <span class="text-2xl text-orange-500 font-bold royal-font mt-2 block">"जय शिवराय"</span><br>
                 <span class="text-sm opacity-70 text-orange-200/50 mt-2 block">Microphone must be active.</span>
@@ -113,10 +113,14 @@
                 <label class="text-xs text-stone-400 mb-1 block">Mavala Name (मावळ्याचे नाव)</label>
                 <input type="text" id="manual-name" class="custom-input" placeholder="Enter Name">
             </div>
-            <div class="w-full">
-                <label class="text-xs text-stone-400 mb-1 block">Age (वय)</label>
-                <input type="number" id="manual-age" class="custom-input" placeholder="25">
-            </div>
+            <input type="hidden" id="manual-age" value="25">
+        </div>
+
+        <div class="flex items-center justify-center gap-2 mb-2 shrink-0">
+            <input type="checkbox" id="remember-me-checkbox" class="custom-checkbox">
+            <label for="remember-me-checkbox" class="text-sm text-stone-300 cursor-pointer select-none">
+                Remember Me
+            </label>
         </div>
 
         <div class="w-full flex flex-col items-center justify-center mb-4 shrink-0">
@@ -130,7 +134,7 @@
                     <label for="use-custom-key-checkbox" class="text-sm text-stone-300 cursor-pointer select-none">Use Custom API Key</label>
                 </div>
                 <input type="text" id="custom-api-key-input" class="custom-input text-xs w-full !w-full" placeholder="Paste API Key" disabled>
-                <button id="clear-history-btn" type="button" class="w-full py-2 bg-red-900/50 text-red-200 text-xs rounded hover:bg-red-800">Clear Saved History</button>
+                <button id="paste-key-btn" type="button" disabled class="w-full py-2 bg-stone-600 text-white text-xs rounded">Paste</button>
             </div>
         </div>
 
@@ -151,12 +155,12 @@
 
     <script>
         // --- CONFIGURATION ---
+        // REPLACE WITH YOUR VALID API KEY IF NEEDED
         const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
         
         // --- STATE VARIABLES ---
 	    let appState = 'IDLE'; 
         let userName = '';
-        let userAge = 25; 
         let chatHistory = [];
         let systemInstruction = '';
         let recognition;
@@ -169,14 +173,11 @@
         const statusIndicator = document.getElementById('status-indicator');
         const conversationLog = document.getElementById('conversation-log');
         const manualNameInput = document.getElementById('manual-name');
-        const manualAgeInput = document.getElementById('manual-age');
-        const customApiKeyInput = document.getElementById('custom-api-key-input');
-        const useCustomKeyCheckbox = document.getElementById('use-custom-key-checkbox');
-
+        
         // --- INITIALIZATION ---
         window.onload = () => {
             if (synth.speaking) synth.cancel();
-            loadSettings(); 
+            loadUserData(); 
             loadVoices();   
         };
 
@@ -190,6 +191,7 @@
             recognition = new SpeechRecognition();
             recognition.continuous = false; 
             recognition.interimResults = false;
+            // CRITICAL: Marathi Language
             recognition.lang = 'mr-IN'; 
 
             recognition.onresult = handleSpeechResult;
@@ -213,38 +215,32 @@
         talkButton.addEventListener('click', async () => {
             if (appState === 'IDLE') {
                 // STARTING
-                enableNoSleepVideo(); // Trigger video hack on user gesture
-                requestWakeLock();    // Trigger API lock on user gesture
-
+                await acquireWakeLock();
                 const inputName = manualNameInput.value.trim();
-                const inputAge = manualAgeInput.value.trim();
 
-                if (inputName && inputAge) {
+                if (inputName) {
                     userName = inputName;
-                    userAge = parseInt(inputAge);
-                    
-                    saveSettings(); // Save inputs to LocalStorage
+                    saveUserData();
                     buildSystemPrompt();
                     
-                    // Restore chat history if exists
-                    const history = loadChatHistory(userName);
+                    const history = loadChatContext(userName);
                     if (history.length > 0) {
                         chatHistory = history;
-                        renderHistoryToLog(chatHistory); // Visual Restore
-                        logMessage('System', 'Previous chronicles restored.');
+                        logMessage('System', 'Welcome back, brave Mavala.');
                     }
                     
                     setState('LISTENING_FOR_WAKEWORD');
                     startRecognitionSafe();
                     logMessage('Info', 'Listening... Say "जय शिवराय" (Jay Shivrai)');
                 } else {
-                    alert("Please enter Name and Age first.");
+                    alert("Please enter your Name first.");
                 }
             } else {
                 // STOPPING
                 setState('IDLE');
                 recognition.stop();
                 if (synth.speaking) synth.cancel();
+                releaseWakeLock();
             }
         });
 
@@ -257,19 +253,17 @@
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-stone-500';
                     talkButton.classList.replace('bg-red-700', 'bg-orange-700');
                     manualNameInput.disabled = false;
-                    manualAgeInput.disabled = false;
                     break;
                 case 'LISTENING_FOR_WAKEWORD':
                     talkButton.textContent = 'Waiting for "जय शिवराय"...';
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-orange-500 listening-pulse';
                     talkButton.classList.replace('bg-orange-700', 'bg-stone-600');
                     manualNameInput.disabled = true;
-                    manualAgeInput.disabled = true;
                     break;
                 case 'CONVERSATION':
                     talkButton.textContent = 'Listening...';
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-orange-500 listening-pulse';
-                    talkButton.classList.replace('bg-stone-600', 'bg-orange-700'); 
+                    talkButton.classList.replace('bg-stone-600', 'bg-orange-700'); // Active state
                     break;
                 case 'BUSY':
                     talkButton.textContent = 'Poet is Reciting...';
@@ -294,30 +288,41 @@
             recognition.stop();
 
             if (appState === 'LISTENING_FOR_WAKEWORD') {
+                // *** WAKE WORD LOGIC ***
                 const t = transcript.toLowerCase(); 
+                
+                // Matches: Jay Shivrai, Jay Bhavani, Jai Shivaji
                 if (t.includes('शिवराय') || t.includes('शिवाजी') || t.includes('भवानी')) {
+                    
                     setState('BUSY');
                     const greeting = `जय भवानी, जय शिवाजी! ये मावळ्या ${userName}, आज तुला राजांच्या कोणत्या पराक्रमाची गाथा ऐकायची आहे?`;
                     logMessage('Kavi', greeting);
                     await speakText(greeting);
                     setState('CONVERSATION'); 
                     startRecognitionSafe();
-                } 
+                    
+                } else {
+                    console.log("Ignored: Not wake word");
+                }
             } 
             else if (appState === 'CONVERSATION') {
+                // MAIN CHAT LOGIC
                 setState('BUSY');
                 logMessage('You', transcript);
                 
                 chatHistory.push({ role: 'user', parts: [{ text: transcript }] });
-                saveChatHistory(); // Persist
+                saveChatContext();
 
                 const responseText = await getAIResponse(chatHistory);
+                // Remove formatting for TTS reading
                 const cleanText = cleanTextForTTS(responseText);
 
-                chatHistory.push({ role: 'model', parts: [{ text: responseText }] }); 
-                saveChatHistory(); // Persist
+                chatHistory.push({ role: 'model', parts: [{ text: responseText }] }); // Save formatted text to history
+                saveChatContext();
 
+                // Display formatting in UI
                 logMessage('Kavi', responseText, true); 
+                
                 await speakText(cleanText);
                 
                 setState('CONVERSATION');
@@ -325,33 +330,45 @@
             }
         }
 
-        // --- GEMINI AI INTEGRATION ---
+        // --- GEMINI AI INTEGRATION (HISTORIAN LOGIC) ---
         function buildSystemPrompt() {
             systemInstruction = `
-                You are a fusion of the great poets Kavi Bhushan and Kavi Paramanand.
-                User: ${userName}, Age: ${userAge}.
-                Goal: Answer questions about Shivaji Maharaj.
+                You are a fusion of the great poets Kavi Bhushan and Kavi Paramanand from the court of Chhatrapati Shivaji Maharaj.
                 
-                Adaptation for Age ${userAge}:
-                ${userAge < 15 ? '- Use simple, storytelling Marathi. Focus on bravery and emotion.' : '- Use formal, historical Marathi with references.'}
-
-                Sources: 'Shivbavani', 'Shivabharat'.
-                Strict Format:
-                1. Verse (Devanagari)
-                2. Source Name
-                3. Explanation (Marathi)
+                **Your Goal:** Answer user questions about Shivaji Maharaj's history by quoting relevant poems and then explaining them.
+                
+                **Sources to Use:**
+                1. 'Shivbavani' (by Kavi Bhushan - Braj Bhasha/Hindi)
+                2. 'Shivraj Bhushan' (by Kavi Bhushan)
+                3. 'Shivabharat' (by Kavi Paramanand - Sanskrit)
+                
+                **Response Structure (Strictly follow this):**
+                1. Start with a relevant verse/stanza from the poems in Devanagari script.
+                2. Explicitly state the source. Use phrases like:
+                   - "ह्या प्रसंगावर कवी भूषण 'शिवबावनी' मध्ये म्हणतात..." 
+                   - "कवी परमानंद 'शिवभारत' ग्रंथात लिहितात..."
+                3. Provide the explanation/meaning in clear **Marathi**.
                 4. End with "जय शिवराय".
+
+                **Tone:** - Veer Ras (Heroic), Energetic, Devotional toward Maharaj.
+                - Address the user as 'Mavala' (मावळ्या).
+                
+                **Language:**
+                - Input: Marathi (User).
+                - Output: Verse (Braj/Sanskrit) + Explanation (Marathi).
+                
+                Keep answers concise (max 3-4 sentences of explanation) to keep the conversation flowing naturally.
             `;
         }
 
         function getEffectiveApiKey() {
-            const useCustom = useCustomKeyCheckbox.checked;
-            const customKey = customApiKeyInput.value.trim();
+            const useCustom = document.getElementById('use-custom-key-checkbox').checked;
+            const customKey = document.getElementById('custom-api-key-input').value.trim();
             return (useCustom && customKey) ? customKey : DEFAULT_API_KEY;
         }
 
         async function getAIResponse(history) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${getEffectiveApiKey()}`;
             try {
                 const res = await fetch(url, {
                     method: 'POST',
@@ -363,10 +380,10 @@
                 });
                 const data = await res.json();
                 return data.candidates[0].content.parts[0].text;
-            } catch (e) { return "मावळ्या, संपर्कात अडथळा आला आहे.वारंवार हा  error येत असेल तर तू नवीन A P I की टाकून बघ"; }
+            } catch (e) { return "मावळ्या, संपर्कात अडथळा आला आहे. पुन्हा प्रयत्न कर. (API Error)"; }
         }
 
-        // --- TTS ---
+        // --- TTS (TEXT TO SPEECH) ---
         function loadVoices() { voices = synth.getVoices(); if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => { voices = synth.getVoices(); }; }
 
         async function speakText(text) {
@@ -375,152 +392,85 @@
                 const utter = new SpeechSynthesisUtterance(text);
                 utter.onend = resolve;
                 utter.onerror = resolve; 
+                
+                // Try to find Marathi/Hindi voice
                 let voice = voices.find(v => v.lang === 'mr-IN') || voices.find(v => v.lang === 'hi-IN');
                 if (voice) utter.voice = voice;
+                
                 utter.lang = 'mr-IN';
-                utter.rate = 1.0; 
+                utter.rate = 1.0; // Normal speed (Energetic/Veer Ras)
+                utter.pitch = 1.0; // Strong pitch
+                
                 synth.speak(utter);
             });
         }
 
-        function cleanTextForTTS(text) { return text.replace(/[*#_`]/g, '').trim(); }
+        function cleanTextForTTS(text) {
+            // Remove markdown symbols for smoother speech
+            return text.replace(/[*#_`]/g, '').trim();
+        }
 
-        // --- UI UTILS ---
+        // --- UTILITIES ---
         function logMessage(sender, text, isMarkdown = false) {
             const div = document.createElement('div');
+            // Colors: Kavi = Orange, User = White, System = Gray
             const color = sender === 'Kavi' ? 'text-orange-400' : (sender === 'You' ? 'text-white' : 'text-stone-500');
+            
+            // formatting for poem display
             let content = text;
-            if(isMarkdown) content = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+            if(isMarkdown) {
+                // simple bold replacement for display
+                content = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+            }
+
             div.innerHTML = `<strong class="${color} font-bold">${sender}:</strong> <span class="text-stone-200">${content}</span>`;
             conversationLog.appendChild(div);
             conversationLog.scrollTop = conversationLog.scrollHeight;
         }
-
-        function renderHistoryToLog(history) {
-            document.getElementById('welcome-message').style.display = 'none';
-            history.forEach(msg => {
-                const sender = msg.role === 'user' ? 'You' : 'Kavi';
-                logMessage(sender, msg.parts[0].text, msg.role === 'model');
-            });
-        }
-
-        // --- LOCAL STORAGE MANAGER ---
-        function saveSettings() {
-            localStorage.setItem('shivkavi_name', userName);
-            localStorage.setItem('shivkavi_age', userAge);
-            if(useCustomKeyCheckbox.checked) {
-                localStorage.setItem('shivkavi_apikey', customApiKeyInput.value.trim());
-                localStorage.setItem('shivkavi_usecustom', 'true');
-            } else {
-                localStorage.setItem('shivkavi_usecustom', 'false');
+        
+        // --- STORAGE & SETTINGS ---
+        const rememberMeCheckbox = document.getElementById('remember-me-checkbox');
+        const useCustomKeyCheckbox = document.getElementById('use-custom-key-checkbox');
+        const customApiKeyInput = document.getElementById('custom-api-key-input');
+        
+        function loadUserData() {
+            if (localStorage.getItem('shivkavi_remember') === 'true') {
+                rememberMeCheckbox.checked = true;
+                manualNameInput.value = localStorage.getItem('shivkavi_userName') || '';
             }
         }
-
-        function loadSettings() {
-            if (localStorage.getItem('shivkavi_name')) {
-                manualNameInput.value = localStorage.getItem('shivkavi_name');
-                manualAgeInput.value = localStorage.getItem('shivkavi_age');
-            }
-            if (localStorage.getItem('shivkavi_usecustom') === 'true') {
-                useCustomKeyCheckbox.checked = true;
-                customApiKeyInput.disabled = false;
-                customApiKeyInput.value = localStorage.getItem('shivkavi_apikey') || '';
+        function saveUserData() {
+            if (rememberMeCheckbox.checked) {
+                localStorage.setItem('shivkavi_remember', 'true');
+                localStorage.setItem('shivkavi_userName', userName);
             }
         }
-
-        function saveChatHistory() {
-            if(!userName) return;
-            // Limit to last 30 messages to prevent storage overflow
-            const trimmedHistory = chatHistory.slice(-30);
-            localStorage.setItem(`shivkavi_chat_${userName}`, JSON.stringify(trimmedHistory));
-        }
-
-        function loadChatHistory(name) {
+        function loadChatContext(name) {
             try { return JSON.parse(localStorage.getItem(`shivkavi_chat_${name}`)) || []; } catch(e){ return []; }
         }
-
-        // Clear History Button
-        document.getElementById('clear-history-btn').onclick = () => {
-            if(confirm("Are you sure you want to delete the chat history for this user?")) {
-                localStorage.removeItem(`shivkavi_chat_${manualNameInput.value}`);
-                chatHistory = [];
-                conversationLog.innerHTML = '';
-                alert("History cleared.");
-            }
-        };
-
-        // --- ROBUST WAKE LOCK (PREVENT SLEEP) ---
-        // 1. Screen Wake Lock API
-        async function requestWakeLock() {
-            try {
-                if ('wakeLock' in navigator) {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                    console.log('Wake Lock active');
-                    wakeLock.addEventListener('release', () => {
-                        console.log('Wake Lock released, re-acquiring...');
-                        if(appState !== 'IDLE') requestWakeLock(); // Auto re-acquire
-                    });
-                }
-            } catch (err) { console.log("WakeLock Error:", err); }
+        function saveChatContext() {
+            localStorage.setItem(`shivkavi_chat_${userName}`, JSON.stringify(chatHistory.slice(-15)));
         }
 
-        // 2. Re-acquire on Visibility Change
-        document.addEventListener('visibilitychange', async () => {
-            if (document.visibilityState === 'visible' && appState !== 'IDLE') {
-                await requestWakeLock();
-            }
-        });
-
-        // 3. The "Video Hack" - Fallback for Safari/Old Android
-        // Creates an invisible looped video. Browsers won't sleep if video is playing.
-        function enableNoSleepVideo() {
-            // Check if already exists
-            if(document.getElementById('no-sleep-video')) return;
-
-            const video = document.createElement('video');
-            video.id = 'no-sleep-video';
-            video.setAttribute('playsinline', '');
-            video.setAttribute('loop', '');
-            video.setAttribute('muted', '');
-            // Tiny 1x1 pixel black video (Base64)
-            video.src = "data:video/mp4;base64,AAAAHGZ0eXBNNEVAAAAAAAEAAQAAAABtZGF0AAAAAAAAAAAAAA=="; 
-            video.style.display = 'none';
-            document.body.appendChild(video);
-            
-            video.play().then(() => console.log("NoSleep Video Playing"))
-                        .catch(e => console.log("NoSleep Video Failed:", e));
-        }
-
-        // Settings Toggle UI
+        // Settings Toggle
         document.getElementById('advance-toggle-btn').onclick = () => {
             document.getElementById('advance-container').classList.toggle('hidden');
         };
         useCustomKeyCheckbox.onchange = () => {
             customApiKeyInput.disabled = !useCustomKeyCheckbox.checked;
+            document.getElementById('paste-key-btn').disabled = !useCustomKeyCheckbox.checked;
+        };
+        document.getElementById('paste-key-btn').onclick = async () => {
+            try { customApiKeyInput.value = await navigator.clipboard.readText(); } catch(e){}
         };
 
-        // Standard Control Buttons
+        // --- WAKE LOCK ---
+        async function acquireWakeLock() { if ('wakeLock' in navigator) { try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {} } }
+        async function releaseWakeLock() { if (wakeLock) { await wakeLock.release(); wakeLock = null; } }
+        
+        // Control Buttons
         document.getElementById('stop-speech-button').onclick = () => { synth.cancel(); };
-        document.getElementById('restart-chat-button').onclick = () => { 
-            chatHistory = []; 
-            conversationLog.innerHTML = ''; 
-            logMessage('System', 'Chronicles reset.'); 
-        };
-
-// Re-activate wake lock whenever the page becomes active again
-document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") {
-        requestWakeLock();
-        enableNoSleepVideo();
-    }
-});
-
-// Also activate wake lock as soon as the page loads
-window.addEventListener("load", () => {
-    requestWakeLock();
-    enableNoSleepVideo();
-});
-
+        document.getElementById('restart-chat-button').onclick = () => { chatHistory = []; conversationLog.innerHTML = ''; logMessage('System', 'Chat Reset.'); };
     </script>
 </body>
 </html>
