@@ -3,858 +3,778 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Eप्रशाला ध्वनी AI शिक्षिका</title>
+    <title>ध्वनी AI शिक्षिका (Free TTS)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Use Inter font for clean readability */
-        body { font-family: 'Inter', sans-serif; }
-        
-        /* ANIMATION: Pulse effect to show the microphone is active/listening */
-        .listening-pulse { animation: pulse 1.5s infinite ease-in-out; }
+        /* Custom styles for the app */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Style for the pulsing "listening" indicator */
+        .listening-pulse {
+            animation: pulse 1.5s infinite ease-in-out;
+        }
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
             70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
             100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
         }
-
-        /* UI: Icon Button Styles */
-        .icon-btn {
-            @apply p-3 rounded-full text-white transition-all duration-200
-                   bg-gray-700 hover:bg-gray-600 shadow-lg
+        /* Style for audio control buttons */
+        .control-btn {
+            @apply px-4 py-2 rounded-lg text-sm font-medium transition-colors
+                   bg-gray-600 text-white
+                   hover:bg-gray-500
                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-blue-500
-                   disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none;
+                   disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed;
         }
-        
-        /* UI: General Buttons */
+        /* Style for chat utility buttons */
         .utility-btn {
-            @apply w-full py-3 px-2 rounded-lg text-sm font-semibold transition-colors
+            @apply w-full py-3 px-4 rounded-lg text-sm font-semibold transition-colors
                    bg-gray-700 text-white
                    hover:bg-gray-600
                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-blue-500
                    disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed;
         }
-
-        /* UI: Custom Checkbox */
-        .custom-checkbox {
-            @apply w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-600 focus:ring-2 ring-offset-gray-800;
-        }
-        
-        /* UI: High Contrast Inputs (Black BG / White Text) for better visibility */
-        .custom-input {
-            @apply block w-3/4 mx-auto text-center border border-gray-500 rounded-lg p-3 outline-none transition-all;
-            background-color: #000000 !important; 
-            color: #ffffff !important;             
-            caret-color: #ffffff !important;       
-        }
-        .custom-input::placeholder {
-            color: #9ca3af !important;
-            opacity: 1 !important;
-        }
     </style>
 </head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
 
-<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4" oncontextmenu="return false;">
-
-    <div class="bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-2xl flex flex-col h-[95vh] md:h-auto">
+    <div class="bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-2xl">
         
-        <div class="flex items-center justify-between mb-4 shrink-0">
-            <h1 class="text-2xl md:text-3xl font-bold text-white">
-                <span class="text-blue-400">Eप्रशाला</span> "ध्वनी <span class="text-pink-500">AI</span> शिक्षिका"
-            </h1>
+        <div class="flex items-center justify-between mb-6">
+            <h1 class="text-3xl font-bold text-white">ध्वनी AI शिक्षिका</h1>
             <div id="status-indicator" class="w-4 h-4 rounded-full bg-gray-500 transition-colors" title="Offline"></div>
         </div>
 
-        <div id="conversation-log" class="flex-grow overflow-y-auto bg-gray-900 rounded-lg p-4 mb-4 border border-gray-700 space-y-4 shadow-inner min-h-[200px]">
-            <div class="text-gray-400 text-center mt-10">
-                Press the button to begin.<br>
-                <span class="text-sm opacity-70">Fill in your details below to skip the introduction.</span>
-            </div>
+        <div id="conversation-log" class="h-80 overflow-y-auto bg-gray-900 rounded-lg p-4 mb-6 border border-gray-700 space-y-4">
+            <div class="text-gray-400 text-center">Press the button and say "Dhwani" to begin.</div>
         </div>
 
-        <div class="flex justify-center gap-8 mb-4 shrink-0 bg-gray-800/50 p-2 rounded-xl">
-            <button id="pause-resume-button" class="icon-btn bg-blue-900/30 hover:bg-blue-800" title="Pause/Resume" disabled>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" />
-                </svg>
-            </button>
-            
-            <button id="stop-speech-button" class="icon-btn bg-red-900/30 hover:bg-red-800" title="Stop Speaking" disabled>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z" />
-                </svg>
-            </button>
-
-            <button id="replay-button" class="icon-btn bg-green-900/30 hover:bg-green-800" title="Replay Last Message" disabled>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-                </svg>
-            </button>
+        <div id="audio-controls" class="grid grid-cols-3 md:grid-cols-4 gap-3 mb-6">
+            <button id="pause-resume-button" class="control-btn" disabled>Pause</button>
+            <button id="stop-speech-button" class="control-btn" disabled>Stop</button>
+            <button id="replay-button" class="control-btn" disabled>Replay</button>
+            <button id="share-button" class="control-btn md:col-start-4">Share Chat</button>
         </div>
 
-        <div class="flex flex-col gap-4 mb-4 shrink-0 w-full text-center">
-            <div class="w-full">
-                <label class="text-xs text-gray-400 mb-1 block">Name (नाव)</label>
-                <input type="text" id="manual-name" class="custom-input" placeholder="Enter Name">
-            </div>
-            <div class="w-full">
-                <label class="text-xs text-gray-400 mb-1 block">Age (वय)</label>
-                <input type="number" id="manual-age" class="custom-input" placeholder="18">
-            </div>
-        </div>
-
-        <div class="flex items-center justify-center gap-2 mb-2 shrink-0">
-            <input type="checkbox" id="remember-me-checkbox" class="custom-checkbox">
-            <label for="remember-me-checkbox" class="text-sm text-gray-300 cursor-pointer select-none">
-                Remember my Name & Age
-            </label>
-        </div>
-
-        <div class="w-full flex flex-col items-center justify-center mb-4 shrink-0">
-            <button id="advance-toggle-btn" class="text-xs text-blue-400 hover:text-blue-300 underline mb-2 focus:outline-none">
-                ▼ Advance Settings (API Key)
-            </button>
-
-            <div id="advance-container" class="hidden w-full bg-gray-800/80 border border-gray-700 rounded-lg p-4 flex flex-col gap-3 transition-all">
-                
-                <div class="flex items-center gap-2">
-                    <input type="checkbox" id="use-custom-key-checkbox" class="custom-checkbox">
-                    <label for="use-custom-key-checkbox" class="text-sm text-gray-300 cursor-pointer select-none">
-                        Use your own API Key (Faster & better)
-                    </label>
-                </div>
-
-                <input type="text" id="custom-api-key-input" class="custom-input text-xs w-full !w-full" placeholder="Paste your API Key here (AIza...)" disabled>
-                
-                <button id="paste-key-btn" type="button" disabled class="w-full py-2 px-4 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
-                    </svg>
-                    Paste API Key from Clipboard
-                </button>
-
-                <a href="https://ai.google.dev/gemini-api/docs/api-key" target="_blank" class="text-center w-full py-2 bg-gray-700 hover:bg-gray-600 text-xs text-blue-300 rounded transition-colors border border-gray-600">
-                    Learn how to get your own API key ↗
-                </a>
-            </div>
-        </div>
-
-        <button id="talk-button" class="w-full py-4 px-6 rounded-lg text-lg font-semibold transition-all duration-300 ease-in-out shrink-0
-                       bg-blue-600 text-white shadow-lg shadow-blue-900/50
-                       hover:bg-blue-500 hover:shadow-blue-500/50 hover:-translate-y-0.5
+        <button id="talk-button" class="w-full py-4 px-6 rounded-lg text-lg font-semibold transition-all duration-300 ease-in-out
+                       bg-blue-600 text-white
+                       hover:bg-blue-700
                        focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50
-                       disabled:bg-gray-600 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-y-0">
+                       disabled:bg-gray-500 disabled:cursor-not-allowed">
             Start Listening
         </button>
 
-        <div class="mt-4 grid grid-cols-3 gap-3 shrink-0">
-            <button id="restart-chat-button" class="utility-btn" disabled>Restart</button>
-            <button id="share-button" class="utility-btn bg-indigo-700 hover:bg-indigo-600">Share Chat</button>
-            <button id="end-chat-button" class="utility-btn text-red-200 hover:bg-red-900/40" disabled>End Chat</button>
+        <div class="mt-4 grid grid-cols-2 gap-3">
+            <button id="restart-chat-button" class="utility-btn" disabled>Restart Chat</button>
+            <button id="end-chat-button" class="utility-btn" disabled>End Chat</button>
         </div>
 
     </div>
 
     <script>
-        /* ==========================================================================
-           LOGIC SECTION
-           ==========================================================================
-           This script handles the 3 main components of the AI Teacher:
-           1. THE EAR (Speech Recognition): Converts your voice to text.
-           2. THE BRAIN (Google Gemini API): Thinks and generates a response.
-           3. THE MOUTH (Speech Synthesis): Speaks the response back to you.
-           
-           It also handles "Memory" (LocalStorage) to remember previous chats.
-        */
-
-        // --- UTILITY: PREVENT RIGHT CLICK ---
-        document.addEventListener('contextmenu', event => event.preventDefault());
-
-        // --- UTILITY: FULLSCREEN MODE (Kiosk Feel) ---
-        function enterFullScreen() {
-            const elem = document.documentElement;
-            if (elem.requestFullscreen) { elem.requestFullscreen(); } 
-            else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen(); } 
-            else if (elem.msRequestFullscreen) { elem.msRequestFullscreen(); }
-        }
-
-        // --- DOM ELEMENTS ---
+        // --- 1. DOM Elements ---
         const talkButton = document.getElementById('talk-button');
         const statusIndicator = document.getElementById('status-indicator');
         const conversationLog = document.getElementById('conversation-log');
-        const rememberMeCheckbox = document.getElementById('remember-me-checkbox');
-        const manualNameInput = document.getElementById('manual-name');
-        const manualAgeInput = document.getElementById('manual-age');
+        
         const pauseResumeButton = document.getElementById('pause-resume-button');
         const stopSpeechButton = document.getElementById('stop-speech-button');
         const replayButton = document.getElementById('replay-button');
         const shareButton = document.getElementById('share-button');
+        
         const endChatButton = document.getElementById('end-chat-button');
         const restartChatButton = document.getElementById('restart-chat-button');
-        
-        // Advance Settings
-        const advanceToggleBtn = document.getElementById('advance-toggle-btn');
-        const advanceContainer = document.getElementById('advance-container');
-        const useCustomKeyCheckbox = document.getElementById('use-custom-key-checkbox');
-        const customApiKeyInput = document.getElementById('custom-api-key-input');
-        const pasteKeyBtn = document.getElementById('paste-key-btn');
 
-        // --- CONFIGURATION & STATE ---
-        const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
-        const SILENCE_TIMEOUT = 4000; // 4000 milliseconds = 4 Seconds
-	let appState = 'IDLE'; 
+
+        // --- DANGER: API KEY ---
+        // This is ONLY for your own private, local testing.
+        const GEMINI_API_KEY = "AIzaSyA4Ts-x9EKRUY9nBEegxlBUtNiJ_Qvo_zo"; 
+        // -------------------------
+
+        
+        // --- 2. State Management ---
+        let appState = 'IDLE'; // IDLE, LISTENING_FOR_WAKEWORD, LISTENING_FOR_NAME, LISTENING_FOR_AGE, CONVERSATION, BUSY
         let userName = '';
         let userAge = 18;
-        let chatHistory = []; // Current session
+        let chatHistory = [];
         let systemInstruction = '';
         let recognition;
         let lastSpokenText = ''; 
         let speechManuallyStopped = false; 
+        
         const synth = window.speechSynthesis;
         let voices = [];
         let wakeLock = null;
-
-        // --- INITIALIZATION ---
+        
         window.onload = () => {
-            if (synth.speaking) synth.cancel();
-            loadUserData(); // Load settings (Name, Key)
-            loadVoices();   // Load robotic voices
+            if (window.location.protocol !== 'https:') {
+                console.warn('Note: To stop asking for mic permission, this page must be on a secure (https://) server.');
+            }
         };
 
-        // --- LOGIC: ADVANCED SETTINGS UI ---
-        advanceToggleBtn.addEventListener('click', () => {
-            advanceContainer.classList.toggle('hidden');
-            advanceContainer.classList.toggle('flex');
-            const isHidden = advanceContainer.classList.contains('hidden');
-            advanceToggleBtn.textContent = isHidden ? "▼ Advance Settings (API Key)" : "▲ Hide Settings";
-        });
 
-        useCustomKeyCheckbox.addEventListener('change', () => {
-            const isChecked = useCustomKeyCheckbox.checked;
-            customApiKeyInput.disabled = !isChecked;
-            pasteKeyBtn.disabled = !isChecked;
-            saveUserData(); 
-            if (isChecked) customApiKeyInput.focus();
-        });
-
-        customApiKeyInput.addEventListener('input', saveUserData);
-
-        // --- LOGIC: PASTE BUTTON (Since right click is disabled) ---
-        pasteKeyBtn.addEventListener('click', async () => {
-            try {
-                const text = await navigator.clipboard.readText();
-                if(text) {
-                    customApiKeyInput.value = text;
-                    saveUserData();
-                    const originalText = pasteKeyBtn.innerHTML;
-                    pasteKeyBtn.textContent = "Pasted!";
-                    setTimeout(() => { pasteKeyBtn.innerHTML = originalText; }, 1000);
-                } else {
-                    alert("Clipboard is empty!");
-                }
-            } catch (err) {
-                alert('Could not paste. Please type manually.');
-            }
-        });
-
-        function getEffectiveApiKey() {
-            if (useCustomKeyCheckbox.checked && customApiKeyInput.value.trim().length > 10) {
-                return customApiKeyInput.value.trim();
-            }
-            return DEFAULT_API_KEY;
-        }
-
-        // --- MEMORY LOGIC: LOCAL STORAGE & HISTORY ---
-        
-        // 1. Load User Settings
-        function loadUserData() {
-            try {
-                const savedName = localStorage.getItem('dhwani_userName');
-                const savedAge = localStorage.getItem('dhwani_userAge');
-                const savedRemember = localStorage.getItem('dhwani_remember');
-
-                if (savedRemember === 'true') {
-                    rememberMeCheckbox.checked = true;
-                    if (savedName) manualNameInput.value = savedName;
-                    if (savedAge) manualAgeInput.value = savedAge;
-                    if (savedName && savedAge) talkButton.textContent = `Start as ${savedName}`;
-                }
-
-                const savedUseKey = localStorage.getItem('dhwani_useCustomKey');
-                const savedKey = localStorage.getItem('dhwani_customKey');
-
-                if (savedUseKey === 'true') {
-                    useCustomKeyCheckbox.checked = true;
-                    customApiKeyInput.disabled = false;
-                    pasteKeyBtn.disabled = false;
-                    if (savedKey) customApiKeyInput.value = savedKey;
-                }
-            } catch (e) { console.error(e); }
-        }
-
-        // 2. Save User Settings
-        function saveUserData() {
-            try {
-                if (rememberMeCheckbox.checked) {
-                    localStorage.setItem('dhwani_remember', 'true');
-                    localStorage.setItem('dhwani_userName', manualNameInput.value.trim());
-                    localStorage.setItem('dhwani_userAge', manualAgeInput.value.trim());
-                } else {
-                    localStorage.removeItem('dhwani_remember');
-                    localStorage.removeItem('dhwani_userName');
-                    localStorage.removeItem('dhwani_userAge');
-                }
-                localStorage.setItem('dhwani_useCustomKey', useCustomKeyCheckbox.checked);
-                if (customApiKeyInput.value) {
-                    localStorage.setItem('dhwani_customKey', customApiKeyInput.value.trim());
-                }
-            } catch (e) { console.error(e); }
-        }
-
-        // 3. Load Previous Chat Context
-        function loadChatContext(name) {
-            const key = `dhwani_history_${name.toLowerCase()}`;
-            const savedHistory = localStorage.getItem(key);
-            if (savedHistory) {
-                try {
-                    return JSON.parse(savedHistory);
-                } catch (e) { return []; }
-            }
-            return [];
-        }
-
-        // 4. Save Current Chat Context
-        function saveChatContext() {
-            if (!userName) return;
-            const key = `dhwani_history_${userName.toLowerCase()}`;
-            // Limit history to last 20 turns to save space
-            const limitedHistory = chatHistory.slice(-20); 
-            localStorage.setItem(key, JSON.stringify(limitedHistory));
-        }
-
-        manualNameInput.addEventListener('input', () => { if(rememberMeCheckbox.checked) saveUserData(); });
-        manualAgeInput.addEventListener('input', () => { if(rememberMeCheckbox.checked) saveUserData(); });
-
-
-        // --- THE EAR: SPEECH RECOGNITION SETUP ---
+        // --- 3. Speech Recognition (Browser STT) ---
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        
         if (!SpeechRecognition) {
-            logMessage('Error', 'Browser not supported. Use Chrome.');
+            logMessage('Error', 'Speech Recognition API is not supported in this browser.');
             talkButton.disabled = true;
         } else {
-            try {
-                recognition = new SpeechRecognition();
-                recognition.continuous = false; 
-                recognition.interimResults = false;
-                recognition.lang = 'mr-IN'; // Listen for Marathi
+            recognition = new SpeechRecognition();
+            recognition.continuous = false; // Keep this false. We will handle timeouts via the 'onerror' event.
+            recognition.interimResults = false;
+            recognition.lang = 'mr-IN';
 
-                recognition.onresult = handleSpeechResult;
-                recognition.onend = handleSpeechEnd;
-                
-                recognition.onerror = (event) => {
-                    console.log("Speech Error:", event.error);
-                    if (event.error === 'no-speech' && appState !== 'IDLE' && appState !== 'BUSY') {
-                        // If silence, just restart listening (Patience)
-                        startRecognitionSafe();
-                    } else if (event.error === 'not-allowed') {
-                        setState('IDLE');
+            recognition.onresult = handleSpeechResult;
+            recognition.onend = handleSpeechEnd;
+            
+            // --- UPDATED: 'onerror' for 5-second pause ---
+            recognition.onerror = (event) => {
+                if (event.error === 'no-speech') {
+                    // This error means the user paused (e.g., for 5+ seconds)
+                    console.warn('Speech recognition timeout (no-speech). Restarting.');
+                    
+                    // Silently restart the mic if we're supposed to be listening
+                    if (appState !== 'IDLE' && appState !== 'BUSY') {
+                        try { recognition.start(); } catch(e) {
+                            console.error("Mic restart failed:", e);
+                            setState('IDLE');
+                        }
                     }
-                };
-            } catch (e) { alert("Mic Error: " + e.message); }
+                } else {
+                    // For all other errors, log them and reset
+                    logMessage('Error', `Speech recognition error: ${event.error}`);
+                    if (appState !== 'IDLE') {
+                        setState('IDLE'); // Reset on critical error
+                    }
+                }
+            };
         }
 
-        function startRecognitionSafe() {
-            if (!recognition) return;
-            try { recognition.start(); } catch (e) {}
-        }
-
-        // --- MAIN INTERACTION FLOW ---
+        // --- 4. Event Listeners ---
         talkButton.addEventListener('click', toggleListening);
+        
         pauseResumeButton.addEventListener('click', togglePauseResume);
         stopSpeechButton.addEventListener('click', stopSpeech);
         replayButton.addEventListener('click', replaySpeech);
         shareButton.addEventListener('click', shareChat);
+
         endChatButton.addEventListener('click', endChat);
         restartChatButton.addEventListener('click', restartChat);
+        
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
+
+        // --- 5. Core Functions ---
+
         async function toggleListening() {
-            if (appState === 'IDLE') {
-                try { enterFullScreen(); } catch(e) {} // Go Fullscreen
+            if (GEMINI_API_KEY === "PASTE_YOUR_GEMINI_API_KEY_HERE") {
+                 logMessage('Error', 'Please paste your API key into the script tag.');
+                 return;
             }
 
-            try {
-                if (appState === 'IDLE') {
-                    talkButton.textContent = "Initializing...";
-                    talkButton.disabled = true;
-                    await acquireWakeLock(); // Prevent phone from sleeping
-                    
-                    const inputName = manualNameInput.value.trim();
-                    const inputAge = manualAgeInput.value.trim();
-
-                    if (inputName && inputAge) {
-                        // --- PATH A: USER DATA KNOWN ---
-                        userName = inputName;
-                        userAge = parseInt(inputAge);
-                        saveUserData(); 
-                        buildSystemPrompt(); 
-
-                        // CHECK FOR PREVIOUS CHAT HISTORY (Intelligent Resume)
-                        const previousHistory = loadChatContext(userName);
-                        
-                        if (previousHistory.length > 0) {
-                            // Restore history
-                            chatHistory = previousHistory;
-                            logMessage('System', 'Previous chat history loaded...');
-                            
-                            // ASK AI TO GENERATE A WELCOME BACK SUMMARY
-                            setState('BUSY');
-                            const welcomeBackPrompt = "The user has returned. Based on our history, greet them in Marathi saying 'Namaskar [Name], last time we stopped at [Topic], shall we continue?'. Do not give a lecture, just a greeting.";
-                            
-                            // Temporary injection to get greeting
-                            const tempHistory = [...chatHistory, { role: 'user', parts: [{ text: welcomeBackPrompt }] }];
-                            const welcomeText = await getAIResponse(tempHistory);
-                            
-                            logMessage('Dhwani', welcomeText);
-                            await speakText(welcomeText, 'mr-IN');
-                            setState('CONVERSATION');
-                            startRecognitionSafe();
-
-                        } else {
-                            // FRESH START
-                            if (chatHistory.length === 0) {
-                                chatHistory.push({ role: 'user', parts: [{ text: "Start session." }] });
-                                chatHistory.push({ role: 'model', parts: [{ text: `Namaskar ${userName}, I am ready.` }] });
-                            }
-                            const welcomeText = `नमस्कार ${userName}, मी तयार आहे. तुमचा प्रश्न विचारा.`;
-                            logMessage('Dhwani', welcomeText);
-                            
-                            setState('BUSY'); 
-                            await speakText(welcomeText, 'mr-IN');
-                            setState('CONVERSATION');
-                            startRecognitionSafe();
-                        }
-
-                    } else {
-                        // --- PATH B: UNKNOWN USER (Ask Questions) ---
-                        setState('LISTENING_FOR_WAKEWORD');
-                        startRecognitionSafe();
-                        if (conversationLog.childElementCount < 3) logMessage('Info', 'Say "Dhwani" to start');
-                    }
-
-                } else {
-                    // STOP EVERYTHING
-                    setState('IDLE');
-                    recognition.stop();
-                    if (synth.speaking) synth.cancel();
-                    await releaseWakeLock();
-                }
-            } catch (error) {
-                console.error(error);
+            if (appState === 'IDLE') {
+                setState('LISTENING_FOR_WAKEWORD');
+                recognition.start();
+                await acquireWakeLock();
+            } else {
                 setState('IDLE');
+                recognition.stop();
+                if (synth.speaking) {
+                    synth.cancel();
+                }
+                await releaseWakeLock();
             }
         }
 
-        // --- STATE MACHINE (Controls Buttons & Colors) ---
         function setState(newState) {
             appState = newState;
+            console.log(`New State: ${appState}`);
+
             switch (newState) {
                 case 'IDLE':
                     talkButton.textContent = 'Start Listening';
                     talkButton.disabled = false;
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-gray-500 transition-colors';
                     endChatButton.disabled = true;
-                    talkButton.classList.remove('bg-red-600', 'hover:bg-red-700');
-                    talkButton.classList.add('bg-blue-600', 'hover:bg-blue-700');
-                    manualNameInput.disabled = false;
-                    manualAgeInput.disabled = false;
                     break;
                 case 'BUSY':
-                    talkButton.textContent = 'Thinking/Speaking...';
+                    talkButton.textContent = 'Thinking...';
                     talkButton.disabled = true;
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-400 transition-colors';
                     endChatButton.disabled = false;
                     break;
-                default: // LISTENING STATES
+                default: // All "LISTENING" states
                     talkButton.textContent = 'Stop Listening';
                     talkButton.disabled = false;
                     statusIndicator.className = 'w-4 h-4 rounded-full bg-blue-500 listening-pulse transition-colors';
                     endChatButton.disabled = false;
-                    talkButton.classList.remove('bg-blue-600', 'hover:bg-blue-700');
-                    talkButton.classList.add('bg-red-600', 'hover:bg-red-700');
-                    manualNameInput.disabled = true;
-                    manualAgeInput.disabled = true;
                     break;
             }
         }
 
         function handleSpeechEnd() {
-            // If we are not IDLE or BUSY, we should still be listening (Continuous Loop)
-            if (appState !== 'IDLE' && appState !== 'BUSY') startRecognitionSafe();
-            else if (appState === 'IDLE') setState('IDLE'); 
+            // Safety net: Keep listening unless we are IDLE or BUSY
+            if (appState !== 'IDLE' && appState !== 'BUSY') {
+                try {
+                    recognition.start();
+                } catch (e) {
+                    // This can happen if stop() was called right before
+                    console.error("Safety net restart recognition error:", e);
+                }
+            } else if (appState === 'IDLE') {
+                setState('IDLE'); // Ensure UI is reset
+            }
         }
         
-        // --- LOGIC: PROCESSING SPEECH INPUT ---
         async function handleSpeechResult(event) {
             const transcript = event.results[event.results.length - 1][0].transcript.trim();
-            if (!transcript) return;
-            console.log(`Heard: ${transcript}`);
-            
+            console.log(`Transcript: ${transcript}`);
+
             const currentState = appState;
-            recognition.stop(); // Pause listening while thinking
+            recognition.stop(); // Stop mic while we process
             setState('BUSY');
 
             try {
                 switch (currentState) {
-                    // 1. Waiting for wake word "Dhwani"
                     case 'LISTENING_FOR_WAKEWORD':
                         if (transcript.toLowerCase().includes('dhwani') || transcript.toLowerCase().includes('ध्वनी')) {
                             const greeting = "नमस्कार, मी ध्वनी, तुमचे नाव काय आहे?";
                             logMessage('Dhwani', greeting);
                             await speakText(greeting, 'mr-IN');
                             setState('LISTENING_FOR_NAME');
-                            startRecognitionSafe(); 
+                            recognition.start(); 
                         } else {
+                            // Wake word not detected, go back to listening
                             setState('LISTENING_FOR_WAKEWORD');
-                            startRecognitionSafe();
+                            recognition.start();
                         }
                         break;
 
-                    // 2. Extracting Name
                     case 'LISTENING_FOR_NAME':
                         logMessage('You', transcript);
                         userName = await extractNameFromTranscript(transcript);
-                        manualNameInput.value = userName; 
                         
-                        const agePrompt = `नमस्ते ${userName}, तुमचे वय काय आहे?`;
+                        const agePrompt = `खूप छान, ${userName}, तुमचे वय काय आहे?`;
                         logMessage('Dhwani', agePrompt);
                         await speakText(agePrompt, 'mr-IN');
                         setState('LISTENING_FOR_AGE');
-                        startRecognitionSafe();
+                        recognition.start();
                         break;
 
-                    // 3. Extracting Age
                     case 'LISTENING_FOR_AGE':
                         logMessage('You', transcript);
-                        userAge = await extractAgeFromTranscript(transcript);
-                        manualAgeInput.value = userAge; 
+                        const age = await extractAgeFromTranscript(transcript);
+                        userAge = Math.min(age, 18);
+                        buildSystemPrompt(); // <-- This enables Restart button
                         
-                        saveUserData();
-                        buildSystemPrompt(); 
-
-                        // Check for history immediately after getting age
-                        const history = loadChatContext(userName);
-                        if(history.length > 0) chatHistory = history;
-
-                        if (userAge > 18) {
-                            const adultMsg = "मी तुमचे वय लक्षात ठेवून तुम्हाला तसे उत्तर देईन.";
-                            logMessage('Dhwani', adultMsg);
-                            await speakText(adultMsg, 'mr-IN');
-                        }
-
-                        const startPrompt = `धन्यवाद, ${userName}! मी तुमच्या प्रश्नां साठी तयार आहे!`;
+                        const startPrompt = `धन्यवाद, ${userName}! मी लक्षात ठेवीन की तुझे वय ${userAge} आहे. मी आता तुझ्या प्रश्नांसाठी तयार आहे!`;
                         logMessage('Dhwani', startPrompt);
                         await speakText(startPrompt, 'mr-IN');
                         setState('CONVERSATION');
-                        startRecognitionSafe();
+                        recognition.start();
                         break;
 
-                    // 4. Main Conversation Loop
                     case 'CONVERSATION':
                         logMessage(userName || 'You', transcript);
                         chatHistory.push({ role: 'user', parts: [{ text: transcript }] });
                         
-                        // Save to LocalStorage immediately so we don't lose progress
-                        saveChatContext();
-
                         const aiResponseText = await generateTextResponseFromChat();
                         const cleanedResponseText = cleanTextForTTS(aiResponseText);
 
                         chatHistory.push({ role: 'model', parts: [{ text: cleanedResponseText }] });
-                        saveChatContext(); // Save again after AI replies
-
                         logMessage('Dhwani', cleanedResponseText);
                         
                         try {
                             await speakText(cleanedResponseText, 'mr-IN');
                         } catch (error) {
-                            if (error.message === "Speech manually stopped") return;
+                            if (error.message === "Speech manually stopped") {
+                                console.log("Speech was stopped, auto-listen handled by stopSpeech().");
+                                return;
+                            }
                             throw error;
                         }
                         
+                        // After speaking, go back to listening
                         setState('CONVERSATION');
-                        startRecognitionSafe();
+                        recognition.start();
                         break;
                 }
             } catch (error) {
-                console.error(error);
-                // Recovery Logic
-                if (systemInstruction) { setState('CONVERSATION'); startRecognitionSafe(); }
-                else { setState('LISTENING_FOR_WAKEWORD'); startRecognitionSafe(); }
+                console.error("Error in speech handling:", error);
+                logMessage('Error', `Sorry, an error occurred: ${error.message}`);
+                
+                // Reset to a safe state
+                if (systemInstruction) {
+                    setState('CONVERSATION');
+                    recognition.start();
+                } else {
+                    setState('LISTENING_FOR_WAKEWORD');
+                    recognition.start();
+                }
             }
         }
 
-        // --- LOGIC: AI PERSONA & PROMPTING (THE BRAIN) ---
+        // --- UPDATED: buildSystemPrompt ---
         function buildSystemPrompt() {
-            // LOGIC: AGE ADAPTATION
-            let ageInstruction = "";
-            let lengthInstruction = "";
-            let engagementInstruction = "";
-
-            if (userAge <= 12) {
-                // CHILD MODE
-                ageInstruction = "User is a CHILD (< 12 years). Use extremely simple words. Be like a kind grandmother.";
-                lengthInstruction = "STRICT RULE: Keep answers very short (Maximum 2 to 3 sentences).";
-                engagementInstruction = "CRITICAL: You MUST end every response with a simple question to the child to keep them engaged (e.g., 'Did you understand?', 'Shall we proceed?').";
-            } else if (userAge <= 18) {
-                // TEEN MODE
-                ageInstruction = "User is a TEENAGER. Provide educational depth suitable for high school.";
-                lengthInstruction = "Keep answers concise (Max 4-5 sentences).";
+            systemInstruction = `
+                You are "Dhwani," a sweet and patient female AI teacher from Maharashtra.
+                You are speaking to ${userName}, who is ${userAge} years old.
+                Your task is to be a virtual teacher.
+                
+                RULES:
+                1.  You MUST speak and answer *only* in the Marathi language using Devanagari script (मराठी फॉन्ट).
+                2.  CRITICAL: Do NOT use English letters (transliteration). You MUST write "तुमचा दिवस चांगला जावो."
+                3.  Do NOT include formatting in your response (like asterisks *).
+                4.  You MUST tailor all answers to be easily understood by a ${userAge}-year-old.
+                5.  You are kind, encouraging, and use simple language.
+                6.  Do not just give the answer; try to explain it simply, like a teacher would.
+                7.  Your responses should be conversational.
+                
+                8.  CRITICAL INTERACTION RULE: Keep your answers very short (2-3 sentences). After your answer, 
+                    YOU MUST ALWAYS ask a follow-up question to keep the chat interactive.
+                    Examples of follow-up questions:
+                    - 'तुम्हाला याबद्दल अधिक माहिती हवी आहे का?' (Do you want more information?)
+                    - 'हे तुम्हाला समजले का?' (Did you understand this?)
+                    - 'आपण पुढे जाऊया का?' (Shall we move on?)
+            `;
+            
+            if (userAge <= 8) {
+                systemInstruction += "\n9. CRITICAL: The user is very young. Use extremely simple, short sentences. Explain things one step at a time. Be very gentle and encouraging.";
+            } else if (userAge <= 12) {
+                systemInstruction += "\n9. CRITICAL: The user is a child. Use simple language, but you can be a bit more detailed. Avoid complex words.";
             } else {
-                // ADULT MODE
-                ageInstruction = "User is an ADULT. Provide mature, respectful, and detailed answers.";
-                lengthInstruction = "You can give detailed answers (Max 7-8 sentences).";
+                systemInstruction += "\n9. CRITICAL: The user is a teenager. You can use more complex sentences, but still be encouraging and clear, like a good teacher.";
             }
 
-            systemInstruction = `
-                You are "Dhwani," a smart AI teacher from Maharashtra created by Dr. Pramod Shinde.
-                You are speaking to ${userName}, who is ${userAge} years old.
-                User's Mother Tongue: Marathi.
-
-                STRICT BEHAVIOR RULES:
-                1. DEFAULT MODE: Speak in Marathi (Devanagari script).
-                2. ENGLISH MODE: If asked for English, teach in English but explain tough concepts in Marathi.
-                3. ${ageInstruction}
-                4. ${lengthInstruction}
-                5. ${engagementInstruction}
-                6. Always be polite.
-            `;
+            // Add the system prompt to the chat history
+            chatHistory = [{ role: 'user', parts: [{ text: 'Here are my instructions' }] }];
+            chatHistory.push({ role: 'model', parts: [{ text: `Okay, I understand. I am Dhwani, a Marathi teacher, and I am speaking to ${userName} (${userAge}). I will answer all questions simply and ask follow-up questions.` }] });
+        
+            // Enable the restart button now that we have user info
             restartChatButton.disabled = false;
         }
 
-        // --- API CALLS (Google Gemini) ---
+        // --- 6. Gemini API Functions ---
+        // ... (These functions: extractNameFromTranscript, extractAgeFromTranscript, 
+        //     generateTextResponseFromChat are all unchanged from the previous version) ...
         
-        // Helper to get response specifically for chat flow
-        async function generateTextResponseFromChat() {
-            return await getAIResponse(chatHistory);
-        }
+        async function extractNameFromTranscript(transcript) {
+            const processingMsg = document.createElement('div');
+            processingMsg.innerHTML = `<strong class="text-yellow-400">Dhwani:</strong> <span class="text-gray-400">(...processing name...)</span>`;
+            conversationLog.appendChild(processingMsg);
+            conversationLog.scrollTop = conversationLog.scrollHeight;
+            
+            const apiKey = GEMINI_API_KEY;
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
 
-        // Generic API Fetcher
-        async function getAIResponse(historyData) {
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
+            const extractionPrompt = `
+                You are a simple utility. Your only job is to extract a single person's first name from the user's text.
+                - If the user says "माझं नाव प्रमोद आहे", you respond "Pramod".
+                - If the user says "प्रमोद शिंदे", you respond "Pramod".
+                - If you cannot find a name, respond with "Friend".
+                - Only respond with the single name. Do not add any other text.
+
+                Text to analyze: "${transcript}"
+            `;
+            
+            const payload = {
+                contents: [{ parts: [{ text: extractionPrompt }] }],
+                generationConfig: { temperature: 0.0, maxOutputTokens: 10 }
+            };
+
             try {
                 const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: historyData,
-                        systemInstruction: { parts: [{ text: systemInstruction }] }
-                    })
+                    body: JSON.stringify(payload)
                 });
+                if (!response.ok) throw new Error('API Error');
                 const result = await response.json();
-                return result.candidates[0].content.parts[0].text.trim();
+                const name = result.candidates[0].content.parts[0].text.trim();
+                conversationLog.removeChild(processingMsg);
+                return name;
             } catch (error) {
-                return "मला माफ करा, पुन्हा सांगा? तू स्वतःची नवीन  A P I की टाकून बघ."; // "Sorry, say again?"
+                console.error("extractNameFromTranscript error:", error);
+                conversationLog.removeChild(processingMsg);
+                return "Friend";
             }
         }
 
-        async function extractNameFromTranscript(transcript) {
-            // Simple AI call to clean up the name (remove sentences like "My name is...")
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
+
+        async function extractAgeFromTranscript(transcript) {
+            const processingMsg = document.createElement('div');
+            processingMsg.innerHTML = `<strong class="text-yellow-400">Dhwani:</strong> <span class="text-gray-400">(...processing age...)</span>`;
+            conversationLog.appendChild(processingMsg);
+            conversationLog.scrollTop = conversationLog.scrollHeight;
+
+            const apiKey = GEMINI_API_KEY;
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
+
+            const extractionPrompt = `
+                You are a simple utility. Your only job is to extract a single number (age) from the user's text.
+                - Respond ONLY with the digits (e.g., "10", "8").
+                - If you cannot find a number, respond with "18".
+                EXAMPLES:
+                User Text: "मी दहा वर्षांचा आहे" -> Response: "10"
+                User Text: "10 varsha" -> Response: "10"
+                User Text: "majhe vaay 10 varsha aahe" -> Response: "10"
+                User Text: "mi 10 varshacha aahe" -> Response: "10"
+                User Text: "मी १० वर्षांचा आहे" -> Response: "10"
+                User Text: "१० वर्षे" -> Response: "10"
+                User Text: "माझं वय आठ आहे" -> Response: "8"
+                Text to analyze: "${transcript}"
+            `;
+
+            const payload = {
+                contents: [{ parts: [{ text: extractionPrompt }] }],
+                generationConfig: { temperature: 0.0, maxOutputTokens: 4 }
+            };
+
             try {
                 const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: `Extract First Name from: "${transcript}". Return ONLY the name. If unclear return "बाळा".` }] }] })
+                    body: JSON.stringify(payload)
                 });
+                if (!response.ok) throw new Error('API Error');
                 const result = await response.json();
-                let name = result.candidates[0].content.parts[0].text.trim();
-                name = name.replace(/['".]/g, '');
-                return (name.length < 2) ? "बाळा" : name;
-            } catch (error) { return "बाळा"; }
+                const text = result.candidates[0].content.parts[0].text;
+                const age = parseInt(text.trim()) || 18;
+                conversationLog.removeChild(processingMsg);
+                return age;
+            } catch (error) {
+                console.error("extractAgeFromTranscript error:", error);
+                conversationLog.removeChild(processingMsg);
+                return 18;
+            }
         }
 
-        async function extractAgeFromTranscript(transcript) {
-             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getEffectiveApiKey()}`;
-             try {
+        async function generateTextResponseFromChat() {
+            const apiKey = GEMINI_API_KEY;
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
+
+            const payload = {
+                contents: chatHistory,
+                systemInstruction: { parts: [{ text: systemInstruction }] }
+            };
+
+            try {
                 const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: `Extract age number from: "${transcript}". Return ONLY digits. Default 18.` }] }] })
+                    body: JSON.stringify(payload)
                 });
+                if (!response.ok) {
+                    const errorBody = await response.json();
+                    throw new Error(`API Error: ${response.statusText} - ${errorBody?.error?.message || 'Unknown'}`);
+                }
                 const result = await response.json();
-                let age = parseInt(result.candidates[0].content.parts[0].text.trim());
-                return isNaN(age) ? 18 : age;
-            } catch (e) { return 18; }
+                const text = result.candidates[0].content.parts[0].text.trim();
+                return text;
+            } catch (error) {
+                console.error("Gemini Text API error:", error);
+                logMessage('Error', `Failed to generate response: ${error.message}`);
+                return "मला माफ करा, मला एक समस्या आली आहे.";
+            }
         }
         
-        // Remove Markdown symbols so the Robot voice doesn't say "Asterisk"
         function cleanTextForTTS(text) {
-            let cleaned = text.replace(/\[.*?\]|\(.*?\)|{.*?}/g, ""); 
-            return cleaned.replace(/[\*#`]/g, ' ').replace(/\s+/g, ' ').trim();
+            return text.replace(/[\*#`]/g, ' ').replace(/\s+/g, ' ').trim();
         }
 
-        // --- THE MOUTH: SPEECH SYNTHESIS ---
+        
+        // --- 7. Speech Synthesis (Browser TTS) ---
+        // ... (loadVoices, togglePauseResume, stopSpeech, replaySpeech, speakText
+        //     are all unchanged from the previous version) ...
+
         function loadVoices() {
             voices = synth.getVoices();
-            if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => { voices = synth.getVoices(); };
+            if (synth.onvoiceschanged !== undefined) {
+                synth.onvoiceschanged = () => {
+                    voices = synth.getVoices();
+                    console.log("Voices loaded:", voices);
+                };
+            }
         }
+        loadVoices();
 
         function togglePauseResume() {
-            if (synth.paused) synth.resume();
-            else if (synth.speaking) { synth.pause(); recognition.stop(); setState('BUSY'); }
+            if (synth.paused) { 
+                synth.resume();
+                pauseResumeButton.textContent = 'Pause';
+            } else if (synth.speaking) { 
+                synth.pause();
+                pauseResumeButton.textContent = 'Resume';
+                recognition.stop(); 
+                setState('BUSY'); 
+            }
         }
 
         function stopSpeech() {
             if (!synth.speaking) return;
+
             speechManuallyStopped = true; 
             synth.cancel(); 
             recognition.stop(); 
-            toggleMediaButtons(true);
-            logMessage('Info', 'Stopped.');
-            // Small delay before listening again
+
+            pauseResumeButton.disabled = true;
+            stopSpeechButton.disabled = true;
+            pauseResumeButton.textContent = 'Pause';
+
+            logMessage('Info', 'Speech stopped. Listening in 2 seconds...');
+
             setTimeout(() => {
                 speechManuallyStopped = false;
-                if (appState !== 'IDLE') {
-                    if (systemInstruction) { setState('CONVERSATION'); startRecognitionSafe(); }
-                    else { setState('LISTENING_FOR_WAKEWORD'); startRecognitionSafe(); }
+                if (systemInstruction) { 
+                    setState('CONVERSATION');
+                    try { recognition.start(); } catch(e) {}
+                } else {
+                    setState('LISTENING_FOR_WAKEWORD');
+                     try { recognition.start(); } catch(e) {}
                 }
-            }, 1500);
+            }, 2000);
         }
 
         function replaySpeech() {
-            if (lastSpokenText) { recognition.stop(); setState('BUSY'); speakText(lastSpokenText); }
+            if (lastSpokenText) {
+                recognition.stop(); 
+                setState('BUSY');   
+                speakText(lastSpokenText); 
+            }
         }
         
         async function speakText(text, lang = 'mr-IN') {
-            if (synth.speaking) synth.cancel();
+            if (synth.speaking) {
+                synth.cancel();
+            }
+
             lastSpokenText = text;
             speechManuallyStopped = false;
-            if (voices.length === 0) voices = synth.getVoices();
+
+            if (voices.length === 0) {
+                voices = synth.getVoices();
+            }
 
             return new Promise((resolve, reject) => {
                 const utterance = new SpeechSynthesisUtterance(text);
                 
-                utterance.onstart = () => { toggleMediaButtons(false); };
-                utterance.onend = () => {
-                    toggleMediaButtons(true);
-                    if (speechManuallyStopped) reject(new Error("Speech manually stopped"));
-                    else resolve();
+                utterance.onstart = () => {
+                    pauseResumeButton.disabled = false;
+                    stopSpeechButton.disabled = false;
+                    replayButton.disabled = false;
+                    pauseResumeButton.textContent = 'Pause';
                 };
-                utterance.onerror = (e) => { 
-                    toggleMediaButtons(true);
-                    if (e.error === 'interrupted') resolve(); else reject(e.error); 
+                
+                utterance.onend = () => {
+                    pauseResumeButton.disabled = true;
+                    stopSpeechButton.disabled = true;
+                    pauseResumeButton.textContent = 'Pause';
+                    
+                    if (speechManuallyStopped) {
+                        reject(new Error("Speech manually stopped"));
+                    } else {
+                        resolve();
+                    }
+                };
+                
+                utterance.onerror = (event) => {
+                    console.error("SpeechSynthesisUtterance.onerror", event);
+                    logMessage('Error', 'Failed to play audio.');
+                    pauseResumeButton.disabled = true;
+                    stopSpeechButton.disabled = true;
+                    reject(event.error);
                 };
 
-                // Find a Marathi or Hindi voice
-                let marathiVoice = voices.find(voice => voice.lang === 'mr-IN') || voices.find(voice => voice.lang === 'hi-IN');
-                if (marathiVoice) utterance.voice = marathiVoice;
-                utterance.lang = 'mr-IN';
-                
-                // LOGIC: DYNAMIC SPEED BASED ON AGE
-                // Children need slower speech to understand better
-                if (userAge <= 7) {
-                    utterance.rate = 0.7; 
-                } else if (userAge <= 15) {
-                    utterance.rate = 0.85; 
+                let marathiVoice = voices.find(voice => voice.lang === 'mr-IN');
+                if (!marathiVoice) {
+                    marathiVoice = voices.find(voice => voice.lang === 'hi-IN');
+                }
+                if (marathiVoice) {
+                    utterance.voice = marathiVoice;
                 } else {
-                    utterance.rate = 1.0; 
+                    utterance.lang = 'mr-IN';
                 }
                 
+                utterance.pitch = 1;
+                utterance.rate = 1;
                 synth.speak(utterance);
             });
         }
-
-        function toggleMediaButtons(disabled) {
-            pauseResumeButton.disabled = disabled;
-            stopSpeechButton.disabled = disabled;
-            replayButton.disabled = disabled;
-        }
         
-        // --- UI HELPERS ---
+        // --- 8. Utility Functions ---
+        // ... (logMessage is unchanged from the previous version) ...
+
         function logMessage(sender, message) {
             const div = document.createElement('div');
             let senderClass = 'text-blue-300 font-semibold';
             let messageClass = 'text-white';
 
-            if (sender === 'Dhwani') senderClass = 'text-cyan-300 font-semibold';
-            else if (sender === 'Error') { senderClass = 'text-red-400 font-bold'; messageClass = 'text-red-300'; }
-            else if (sender === 'You') senderClass = 'text-green-300 font-semibold';
+            if (sender === 'Dhwani') {
+                senderClass = 'text-cyan-300 font-semibold';
+            } else if (sender === 'Error') {
+                senderClass = 'text-red-400 font-bold';
+                messageClass = 'text-red-300';
+            } else if (sender === 'You') {
+                 senderClass = 'text-green-300 font-semibold';
+            } else if (sender === 'Info') {
+                 senderClass = 'text-yellow-400 font-semibold';
+                 messageClass = 'text-yellow-300';
+            }
 
-            div.innerHTML = `<strong class="${senderClass}">${sender}:</strong> <span class="${messageClass}">${message}</span>`;
+            div.innerHTML = `<strong class="${senderClass}">${sender}:</strong> <span class_="${messageClass}">${message}</span>`;
             conversationLog.appendChild(div);
             conversationLog.scrollTop = conversationLog.scrollHeight;
         }
 
+        // --- 9. Share Functions ---
+        // ... (getChatLogAsText, shareChat are unchanged from the previous version) ...
+        
         function getChatLogAsText() {
             const messages = [];
-            conversationLog.querySelectorAll('div').forEach(div => { if (div.textContent) messages.push(div.textContent); });
+            conversationLog.querySelectorAll('div').forEach(div => {
+                if (div.textContent) {
+                    messages.push(div.textContent);
+                }
+            });
             return messages.join('\n');
         }
 
         async function shareChat() {
             const chatText = getChatLogAsText();
-            if (!chatText.trim()) return;
-            try { await navigator.share({ title: 'Dhwani Chat', text: chatText }); } 
-            catch (err) { try { await navigator.clipboard.writeText(chatText); logMessage('Info', 'Copied'); } catch (e) {} }
+            if (!chatText || chatText.trim().length === 0) {
+                logMessage('Error', 'Chat log is empty.');
+                return;
+            }
+
+            const shareData = {
+                title: 'Dhwani AI Teacher Chat',
+                text: chatText,
+            };
+
+            if (navigator.share) {
+                try {
+                    await navigator.share(shareData);
+                    console.log("Chat shared successfully via Web Share");
+                } catch (err) {
+                    console.error("Web Share failed:", err);
+                    logMessage('Error', 'Could not share chat.');
+                }
+            } else if (navigator.clipboard) {
+                try {
+                    await navigator.clipboard.writeText(chatText);
+                    logMessage('Info', 'Chat copied to clipboard!');
+                } catch (err) {
+                    console.error("Clipboard copy failed:", err);
+                    logMessage('Error', 'Could not copy chat to clipboard.');
+                }
+            } else {
+                logMessage('Error', 'Sharing and copying are not supported in this browser.');
+            }
         }
 
-        // --- UTILITY: WAKE LOCK (Prevents Screen from sleeping) ---
+        // --- 10. Wake Lock API Functions ---
+        // ... (acquireWakeLock, releaseWakeLock, handleVisibilityChange
+        //     are all unchanged from the previous version) ...
+        
         async function acquireWakeLock() {
-            if ('wakeLock' in navigator) { 
-                try { 
+            if ('wakeLock' in navigator) {
+                try {
                     wakeLock = await navigator.wakeLock.request('screen');
-                    console.log("Screen Wake Lock Active");
+                    console.log('Screen Wake Lock acquired.');
+                    
                     wakeLock.addEventListener('release', () => {
-                        console.log('Wake Lock Released by system');
-                        if (appState !== 'IDLE' && document.visibilityState === 'visible') {
-                            acquireWakeLock();
-                        }
+                        console.log('Screen Wake Lock was released by system.');
+                        wakeLock = null;
                     });
-                } catch (e) { console.error("Wake Lock failed:", e); } 
+                } catch (err) {
+                    console.error(`Wake Lock failed: ${err.name}, ${err.message}`);
+                }
+            } else {
+                console.warn('Wake Lock API not supported in this browser.');
             }
         }
 
         async function releaseWakeLock() {
-            if (wakeLock) { try { await wakeLock.release(); wakeLock = null; } catch (e) {} }
+            if (wakeLock !== null) {
+                try {
+                    await wakeLock.release();
+                    wakeLock = null;
+                    console.log('Screen Wake Lock released.');
+                } catch (err) {
+                    console.error(`Wake Lock release failed: ${err.name}, ${err.message}`);
+                }
+            }
         }
 
         async function handleVisibilityChange() {
-            if (appState !== 'IDLE' && document.visibilityState === 'visible') {
+            if (appState !== 'IDLE' && wakeLock === null && document.visibilityState === 'visible') {
                 await acquireWakeLock();
             }
         }
 
+
+        // --- 11. Chat Control Functions ---
+
+        /**
+         * Ends the chat completely, clears user data, and resets the app.
+         * User must press "Start Listening" to begin again.
+         */
         async function endChat() {
-            appState = 'IDLE'; setState('IDLE');
-            speechManuallyStopped = true;
+            console.log("Ending chat...");
+            
+            // 1. Stop all activity
             if (synth.speaking) synth.cancel();
-            if (recognition) try { recognition.stop(); } catch (e) {}
-            await releaseWakeLock();
+            if (appState !== 'IDLE') recognition.stop(); // Stop mic
             
-            // We do NOT clear LocalStorage here so memory persists
-            userName = ''; userAge = 18; chatHistory = []; systemInstruction = '';
+            setState('IDLE'); // This handles button states and UI
+            await releaseWakeLock(); // Explicitly release lock
+
+            // 2. Clear credentials
+            userName = '';
+            userAge = 18;
             
-            conversationLog.innerHTML = '<div class="text-gray-400 text-center">Chat Ended. Press Start.</div>';
-            restartChatButton.disabled = true;
+            // 3. Clear history
+            chatHistory = [];
+            systemInstruction = '';
+            
+            // 4. Reset UI
+            conversationLog.innerHTML = '<div class="text-gray-400 text-center">Press the button and say "Dhwani" to begin.</div>';
+            restartChatButton.disabled = true; // Disable restart
+            
+            logMessage('Info', 'Chat ended. Press "Start Listening" to begin again.');
         }
 
+        /**
+         * Restarts the chat: stops activity, clears log, keeps user data.
+         * User must press "Start Listening" to continue.
+         */
         async function restartChat() {
-            if (!systemInstruction) return;
+            console.log("Restarting chat...");
+
+            if (!systemInstruction) {
+                logMessage('Error', 'Please start a chat first.');
+                return;
+            }
+
+            // 1. Stop all activity
             if (synth.speaking) synth.cancel();
-            if (recognition) try { recognition.stop(); } catch(e){}
-            appState = 'IDLE'; setState('IDLE');
-            await releaseWakeLock();
+            if (appState !== 'IDLE') recognition.stop();
+            
+            // 2. Set state to IDLE (forces user to press button)
+            setState('IDLE');
+            await releaseWakeLock(); // Release lock
+
+            // 3. Clear visual log
             conversationLog.innerHTML = '';
             
-            // Clear specific history for this user if they hit Restart manually
-            if(userName) {
-                localStorage.removeItem(`dhwani_history_${userName.toLowerCase()}`);
-                chatHistory = [];
-            }
+            // 4. Rebuild logical history (keeps name/age)
+            buildSystemPrompt(); 
             
-            logMessage('Info', `Chat restarted for ${userName}. Press Start.`);
+            // 5. Log message
+            logMessage('Info', `Chat restarted for ${userName}. Press "Start Listening" to continue.`);
         }
+
     </script>
 </body>
 </html>
