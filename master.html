@@ -17,7 +17,7 @@
         .input-group { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-bottom: 20px; }
         #setup-screen input { width: 45%; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; }
         #setup-screen input[type="password"] { width: 93%; }
-        button { background: #2980b9; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        button { background: #2980b9; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.3s; }
         button:hover { background: #1c5980; }
         button:disabled { background: #95a5a6; cursor: not-allowed; }
         
@@ -38,10 +38,13 @@
         .user-msg { background: #27ae60; color: white; align-self: flex-end; margin-left: auto; border-bottom-right-radius: 0; }
         .system-msg { background: #fff3cd; color: #856404; font-size: 13px; text-align: center; margin: 10px auto; border-radius: 4px; padding: 8px; width: 80%; }
         
-        .controls-area { padding: 15px; background: white; border-top: 1px solid #eee; display: flex; gap: 10px; }
+        .controls-area { padding: 15px; background: white; border-top: 1px solid #eee; display: flex; gap: 10px; align-items: center; }
         .controls-area input { flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; }
+        #micBtn { background: #e67e22; width: 50px; height: 50px; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 20px; padding: 0; }
+        #micBtn.listening { background: #c0392b; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
         
-        #loading { display: none; position: absolute; bottom: 80px; left: 20px; background: rgba(0,0,0,0.7); color: white; padding: 8px 15px; border-radius: 20px; font-size: 14px; }
+        #loading { display: none; position: absolute; bottom: 90px; left: 20px; background: rgba(0,0,0,0.7); color: white; padding: 8px 15px; border-radius: 20px; font-size: 14px; }
         
         /* Final Report Screen */
         #report-screen { padding: 40px; overflow-y: auto; background: white; }
@@ -55,14 +58,14 @@
 
 <div class="container">
     <div id="setup-screen" class="screen active-screen">
-        <h2>Dhwani Comprehensive Aptitude Center</h2>
-        <p>Expert career mapping for the youth of India.</p>
+        <h2>Dhwani Interactive Aptitude Center</h2>
+        <p>Voice-enabled psychometric assessment.</p>
         <div class="input-group">
             <input type="password" id="apiKey" placeholder="Gemini API Key" required>
             <input type="text" id="childName" placeholder="Student's Name" required>
             <input type="number" id="childAge" placeholder="Age" required>
-            <input type="text" id="childCity" placeholder="City/Town (e.g., Mumbai, Delhi)" required>
-            <input type="text" id="childLanguage" placeholder="Preferred Language Context" value="English">
+            <input type="text" id="childCity" placeholder="City/Town (e.g., Pune, Delhi)" required>
+            <input type="text" id="childLanguage" placeholder="Language Context (e.g., English, Hindi)" value="English">
         </div>
         <button onclick="startTest()">Initialize Session</button>
     </div>
@@ -76,13 +79,14 @@
             <div class="video-panel">
                 <div class="recording-badge">REC (Auto-Saving)</div>
                 <video id="webcam" autoplay muted playsinline></video>
-                <button style="border-radius: 0; background: #e74c3c; width: 100%; margin-top: auto;" onclick="generateReportEarly()">Generate Report Early</button>
+                <button style="border-radius: 0; background: #e74c3c; width: 100%; margin-top: auto;" onclick="generateReportEarly()">End Test & Generate Report</button>
             </div>
             <div class="interaction-panel">
                 <div id="chat-history"></div>
                 <div id="loading">Dhwani is analyzing...</div>
                 <div class="controls-area">
-                    <input type="text" id="userInput" placeholder="Type your answer..." onkeypress="handleEnter(event, submitAnswer)">
+                    <button id="micBtn" onclick="toggleSpeechRecognition()" title="Click to Speak">🎤</button>
+                    <input type="text" id="userInput" placeholder="Speak or type your answer..." onkeypress="handleEnter(event, submitAnswer)">
                     <button id="sendBtn" onclick="submitAnswer()">Submit</button>
                 </div>
             </div>
@@ -97,12 +101,12 @@
         <div id="report-body"></div>
         
         <div class="consultation-box">
-            <div class="consultation-header">Ask Dhwani: Carrier & Course Consultation</div>
+            <div class="consultation-header">Ask Dhwani: Career & Course Consultation</div>
             <div id="consult-history">
-                <div class="message bot-msg">The test is complete. You can now ask me about specific universities, required percentages, or ask for YouTube/Udemy course recommendations to build your skills!</div>
+                <div class="message bot-msg">The test is complete. You can now ask me about universities, cut-offs, or request YouTube/Udemy courses!</div>
             </div>
             <div class="controls-area" style="border-top: none;">
-                <input type="text" id="consultInput" placeholder="Ask about colleges, streams, or courses..." onkeypress="handleEnter(event, submitConsult)">
+                <input type="text" id="consultInput" placeholder="Ask about colleges or courses..." onkeypress="handleEnter(event, submitConsult)">
                 <button id="consultBtn" onclick="submitConsult()">Ask AI</button>
             </div>
         </div>
@@ -116,35 +120,53 @@
     let streamReference;
     let videoChunkTimer;
     let chunkCounter = 1;
+    let questionAskedTime = 0;
     
-    let childData = { name: "", age: 0, city: "" };
+    let childData = { name: "", age: 0, city: "", language: "" };
     let apiKey = "";
     
     // Stages Progression
     const stages = [
-        "Icebreaker & Local Context",
-        "Logical Reasoning (Thinking Power)",
-        "Numerical Ability (Number Intelligence)",
-        "Verbal Ability (Language Skills)",
-        "Spatial Ability (Visual Thinking)",
-        "Mechanical / Technical Aptitude",
-        "Abstract Reasoning",
-        "Personality & Interests",
-        "Situational Judgment",
-        "Final Career Mapping"
+        "Icebreaker", "Logical Reasoning", "Numerical Ability", "Verbal Ability", 
+        "Spatial Ability", "Mechanical Aptitude", "Abstract Reasoning", 
+        "Personality & Interests", "Situational Judgment", "Final Career Mapping"
     ];
     let currentStageIndex = 0;
-    let maxQuestionsPerStage = 2; // Adjust for test length
+    let maxQuestionsPerStage = 2; 
     let questionCountInStage = 0;
     
-    let conversationHistory = []; // Main test history
-    let consultHistory = [];      // Post-test chat history
+    let conversationHistory = []; 
+    let consultHistory = [];      
 
-    // Auto-load API key if previously saved
+    // Speech Recognition Setup
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition;
+    let isListening = false;
+    
+    if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        
+        recognition.onstart = () => {
+            isListening = true;
+            document.getElementById('micBtn').classList.add('listening');
+            document.getElementById('userInput').placeholder = "Listening...";
+        };
+        
+        recognition.onresult = (event) => {
+            document.getElementById('userInput').value = event.results[0][0].transcript;
+        };
+        
+        recognition.onend = () => {
+            isListening = false;
+            document.getElementById('micBtn').classList.remove('listening');
+            document.getElementById('userInput').placeholder = "Speak or type your answer...";
+        };
+    }
+
     window.onload = () => {
-        if(localStorage.getItem('gemini_api_key')) {
-            document.getElementById('apiKey').value = localStorage.getItem('gemini_api_key');
-        }
+        if(localStorage.getItem('gemini_api_key')) document.getElementById('apiKey').value = localStorage.getItem('gemini_api_key');
     };
 
     async function startTest() {
@@ -152,10 +174,11 @@
         childData.name = document.getElementById('childName').value.trim();
         childData.age = parseInt(document.getElementById('childAge').value);
         childData.city = document.getElementById('childCity').value.trim();
+        childData.language = document.getElementById('childLanguage').value.trim();
 
         if(!apiKey || !childData.name || !childData.age) return alert("Fill all fields.");
         
-        localStorage.setItem('gemini_api_key', apiKey); // Persist Key
+        localStorage.setItem('gemini_api_key', apiKey); 
 
         document.getElementById('setup-screen').classList.remove('active-screen');
         document.getElementById('test-screen').classList.add('active-screen');
@@ -163,35 +186,32 @@
 
         await initRollingCamera();
         
-        conversationHistory.push({ role: "user", parts: [{ text: "Initialize the psychometric assessment. Start with the Icebreaker." }] });
+        conversationHistory.push({ role: "user", parts: [{ text: "Initialize the test. Start with the Icebreaker." }] });
         
         document.getElementById('loading').style.display = 'block';
         callGeminiAPI(getTestSystemInstruction(), processTestResponse);
     }
 
-    // --- VIDEO CHUNKING LOGIC ---
+    // --- VIDEO CHUNKING ---
     async function initRollingCamera() {
         try {
             streamReference = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
             document.getElementById('webcam').srcObject = streamReference;
             startNewRecordingChunk();
             
-            // Auto-save video every 5 minutes (300000 ms)
             videoChunkTimer = setInterval(() => {
                 if (mediaRecorder && mediaRecorder.state === "recording") {
-                    mediaRecorder.stop(); // Triggers download
-                    startNewRecordingChunk(); // Instantly restart
+                    mediaRecorder.stop(); 
+                    startNewRecordingChunk(); 
                 }
-            }, 300000); 
-        } catch (err) { alert("Camera access required."); }
+            }, 300000); // 5 minutes
+        } catch (err) { alert("Camera/Mic access required."); }
     }
 
     function startNewRecordingChunk() {
         let localChunks = [];
         mediaRecorder = new MediaRecorder(streamReference);
-        
         mediaRecorder.ondataavailable = e => { if (e.data.size > 0) localChunks.push(e.data); };
-        
         mediaRecorder.onstop = () => {
             const blob = new Blob(localChunks, { type: 'video/webm' });
             const url = URL.createObjectURL(blob);
@@ -206,32 +226,59 @@
         };
         mediaRecorder.start();
     }
-    // ----------------------------
 
+    // --- VOICE OUTPUT (TTS) ---
+    function speakText(text) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel(); 
+            const utterance = new SpeechSynthesisUtterance(text);
+            const voices = window.speechSynthesis.getVoices();
+            
+            // Prioritize an Indian voice to match context
+            const indianVoice = voices.find(v => v.lang.includes('IN') || v.lang.includes('hi'));
+            if(indianVoice) utterance.voice = indianVoice;
+            
+            utterance.rate = 0.7; // Keep Dhwani's deliberate, clear teaching pace
+            
+            utterance.onend = () => { questionAskedTime = Date.now(); };
+            window.speechSynthesis.speak(utterance);
+        } else {
+            questionAskedTime = Date.now(); 
+        }
+    }
+
+    function toggleSpeechRecognition() {
+        if (!recognition) return alert("Speech recognition not supported here. Please type.");
+        if (isListening) recognition.stop();
+        else {
+            recognition.lang = childData.language.toLowerCase().includes('hindi') ? 'hi-IN' : 'en-IN';
+            recognition.start();
+        }
+    }
+
+    // --- PROMPT ENGINEERING ---
     function getTestSystemInstruction() {
-        const ageContext = childData.age >= 18 
-            ? "The student is 18+. They have likely already chosen a stream. Focus questions on evaluating their current choice, uncovering hidden frustrations, and mapping towards higher education specialization or validating a stream change."
-            : "The student is under 18. They are preparing for their 10th standard choice. Slowly map their innate abilities to Indian streams: Science (PCM/PCB), Commerce, Arts, Sports, Music, or IT.";
-
-        return `You are Dhwani, a world-class Indian AI career counselor and aptitude expert. 
+        return `You are Dhwani, a strict but empathetic Indian psychometric evaluator. 
         Student: ${childData.name}, Age: ${childData.age}, City: ${childData.city}.
         
-        ${ageContext}
+        CURRENT STAGE: ${stages[currentStageIndex]}. 
 
-        CURRENT STAGE: ${stages[currentStageIndex]}. (Question ${questionCountInStage + 1} of ${maxQuestionsPerStage})
-        
-        RULES FOR PACING & TONE:
-        1. Never rush. The test must slowly dig into the user's nerves. 
-        2. If Stage 1 (Icebreaker), start casually. Mention something local about ${childData.city} (e.g., a local sports match, weather, or news) to ease them in. Do not ask academic questions yet.
-        3. Challenge them. If they give a short answer, probe deeper. Find out what frustrates them and what they hate.
-        4. Do NOT mention streams explicitly until the final stages. You are testing innate aptitude covertly.
+        LATENCY METADATA: 
+        You will receive a timestamp [Answer Latency: X seconds] with every user answer. Fast latency means high intuition. Slow latency means struggle or deep calculation. Track this in your internal_analysis.
+
+        RULES FOR PACING & TONE (CRITICAL):
+        1. Keep questions EXTREMELY SHORT. Maximum 15 words per question. 
+        2. Do NOT use conversational filler like "Great job!" or "That's interesting." Just fire the next question immediately. Real aptitude tests are rapid and punchy.
+        3. Do NOT combine questions. Ask exactly ONE direct question.
+        4. If Stage 1, ask a 10-word question about ${childData.city}.
+        5. You are probing for streams: Science, Commerce, Arts, IT.
 
         OUTPUT STRICTLY AS JSON:
         {
-            "bot_reply": "Your engaging, conversational next question.",
-            "internal_analysis": "Hidden notes. What did you learn about their likes, dislikes, or cognitive speed?",
-            "is_test_complete": boolean (True ONLY if you have completed the 'Final Career Mapping' stage),
-            "final_report_html": "If is_test_complete is true, generate a highly detailed HTML report using <h3>, <p>, and <ul>. MUST include sections: 1. Likes Most 2. Likes Somewhat 3. Dislikes 4. Hates 5. Will NEVER Do 6. Final Stream/Career Recommendations."
+            "bot_reply": "Your 10-15 word question.",
+            "internal_analysis": "Hidden notes. Note their latency and cognitive capability.",
+            "is_test_complete": boolean,
+            "final_report_html": "If is_test_complete is true, generate an HTML report including: 1. Likes Most 2. Likes Somewhat 3. Dislikes 4. Hates 5. Will NEVER Do 6. Final Stream Recommendations."
         }`;
     }
 
@@ -240,12 +287,15 @@
         const answerText = inputField.value.trim();
         if (!answerText) return;
 
+        let timeTakenSecs = questionAskedTime > 0 ? ((Date.now() - questionAskedTime) / 1000).toFixed(1) : 0;
+
         addMessage(answerText, 'user', 'chat-history');
         inputField.value = '';
-        toggleInput(true, 'userInput', 'sendBtn');
+        toggleInput(true, 'userInput', 'sendBtn', 'micBtn');
         document.getElementById('loading').style.display = 'block';
 
-        conversationHistory.push({ role: "user", parts: [{ text: answerText }] });
+        const enrichedAnswer = `[Answer Latency: ${timeTakenSecs} seconds] ${answerText}`;
+        conversationHistory.push({ role: "user", parts: [{ text: enrichedAnswer }] });
         
         questionCountInStage++;
         if (questionCountInStage >= maxQuestionsPerStage && currentStageIndex < stages.length - 1) {
@@ -265,23 +315,21 @@
             transitionToReport(aiData.final_report_html);
         } else {
             addMessage(aiData.bot_reply, 'bot', 'chat-history');
-            console.log(`[Stage ${currentStageIndex + 1}] Notes:`, aiData.internal_analysis);
+            speakText(aiData.bot_reply); // Speak the AI's response aloud
         }
-        toggleInput(false, 'userInput', 'sendBtn');
+        toggleInput(false, 'userInput', 'sendBtn', 'micBtn');
     }
 
     function generateReportEarly() {
-        if(!confirm("End the test early and generate the report based on current data?")) return;
-        toggleInput(true, 'userInput', 'sendBtn');
+        if(!confirm("End the test early?")) return;
+        toggleInput(true, 'userInput', 'sendBtn', 'micBtn');
         document.getElementById('loading').style.display = 'block';
         
-        // Force the AI to conclude and write the report
-        conversationHistory.push({ role: "user", parts: [{ text: "SYSTEM OVERRIDE: End the test immediately and generate the final_report_html based on the data gathered so far." }] });
+        conversationHistory.push({ role: "user", parts: [{ text: "SYSTEM OVERRIDE: End the test immediately and generate the final_report_html." }] });
         callGeminiAPI(getTestSystemInstruction(), processTestResponse);
     }
 
     function transitionToReport(htmlReport) {
-        // Stop Video & Timers
         clearInterval(videoChunkTimer);
         if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
         if (streamReference) streamReference.getTracks().forEach(track => track.stop());
@@ -291,12 +339,10 @@
         document.getElementById('report-name-age').innerText = `${childData.name} | Age: ${childData.age}`;
         document.getElementById('report-body').innerHTML = htmlReport;
 
-        // Initialize Consult History with context of the report
         consultHistory.push({ role: "user", parts: [{ text: `Here is my assessment report: ${htmlReport}. I will now ask follow up questions.` }] });
-        consultHistory.push({ role: "model", parts: [{ text: "Understood. I am ready to provide university guidance, course links, and actionable next steps based on your report." }] });
+        consultHistory.push({ role: "model", parts: [{ text: "I am ready to provide university guidance and course links based on your report." }] });
     }
 
-    // --- POST-TEST CONSULTATION LOGIC ---
     function submitConsult() {
         const inputField = document.getElementById('consultInput');
         const text = inputField.value.trim();
@@ -308,15 +354,12 @@
 
         consultHistory.push({ role: "user", parts: [{ text: text }] });
         
-        const consultSystemInstruction = `You are Dhwani, an educational consultant in India. You just finished an aptitude test for ${childData.name}. Answer their follow-up questions regarding universities, exam cut-offs (e.g., JEE, NEET, CUET, CAT), or recommend specific online courses (YouTube channels, Udemy topics). Be direct, factual, and helpful. OUTPUT AS PLAIN TEXT OR HTML ONLY (No JSON required for this phase).`;
+        const consultInstruction = `You are Dhwani, an educational consultant in India. You just finished an aptitude test for ${childData.name}. Answer follow-up questions regarding universities, cut-offs, or recommend online courses. OUTPUT AS PLAIN TEXT OR HTML ONLY.`;
 
         fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                system_instruction: { parts: [{ text: consultSystemInstruction }] },
-                contents: consultHistory
-            })
+            body: JSON.stringify({ system_instruction: { parts: [{ text: consultInstruction }] }, contents: consultHistory })
         })
         .then(res => res.json())
         .then(data => {
@@ -327,7 +370,6 @@
         .finally(() => toggleInput(false, 'consultInput', 'consultBtn'));
     }
 
-    // --- UTILITIES ---
     async function callGeminiAPI(systemInstruction, successCallback) {
         try {
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
@@ -347,7 +389,7 @@
         } catch (error) {
             console.error(error);
             addSystemMessage("Network error communicating with Dhwani AI.");
-            toggleInput(false, 'userInput', 'sendBtn');
+            toggleInput(false, 'userInput', 'sendBtn', 'micBtn');
         } finally {
             document.getElementById('loading').style.display = 'none';
         }
@@ -357,7 +399,7 @@
         const container = document.getElementById(containerId);
         const msgDiv = document.createElement('div');
         msgDiv.className = `message ${sender}-msg`;
-        msgDiv.innerHTML = text; // Allow HTML rendering in chat
+        msgDiv.innerHTML = text; 
         container.appendChild(msgDiv);
         container.scrollTop = container.scrollHeight;
     }
@@ -371,9 +413,10 @@
         container.scrollTop = container.scrollHeight;
     }
 
-    function toggleInput(disable, inputId, btnId) {
+    function toggleInput(disable, inputId, btnId, micId = null) {
         document.getElementById(inputId).disabled = disable;
         document.getElementById(btnId).disabled = disable;
+        if(micId) document.getElementById(micId).disabled = disable;
         if(!disable) document.getElementById(inputId).focus();
     }
 
