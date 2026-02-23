@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dhwani - Interactive Aptitude Assessment</title>
+    <title>Dhwani AI - Aptitude Assessment</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; display: flex; justify-content: center; height: 100dvh; box-sizing: border-box; }
         .container { background: white; max-width: 800px; width: 100%; box-shadow: 0 4px 20px rgba(0,0,0,0.05); display: flex; flex-direction: column; overflow: hidden; }
@@ -25,33 +25,31 @@
         .message { margin-bottom: 15px; max-width: 90%; padding: 14px; border-radius: 10px; font-size: 15px; line-height: 1.5; }
         .bot-msg { background: #e3f2fd; color: #0b3c7c; align-self: flex-start; border-bottom-left-radius: 0; }
         .user-msg { background: #27ae60; color: white; align-self: flex-end; margin-left: auto; border-bottom-right-radius: 0; }
-        .sys-msg { text-align: center; font-size: 12px; color: #7f8c8d; margin: 10px 0; }
         
+        /* Mic and Controls */
         .controls-area { padding: 15px; background: white; border-top: 1px solid #eee; padding-bottom: max(15px, env(safe-area-inset-bottom)); }
         .input-row { display: flex; gap: 10px; align-items: center; }
-        #micBtn { background: #e67e22; width: 50px; height: 50px; border-radius: 50%; font-size: 20px; flex-shrink: 0; border: none; padding: 0;}
-        #micBtn.listening { background: #c0392b; animation: pulse 1s infinite; }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        #micBtn { background: #e67e22; width: 50px; height: 50px; border-radius: 50%; font-size: 20px; flex-shrink: 0; border: none; padding: 0; transition: 0.2s; }
+        #micBtn.listening { background: #e74c3c; box-shadow: 0 0 15px rgba(231, 76, 60, 0.6); animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.08); } 100% { transform: scale(1); } }
         
         /* Loading Overlay */
         #full-loader { display: none; position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.9); z-index: 100; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px; box-sizing: border-box;}
         
-        /* Report & Consult Screen */
+        /* Report Screen */
         #report-screen { display: none; flex-direction: column; height: 100%; }
         #report-content { flex: 1; overflow-y: auto; padding: 20px; background: white; }
         .report-card { background: #f8f9fa; border-left: 4px solid #2980b9; padding: 15px; margin-bottom: 20px; border-radius: 0 8px 8px 0; }
-        
         #consult-area { background: #eef2f5; padding: 20px; border-top: 2px solid #ddd; }
         #consult-history { max-height: 250px; overflow-y: auto; margin-bottom: 10px; background: white; padding: 10px; border-radius: 8px; border: 1px solid #ddd;}
-        #android-fallback { display: none; margin-top: 10px; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div id="setup-screen">
-        <h2>Eprashala - Dhwani Assessment</h2>
-        <p style="color: #666; font-size: 14px;">A 30-minute deep-dive psychometric evaluation.</p>
+        <h2>Dhwani AI</h2>
+        <p style="color: #666; font-size: 14px;">Standalone Aptitude Assessment</p>
         <input type="password" id="apiKey" placeholder="Gemini API Key" required>
         <input type="text" id="childName" placeholder="Student's Name" required>
         <input type="number" id="childAge" placeholder="Age (e.g., 14)" required>
@@ -67,37 +65,30 @@
         <div id="chat-history"></div>
         
         <div class="controls-area">
+            <p id="mic-status" style="font-size: 11px; color: #7f8c8d; margin: 0 0 5px 0; text-align: center;">Tap mic to speak</p>
             <div class="input-row">
                 <button id="micBtn" onclick="toggleSpeech()">🎤</button>
-                <input type="text" id="userInput" placeholder="Type answer here..." onkeypress="handleEnter(event)">
+                <input type="text" id="userInput" placeholder="Type or speak..." onkeypress="handleEnter(event)">
                 <button id="sendBtn" onclick="submitAnswer()" style="width: auto; margin:0;">Send</button>
             </div>
         </div>
     </div>
 
     <div id="report-screen">
-        <div id="report-content">
-            </div>
+        <div id="report-content"></div>
         <div id="consult-area">
-            <h3 style="margin-top:0; color:#2c3e50;">Post-Test AI Consultation</h3>
-            <p style="font-size:12px; color:#666;">Ask Dhwani about colleges, courses, or career shifts based on your report.</p>
+            <h3 style="margin-top:0; color:#2c3e50;">Consult Dhwani</h3>
             <div id="consult-history"></div>
             <div class="input-row">
-                <input type="text" id="consultInput" placeholder="e.g. Which Udemy course should I take?" onkeypress="if(event.key === 'Enter') sendConsult()">
+                <input type="text" id="consultInput" placeholder="Ask about courses, careers..." onkeypress="if(event.key === 'Enter') sendConsult()">
                 <button onclick="sendConsult()" style="width: auto; margin:0;">Ask</button>
             </div>
-            <button onclick="downloadChatAsText()" style="background: #27ae60;">Download Chat Report (.txt)</button>
-            
-            <div id="android-fallback">
-                <p style="font-size: 11px; color: #c0392b; margin-bottom: 5px;">If download fails (WebView restriction), copy text below:</p>
-                <textarea id="fallback-text" style="width: 100%; height: 100px; font-size: 12px;" readonly></textarea>
-            </div>
+            <button onclick="downloadChatAsText()" style="background: #27ae60;">Download Full Report (.txt)</button>
         </div>
     </div>
 
     <div id="full-loader">
         <h2 id="loader-text">Dhwani is analyzing...</h2>
-        <p>Please wait.</p>
     </div>
 </div>
 
@@ -105,34 +96,112 @@
     let childData = { name: "", age: 0, city: "" };
     let apiKey = "";
     
-    // Assessment State
     let currentStage = 0;
     let questionCount = 0;
-    const questionsPerStage = 5; // 5 stages * 5 Qs = 25 total (approx 30 mins)
+    const questionsPerStage = 5; 
     let testHistory = []; 
     let consultHistory = [];
     
     const STAGES = {
-        0: { name: "Stage 0: Basics (MCQ)", type: "Single option (A, B, C, or D)", desc: "Ask a 4-option multiple choice question to gauge basic likes (subjects, hobbies)." },
-        1: { name: "Stage 1: Quick Fire (Yes/No)", type: "1 word (Yes, No, or Maybe)", desc: "Ask a question that requires a simple Yes, No, or Maybe. Focus on their working style." },
-        2: { name: "Stage 2: Short Thoughts", type: "1 sentence", desc: "Ask a question requiring a 1-sentence answer about a minor problem they solved or an achievement." },
-        3: { name: "Stage 3: Exploration", type: "2-3 sentences", desc: "Dig into a career/field they showed interest in. Ask *why* they like it." },
-        4: { name: "Stage 4: Stress Test", type: "Detailed paragraph", desc: "FRUSTRATE THEM mildly. Play devil's advocate. Give a complex scenario based on their city. If they like tech, say 'AI is replacing coders, what is your backup plan?'. Challenge their choices to see their resilience." }
+        0: { name: "Stage 0: Basics (MCQ)", type: "Single option (A, B, C, or D)" },
+        1: { name: "Stage 1: Quick Fire (Yes/No)", type: "1 word (Yes, No, or Maybe)" },
+        2: { name: "Stage 2: Short Thoughts", type: "1 sentence" },
+        3: { name: "Stage 3: Exploration", type: "2-3 sentences" },
+        4: { name: "Stage 4: Stress Test", type: "Detailed paragraph" }
     };
 
-    // Speech Recognition Setup (Audio only, no recording overhead)
+    // --- 1. SPEECH-TO-TEXT (STT) SETUP ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let recognition;
     let isListening = false;
     
     if (SpeechRecognition) {
         recognition = new SpeechRecognition();
-        recognition.continuous = false;
-        recognition.onstart = () => { isListening = true; document.getElementById('micBtn').classList.add('listening'); };
-        recognition.onresult = (e) => { document.getElementById('userInput').value = e.results[0][0].transcript; };
-        recognition.onend = () => { isListening = false; document.getElementById('micBtn').classList.remove('listening'); };
+        recognition.continuous = true; // Keep listening until user hits send
+        recognition.interimResults = true; // Show text as they speak
+        recognition.lang = 'en-IN'; // Default to Indian English context
+        
+        recognition.onstart = () => { 
+            isListening = true; 
+            document.getElementById('micBtn').classList.add('listening'); 
+            document.getElementById('mic-status').innerText = "Listening... Tap Send when done.";
+            document.getElementById('userInput').placeholder = "Listening...";
+        };
+        
+        recognition.onresult = (e) => { 
+            let interimTranscript = '';
+            for (let i = e.resultIndex; i < e.results.length; ++i) {
+                if (e.results[i].isFinal) {
+                    document.getElementById('userInput').value += e.results[i][0].transcript + ' ';
+                } else {
+                    interimTranscript += e.results[i][0].transcript;
+                }
+            }
+        };
+
+        recognition.onerror = (e) => {
+            console.error("Speech recognition error", e.error);
+            stopListeningUI();
+        };
+        
+        recognition.onend = () => { 
+            stopListeningUI();
+        };
     }
 
+    function stopListeningUI() {
+        isListening = false; 
+        document.getElementById('micBtn').classList.remove('listening'); 
+        document.getElementById('mic-status').innerText = "Tap mic to speak";
+        document.getElementById('userInput').placeholder = "Type or speak...";
+    }
+
+    function toggleSpeech() {
+        if (!recognition) return alert("Your browser does not support voice input.");
+        if (isListening) {
+            recognition.stop();
+        } else {
+            document.getElementById('userInput').value = ''; // Clear input for new speech
+            recognition.start();
+        }
+    }
+
+    // --- 2. TEXT-TO-SPEECH (TTS) SETUP ---
+    // Ensure voices are loaded into the browser (Android does this lazily)
+    let availableVoices = [];
+    window.speechSynthesis.onvoiceschanged = () => {
+        availableVoices = window.speechSynthesis.getVoices();
+    };
+
+    function unlockAndroidAudio() {
+        // HACK: Play a silent 0-second utterance on the user's first tap.
+        // This grants the webpage permission to play TTS later without interaction.
+        const silentUtterance = new SpeechSynthesisUtterance('');
+        silentUtterance.volume = 0;
+        window.speechSynthesis.speak(silentUtterance);
+    }
+
+    function speakDhwaniResponse(text) {
+        if (!('speechSynthesis' in window)) return;
+        
+        window.speechSynthesis.cancel(); // Stop any overlapping speech
+        const utterance = new SpeechSynthesisUtterance(text);
+        
+        // Try to find a native Indian voice (en-IN or hi-IN)
+        let voices = window.speechSynthesis.getVoices();
+        let indianVoice = voices.find(v => v.lang === 'en-IN' || v.lang === 'hi-IN' || v.name.includes('India'));
+        
+        if (indianVoice) {
+            utterance.voice = indianVoice;
+        }
+        
+        utterance.rate = 0.95; // Slightly slower for clear dictation
+        utterance.pitch = 1.0;
+        
+        window.speechSynthesis.speak(utterance);
+    }
+
+    // --- 3. CORE LOGIC ---
     function startTest() {
         apiKey = document.getElementById('apiKey').value.trim();
         childData.name = document.getElementById('childName').value.trim();
@@ -141,6 +210,8 @@
 
         if(!apiKey || !childData.name || !childData.age || !childData.city) { alert("Fill all fields."); return; }
 
+        unlockAndroidAudio(); // Must happen synchronously with this button click
+
         document.getElementById('setup-screen').style.display = 'none';
         document.getElementById('test-screen').style.display = 'flex';
         
@@ -148,12 +219,9 @@
         processTurn();
     }
 
-    function toggleSpeech() {
-        if (!recognition) return alert("Speech recognition not supported.");
-        isListening ? recognition.stop() : recognition.start();
-    }
-
     function submitAnswer() {
+        if (isListening) recognition.stop(); // Stop mic if it's still running
+
         const input = document.getElementById('userInput');
         if (!input.value.trim()) return;
         
@@ -179,26 +247,13 @@
     function getSystemPrompt() {
         const stage = STAGES[currentStage];
         const ageContext = childData.age <= 14 
-            ? "Keep vocabulary simple. Focus on school subjects, basic hobbies, and foundational life skills." 
-            : "Use mature vocabulary. Focus on college streams, career shifts, current market trends, and complex situational awareness.";
+            ? "Keep vocabulary simple. Focus on school, basic hobbies, and foundational life skills." 
+            : "Use mature vocabulary. Focus on college streams, career shifts, and market realities.";
 
-        return `You are Dhwani, an AI aptitude evaluator for Eprashala LMS.
-        User: ${childData.name} | Age: ${childData.age} | City: ${childData.city}.
-        
-        CURRENT STAGE: ${stage.name}
-        Stage Goal: ${stage.desc}
-        Expected User Answer Length: ${stage.type} (Frame your question to elicit this length naturally).
-        
-        AGE CONTEXT: ${ageContext}
-        
-        CRITICAL RULES:
-        1. Keep YOUR questions SHORT and simple. It is the user's test, not yours.
-        2. Ask EXACTLY ONE question. Do not bundle questions.
-        3. ALWAYS output strictly in this JSON format:
-        {
-            "bot_reply": "Your short question to the user.",
-            "internal_analysis": "Brief psychological note based on their previous answer."
-        }`;
+        return `You are Dhwani, an AI aptitude evaluator. User: ${childData.name} | Age: ${childData.age} | City: ${childData.city}.
+        STAGE: ${stage.name}. Expected Answer Length: ${stage.type}. AGE CONTEXT: ${ageContext}.
+        RULES: Keep YOUR questions SHORT. Ask ONE question. Output STRICTLY in JSON:
+        {"bot_reply": "Your question.", "internal_analysis": "Psychological note."}`;
     }
 
     async function processTurn() {
@@ -222,93 +277,65 @@
             testHistory.push({ role: "model", parts: [{ text: aiData.bot_reply }] });
             addMessage(aiData.bot_reply, 'bot', 'chat-history');
             
-        } catch (e) { alert("API Error. Please retry."); }
+            // Speak the response natively
+            speakDhwaniResponse(aiData.bot_reply);
+            
+        } catch (e) { alert("API Error. Please check your key or connection."); }
         setLoading(false);
     }
 
     async function generateFinalReport() {
-        setLoading(true, "Compiling 30-minute psychometric data. Generating final Eprashala Report...");
-        
-        const reportPrompt = `You are Dhwani. The user has finished all 5 stages of the aptitude test. 
-        Analyze their entire history. Generate a highly professional, real-world acceptable aptitude test report.
-        Output ONLY raw, clean HTML (no markdown tags like \`\`\`html). 
-        Include:
-        - <h2 style='color:#2980b9'>Executive Summary</h2>
-        - <div class='report-card'><b>Personality Traits & Virtues:</b> Real, honest assessment.</div>
-        - <div class='report-card'><b>Problem Solving & Stress Response:</b> Based on how they handled the Stage 4 stress test.</div>
-        - <div class='report-card'><b>Recommended Paths:</b> Top 3 Streams/Colleges/Careers.</div>`;
+        setLoading(true, "Compiling psychometric data...");
+        const reportPrompt = `You are Dhwani. The user finished the test. Analyze history. Output ONLY raw HTML. 
+        Include: <h2 style='color:#2980b9'>Executive Summary</h2>, and cards for Personality, Problem Solving, and Top 3 Career Paths.`;
 
         try {
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    system_instruction: { parts: [{ text: reportPrompt }] },
-                    contents: testHistory
-                })
+                body: JSON.stringify({ system_instruction: { parts: [{ text: reportPrompt }] }, contents: testHistory })
             });
 
             const data = await response.json();
-            const htmlReport = data.candidates[0].content.parts[0].text.replace(/```html|```/g, '');
-            
             document.getElementById('test-screen').style.display = 'none';
             document.getElementById('report-screen').style.display = 'flex';
-            document.getElementById('report-content').innerHTML = htmlReport;
-            
-            // Initialize consult history with context
-            consultHistory.push({ role: "user", parts: [{ text: "I have read my report. Let's start the consultation." }] });
-            
+            document.getElementById('report-content').innerHTML = data.candidates[0].content.parts[0].text.replace(/```html|```/g, '');
+            consultHistory.push({ role: "user", parts: [{ text: "I have read my report. Let's start." }] });
+            speakDhwaniResponse("Your report is ready. You can now ask me any questions about your career paths.");
         } catch (e) { alert("Error generating report."); }
         setLoading(false);
     }
 
-    // --- CONSULTATION LOGIC ---
     async function sendConsult() {
         const input = document.getElementById('consultInput');
         const text = input.value.trim();
         if (!text) return;
-
         addMessage(text, 'user', 'consult-history');
         consultHistory.push({ role: "user", parts: [{ text: text }] });
         input.value = '';
         
-        const sysPrompt = `You are Dhwani, an AI career consultant. The user (${childData.age} yrs old) just finished their aptitude test and is reading their report. Answer their questions about colleges, Udemy courses, YouTube videos, or career shifts directly and conversationally. Do not use JSON. Use plain text.`;
-
         try {
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    system_instruction: { parts: [{ text: sysPrompt }] },
+                    system_instruction: { parts: [{ text: "You are Dhwani, a career consultant. Answer questions directly via plain text." }] },
                     contents: consultHistory
                 })
             });
-
-            const data = await response.json();
-            const reply = data.candidates[0].content.parts[0].text;
-            
+            const reply = (await response.json()).candidates[0].content.parts[0].text;
             consultHistory.push({ role: "model", parts: [{ text: reply }] });
             addMessage(reply, 'bot', 'consult-history');
-        } catch(e) { alert("Error connecting to Dhwani."); }
+            speakDhwaniResponse(reply); // Speak consultation answers too
+        } catch(e) { alert("Error connecting."); }
     }
 
     function downloadChatAsText() {
-        let textToSave = `--- Eprashala: Dhwani Consultation for ${childData.name} ---\n\n`;
-        consultHistory.forEach(msg => {
-            let role = msg.role === 'user' ? childData.name : 'Dhwani AI';
-            if (msg.parts[0].text.includes("I have read my report")) return; // Skip sys message
-            textToSave += `${role}: ${msg.parts[0].text}\n\n`;
-        });
-
-        // WebView Fallback
-        document.getElementById('android-fallback').style.display = 'block';
-        document.getElementById('fallback-text').value = textToSave;
-
-        // Standard Web Download
-        const blob = new Blob([textToSave], { type: "text/plain" });
+        let textToSave = `--- Dhwani Report ---\n\n`;
+        consultHistory.forEach(msg => { if (!msg.parts[0].text.includes("I have read my report")) textToSave += `${msg.role}: ${msg.parts[0].text}\n\n`; });
         const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = `${childData.name}_Consultation.txt`;
+        link.href = URL.createObjectURL(new Blob([textToSave], { type: "text/plain" }));
+        link.download = `Dhwani_Consultation.txt`;
         link.click();
     }
 
@@ -322,13 +349,8 @@
     }
 
     function setLoading(show, text="") {
-        const loader = document.getElementById('full-loader');
+        document.getElementById('full-loader').style.display = show ? 'flex' : 'none';
         document.getElementById('loader-text').innerText = text;
-        loader.style.display = show ? 'flex' : 'none';
-        
-        // Disable inputs while loading
-        const inputs = document.querySelectorAll('input, button');
-        inputs.forEach(el => el.disabled = show);
     }
 </script>
 </body>
