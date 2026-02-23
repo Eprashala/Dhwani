@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dhwani - Aptitude Evaluator</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .container { background: white; max-width: 800px; width: 100%; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; }
+        
+        /* Setup Screen */
+        #setup-screen { padding: 40px; text-align: center; }
+        #setup-screen input { display: block; width: 80%; margin: 15px auto; padding: 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; }
+        button { background: #4CAF50; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 6px; cursor: pointer; transition: 0.3s; }
+        button:hover { background: #45a049; }
+        
+        /* Test Screen */
+        #test-screen { display: none; display: flex; flex-direction: column; height: 90vh; }
+        .header { background: #2c3e50; color: white; padding: 15px; text-align: center; font-weight: bold; }
+        
+        .main-content { display: flex; flex: 1; overflow: hidden; }
+        
+        /* Video Section */
+        .video-panel { width: 30%; background: #000; position: relative; display: flex; flex-direction: column; }
+        #webcam { width: 100%; height: 100%; object-fit: cover; }
+        .recording-badge { position: absolute; top: 10px; left: 10px; background: rgba(255,0,0,0.8); color: white; padding: 5px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; animation: blink 1.5s infinite; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        
+        /* Chat Section */
+        .chat-panel { width: 70%; display: flex; flex-direction: column; border-left: 1px solid #eee; }
+        #chat-history { flex: 1; padding: 20px; overflow-y: auto; background: #fafafa; }
+        .message { margin-bottom: 15px; max-width: 80%; padding: 10px 15px; border-radius: 8px; line-height: 1.4; }
+        .bot-msg { background: #e3f2fd; color: #0d47a1; align-self: flex-start; border-bottom-left-radius: 0; }
+        .user-msg { background: #4CAF50; color: white; align-self: flex-end; margin-left: auto; border-bottom-right-radius: 0; }
+        
+        .input-area { display: flex; padding: 15px; background: white; border-top: 1px solid #eee; }
+        .input-area input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; margin-right: 10px; font-size: 16px; }
+        .stop-btn { background: #e74c3c; margin-top: 10px; width: 100%; border-radius: 0; }
+        .stop-btn:hover { background: #c0392b; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="setup-screen">
+        <h2>Dr. Dhwani Aptitude Evaluator</h2>
+        <p>Enter details to begin the clinical assessment.</p>
+        <input type="text" id="childName" placeholder="Child's Name" required>
+        <input type="number" id="childAge" placeholder="Child's Age (e.g., 8)" required>
+        <button onclick="startTest()">Initialize Camera & Start Test</button>
+    </div>
+
+    <div id="test-screen" style="display: none;">
+        <div class="header" id="test-header">Dhwani Session</div>
+        <div class="main-content">
+            <div class="video-panel">
+                <div class="recording-badge">REC</div>
+                <video id="webcam" autoplay muted playsinline></video>
+                <button class="stop-btn" onclick="stopTest()">End Test & Save Video</button>
+            </div>
+            <div class="chat-panel">
+                <div id="chat-history"></div>
+                <div class="input-area">
+                    <input type="text" id="userInput" placeholder="Type your answer here..." onkeypress="handleEnter(event)">
+                    <button onclick="processUserAnswer()">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let mediaRecorder;
+    let recordedChunks = [];
+    let childData = { name: "", age: 0 };
+    let askedQuestions = new Set();
+    
+    // Mock Database of Questions (A real AI backend would replace this)
+    const questionBank = {
+        young: [ // Ages 4-7
+            "If you have 3 apples and I give you 2 more, how many do you have?",
+            "What is the opposite of 'Hot'?",
+            "If a bird flies, what does a fish do?",
+            "Look around the room. Name three things that are circles."
+        ],
+        middle: [ // Ages 8-11
+            "If a train leaves at 3:00 and takes 2 hours, what time does it arrive?",
+            "What do a bicycle and a motorcycle have in common?",
+            "Rearrange these letters to make a word: 'C A T E H E R'",
+            "If tomorrow is Tuesday, what was yesterday?"
+        ],
+        older: [ // Ages 12+
+            "If 3x = 15, what is x?",
+            "Identify the pattern: 2, 6, 18, 54... What comes next?",
+            "How would you explain the concept of gravity to a 5-year-old?",
+            "A bat and a ball cost $1.10 in total. The bat costs $1.00 more than the ball. How much does the ball cost?"
+        ]
+    };
+
+    async function startTest() {
+        childData.name = document.getElementById('childName').value;
+        childData.age = parseInt(document.getElementById('childAge').value);
+
+        if(!childData.name || !childData.age) {
+            alert("Please enter both name and age.");
+            return;
+        }
+
+        document.getElementById('setup-screen').style.display = 'none';
+        document.getElementById('test-screen').style.display = 'flex';
+        document.getElementById('test-header').innerText = `Aptitude Assessment: ${childData.name} (Age: ${childData.age})`;
+
+        await initCamera();
+        
+        // Initial Greeting
+        addMessage(`Hello ${childData.name}! I am Dhwani. I'm going to ask you a few fun questions to see how your brain works. Let's begin!`, 'bot');
+        setTimeout(askNextQuestion, 2000);
+    }
+
+    async function initCamera() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            document.getElementById('webcam').srcObject = stream;
+            
+            // Setup MediaRecorder
+            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder.ondataavailable = function(event) {
+                if (event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+            mediaRecorder.onstop = saveVideo;
+            mediaRecorder.start();
+        } catch (err) {
+            alert("Camera/Microphone access is required for this test.");
+            console.error(err);
+        }
+    }
+
+    function askNextQuestion() {
+        let category = childData.age <= 7 ? 'young' : (childData.age <= 11 ? 'middle' : 'older');
+        let availableQuestions = questionBank[category].filter(q => !askedQuestions.has(q));
+
+        if (availableQuestions.length === 0) {
+            addMessage("You've answered all my questions for today! Great job. Click 'End Test' to finish.", 'bot');
+            return;
+        }
+
+        // Pick a random question to ensure it doesn't just go in order
+        let randomIndex = Math.floor(Math.random() * availableQuestions.length);
+        let selectedQuestion = availableQuestions[randomIndex];
+        
+        askedQuestions.add(selectedQuestion);
+        addMessage(selectedQuestion, 'bot');
+    }
+
+    function processUserAnswer() {
+        const inputField = document.getElementById('userInput');
+        const answer = inputField.value.trim();
+        if (!answer) return;
+
+        addMessage(answer, 'user');
+        inputField.value = '';
+
+        // Simulate AI analyzing the answer before asking the next one
+        setTimeout(() => {
+            addMessage("Interesting answer! Let's try another one.", 'bot');
+            setTimeout(askNextQuestion, 1500);
+        }, 1000);
+    }
+
+    function handleEnter(event) {
+        if (event.key === 'Enter') {
+            processUserAnswer();
+        }
+    }
+
+    function addMessage(text, sender) {
+        const chatHistory = document.getElementById('chat-history');
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message ${sender}-msg`;
+        msgDiv.innerText = text;
+        chatHistory.appendChild(msgDiv);
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+
+    function stopTest() {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+            // Stop all video/audio tracks to turn off the webcam light
+            document.getElementById('webcam').srcObject.getTracks().forEach(track => track.stop());
+        }
+    }
+
+    function saveVideo() {
+        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        document.body.appendChild(a);
+        a.style = 'display: none';
+        a.href = url;
+        a.download = `${childData.name}_Aptitude_Test.webm`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+        
+        alert("Test completed! The video recording has been downloaded to your device.");
+        location.reload(); // Reset the app
+    }
+</script>
+</body>
+</html>
