@@ -112,11 +112,9 @@
         <div id="report-content"></div>
         
         <h4 style="text-align: center; color: #2c3e50; margin-bottom: 10px;">🔊 Read Report Aloud</h4>
-        <div class="tts-controls">
-            <button onclick="playReportText()" class="btn-purple">▶️ Play</button>
-            <button onclick="pauseReportText()" class="btn-orange">⏸️ Pause</button>
-            <button onclick="stopReportText()" class="btn-red">⏹️ Stop</button>
-        </div>
+		<div class="tts-controls">
+		<button id="ttsToggleBtn" onclick="toggleReportAudio()" class="btn-purple">▶️ Play Report</button>
+	</div>
 
         <div style="padding: 0 20px;">
             <button onclick="downloadInitialReport()" style="background: #e67e22; margin-bottom: 20px;">⬇️ Download Report & Q&A</button>
@@ -489,44 +487,56 @@
 
     // --- REPORT TTS PLAYBACK CONTROLS ---
     // Add these global variables near the top of your script
+// --- UNIFIED REPORT TTS PLAYBACK CONTROLS ---
+
 let reportChunks = [];
 let currentChunkIndex = 0;
 let isPlayingReport = false;
 
-// --- REWRITTEN REPORT TTS PLAYBACK CONTROLS ---
-
-function playReportText() {
+function toggleReportAudio() {
     if (!('speechSynthesis' in window)) { 
         alert("Your browser does not support Speech Synthesis."); 
         return; 
     }
-    
-    // 1. Handle Resume cleanly
+
+    const btn = document.getElementById('ttsToggleBtn');
+
+    // Case 1: It is currently paused -> Resume it
     if (window.speechSynthesis.paused) {
         window.speechSynthesis.resume();
+        btn.innerHTML = "⏸️ Pause Report";
+        btn.className = "btn-orange";
         return;
     }
     
-    // 2. Prevent overlapping plays if already speaking
-    if (window.speechSynthesis.speaking) return;
+    // Case 2: It is actively speaking -> Pause it
+    if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.pause();
+        btn.innerHTML = "▶️ Resume Report";
+        btn.className = "btn-purple";
+        return;
+    }
 
+    // Case 3: It is not playing at all -> Start fresh from the beginning
     const pureText = document.getElementById('report-content').innerText;
     if (!pureText) return;
 
     window.speechSynthesis.cancel(); 
-    
-    // 3. Chunk the text by sentences to bypass the 15-second browser limit
-    // This regex splits the text safely at periods, exclamation marks, or question marks
     reportChunks = pureText.match(/[^.!?]+[.!?]+/g) || [pureText];
     currentChunkIndex = 0;
     isPlayingReport = true;
 
-    // 4. Slight timeout prevents the cancel/speak race condition
+    // Update button UI
+    btn.innerHTML = "⏸️ Pause Report";
+    btn.className = "btn-orange";
+
     setTimeout(playNextReportChunk, 50); 
 }
 
 function playNextReportChunk() {
+    // If playback is manually stopped or finishes the last chunk
     if (!isPlayingReport || currentChunkIndex >= reportChunks.length) {
+        resetTTSButton();
         isPlayingReport = false;
         return;
     }
@@ -560,35 +570,13 @@ function playNextReportChunk() {
     window.speechSynthesis.speak(reportUtterance);
 }
 
-function pauseReportText() {
-    if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
-        window.speechSynthesis.pause();
+function resetTTSButton() {
+    const btn = document.getElementById('ttsToggleBtn');
+    if (btn) {
+        btn.innerHTML = "▶️ Play Report";
+        btn.className = "btn-purple";
     }
 }
-
-function stopReportText() {
-    isPlayingReport = false; // Stop the chunk chain
-    
-    // Fix for the Pause Deadlock: Briefly resume before cancelling
-    if (window.speechSynthesis.paused) {
-        window.speechSynthesis.resume();
-    }
-    
-    setTimeout(() => {
-        window.speechSynthesis.cancel();
-    }, 50);
-}
-
-    function pauseReportText() {
-        if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
-            window.speechSynthesis.pause();
-        }
-    }
-
-    function stopReportText() {
-        window.speechSynthesis.cancel();
-    }
-
     // --- GEMINI API: CONSULTATION ---
     async function sendConsult() {
         const input = document.getElementById('consultInput');
