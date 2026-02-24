@@ -488,30 +488,96 @@
     }
 
     // --- REPORT TTS PLAYBACK CONTROLS ---
-    function playReportText() {
-        if (!('speechSynthesis' in window)) { alert("Your browser does not support Speech Synthesis."); return; }
-        
-        if (window.speechSynthesis.paused && reportUtterance) {
-            window.speechSynthesis.resume();
-            return;
-        }
-        
-        window.speechSynthesis.cancel(); 
-        
-        const pureText = document.getElementById('report-content').innerText;
-        if (!pureText) return;
+    // Add these global variables near the top of your script
+let reportChunks = [];
+let currentChunkIndex = 0;
+let isPlayingReport = false;
 
-        reportUtterance = new SpeechSynthesisUtterance(pureText);
-        
-        let voices = window.speechSynthesis.getVoices();
-        let targetVoice = voices.find(v => (v.lang.includes('en-IN') || v.lang.includes('hi-IN')) && (v.name.toLowerCase().includes('female') || v.name.includes('Google'))) || voices.find(v => v.lang === 'en-IN');
-        if (targetVoice) reportUtterance.voice = targetVoice;
-        
-        reportUtterance.rate = 0.85; 
-        reportUtterance.pitch = 1.0;
+// --- REWRITTEN REPORT TTS PLAYBACK CONTROLS ---
 
-        window.speechSynthesis.speak(reportUtterance);
+function playReportText() {
+    if (!('speechSynthesis' in window)) { 
+        alert("Your browser does not support Speech Synthesis."); 
+        return; 
     }
+    
+    // 1. Handle Resume cleanly
+    if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+        return;
+    }
+    
+    // 2. Prevent overlapping plays if already speaking
+    if (window.speechSynthesis.speaking) return;
+
+    const pureText = document.getElementById('report-content').innerText;
+    if (!pureText) return;
+
+    window.speechSynthesis.cancel(); 
+    
+    // 3. Chunk the text by sentences to bypass the 15-second browser limit
+    // This regex splits the text safely at periods, exclamation marks, or question marks
+    reportChunks = pureText.match(/[^.!?]+[.!?]+/g) || [pureText];
+    currentChunkIndex = 0;
+    isPlayingReport = true;
+
+    // 4. Slight timeout prevents the cancel/speak race condition
+    setTimeout(playNextReportChunk, 50); 
+}
+
+function playNextReportChunk() {
+    if (!isPlayingReport || currentChunkIndex >= reportChunks.length) {
+        isPlayingReport = false;
+        return;
+    }
+
+    reportUtterance = new SpeechSynthesisUtterance(reportChunks[currentChunkIndex]);
+    
+    let voices = window.speechSynthesis.getVoices();
+    let targetVoice = voices.find(v => 
+        (v.lang.includes('en-IN') || v.lang.includes('hi-IN')) && 
+        (v.name.toLowerCase().includes('female') || v.name.includes('Google'))
+    ) || voices.find(v => v.lang === 'en-IN') || voices[0];
+    
+    if (targetVoice) reportUtterance.voice = targetVoice;
+    
+    reportUtterance.rate = 0.85; 
+    reportUtterance.pitch = 1.0;
+
+    // Chain the next chunk automatically
+    reportUtterance.onend = () => {
+        currentChunkIndex++;
+        playNextReportChunk();
+    };
+
+    // Push through errors instead of crashing the whole playback
+    reportUtterance.onerror = (e) => {
+        console.warn("TTS Error on chunk:", e);
+        currentChunkIndex++;
+        playNextReportChunk();
+    };
+
+    window.speechSynthesis.speak(reportUtterance);
+}
+
+function pauseReportText() {
+    if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+        window.speechSynthesis.pause();
+    }
+}
+
+function stopReportText() {
+    isPlayingReport = false; // Stop the chunk chain
+    
+    // Fix for the Pause Deadlock: Briefly resume before cancelling
+    if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+    }
+    
+    setTimeout(() => {
+        window.speechSynthesis.cancel();
+    }, 50);
+}
 
     function pauseReportText() {
         if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
