@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dhwani AI - Eprashala Marathi Aptitude Test</title>
+    <script src="qa.js"></script>
+    <script src="qm.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; display: flex; justify-content: center; height: 100dvh; box-sizing: border-box; }
+        .container { background: white; max-width: 800px; width: 100%; box-shadow: 0 4px 20px rgba(0,0,0,0.05); display: flex; flex-direction: column; overflow: hidden; }
+        
+        button { background: #2980b9; color: white; border: none; padding: 14px 20px; font-size: 16px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; transition: 0.2s; }
+        button:hover { background: #1c5980; }
+        button:disabled { background: #bdc3c7; cursor: not-allowed; }
+        
+        input[type="text"], input[type="number"], input[type="password"], select { width: 100%; padding: 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; margin-bottom: 10px; }
+        
+        #setup-screen, #api-key-screen { padding: 40px 20px; text-align: center; overflow-y: auto; height: 100%; }
+        #api-key-screen, #test-screen, #report-screen { display: none; } 
+        
+        #test-screen { flex-direction: column; height: 100%; }
+        .header { background: #2c3e50; color: white; padding: 15px; text-align: center; font-size: 15px; }
+        #stage-indicator { background: #e67e22; padding: 4px 10px; border-radius: 12px; font-size: 13px; font-weight: bold; display: inline-block; margin-top: 5px; }
+        
+        #chat-history { flex: 1; padding: 20px; overflow-y: auto; background: #fafafa; display: flex; flex-direction: column; }
+        .message { margin-bottom: 15px; max-width: 85%; padding: 14px; border-radius: 10px; font-size: 15px; line-height: 1.5; white-space: pre-wrap; }
+        .bot-msg { background: #e3f2fd; color: #0b3c7c; align-self: flex-start; border-bottom-left-radius: 0; border: 1px solid #bbdefb; }
+        .user-msg { background: #27ae60; color: white; align-self: flex-end; border-bottom-right-radius: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        
+        .controls-area { padding: 15px; background: white; border-top: 1px solid #eee; }
+        .input-row { display: flex; gap: 10px; align-items: center; }
+        
+        #micBtn { background: #e67e22; width: 60px; height: 60px; border-radius: 50%; font-size: 24px; border: none; cursor: pointer; transition: 0.2s; touch-action: none; }
+        #micBtn.listening { background: #e74c3c; box-shadow: 0 0 15px rgba(231, 76, 60, 0.6); transform: scale(1.1); }
+        
+        #full-loader { display: none; position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.9); z-index: 100; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="setup-screen">
+        <h2>Dhwani AI - Aptitude Test</h2>
+        <p style="color: #666; font-size: 14px;">Eprashala Multilingual LMS</p>
+        <input type="text" id="childName" placeholder="Student's Name">
+        <input type="number" id="childAge" placeholder="Age">
+        <input type="text" id="childCity" placeholder="City">
+        
+        <label style="display:block; text-align:left; font-size:12px; color:#666; margin-left:5px;">Assessment Language:</label>
+        <select id="testLang">
+            <option value="en-IN">English (India)</option>
+            <option value="mr-IN">Marathi (मराठी)</option>
+        </select>
+
+        <button onclick="startTest()">Begin Assessment</button>
+    </div>
+
+    <div id="test-screen">
+        <div class="header">
+            <div id="test-header">Dhwani Psychometric Session</div>
+            <div id="stage-indicator">Loading...</div>
+        </div>
+        <div id="chat-history"></div>
+        <div class="controls-area">
+            <div class="input-row">
+                <button id="micBtn">🎤</button>
+                <input type="text" id="userInput" placeholder="Wait for Dhwani to finish speaking..." onkeypress="if(event.key === 'Enter') submitAnswer()">
+            </div>
+        </div>
+    </div>
+
+    <div id="api-key-screen">
+        <h2>Assessment Complete!</h2>
+        <button onclick="downloadRawTranscript()">Download Backup Transcript</button>
+        <hr>
+        <input type="password" id="apiKey" placeholder="Enter Gemini API Key">
+        <button onclick="generateFinalReport()">Analyze & Generate Report</button>
+    </div>
+
+    <div id="report-screen">
+        <div id="report-content" style="padding:20px;"></div>
+    </div>
+
+    <div id="full-loader">
+        <h2 id="loader-text">Dhwani is thinking...</h2>
+    </div>
+</div>
+
+<script>
+    let childData = { name: "", lang: "en-IN" };
+    let currentStage = 0;
+    let questionCount = 0;
+    let fullTranscript = "";
+    let isProcessing = false;
+    let activeQuestionQueues = {};
+
+    // --- STT Configuration ---
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition = SpeechRecognition ? new SpeechRecognition() : null;
+
+    if (recognition) {
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        
+        recognition.onstart = () => { document.getElementById('micBtn').classList.add('listening'); };
+        recognition.onresult = (e) => {
+            let result = '';
+            for (let i = e.resultIndex; i < e.results.length; ++i) {
+                if (e.results[i].isFinal) document.getElementById('userInput').value = e.results[i][0].transcript;
+            }
+        };
+        recognition.onend = () => {
+            document.getElementById('micBtn').classList.remove('listening');
+            if(document.getElementById('userInput').value.trim()) submitAnswer();
+        };
+    }
+
+    function startTest() {
+        childData.name = document.getElementById('childName').value;
+        childData.lang = document.getElementById('testLang').value; // Sets 'mr-IN' or 'en-IN'
+
+        if(!childData.name) return alert("Please enter a name.");
+
+        // Switch to Marathi Bank if selected
+        let bank = (childData.lang === 'mr-IN' && typeof QUESTION_BANK_MR !== 'undefined') ? QUESTION_BANK_MR : QUESTION_BANK;
+        
+        // Sync STT Language
+        if (recognition) recognition.lang = childData.lang;
+
+        for (let stage in bank) {
+            activeQuestionQueues[stage] = [...bank[stage]].sort(() => 0.5 - Math.random());
+        }
+
+        document.getElementById('setup-screen').style.display = 'none';
+        document.getElementById('test-screen').style.display = 'flex';
+        
+        let intro = (childData.lang === 'mr-IN') ? 
+            `नमस्ते ${childData.name}. मी तुमची ए-प्रशाला मार्गदर्शक, ध्वनी आहे. आपण आता चाचणी सुरू करूया.` : 
+            `Namaste ${childData.name}. I am Dhwani, your guide. Let's start the test.`;
+
+        addMessage(intro, 'bot');
+        speakDhwani(intro, askNextQuestion);
+    }
+
+    function askNextQuestion() {
+        document.getElementById('stage-indicator').innerText = "Stage " + currentStage;
+        let q = activeQuestionQueues[currentStage].pop();
+        addMessage(q, 'bot');
+        speakDhwani(q);
+        isProcessing = false;
+    }
+
+    function submitAnswer() {
+        if (isProcessing) return;
+        let ans = document.getElementById('userInput').value;
+        addMessage(ans, 'user');
+        fullTranscript += `Q: ${ans}\n`;
+        document.getElementById('userInput').value = '';
+        isProcessing = true;
+        
+        questionCount++;
+        if (questionCount >= 10) {
+            currentStage++;
+            questionCount = 0;
+        }
+
+        if (currentStage > 4) {
+            document.getElementById('test-screen').style.display = 'none';
+            document.getElementById('api-key-screen').style.display = 'block';
+        } else {
+            setTimeout(askNextQuestion, 1000);
+        }
+    }
+
+    // --- Native TTS Configuration ---
+    function speakDhwani(text, callback) {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(text);
+        
+        // Match the voice to the selected language
+        let voices = window.speechSynthesis.getVoices();
+        let targetVoice = voices.find(v => v.lang === childData.lang) || 
+                          voices.find(v => v.lang.includes(childData.lang.split('-')[0]));
+        
+        if (targetVoice) utter.voice = targetVoice;
+        utter.rate = 0.9;
+        utter.onend = () => { if(callback) callback(); };
+        window.speechSynthesis.speak(utter);
+    }
+
+    function addMessage(text, sender) {
+        const div = document.createElement('div');
+        div.className = `message ${sender}-msg`;
+        div.innerText = text;
+        document.getElementById('chat-history').appendChild(div);
+        document.getElementById('chat-history').scrollTop = document.getElementById('chat-history').scrollHeight;
+    }
+
+    // Mic Button Listeners
+    const mBtn = document.getElementById('micBtn');
+    mBtn.addEventListener('mousedown', () => recognition && recognition.start());
+    mBtn.addEventListener('mouseup', () => recognition && recognition.stop());
+
+    // Report Generation Logic...
+</script>
+</body>
+</html>
