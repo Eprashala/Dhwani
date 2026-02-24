@@ -59,7 +59,7 @@
     <div id="test-screen">
         <div class="header">
             <div id="test-header">Dhwani Session</div>
-            <div id="stage-indicator">Stage 0: Basics</div>
+            <div id="stage-indicator">Welcome</div>
         </div>
         <div id="chat-history"></div>
         <div class="controls-area">
@@ -107,16 +107,16 @@
     
     let currentStage = 0;
     let questionCount = 0;
-    const questionsPerStage = 5; 
+    const questionsPerStage = 10; // 50 questions total for a solid 30-minute test
     let fullTranscript = ""; 
     let generatedReportHtml = ""; 
     let lastBotQuestion = ""; 
     let consultHistory = [];
     let isProcessing = false;
+    let questionStartTime = 0; // To track cognitive response speed
     
     const STAGE_NAMES = ["Stage 0: Basics", "Stage 1: Quick Fire", "Stage 2: Short Thoughts", "Stage 3: Exploration", "Stage 4: Stress Test"];
 
-    // Ensure QUESTION_BANK loaded from qa.js successfully
     if (typeof QUESTION_BANK === 'undefined') {
         alert("CRITICAL ERROR: qa.js file is missing or failed to load. The app cannot run.");
     }
@@ -125,7 +125,6 @@
 
     function initializeQuestionQueues() {
         for (let stage in QUESTION_BANK) {
-            // Clone the array and shuffle it to ensure a unique offline test every time
             activeQuestionQueues[stage] = [...QUESTION_BANK[stage]].sort(() => 0.5 - Math.random());
         }
     }
@@ -229,7 +228,7 @@
         ) || voices.find(v => v.lang === 'en-IN');
         
         if (targetVoice) utterance.voice = targetVoice;
-        utterance.rate = 0.90; 
+        utterance.rate = 0.95; 
         utterance.pitch = 1.1; 
         window.speechSynthesis.speak(utterance);
     }
@@ -240,7 +239,7 @@
         childData.age = parseInt(document.getElementById('childAge').value);
         childData.city = document.getElementById('childCity').value.trim();
 
-        if(!childData.name || !childData.age || !childData.city) { alert("Fill all fields."); return; }
+        if(!childData.name || !childData.age || !childData.city) { alert("Please fill all fields."); return; }
 
         unlockAndroidAudio(); 
         initializeQuestionQueues(); 
@@ -248,22 +247,32 @@
         document.getElementById('setup-screen').style.display = 'none';
         document.getElementById('test-screen').style.display = 'flex';
         
-        askNextLocalQuestion(true);
+        // Introductory Greeting
+        isProcessing = true;
+        let introMsg = `Namaste ${childData.name}. Welcome to the Eprashala Aptitude Assessment. I am Dhwani. Please take a deep breath, relax, and stay calm. This test will take about 30 minutes. Please give the answers that naturally come to your mind without the influence of any person in or around you. Let's begin with Stage 0.`;
+        
+        addMessage(introMsg, 'bot', 'chat-history');
+        speakDhwaniResponse(introMsg);
+        
+        // Wait for intro to be read, then ask first question
+        setTimeout(() => {
+            isProcessing = false;
+            askNextLocalQuestion();
+        }, 12000); 
     }
 
-    function askNextLocalQuestion(isFirst = false) {
+    function askNextLocalQuestion() {
         document.getElementById('stage-indicator').innerText = STAGE_NAMES[currentStage];
         
         let nextQuestion = activeQuestionQueues[currentStage].pop();
         if (!nextQuestion) nextQuestion = "Please tell me a bit more about your career interests.";
 
-        if (isFirst) {
-            nextQuestion = `Namaste ${childData.name}. Let's begin. ` + nextQuestion;
-        }
-
         lastBotQuestion = nextQuestion;
         addMessage(nextQuestion, 'bot', 'chat-history');
         speakDhwaniResponse(nextQuestion);
+        
+        // Start the timer to track user's cognitive speed
+        questionStartTime = Date.now();
     }
 
     function submitAnswer() {
@@ -276,8 +285,17 @@
         
         isProcessing = true; 
         
+        // Calculate cognitive response time
+        let responseTimeSecs = (Date.now() - questionStartTime) / 1000;
+        let cognitiveTrait = "";
+        if (responseTimeSecs < 4) cognitiveTrait = "Impulsive/Impatient";
+        else if (responseTimeSecs > 25) cognitiveTrait = "Deep Thinking/Hesitant";
+        else cognitiveTrait = "Stable/Calculated";
+        
         addMessage(answerTxt, 'user', 'chat-history');
-        fullTranscript += `Stage ${currentStage} - Q: ${lastBotQuestion}\nUser (${childData.name}): ${answerTxt}\n\n`;
+        
+        // Inject metadata into the transcript for the AI to analyze later
+        fullTranscript += `Stage ${currentStage} - Q: ${lastBotQuestion}\nUser (${childData.name}) [Response Time: ${responseTimeSecs.toFixed(1)}s - ${cognitiveTrait}]: ${answerTxt}\n\n`;
 
         input.value = '';
         committedText = ''; 
@@ -291,18 +309,38 @@
             const divider = document.createElement('div');
             divider.innerHTML = `<hr style="border:0; border-top:1px dashed #ccc; margin: 20px 0;">`;
             chat.appendChild(divider);
+
+            if (currentStage > 4) {
+                document.getElementById('test-screen').style.display = 'none';
+                document.getElementById('api-key-screen').style.display = 'block';
+                speakDhwaniResponse("The offline assessment is complete. Please provide the key for analysis.");
+                return;
+            } else {
+                // Stage Transition Messages
+                let transitionMsg = "";
+                if (currentStage === 1) transitionMsg = `Congratulations on completing the Basics, ${childData.name}! We will now move on to Stage 1: Quick Fire. In this stage, you must answer strictly with a 'Yes' or 'No'. Rely on your immediate gut instinct.`;
+                else if (currentStage === 2) transitionMsg = `Well done! You have successfully completed Stage 1. Let's move to Stage 2: Short Thoughts. Here, I need you to summarize your answers in exactly one clear sentence.`;
+                else if (currentStage === 3) transitionMsg = `Excellent work so far. We are entering Stage 3: Exploration. For these questions, take your time. I want 2 to 3 sentences explaining your analytical reasoning and thought process.`;
+                else if (currentStage === 4) transitionMsg = `You have reached the final stage, ${childData.name}. Please listen to me carefully. Stage 4 is the Stress Test. The upcoming questions will be intentionally frustrating, blunt, and confrontational. Frustrating you is a deliberate part of this stage to measure your raw resilience. I request you to stay calm, focus, and give me answers as per your real mindset. Let's begin.`;
+
+                addMessage(transitionMsg, 'bot', 'chat-history');
+                speakDhwaniResponse(transitionMsg);
+
+                // Wait for transition message to finish before asking the next question
+                let delay = Math.max(transitionMsg.length * 70, 5000); 
+                setTimeout(() => {
+                    isProcessing = false;
+                    askNextLocalQuestion();
+                }, delay);
+                return;
+            }
         }
 
-        if (currentStage > 4) {
-            document.getElementById('test-screen').style.display = 'none';
-            document.getElementById('api-key-screen').style.display = 'block';
-            speakDhwaniResponse("The offline assessment is complete. Please provide the key for analysis.");
-        } else {
-            setTimeout(() => {
-                isProcessing = false;
-                askNextLocalQuestion();
-            }, 500);
-        }
+        // Normal flow (no transition)
+        setTimeout(() => {
+            isProcessing = false;
+            askNextLocalQuestion();
+        }, 500);
     }
 
     function handleEnter(e) { if (e.key === 'Enter') submitAnswer(); }
@@ -316,17 +354,21 @@
 
         setLoading(true, "Sending transcript to Dhwani Cloud for deep analysis...");
         
-        const reportPrompt = `You are Dhwani, the career consultant AI. The user (${childData.name}, Age ${childData.age}, from ${childData.city}) just completed an offline aptitude test.
-        Here is the full flat-text transcript of their answers:
+        const reportPrompt = `You are an Expert Career Consultant and Master Psychologist. The user (${childData.name}, Age ${childData.age}, from ${childData.city}) just completed a highly stressful 30-minute psychometric aptitude test.
+        Here is the full flat-text transcript of their answers. Notice the "Response Time" tags (Impulsive vs Stable vs Deep Thinking) attached to every answer.
         
         ${fullTranscript}
         
-        Analyze this holistically. Output ONLY raw HTML. DO NOT use markdown like \`\`\`html.
+        Act as an expert career consultant to give the right direction to the future of the child. Make it as realistic and brutally honest as possible.
+        Analyze their cognitive speed (based on the Response Time metadata), emotional resilience in Stage 4, and core interests.
+        
+        Output ONLY raw HTML. DO NOT use markdown like \`\`\`html.
         Format strictly:
-        <h2 style='color:#2980b9'>Dhwani AI Executive Summary</h2>
-        <div class='report-card'><b>Personality Traits:</b> Honest assessment based on text.</div>
-        <div class='report-card'><b>Strengths & Areas of Improvement:</b> Highlight specific answers.</div>
-        <div class='report-card'><b>Recommended Indian Career Streams:</b> Top 3 paths suitable for them.</div>`;
+        <h2 style='color:#2980b9'>Dhwani Eprashala: Expert Psychometric Report</h2>
+        <div class='report-card'><b>Cognitive Processing & Stability:</b> (Analyze their response times here. Are they impatient, stable, or hesitant?)</div>
+        <div class='report-card'><b>Resilience & Stress Handling:</b> (How did they handle the Stage 4 frustration?)</div>
+        <div class='report-card'><b>Personality & Flaws:</b> Honest assessment based on text.</div>
+        <div class='report-card'><b>Recommended Indian Career Streams:</b> Top 3 paths perfectly suitable for their psychology.</div>`;
 
         try {
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
@@ -352,7 +394,7 @@
             document.getElementById('report-screen').style.display = 'flex';
             document.getElementById('report-content').innerHTML = rawHtml;
             
-            speakDhwaniResponse("Assessment complete. Your final report is ready. You can now consult me below.");
+            speakDhwaniResponse("Assessment complete. Your final report is ready. You can now consult me for career advice below.");
         } catch (e) { 
             console.error("Report Error:", e);
             alert(`Error generating report: ${e.message}`); 
@@ -372,14 +414,13 @@
         consultHistory.push({ role: "user", parts: [{ text: text }] });
         input.value = '';
         
-        // Passing transcript as context safely inside the System Instruction
-        const systemPrompt = `You are Dhwani, an Indian career consultant. 
-        The user (${childData.name}) just took an aptitude test. Here is their offline test transcript:
+        const systemPrompt = `You are Dhwani, an expert Indian career consultant. 
+        The user (${childData.name}) just took a deep aptitude test. Here is their offline test transcript:
         ---
         ${fullTranscript}
         ---
-        Based on their results, give advice on Indian colleges, coaching, Udemy, and entrance exams. 
-        Reply in plain text. DO NOT USE MARKDOWN.`;
+        Based on their psychological profile, give practical, realistic advice on Indian colleges, coaching, skills, and entrance exams. 
+        Reply in plain text. DO NOT USE MARKDOWN. Keep your tone professional, guiding, and expert.`;
 
         try {
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
