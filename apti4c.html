@@ -12,7 +12,15 @@
         button { background: #2980b9; color: white; border: none; padding: 14px 20px; font-size: 16px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; transition: 0.2s; }
         button:hover { background: #1c5980; }
         button:disabled { background: #bdc3c7; cursor: not-allowed; }
+        
+        /* Specific button colors */
+        .btn-green { background: #27ae60; } .btn-green:hover { background: #219653; }
+        .btn-purple { background: #8e44ad; } .btn-purple:hover { background: #732d91; }
+        .btn-orange { background: #f39c12; } .btn-orange:hover { background: #d68910; }
+        .btn-red { background: #c0392b; } .btn-red:hover { background: #a53125; }
+
         input[type="text"], input[type="number"], input[type="password"] { width: 100%; padding: 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; margin-bottom: 10px; }
+        input[type="file"] { width: 100%; padding: 10px; border: 1px dashed #2980b9; border-radius: 8px; background: #f9fbfc; cursor: pointer; }
         
         #setup-screen, #api-key-screen { padding: 40px 20px; text-align: center; overflow-y: auto; height: 100%; }
         #api-key-screen { display: none; } 
@@ -42,6 +50,9 @@
         .report-card { background: #f8f9fa; border-left: 4px solid #2980b9; padding: 15px; margin-bottom: 20px; border-radius: 0 8px 8px 0; }
         #consult-area { background: #eef2f5; padding: 20px; border-top: 2px solid #ddd; }
         #consult-history { max-height: 250px; overflow-y: auto; margin-bottom: 10px; background: white; padding: 10px; border-radius: 8px; border: 1px solid #ddd;}
+        
+        .tts-controls { display: flex; gap: 10px; padding: 0 20px 15px 20px; justify-content: center; }
+        .tts-controls button { width: auto; flex: 1; margin-top: 0; }
     </style>
 </head>
 <body>
@@ -54,6 +65,10 @@
         <input type="number" id="childAge" placeholder="Age (e.g., 14)" required>
         <input type="text" id="childCity" placeholder="City/Town (e.g., Pune)" required>
         <button onclick="startTest()">Begin Assessment (Offline)</button>
+
+        <hr style="border:0; border-top:1px dashed #ccc; margin: 30px 0 20px 0;">
+        <p style="color: #666; font-size: 14px; margin-bottom: 10px;">Already took the test? Skip directly to the report generation.</p>
+        <button onclick="skipToUpload()" class="btn-orange" style="margin-top: 0;">⏭️ Skip to Upload Assessment</button>
     </div>
 
     <div id="test-screen">
@@ -74,13 +89,35 @@
 
     <div id="api-key-screen">
         <h2>Assessment Complete!</h2>
-        <p style="color: #666; font-size: 14px;">Enter the Gemini API Key to submit the offline transcript for cloud psychological analysis.</p>
+        
+        <div style="background: #fff3cd; border-left: 4px solid #f39c12; padding: 15px; text-align: left; margin-bottom: 20px; border-radius: 4px;">
+            <p style="color: #d35400; font-weight: bold; font-size: 14px; margin-top:0;">⚠️ IMPORTANT BACKUP REQUIRED</p>
+            <p style="color: #555; font-size: 13px; margin-bottom: 10px;">Please download your raw assessment transcript and keep it handy. If the AI server is busy or fails to generate the report, you can reload the page and upload this file to try again without retaking the 30-minute test.</p>
+            <button onclick="downloadRawTranscript()" class="btn-green" style="margin-top: 0;">⬇️ Download Raw Transcript</button>
+        </div>
+
+        <div style="text-align: left; margin-bottom: 25px;">
+            <p style="color: #666; font-size: 13px; font-weight: bold;">Restore Previous Session:</p>
+            <input type="file" id="transcriptUpload" accept=".txt" onchange="uploadRawTranscript(event)">
+        </div>
+        
+        <hr style="border:0; border-top:1px dashed #ccc; margin: 20px 0;">
+        
+        <p style="color: #666; font-size: 14px; font-weight: bold;">Enter Gemini API Key for Analysis:</p>
         <input type="password" id="apiKey" placeholder="Enter Gemini API Key" required>
-        <button onclick="generateFinalReport()">Generate Report</button>
+        <button onclick="generateFinalReport()">Generate Final Report</button>
     </div>
 
     <div id="report-screen">
         <div id="report-content"></div>
+        
+        <h4 style="text-align: center; color: #2c3e50; margin-bottom: 10px;">🔊 Read Report Aloud</h4>
+        <div class="tts-controls">
+            <button onclick="playReportText()" class="btn-purple">▶️ Play</button>
+            <button onclick="pauseReportText()" class="btn-orange">⏸️ Pause</button>
+            <button onclick="stopReportText()" class="btn-red">⏹️ Stop</button>
+        </div>
+
         <div style="padding: 0 20px;">
             <button onclick="downloadInitialReport()" style="background: #e67e22; margin-bottom: 20px;">⬇️ Download Report & Q&A</button>
         </div>
@@ -92,7 +129,7 @@
                 <input type="text" id="consultInput" placeholder="Ask about colleges, streams..." onkeypress="if(event.key === 'Enter') sendConsult()">
                 <button onclick="sendConsult()" style="width: auto; margin:0;">Ask</button>
             </div>
-            <button onclick="downloadFullSession()" style="background: #27ae60;">⬇️ Export Entire Session (Q&A + Summary + AI Chat)</button>
+            <button onclick="downloadFullSession()" class="btn-green">⬇️ Export Entire Session</button>
         </div>
     </div>
 
@@ -107,14 +144,17 @@
     
     let currentStage = 0;
     let questionCount = 0;
-    const questionsPerStage = 10; // 50 questions total for a solid 30-minute test
+    const questionsPerStage = 10; 
     let fullTranscript = ""; 
     let generatedReportHtml = ""; 
     let lastBotQuestion = ""; 
     let consultHistory = [];
     let isProcessing = false;
-    let questionStartTime = 0; // To track cognitive response speed
+    let questionStartTime = 0; 
+    let reportUtterance = null; 
     
+    let currentSpeechUtterance = null; // Global variable to prevent TTS garbage collection bugs
+
     const STAGE_NAMES = ["Stage 0: Basics", "Stage 1: Quick Fire", "Stage 2: Short Thoughts", "Stage 3: Exploration", "Stage 4: Stress Test"];
 
     if (typeof QUESTION_BANK === 'undefined') {
@@ -127,6 +167,12 @@
         for (let stage in QUESTION_BANK) {
             activeQuestionQueues[stage] = [...QUESTION_BANK[stage]].sort(() => 0.5 - Math.random());
         }
+    }
+
+    // --- NEW: Skip to Upload ---
+    function skipToUpload() {
+        document.getElementById('setup-screen').style.display = 'none';
+        document.getElementById('api-key-screen').style.display = 'block';
     }
 
     // --- PUSH-TO-TALK LOGIC ---
@@ -209,17 +255,23 @@
         document.getElementById('userInput').placeholder = "Type or hold mic...";
     }
 
-    // --- TTS SETUP ---
+    // --- TTS SETUP & CONTROL (UPDATED WITH CALLBACKS) ---
     function unlockAndroidAudio() {
         const silentUtterance = new SpeechSynthesisUtterance('');
         silentUtterance.volume = 0;
         window.speechSynthesis.speak(silentUtterance);
     }
 
-    function speakDhwaniResponse(text) {
-        if (!('speechSynthesis' in window)) return;
+    function speakDhwaniResponse(text, onCompleteCallback = null) {
+        if (!('speechSynthesis' in window)) {
+            // Fallback if browser doesn't support TTS
+            if (onCompleteCallback) setTimeout(onCompleteCallback, text.length * 50);
+            return;
+        }
+        
         window.speechSynthesis.cancel(); 
-        const utterance = new SpeechSynthesisUtterance(text);
+        
+        currentSpeechUtterance = new SpeechSynthesisUtterance(text);
         
         let voices = window.speechSynthesis.getVoices();
         let targetVoice = voices.find(v => 
@@ -227,10 +279,22 @@
             (v.name.toLowerCase().includes('female') || v.name.includes('Google'))
         ) || voices.find(v => v.lang === 'en-IN');
         
-        if (targetVoice) utterance.voice = targetVoice;
-        utterance.rate = 0.95; 
-        utterance.pitch = 1.1; 
-        window.speechSynthesis.speak(utterance);
+        if (targetVoice) currentSpeechUtterance.voice = targetVoice;
+        currentSpeechUtterance.rate = 0.85; 
+        currentSpeechUtterance.pitch = 1.1; 
+
+        // THIS FIXES THE INTERRUPTION BUG!
+        if (onCompleteCallback) {
+            currentSpeechUtterance.onend = function() {
+                setTimeout(onCompleteCallback, 500); // Small 500ms pause after speaking before moving on
+            };
+            currentSpeechUtterance.onerror = function(e) {
+                console.warn("TTS Error, skipping to next function:", e);
+                setTimeout(onCompleteCallback, 500);
+            };
+        }
+
+        window.speechSynthesis.speak(currentSpeechUtterance);
     }
 
     // --- CORE LOCAL LOGIC ---
@@ -247,18 +311,16 @@
         document.getElementById('setup-screen').style.display = 'none';
         document.getElementById('test-screen').style.display = 'flex';
         
-        // Introductory Greeting
         isProcessing = true;
         let introMsg = `Namaste ${childData.name}. Welcome to the Eprashala Aptitude Assessment. I am Dhwani. Please take a deep breath, relax, and stay calm. This test will take about 30 minutes. Please give the answers that naturally come to your mind without the influence of any person in or around you. Let's begin with Stage 0.`;
         
         addMessage(introMsg, 'bot', 'chat-history');
-        speakDhwaniResponse(introMsg);
         
-        // Wait for intro to be read, then ask first question
-        setTimeout(() => {
+        // Wait until intro completely finishes speaking before asking first question
+        speakDhwaniResponse(introMsg, () => {
             isProcessing = false;
             askNextLocalQuestion();
-        }, 12000); 
+        });
     }
 
     function askNextLocalQuestion() {
@@ -271,7 +333,6 @@
         addMessage(nextQuestion, 'bot', 'chat-history');
         speakDhwaniResponse(nextQuestion);
         
-        // Start the timer to track user's cognitive speed
         questionStartTime = Date.now();
     }
 
@@ -285,7 +346,6 @@
         
         isProcessing = true; 
         
-        // Calculate cognitive response time
         let responseTimeSecs = (Date.now() - questionStartTime) / 1000;
         let cognitiveTrait = "";
         if (responseTimeSecs < 4) cognitiveTrait = "Impulsive/Impatient";
@@ -294,7 +354,6 @@
         
         addMessage(answerTxt, 'user', 'chat-history');
         
-        // Inject metadata into the transcript for the AI to analyze later
         fullTranscript += `Stage ${currentStage} - Q: ${lastBotQuestion}\nUser (${childData.name}) [Response Time: ${responseTimeSecs.toFixed(1)}s - ${cognitiveTrait}]: ${answerTxt}\n\n`;
 
         input.value = '';
@@ -313,10 +372,9 @@
             if (currentStage > 4) {
                 document.getElementById('test-screen').style.display = 'none';
                 document.getElementById('api-key-screen').style.display = 'block';
-                speakDhwaniResponse("The offline assessment is complete. Please provide the key for analysis.");
+                speakDhwaniResponse("The offline assessment is complete. Please download your backup file and provide the API key for analysis.");
                 return;
             } else {
-                // Stage Transition Messages
                 let transitionMsg = "";
                 if (currentStage === 1) transitionMsg = `Congratulations on completing the Basics, ${childData.name}! We will now move on to Stage 1: Quick Fire. In this stage, you must answer strictly with a 'Yes' or 'No'. Rely on your immediate gut instinct.`;
                 else if (currentStage === 2) transitionMsg = `Well done! You have successfully completed Stage 1. Let's move to Stage 2: Short Thoughts. Here, I need you to summarize your answers in exactly one clear sentence.`;
@@ -324,19 +382,17 @@
                 else if (currentStage === 4) transitionMsg = `You have reached the final stage, ${childData.name}. Please listen to me carefully. Stage 4 is the Stress Test. The upcoming questions will be intentionally frustrating, blunt, and confrontational. Frustrating you is a deliberate part of this stage to measure your raw resilience. I request you to stay calm, focus, and give me answers as per your real mindset. Let's begin.`;
 
                 addMessage(transitionMsg, 'bot', 'chat-history');
-                speakDhwaniResponse(transitionMsg);
-
-                // Wait for transition message to finish before asking the next question
-                let delay = Math.max(transitionMsg.length * 70, 5000); 
-                setTimeout(() => {
+                
+                // Wait until transition message is FULLY spoken before asking next question
+                speakDhwaniResponse(transitionMsg, () => {
                     isProcessing = false;
                     askNextLocalQuestion();
-                }, delay);
+                });
                 return;
             }
         }
 
-        // Normal flow (no transition)
+        // Just a normal question delay, no speaking conflict here
         setTimeout(() => {
             isProcessing = false;
             askNextLocalQuestion();
@@ -344,13 +400,40 @@
     }
 
     function handleEnter(e) { if (e.key === 'Enter') submitAnswer(); }
-
     function cleanText(text) { return text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*/g, ''); }
+
+    // --- TRANSCRIPT BACKUP & RESTORE LOGIC ---
+    function downloadRawTranscript() {
+        if (!fullTranscript) { alert("The transcript is empty. You must take the test first."); return; }
+        
+        let header = `--- EPRASHALA RAW ASSESSMENT BACKUP ---\n`;
+        header += `Name: ${childData.name || 'Student'}\nAge: ${childData.age || 'N/A'}\nCity: ${childData.city || 'N/A'}\n\n`;
+        
+        triggerDownload(header + fullTranscript, `Dhwani_Raw_Backup_${childData.name || 'Student'}.txt`);
+    }
+
+    function uploadRawTranscript(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            fullTranscript = e.target.result;
+            
+            if(!childData.name) {
+                const nameMatch = fullTranscript.match(/Name: (.*)/);
+                if(nameMatch) childData.name = nameMatch[1];
+            }
+            alert("Backup transcript successfully loaded! You can now enter your API key to generate the report.");
+        };
+        reader.readAsText(file);
+    }
 
     // --- GEMINI API: REPORT GENERATION ---
     async function generateFinalReport() {
         apiKey = document.getElementById('apiKey').value.trim();
         if (!apiKey) { alert("Please enter the API key to generate the report."); return; }
+        if (!fullTranscript) { alert("No transcript found! Please take the test or upload a backup file."); return; }
 
         setLoading(true, "Sending transcript to Dhwani Cloud for deep analysis...");
         
@@ -394,7 +477,7 @@
             document.getElementById('report-screen').style.display = 'flex';
             document.getElementById('report-content').innerHTML = rawHtml;
             
-            speakDhwaniResponse("Assessment complete. Your final report is ready. You can now consult me for career advice below.");
+            speakDhwaniResponse("Assessment complete. Your final report is ready. You can use the playback buttons to listen to it, or consult me for advice below.");
         } catch (e) { 
             console.error("Report Error:", e);
             alert(`Error generating report: ${e.message}`); 
@@ -402,6 +485,42 @@
             setLoading(false);
             isProcessing = false;
         }
+    }
+
+    // --- REPORT TTS PLAYBACK CONTROLS ---
+    function playReportText() {
+        if (!('speechSynthesis' in window)) { alert("Your browser does not support Speech Synthesis."); return; }
+        
+        if (window.speechSynthesis.paused && reportUtterance) {
+            window.speechSynthesis.resume();
+            return;
+        }
+        
+        window.speechSynthesis.cancel(); 
+        
+        const pureText = document.getElementById('report-content').innerText;
+        if (!pureText) return;
+
+        reportUtterance = new SpeechSynthesisUtterance(pureText);
+        
+        let voices = window.speechSynthesis.getVoices();
+        let targetVoice = voices.find(v => (v.lang.includes('en-IN') || v.lang.includes('hi-IN')) && (v.name.toLowerCase().includes('female') || v.name.includes('Google'))) || voices.find(v => v.lang === 'en-IN');
+        if (targetVoice) reportUtterance.voice = targetVoice;
+        
+        reportUtterance.rate = 0.85; 
+        reportUtterance.pitch = 1.0;
+
+        window.speechSynthesis.speak(reportUtterance);
+    }
+
+    function pauseReportText() {
+        if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+            window.speechSynthesis.pause();
+        }
+    }
+
+    function stopReportText() {
+        window.speechSynthesis.cancel();
     }
 
     // --- GEMINI API: CONSULTATION ---
@@ -450,25 +569,25 @@
     // --- EXPORT OPTIONS ---
     function downloadInitialReport() {
         let cleanSummary = generatedReportHtml.replace(/<[^>]*>?/gm, ''); 
-        let textToSave = `--- EPRASHALA APTITUDE REPORT: ${childData.name} ---\n\n`;
+        let textToSave = `--- EPRASHALA APTITUDE REPORT: ${childData.name || 'Student'} ---\n\n`;
         textToSave += `--- OFFLINE TEST TRANSCRIPT ---\n${fullTranscript}\n\n`;
         textToSave += `--- AI EXECUTIVE SUMMARY ---\n${cleanSummary}\n`;
-        triggerDownload(textToSave, `Dhwani_Report_${childData.name}.txt`);
+        triggerDownload(textToSave, `Dhwani_Report_${childData.name || 'Student'}.txt`);
     }
 
     function downloadFullSession() {
         let cleanSummary = generatedReportHtml.replace(/<[^>]*>?/gm, ''); 
-        let textToSave = `--- EPRASHALA FULL SESSION: ${childData.name} ---\n\n`;
+        let textToSave = `--- EPRASHALA FULL SESSION: ${childData.name || 'Student'} ---\n\n`;
         textToSave += `--- OFFLINE TEST TRANSCRIPT ---\n${fullTranscript}\n\n`;
         textToSave += `--- AI EXECUTIVE SUMMARY ---\n${cleanSummary}\n\n`;
         textToSave += `--- POST-TEST AI CONSULTATION ---\n`;
         
         consultHistory.forEach(msg => { 
-            let roleName = msg.role === 'user' ? childData.name : 'Dhwani';
+            let roleName = msg.role === 'user' ? (childData.name || 'Student') : 'Dhwani';
             textToSave += `${roleName}: ${msg.parts[0].text}\n\n`; 
         });
         
-        triggerDownload(textToSave, `Dhwani_Full_Session_${childData.name}.txt`);
+        triggerDownload(textToSave, `Dhwani_Full_Session_${childData.name || 'Student'}.txt`);
     }
 
     function triggerDownload(content, filename) {
