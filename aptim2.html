@@ -147,7 +147,7 @@
     
     let currentStage = 0;
     let questionCount = 0;
-    const questionsPerStage = 10; // Pull exactly 10 questions per stage from the massive banks
+    const questionsPerStage = 10; 
     let fullTranscript = ""; 
     let generatedReportHtml = ""; 
     let lastBotQuestion = ""; 
@@ -163,7 +163,6 @@
 
     function initializeQuestionQueues(bank) {
         for (let stage in bank) {
-            // Shuffle the massive arrays and prepare them for popping
             activeQuestionQueues[stage] = [...bank[stage]].sort(() => 0.5 - Math.random());
         }
     }
@@ -381,15 +380,42 @@
         
         isProcessing = true; 
         
-        // Behavioral tracking based on timing
+        // --- DYNAMIC STAGE-BASED BEHAVIORAL TRACKING ---
         let responseTimeSecs = (Date.now() - questionStartTime) / 1000;
         let cognitiveTrait = "";
         
-        if (responseTimeSecs < 2) cognitiveTrait = "Hasty / Desperate (Did not listen to full question)";
-        else if (responseTimeSecs < 5) cognitiveTrait = "Impulsive / Very Fast";
-        else if (responseTimeSecs < 15) cognitiveTrait = "Stable / Calculated";
-        else if (responseTimeSecs < 30) cognitiveTrait = "Deep Thinking / Hesitant";
-        else cognitiveTrait = "Distracted / Timepass / Struggling";
+        if (currentStage === 0 || currentStage === 1) {
+            // Stages 0 & 1: Quick Math and Yes/No/True/False (Very Fast)
+            if (responseTimeSecs < 2) cognitiveTrait = "Hasty / Desperate (Did not process question)";
+            else if (responseTimeSecs < 5) cognitiveTrait = "Impulsive / Very Fast";
+            else if (responseTimeSecs < 15) cognitiveTrait = "Stable / Calculated";
+            else if (responseTimeSecs < 30) cognitiveTrait = "Hesitant / Overthinking simple binary choice";
+            else cognitiveTrait = "Distracted / Timepass / Struggling (Took over 30s)";
+            
+        } else if (currentStage === 2) {
+            // Stage 2: One Sentence Answers (Requires brief typing)
+            if (responseTimeSecs < 3) cognitiveTrait = "Hasty / Skipped thinking completely";
+            else if (responseTimeSecs < 10) cognitiveTrait = "Impulsive / Fast Typing";
+            else if (responseTimeSecs < 25) cognitiveTrait = "Stable / Measured Response";
+            else if (responseTimeSecs < 45) cognitiveTrait = "Deep Thinking / Hesitant";
+            else cognitiveTrait = "Distracted / Timepass (Took over 45s)";
+            
+        } else if (currentStage === 3) {
+            // Stage 3: Exploration / 2-3 Sentences (High cognitive load, typing required)
+            if (responseTimeSecs < 8) cognitiveTrait = "Highly Reactive / Hasty (Did not think through scenario)";
+            else if (responseTimeSecs < 20) cognitiveTrait = "Impulsive / Quick Judgement";
+            else if (responseTimeSecs < 45) cognitiveTrait = "Stable / Calculated / Good Focus";
+            else if (responseTimeSecs < 60) cognitiveTrait = "Deep Thinking / Analyzing";
+            else cognitiveTrait = "Unacceptable Delay / Timepass (Took over 1 minute)";
+            
+        } else if (currentStage === 4) {
+            // Stage 4: Stress Test (Deep emotional opinions, heavy typing)
+            if (responseTimeSecs < 10) cognitiveTrait = "Extremely Reactive / Defensive (Answered without processing)";
+            else if (responseTimeSecs < 30) cognitiveTrait = "Impulsive / Quick to argue";
+            else if (responseTimeSecs < 120) cognitiveTrait = "Stable / Thoughtful / Focused";
+            else if (responseTimeSecs < 300) cognitiveTrait = "Deep Thinking / Careful Construction";
+            else cognitiveTrait = "Unacceptable Delay / Evading / Timepass (Took over 5 minutes)";
+        }
         
         addMessage(answerTxt, 'user', 'chat-history');
         fullTranscript += `Stage ${currentStage} - Q: ${lastBotQuestion}\nUser (${childData.name}) [Response Time: ${responseTimeSecs.toFixed(1)}s - Behavior: ${cognitiveTrait}]: ${answerTxt}\n\n`;
