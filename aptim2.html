@@ -3,11 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dhwani AI - Eprashala Multilingual Aptitude Test</title>
+    <title>Dhwani AI - Eprashala Master Aptitude Test</title>
+    
     <script src="qa.js"></script>
     <script src="qm.js"></script>
     <script src="qb.js"></script>
     <script src="qbm.js"></script>
+
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; display: flex; justify-content: center; height: 100dvh; box-sizing: border-box; }
         .container { background: white; max-width: 800px; width: 100%; box-shadow: 0 4px 20px rgba(0,0,0,0.05); display: flex; flex-direction: column; overflow: hidden; }
@@ -31,21 +33,22 @@
         #stage-indicator { background: #e67e22; padding: 4px 10px; border-radius: 12px; font-size: 13px; font-weight: bold; display: inline-block; margin-top: 5px; }
         
         #chat-history { flex: 1; padding: 20px; overflow-y: auto; background: #fafafa; }
-        .message { margin-bottom: 15px; max-width: 90%; padding: 14px; border-radius: 10px; font-size: 15px; line-height: 1.5; white-space: pre-wrap; }
+        .message { margin-bottom: 15px; max-width: 90%; padding: 14px; border-radius: 10px; font-size: 15px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
         .bot-msg { background: #e3f2fd; color: #0b3c7c; align-self: flex-start; border-bottom-left-radius: 0; border: 1px solid #bbdefb; }
         .user-msg { background: #27ae60; color: white; align-self: flex-end; margin-left: auto; border-bottom-right-radius: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         
         .controls-area { padding: 15px; background: white; border-top: 1px solid #eee; padding-bottom: max(15px, env(safe-area-inset-bottom)); }
         .input-row { display: flex; gap: 10px; align-items: center; }
         
-        #micBtn { background: #e67e22; width: 50px; height: 50px; border-radius: 50%; font-size: 20px; flex-shrink: 0; border: none; padding: 0; transition: 0.2s; user-select: none; touch-action: none; }
-        #micBtn.listening { background: #e74c3c; box-shadow: 0 0 15px rgba(231, 76, 60, 0.6); transform: scale(1.08); }
+        .mic-btn { background: #e67e22; width: 50px; height: 50px; border-radius: 50%; font-size: 20px; flex-shrink: 0; border: none; padding: 0; transition: 0.2s; user-select: none; touch-action: none; }
+        .mic-btn.listening { background: #e74c3c; box-shadow: 0 0 15px rgba(231, 76, 60, 0.6); transform: scale(1.08); }
         
         #full-loader { display: none; position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.9); z-index: 100; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px; box-sizing: border-box;}
         
         #report-screen { display: none; flex-direction: column; height: 100%; }
         #report-content { flex: 1; overflow-y: auto; padding: 20px; background: white; line-height: 1.6;}
         .report-card { background: #f8f9fa; border-left: 4px solid #2980b9; padding: 15px; margin-bottom: 20px; border-radius: 0 8px 8px 0; }
+        
         #consult-area { background: #eef2f5; padding: 20px; border-top: 2px solid #ddd; }
         #consult-history { max-height: 250px; overflow-y: auto; margin-bottom: 10px; background: white; padding: 10px; border-radius: 8px; border: 1px solid #ddd;}
         
@@ -69,7 +72,7 @@
             <option value="mr-IN">Marathi (मराठी)</option>
         </select>
 
-        <button onclick="startTest()">Begin Assessment</button>
+        <button onclick="startTest()">Begin Assessment (Offline)</button>
 
         <hr style="border:0; border-top:1px dashed #ccc; margin: 30px 0 20px 0;">
         <p style="color: #666; font-size: 14px; margin-bottom: 10px;">Already took the test? Skip directly to the report generation.</p>
@@ -85,7 +88,7 @@
         <div class="controls-area">
             <p id="mic-status" style="font-size: 11px; color: #7f8c8d; margin: 0 0 5px 0; text-align: center;">Hold mic to speak. Auto-sends on release.</p>
             <div class="input-row">
-                <button id="micBtn">🎤</button>
+                <button id="micBtn" class="mic-btn">🎤</button>
                 <input type="text" id="userInput" placeholder="Type or hold mic..." onkeypress="handleEnter(event)">
                 <button id="sendBtn" onclick="submitAnswer()" style="display: none;">Send</button>
             </div>
@@ -125,7 +128,7 @@
             <h3 style="margin-top:0; color:#2c3e50;" id="consult-title">Consult Dhwani AI</h3>
             <div id="consult-history"></div>
             <div class="input-row">
-                <button id="consultMicBtn" style="background: #e67e22; width: 50px; height: 50px; border-radius: 50%; font-size: 20px; flex-shrink: 0; border: none; padding: 0; transition: 0.2s; user-select: none; touch-action: none;">🎤</button>
+                <button id="consultMicBtn" class="mic-btn">🎤</button>
                 <input type="text" id="consultInput" placeholder="Ask about colleges, streams..." onkeypress="if(event.key === 'Enter') sendConsult()">
                 <button onclick="sendConsult()" style="width: auto; margin:0;">Ask</button>
             </div>
@@ -144,7 +147,7 @@
     
     let currentStage = 0;
     let questionCount = 0;
-    const questionsPerStage = 10; 
+    const questionsPerStage = 10; // Pull exactly 10 questions per stage from the massive banks
     let fullTranscript = ""; 
     let generatedReportHtml = ""; 
     let lastBotQuestion = ""; 
@@ -153,7 +156,6 @@
     let questionStartTime = 0; 
     let currentSpeechUtterance = null; 
 
-    // Bilingual Stage Names
     const STAGES_EN = ["Stage 0: Basics", "Stage 1: Quick Fire", "Stage 2: Short Thoughts", "Stage 3: Exploration", "Stage 4: Stress Test"];
     const STAGES_MR = ["टप्पा 0: मूलभूत माहिती", "टप्पा 1: जलद उत्तरे", "टप्पा 2: थोडक्यात विचार", "टप्पा 3: सखोल विचार", "टप्पा 4: तणाव चाचणी"];
     let STAGE_NAMES = STAGES_EN;
@@ -161,6 +163,7 @@
 
     function initializeQuestionQueues(bank) {
         for (let stage in bank) {
+            // Shuffle the massive arrays and prepare them for popping
             activeQuestionQueues[stage] = [...bank[stage]].sort(() => 0.5 - Math.random());
         }
     }
@@ -170,7 +173,7 @@
         document.getElementById('api-key-screen').style.display = 'block';
     }
 
-    // --- PUSH-TO-TALK LOGIC ---
+    // --- TEST PUSH-TO-TALK LOGIC ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let recognition;
     let isButtonHeld = false; 
@@ -211,7 +214,6 @@
                 }, 500);
             }
         };
-
         recognition.onerror = (e) => { if (e.error !== 'no-speech') stopListeningUI(); };
     }
 
@@ -244,6 +246,45 @@
         document.getElementById('userInput').placeholder = childData.lang === 'mr-IN' ? "टाईप करा किंवा माईक वापरा..." : "Type or hold mic...";
     }
 
+    // --- CONSULTATION PUSH-TO-TALK LOGIC ---
+    let consultRecognition;
+    if (SpeechRecognition) {
+        consultRecognition = new SpeechRecognition();
+        consultRecognition.continuous = false;
+        consultRecognition.interimResults = true;
+
+        consultRecognition.onstart = () => {
+            document.getElementById('consultMicBtn').classList.add('listening');
+            document.getElementById('consultInput').placeholder = childData.lang === 'mr-IN' ? "ऐकत आहे..." : "Listening...";
+        };
+
+        consultRecognition.onresult = (e) => {
+            let finalTranscript = '';
+            let interimTranscript = '';
+            for (let i = e.resultIndex; i < e.results.length; ++i) {
+                if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript;
+                else interimTranscript += e.results[i][0].transcript;
+            }
+            if (finalTranscript) {
+                let currentVal = document.getElementById('consultInput').value;
+                document.getElementById('consultInput').value = currentVal + (currentVal.length > 0 && !currentVal.endsWith(' ') ? ' ' : '') + finalTranscript;
+            }
+        };
+
+        consultRecognition.onend = () => {
+            document.getElementById('consultMicBtn').classList.remove('listening');
+            document.getElementById('consultInput').placeholder = childData.lang === 'mr-IN' ? "करिअर, कॉलेज बद्दल विचारा..." : "Ask about colleges, streams...";
+        };
+    }
+
+    const cMicBtn = document.getElementById('consultMicBtn');
+    if(cMicBtn) {
+        cMicBtn.addEventListener('mousedown', () => { if(consultRecognition){ consultRecognition.lang = childData.lang; consultRecognition.start(); }});
+        cMicBtn.addEventListener('mouseup', () => { if(consultRecognition) consultRecognition.stop(); });
+        cMicBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if(consultRecognition){ consultRecognition.lang = childData.lang; consultRecognition.start(); }});
+        cMicBtn.addEventListener('touchend', () => { if(consultRecognition) consultRecognition.stop(); });
+    }
+
     // --- TTS SETUP ---
     function unlockAndroidAudio() {
         const silentUtterance = new SpeechSynthesisUtterance('');
@@ -261,7 +302,6 @@
         currentSpeechUtterance = new SpeechSynthesisUtterance(text);
         
         let voices = window.speechSynthesis.getVoices();
-        // Strongly prefer regional voices for Marathi
         let targetVoice = voices.find(v => v.lang === childData.lang) || 
                           voices.find(v => v.lang.includes(childData.lang.split('-')[0])) ||
                           voices.find(v => v.lang.includes('hi-IN')); 
@@ -289,7 +329,7 @@
         if (recognition) recognition.lang = childData.lang;
         STAGE_NAMES = childData.lang === 'mr-IN' ? STAGES_MR : STAGES_EN;
         
-       // Dynamic Question Bank Routing based on Age and Language
+        // Age-based routing
         let bank;
         if (childData.age < 18) {
             bank = (childData.lang === 'mr-IN' && typeof QUESTION_BANK_TEEN_MR !== 'undefined') ? QUESTION_BANK_TEEN_MR : (typeof QUESTION_BANK_TEEN !== 'undefined' ? QUESTION_BANK_TEEN : null);
@@ -297,7 +337,7 @@
             bank = (childData.lang === 'mr-IN' && typeof QUESTION_BANK_MR !== 'undefined') ? QUESTION_BANK_MR : (typeof QUESTION_BANK !== 'undefined' ? QUESTION_BANK : null);
         }
         
-        if (!bank) { alert("Error: Question bank not found! Make sure qb.js and qbm.js are linked."); return; }
+        if (!bank) { alert("Error: Question bank not found! Ensure all 4 JS files are linked."); return; }
 
         unlockAndroidAudio(); 
         initializeQuestionQueues(bank); 
@@ -323,8 +363,7 @@
         document.getElementById('stage-indicator').innerText = STAGE_NAMES[currentStage];
         let nextQuestion = activeQuestionQueues[currentStage].pop();
         
-        // Failsafe
-        if (!nextQuestion) nextQuestion = childData.lang === 'mr-IN' ? "कृपया तुमच्या करिअरच्या आवडीबद्दल अधिक सांगा." : "Please tell me a bit more about your career interests.";
+        if (!nextQuestion) nextQuestion = childData.lang === 'mr-IN' ? "कृपया मला तुमच्याबद्दल अधिक सांगा." : "Please tell me a bit more about yourself.";
 
         lastBotQuestion = nextQuestion;
         addMessage(nextQuestion, 'bot', 'chat-history');
@@ -342,7 +381,7 @@
         
         isProcessing = true; 
         
-        // Advanced Behavioral Evaluation (Real Teacher Logic)
+        // Behavioral tracking based on timing
         let responseTimeSecs = (Date.now() - questionStartTime) / 1000;
         let cognitiveTrait = "";
         
@@ -389,13 +428,16 @@
                         else if (currentStage === 4) transitionMsg = `You have reached the final stage. Stage 4 is the Stress Test. The upcoming questions will challenge your core beliefs and may feel unfair or frustrating. Stay calm, and defend your real opinions. Let's begin.`;
                     }
                 } else {
-                    // Keep your existing adult transition messages here...
                     if (childData.lang === 'mr-IN') {
                         if (currentStage === 1) transitionMsg = `अभिनंदन! आपण आता टप्पा 1 कडे वळूया: जलद उत्तरे. येथे तुम्हाला फक्त 'होय' किंवा 'नाही' मध्ये उत्तर द्यायचे आहे.`;
-                        // ... rest of adult marathi transitions
+                        else if (currentStage === 2) transitionMsg = `खूप छान! आता टप्पा 2: थोडक्यात विचार. येथे मला तुमची उत्तरे फक्त एका स्पष्ट वाक्यात हवी आहेत.`;
+                        else if (currentStage === 3) transitionMsg = `उत्तम कामगिरी. आता टप्पा 3: सखोल विचार. यासाठी वेळ घ्या. तुमची विचारप्रक्रिया मला २ ते ३ वाक्यांत स्पष्ट करा.`;
+                        else if (currentStage === 4) transitionMsg = `तुम्ही अंतिम टप्प्यात पोहोचला आहात. टप्पा 4: तणाव चाचणी. शांत राहा आणि तुमची खरी उत्तरे द्या. सुरु करूया.`;
                     } else {
                         if (currentStage === 1) transitionMsg = `Congratulations! We will now move on to Stage 1: Quick Fire. Answer strictly with 'Yes' or 'No'.`;
-                        // ... rest of adult english transitions
+                        else if (currentStage === 2) transitionMsg = `Well done! Now Stage 2: Short Thoughts. Summarize your answers in exactly one clear sentence.`;
+                        else if (currentStage === 3) transitionMsg = `Excellent. Stage 3: Exploration. Take your time. I want 2 to 3 sentences explaining your analytical reasoning.`;
+                        else if (currentStage === 4) transitionMsg = `You have reached the final stage. Stage 4 is the Stress Test. Stay calm, and give honest answers. Let's begin.`;
                     }
                 }
 
@@ -436,7 +478,6 @@
     }
 
     // --- GEMINI API: LANGUAGE-AWARE REPORT GENERATION ---
-// --- GEMINI API: LANGUAGE-AWARE REPORT GENERATION ---
     async function generateFinalReport() {
         apiKey = document.getElementById('apiKey').value.trim();
         if (!apiKey) return alert("Please enter the API key.");
@@ -444,7 +485,6 @@
 
         setLoading(true, childData.lang === 'mr-IN' ? "ध्वनी क्लाउड अहवाल तयार करत आहे..." : "Sending transcript to Dhwani Cloud...");
         
-        // Dynamically set the HTML template based on the chosen language
         let htmlTemplate = "";
         if (childData.lang === 'mr-IN') {
             htmlTemplate = `
@@ -466,7 +506,7 @@
         The user (${childData.name}, Age ${childData.age}, from ${childData.city}) completed a highly stressful psychometric test.
         
         CRITICAL INSTRUCTION: You MUST generate the ENTIRE report perfectly in ${childData.langName}. 
-        If Marathi is selected, write EVERYTHING (including your analysis, descriptions, and recommendations) in pure, professional Marathi script (Devanagari). DO NOT output English text if Marathi is requested.
+        If Marathi is selected, write EVERYTHING in pure, professional Marathi script (Devanagari). DO NOT output English text if Marathi is requested.
         
         Here is the transcript. Pay extreme attention to the "Behavior" metadata attached to every answer to judge their true state of mind like an observant teacher:
         ${fullTranscript}
@@ -501,7 +541,7 @@
         }
     }
 
-    // --- REPORT TTS PLAYBACK (UPDATED FOR DEVANAGARI) ---
+    // --- REPORT TTS PLAYBACK ---
     let reportChunks = [];
     let currentChunkIndex = 0;
     let isPlayingReport = false;
@@ -529,7 +569,6 @@
         if (!pureText) return;
 
         window.speechSynthesis.cancel(); 
-        // Regex updated to include Devanagari Danda (।) for smooth Marathi sentence splitting
         reportChunks = pureText.match(/[^.!?।]+[.!?।]+/g) || [pureText];
         currentChunkIndex = 0;
         isPlayingReport = true;
@@ -637,46 +676,6 @@
     function setLoading(show, text="") {
         document.getElementById('full-loader').style.display = show ? 'flex' : 'none';
         document.getElementById('loader-text').innerText = text;
-    }
-	
-	// --- CONSULTATION PUSH-TO-TALK LOGIC ---
-    let consultRecognition;
-    if (window.SpeechRecognition || window.webkitSpeechRecognition) {
-        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-        consultRecognition = new SpeechRec();
-        consultRecognition.continuous = false;
-        consultRecognition.interimResults = true;
-
-        consultRecognition.onstart = () => {
-            document.getElementById('consultMicBtn').classList.add('listening');
-            document.getElementById('consultInput').placeholder = childData.lang === 'mr-IN' ? "ऐकत आहे..." : "Listening...";
-        };
-
-        consultRecognition.onresult = (e) => {
-            let finalTranscript = '';
-            let interimTranscript = '';
-            for (let i = e.resultIndex; i < e.results.length; ++i) {
-                if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript;
-                else interimTranscript += e.results[i][0].transcript;
-            }
-            if (finalTranscript) {
-                let currentVal = document.getElementById('consultInput').value;
-                document.getElementById('consultInput').value = currentVal + (currentVal.length > 0 && !currentVal.endsWith(' ') ? ' ' : '') + finalTranscript;
-            }
-        };
-
-        consultRecognition.onend = () => {
-            document.getElementById('consultMicBtn').classList.remove('listening');
-            document.getElementById('consultInput').placeholder = childData.lang === 'mr-IN' ? "करिअर, कॉलेज बद्दल विचारा..." : "Ask about colleges, streams...";
-        };
-    }
-
-    const cMicBtn = document.getElementById('consultMicBtn');
-    if(cMicBtn) {
-        cMicBtn.addEventListener('mousedown', () => { if(consultRecognition){ consultRecognition.lang = childData.lang; consultRecognition.start(); }});
-        cMicBtn.addEventListener('mouseup', () => { if(consultRecognition) consultRecognition.stop(); });
-        cMicBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if(consultRecognition){ consultRecognition.lang = childData.lang; consultRecognition.start(); }});
-        cMicBtn.addEventListener('touchend', () => { if(consultRecognition) consultRecognition.stop(); });
     }
 </script>
 </body>
