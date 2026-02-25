@@ -9,6 +9,8 @@
     <script src="qm.js"></script>
     <script src="qb.js"></script>
     <script src="qbm.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; display: flex; justify-content: center; height: 100dvh; box-sizing: border-box; }
@@ -36,6 +38,9 @@
         .message { margin-bottom: 15px; max-width: 90%; padding: 14px; border-radius: 10px; font-size: 15px; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
         .bot-msg { background: #e3f2fd; color: #0b3c7c; align-self: flex-start; border-bottom-left-radius: 0; border: 1px solid #bbdefb; }
         .user-msg { background: #27ae60; color: white; align-self: flex-end; margin-left: auto; border-bottom-right-radius: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .typing-indicator { font-style: italic; color: #7f8c8d; animation: pulse 1.5s infinite; }
+        
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
         
         .controls-area { padding: 15px; background: white; border-top: 1px solid #eee; padding-bottom: max(15px, env(safe-area-inset-bottom)); }
         .input-row { display: flex; gap: 10px; align-items: center; }
@@ -45,14 +50,18 @@
         
         #full-loader { display: none; position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.9); z-index: 100; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px; box-sizing: border-box;}
         
-        #report-screen { display: none; flex-direction: column; height: 100%; }
-        #report-content { flex: 1; overflow-y: auto; padding: 20px; background: white; line-height: 1.6;}
-        .report-card { background: #f8f9fa; border-left: 4px solid #2980b9; padding: 15px; margin-bottom: 20px; border-radius: 0 8px 8px 0; }
+        #report-screen { display: none; flex-direction: column; height: 100%; background: white; overflow-y: auto; }
+        
+        /* Premium Report Styling */
+        #report-wrapper { padding: 30px 20px; background: #ffffff; color: #333; }
+        .report-header-title { color: #2c3e50; border-bottom: 2px solid #2980b9; padding-bottom: 10px; margin-bottom: 20px; }
+        .report-card { background: #ffffff; border-left: 5px solid #2980b9; padding: 20px; margin-bottom: 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-top: 1px solid #f0f0f0; border-right: 1px solid #f0f0f0; border-bottom: 1px solid #f0f0f0; }
+        .report-card b { color: #2c3e50; font-size: 1.1em; display: block; margin-bottom: 8px; }
         
         #consult-area { background: #eef2f5; padding: 20px; border-top: 2px solid #ddd; }
-        #consult-history { max-height: 250px; overflow-y: auto; margin-bottom: 10px; background: white; padding: 10px; border-radius: 8px; border: 1px solid #ddd;}
+        #consult-history { max-height: 250px; overflow-y: auto; margin-bottom: 10px; background: white; padding: 15px; border-radius: 8px; border: 1px solid #ddd;}
         
-        .tts-controls { display: flex; gap: 10px; padding: 0 20px 15px 20px; justify-content: center; }
+        .tts-controls { display: flex; gap: 10px; padding: 0 20px 15px 20px; justify-content: center; background: white; }
         .tts-controls button { width: auto; flex: 1; margin-top: 0; }
     </style>
 </head>
@@ -113,15 +122,18 @@
     </div>
 
     <div id="report-screen">
-        <div id="report-content"></div>
+        <div id="report-wrapper">
+            <h2 class="report-header-title" id="pdf-report-title">Eprashala Expert Report</h2>
+            <div id="report-content" style="line-height: 1.6;"></div>
+        </div>
         
-        <h4 style="text-align: center; color: #2c3e50; margin-bottom: 10px;">🔊 Read Report Aloud</h4>
+        <h4 style="text-align: center; color: #2c3e50; margin-bottom: 10px; margin-top: 0;">🔊 Read Report Aloud</h4>
         <div class="tts-controls">
             <button id="ttsToggleBtn" onclick="toggleReportAudio()" class="btn-purple">▶️ Play Report</button>
         </div>
 
-        <div style="padding: 0 20px;">
-            <button onclick="downloadInitialReport()" style="background: #e67e22; margin-bottom: 20px;">⬇️ Download Report & Q&A</button>
+        <div style="padding: 0 20px; background: white;">
+            <button onclick="downloadPDFReport()" style="background: #e74c3c; margin-bottom: 20px;">📄 Download Report as PDF</button>
         </div>
 
         <div id="consult-area">
@@ -132,7 +144,7 @@
                 <input type="text" id="consultInput" placeholder="Ask about colleges, streams..." onkeypress="if(event.key === 'Enter') sendConsult()">
                 <button onclick="sendConsult()" style="width: auto; margin:0;">Ask</button>
             </div>
-            <button onclick="downloadFullSession()" class="btn-green" style="margin-top:15px;">⬇️ Export Entire Session</button>
+            <button onclick="downloadFullSession()" class="btn-green" style="margin-top:15px;">⬇️ Export Entire Q&A Data (TXT)</button>
         </div>
     </div>
 
@@ -160,6 +172,25 @@
     const STAGES_MR = ["टप्पा 0: मूलभूत माहिती", "टप्पा 1: जलद उत्तरे", "टप्पा 2: थोडक्यात विचार", "टप्पा 3: सखोल विचार", "टप्पा 4: तणाव चाचणी"];
     let STAGE_NAMES = STAGES_EN;
     let activeQuestionQueues = {};
+
+    // --- SCREEN WAKE LOCK API ---
+    let wakeLock = null;
+    async function requestWakeLock() {
+        try {
+            if ('wakeLock' in navigator) {
+                wakeLock = await navigator.wakeLock.request('screen');
+                console.log('Screen Wake Lock is active');
+            }
+        } catch (err) {
+            console.error('Wake Lock failed:', err.message);
+        }
+    }
+    // Re-acquire wake lock if user switches tabs and comes back
+    document.addEventListener('visibilitychange', async () => {
+        if (wakeLock !== null && document.visibilityState === 'visible') {
+            requestWakeLock();
+        }
+    });
 
     function initializeQuestionQueues(bank) {
         for (let stage in bank) {
@@ -338,6 +369,8 @@
         
         if (!bank) { alert("Error: Question bank not found! Ensure all 4 JS files are linked."); return; }
 
+        // Ask for Wake Lock
+        requestWakeLock();
         unlockAndroidAudio(); 
         initializeQuestionQueues(bank); 
         
@@ -347,6 +380,9 @@
         if(childData.lang === 'mr-IN') {
             document.getElementById('consult-title').innerText = "ध्वनी AI सल्लागार";
             document.getElementById('consultInput').placeholder = "करिअर, कॉलेज बद्दल विचारा...";
+            document.getElementById('pdf-report-title').innerText = "ई-प्रशाला तज्ञ अहवाल: " + childData.name;
+        } else {
+            document.getElementById('pdf-report-title').innerText = "Eprashala Expert Report: " + childData.name;
         }
 
         isProcessing = true;
@@ -385,7 +421,6 @@
         let cognitiveTrait = "";
         
         if (currentStage === 0 || currentStage === 1) {
-            // Stages 0 & 1: Quick Math and Yes/No/True/False (Very Fast)
             if (responseTimeSecs < 2) cognitiveTrait = "Hasty / Desperate (Did not process question)";
             else if (responseTimeSecs < 5) cognitiveTrait = "Impulsive / Very Fast";
             else if (responseTimeSecs < 15) cognitiveTrait = "Stable / Calculated";
@@ -393,7 +428,6 @@
             else cognitiveTrait = "Distracted / Timepass / Struggling (Took over 30s)";
             
         } else if (currentStage === 2) {
-            // Stage 2: One Sentence Answers (Requires brief typing)
             if (responseTimeSecs < 3) cognitiveTrait = "Hasty / Skipped thinking completely";
             else if (responseTimeSecs < 10) cognitiveTrait = "Impulsive / Fast Typing";
             else if (responseTimeSecs < 25) cognitiveTrait = "Stable / Measured Response";
@@ -401,7 +435,6 @@
             else cognitiveTrait = "Distracted / Timepass (Took over 45s)";
             
         } else if (currentStage === 3) {
-            // Stage 3: Exploration / 2-3 Sentences (High cognitive load, typing required)
             if (responseTimeSecs < 8) cognitiveTrait = "Highly Reactive / Hasty (Did not think through scenario)";
             else if (responseTimeSecs < 20) cognitiveTrait = "Impulsive / Quick Judgement";
             else if (responseTimeSecs < 45) cognitiveTrait = "Stable / Calculated / Good Focus";
@@ -409,7 +442,6 @@
             else cognitiveTrait = "Unacceptable Delay / Timepass (Took over 1 minute)";
             
         } else if (currentStage === 4) {
-            // Stage 4: Stress Test (Deep emotional opinions, heavy typing)
             if (responseTimeSecs < 10) cognitiveTrait = "Extremely Reactive / Defensive (Answered without processing)";
             else if (responseTimeSecs < 30) cognitiveTrait = "Impulsive / Quick to argue";
             else if (responseTimeSecs < 120) cognitiveTrait = "Stable / Thoughtful / Focused";
@@ -438,6 +470,8 @@
                 document.getElementById('api-key-screen').style.display = 'block';
                 let endMsg = childData.lang === 'mr-IN' ? "ऑफलाइन चाचणी पूर्ण झाली आहे. कृपया तुमची बॅकअप फाइल डाउनलोड करा आणि अहवालासाठी API की प्रविष्ट करा." : "The offline assessment is complete. Please download your backup file and provide the API key for analysis.";
                 speakDhwaniResponse(endMsg);
+                // Release Wake Lock
+                if (wakeLock !== null) { wakeLock.release(); wakeLock = null; }
                 return;
             } else {
                 let transitionMsg = "";
@@ -513,15 +547,15 @@
         
         let htmlTemplate = "";
         if (childData.lang === 'mr-IN') {
+            document.getElementById('pdf-report-title').innerText = "ई-प्रशाला तज्ञ अहवाल: " + childData.name;
             htmlTemplate = `
-            <h2 style='color:#2980b9'>ई-प्रशाला तज्ञ अहवाल</h2>
             <div class='report-card'><b>संज्ञानात्मक प्रक्रिया आणि एकाग्रता:</b> (प्रतिसाद वेळेचे विश्लेषण करा. ते घाईत होते, स्थिर होते की विचलित होते?)</div>
             <div class='report-card'><b>सहनशीलता आणि तणाव व्यवस्थापन:</b> (त्यांनी टप्पा 4 कसा हाताळला?)</div>
             <div class='report-card'><b>व्यक्तिमत्व आणि त्रुटी:</b> (प्रामाणिक, सखोल मानसिक मूल्यांकन)</div>
             <div class='report-card'><b>शिफारस केलेले करिअर पर्याय:</b> (त्यांच्यासाठी योग्य असलेले भारतातील टॉप 3 पर्याय)</div>`;
         } else {
+            document.getElementById('pdf-report-title').innerText = "Eprashala Expert Report: " + childData.name;
             htmlTemplate = `
-            <h2 style='color:#2980b9'>Eprashala Expert Report</h2>
             <div class='report-card'><b>Cognitive Processing & Focus:</b> (Analyze their response time behaviors. Were they hasty, stable, or distracted?)</div>
             <div class='report-card'><b>Resilience & Stress Handling:</b> (How did they handle Stage 4?)</div>
             <div class='report-card'><b>Personality & Flaws:</b> (Honest, deep psychological assessment)</div>
@@ -565,6 +599,20 @@
         } finally {
             setLoading(false);
         }
+    }
+
+    // --- PROFESSIONAL PDF DOWNLOAD LOGIC ---
+    function downloadPDFReport() {
+        const element = document.getElementById('report-wrapper');
+        const opt = {
+            margin:       [0.5, 0.5, 0.5, 0.5],
+            filename:     `Eprashala_Report_${childData.name}.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true },
+            jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+        };
+        // Use html2pdf to generate and save
+        html2pdf().set(opt).from(element).save();
     }
 
     // --- REPORT TTS PLAYBACK ---
@@ -636,15 +684,26 @@
         }
     }
 
-    // --- GEMINI API: MULTILINGUAL CONSULTATION ---
+    // --- GEMINI API: MULTILINGUAL CONSULTATION WITH TYPING INDICATOR ---
     async function sendConsult() {
         const input = document.getElementById('consultInput');
         const text = input.value.trim();
         if (!text) return;
+        
+        // Show User Message
         addMessage(text, 'user', 'consult-history');
         consultHistory.push({ role: "user", parts: [{ text: text }] });
         input.value = '';
         
+        // Show Typing Indicator
+        const chat = document.getElementById('consult-history');
+        const typingDiv = document.createElement('div');
+        typingDiv.id = 'dhwani-typing';
+        typingDiv.className = 'message bot-msg typing-indicator';
+        typingDiv.innerText = childData.lang === 'mr-IN' ? "ध्वनी विचार करत आहे... ⏳" : "Dhwani is thinking... ⏳";
+        chat.appendChild(typingDiv);
+        chat.scrollTop = chat.scrollHeight;
+
         const systemPrompt = `You are Dhwani, an expert career consultant for Eprashala. 
         CRITICAL INSTRUCTION: You MUST converse perfectly in ${childData.langName}. 
         Based on their test transcript:\n${fullTranscript}\n
@@ -659,23 +718,22 @@
             const data = await response.json();
             if (!response.ok) throw new Error("API Error");
             
+            // Remove Typing Indicator
+            document.getElementById('dhwani-typing').remove();
+
             const reply = data.candidates[0].content.parts[0].text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*/g, '');
             consultHistory.push({ role: "model", parts: [{ text: reply }] });
             addMessage(reply, 'bot', 'consult-history');
             speakDhwaniResponse(reply); 
         } catch(e) { 
+            // Remove Typing Indicator on Error
+            if(document.getElementById('dhwani-typing')) document.getElementById('dhwani-typing').remove();
             alert(`Error: ${e.message}`); 
             consultHistory.pop(); 
         }
     }
 
     // --- EXPORT OPTIONS ---
-    function downloadInitialReport() {
-        let cleanSummary = generatedReportHtml.replace(/<[^>]*>?/gm, ''); 
-        let textToSave = `--- EPRASHALA APTITUDE REPORT: ${childData.name} ---\n\n--- TRANSCRIPT ---\n${fullTranscript}\n\n--- AI SUMMARY ---\n${cleanSummary}\n`;
-        triggerDownload(textToSave, `Report_${childData.name}.txt`);
-    }
-
     function downloadFullSession() {
         let cleanSummary = generatedReportHtml.replace(/<[^>]*>?/gm, ''); 
         let textToSave = `--- FULL SESSION: ${childData.name} ---\n\n--- TRANSCRIPT ---\n${fullTranscript}\n\n--- SUMMARY ---\n${cleanSummary}\n\n--- CONSULTATION ---\n`;
