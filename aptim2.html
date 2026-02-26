@@ -538,41 +538,80 @@
     }
 
     // --- GEMINI API: LANGUAGE-AWARE REPORT GENERATION ---
+    // --- GEMINI API: MASTER CAREER ANALYTICS REPORT GENERATOR ---
     async function generateFinalReport() {
         apiKey = document.getElementById('apiKey').value.trim();
         if (!apiKey) return alert("Please enter the API key.");
         if (!fullTranscript) return alert("No transcript found!");
 
-        setLoading(true, childData.lang === 'mr-IN' ? "ध्वनी क्लाउड अहवाल तयार करत आहे..." : "Sending transcript to Dhwani Cloud...");
+        setLoading(true, childData.lang === 'mr-IN' ? "ध्वनी क्लाउड अहवाल तयार करत आहे..." : "Eprashala Analytics Engine is processing...");
         
-        let htmlTemplate = "";
-        if (childData.lang === 'mr-IN') {
-            document.getElementById('pdf-report-title').innerText = "ई-प्रशाला तज्ञ अहवाल: " + childData.name;
-            htmlTemplate = `
-            <div class='report-card'><b>संज्ञानात्मक प्रक्रिया आणि एकाग्रता:</b> (प्रतिसाद वेळेचे विश्लेषण करा. ते घाईत होते, स्थिर होते की विचलित होते?)</div>
-            <div class='report-card'><b>सहनशीलता आणि तणाव व्यवस्थापन:</b> (त्यांनी टप्पा 4 कसा हाताळला?)</div>
-            <div class='report-card'><b>व्यक्तिमत्व आणि त्रुटी:</b> (प्रामाणिक, सखोल मानसिक मूल्यांकन)</div>
-            <div class='report-card'><b>शिफारस केलेले करिअर पर्याय:</b> (त्यांच्यासाठी योग्य असलेले भारतातील टॉप 3 पर्याय)</div>`;
+        // 1. Dynamic Age-Based Instruction Logic
+        let ageInstruction = "";
+        let roadmapTitle = "";
+        if (childData.age < 18) {
+            ageInstruction = "The user is UNDER 18. You MUST suggest high school study streams (Science, Commerce, Arts), competitive exam preparations (like JEE, NEET, NDA, CLAT), and undergraduate degree paths. The 'Development Roadmap' must cover the next 3 years of their schooling and exam prep.";
+            roadmapTitle = "Development Roadmap (Next 3 Years of Schooling/Exams)";
+        } else if (childData.age >= 18 && childData.age <= 24) {
+            ageInstruction = "The user is 18-24. You MUST suggest HIGHER STUDIES options (Masters, MBA, specialized tech certifications) and early-career entry strategies (internships, junior roles). The 'Development Roadmap' must cover post-grad prep, skill building, and entering the job market.";
+            roadmapTitle = "Higher Studies & Early Career Roadmap (Next 2-3 Years)";
         } else {
-            document.getElementById('pdf-report-title').innerText = "Eprashala Expert Report: " + childData.name;
-            htmlTemplate = `
-            <div class='report-card'><b>Cognitive Processing & Focus:</b> (Analyze their response time behaviors. Were they hasty, stable, or distracted?)</div>
-            <div class='report-card'><b>Resilience & Stress Handling:</b> (How did they handle Stage 4?)</div>
-            <div class='report-card'><b>Personality & Flaws:</b> (Honest, deep psychological assessment)</div>
-            <div class='report-card'><b>Recommended Career Streams:</b> (Top 3 Indian paths suitable for them)</div>`;
+            ageInstruction = "The user is 25 OR OLDER. You MUST suggest strictly CAREER-ORIENTED options, job roles, professional upskilling, pivoting strategies, and leadership tracks. The 'Development Roadmap' must cover immediate professional milestones, promotions, or business strategies.";
+            roadmapTitle = "Professional Career Roadmap (Next 2-3 Years)";
         }
 
-        const reportPrompt = `You are Dhwani, an Expert Career Consultant and Master Psychologist for Eprashala. 
-        The user (${childData.name}, Age ${childData.age}, from ${childData.city}) completed a highly stressful psychometric test.
+        // 2. Multilingual Header Setup
+        if (childData.lang === 'mr-IN') {
+            document.getElementById('pdf-report-title').innerText = "ई-प्रशाला तज्ञ कलचाचणी अहवाल: " + childData.name;
+        } else {
+            document.getElementById('pdf-report-title').innerText = "Eprashala Career Analytics Report: " + childData.name;
+        }
+
+        // 3. The Master Prompt
+        const reportPrompt = `You are the Lead Master Career Counselor and Psychometrician for the 'Eprashala Career Analytics System'.
+        Analyze the following aptitude test transcript for: Name: ${childData.name}, Age: ${childData.age}, Location: ${childData.city}.
         
-        CRITICAL INSTRUCTION: You MUST generate the ENTIRE report perfectly in ${childData.langName}. 
-        If Marathi is selected, write EVERYTHING in pure, professional Marathi script (Devanagari). DO NOT output English text if Marathi is requested.
+        CRITICAL INSTRUCTION 1: Evaluate the transcript's answers and their associated "Behavior" (Response Times like Hasty, Deep Thinking, Impulsive). Use this data to infer realistic percentage scores for their cognitive domains. 
+        CRITICAL INSTRUCTION 2: ${ageInstruction}
+        CRITICAL INSTRUCTION 3: You MUST generate the ENTIRE report perfectly in ${childData.langName}. If Marathi is selected, write absolutely EVERYTHING in pure, professional Marathi script (Devanagari).
         
-        Here is the transcript. Pay extreme attention to the "Behavior" metadata attached to every answer to judge their true state of mind like an observant teacher:
-        ${fullTranscript}
+        Format the output STRICTLY as clean HTML (using <h3>, <p>, <ul>, <li>, and a clean <table border='1' style='width:100%; border-collapse:collapse; text-align:left;'> for the snapshot). DO NOT use markdown ticks (\`\`\`).
         
-        Format strictly in HTML (No markdown ticks) using exactly this template:
-        ${htmlTemplate}`;
+        Use EXACTLY this structure (translate headings to Marathi if required):
+        
+        <h3>🧠 APTITUDE ASSESSMENT REPORT</h3>
+        <p><b>Student Name:</b> ${childData.name}<br>
+        <b>Age:</b> ${childData.age} Years<br>
+        <b>Assessment Type:</b> Multi-Dimensional Career Aptitude Evaluation<br>
+        <b>Report Generated By:</b> Eprashala Career Analytics System</p>
+
+        <h3>📊 Overall Aptitude Snapshot</h3>
+        (Create a 3-column HTML table with headers: Domain | Score (%) | Strength Level. Infer scores for: Logical & Analytical, Numerical, Verbal & Communication, Creative Thinking, Emotional Intelligence, Stress Resilience. Base this on how they handled the test.)
+
+        <h3>🧩 Detailed Section Analysis</h3>
+        (For each domain from the table above, provide an Observation, Behavioral Indicators based on the transcript, and Suggested Fields)
+
+        <h3>🧠 Personality Interpretation (Behavioral Pattern)</h3>
+        (Deep dive into their reaction times. Did they panic? Were they stable? Are they introverted thinkers or impulsive action-takers?)
+
+        <h3>🎯 Top 5 Career Recommendations (Ranked)</h3>
+        (Provide a ranked numbered list of 5 specific careers/paths strictly tailored to their age bracket and transcript logic.)
+
+        <h3>🚫 Careers NOT Highly Suitable</h3>
+        (List 3-4 fields they should avoid based on their weak points in the test.)
+
+        <h3>📈 ${roadmapTitle}</h3>
+        (Provide a structured timeline roadmap specifically designed for a ${childData.age}-year-old based on the age instructions.)
+
+        <h3>🧾 Advisory Note</h3>
+        (A final, realistic note to the parents/user about their potential and warnings about forcing the wrong path.)
+        
+        <h3>🏁 Final Aptitude Conclusion</h3>
+        <p><b>Core Brain Type:</b> (e.g., Technical Analytical Architect, Creative Diplomat)<br>
+        <b>Career Direction:</b> (e.g., Applied Sciences, Humanities, Corporate Management)</p>
+        
+        TRANSCRIPT TO ANALYZE:
+        ${fullTranscript}`;
 
         try {
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
@@ -585,7 +624,14 @@
             if (!response.ok) throw new Error(data.error?.message || "Failed");
 
             let rawHtml = data.candidates[0].content.parts[0].text;
+            // Clean up any stray markdown formatting the AI might inject
             rawHtml = rawHtml.replace(/^```html\n|```\n?$/gm, '').trim();
+            
+            // Add some basic CSS inline to make the AI's table look neat
+            rawHtml = rawHtml.replace(/<table/g, "<table style='width:100%; border-collapse: collapse; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);'");
+            rawHtml = rawHtml.replace(/<th/g, "<th style='background-color: #2c3e50; color: white; padding: 12px; border: 1px solid #ddd;'");
+            rawHtml = rawHtml.replace(/<td/g, "<td style='padding: 10px; border: 1px solid #ddd;'");
+
             generatedReportHtml = rawHtml; 
 
             document.getElementById('api-key-screen').style.display = 'none';
