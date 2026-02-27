@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Eprashala KBC - Voice Edition</title>
+    <style>
+        body { background: #0d0029; color: white; font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
+        #gameArea { width: 90%; max-width: 900px; text-align: center; display: none; } /* Hidden until name entered */
+        
+        /* INTRO SCREEN */
+        #introScreen { text-align: center; animation: fadeIn 2s; }
+        .big-logo { font-size: 3em; color: gold; text-shadow: 0 0 20px #ff9800; margin-bottom: 20px; }
+        input#studentName { padding: 15px; font-size: 1.2em; border-radius: 30px; border: 2px solid gold; background: #2a0063; color: white; text-align: center; width: 60%; }
+        button#startBtn { padding: 15px 40px; font-size: 1.5em; margin-top: 20px; background: gold; border: none; border-radius: 30px; cursor: pointer; font-weight: bold; color: #0d0029; transition: 0.3s; }
+        button#startBtn:hover { transform: scale(1.1); box-shadow: 0 0 20px gold; }
+
+        /* GAME UI */
+        .prize-ladder { position: fixed; right: 20px; top: 20px; background: rgba(0,0,0,0.8); padding: 10px; border: 2px solid gold; border-radius: 10px; font-size: 0.9em; z-index: 100; }
+        .prize-step { padding: 5px 15px; color: #aaa; }
+        .prize-step.active { color: gold; font-weight: bold; background: #333; border: 1px solid gold; }
+        
+        .timer-circle { width: 80px; height: 80px; border-radius: 50%; border: 4px solid gold; display: flex; align-items: center; justify-content: center; font-size: 2em; margin: 0 auto 20px; background: #000; box-shadow: 0 0 15px gold; }
+        
+        .question-box { background: linear-gradient(#2a0063, #0d0029); border: 2px solid white; padding: 25px; border-radius: 15px; margin-bottom: 25px; font-size: 1.8em; min-height: 120px; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        
+        .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .opt-btn { background: #1a0033; border: 2px solid #555; padding: 20px; border-radius: 40px; color: white; cursor: pointer; transition: 0.3s; font-size: 1.4em; text-align: left; position: relative; }
+        .opt-btn span { color: gold; font-weight: bold; margin-right: 10px; }
+        .opt-btn:hover { background: #333; }
+        
+        /* STATES */
+        .listening { border-color: #00ffff !important; box-shadow: 0 0 20px #00ffff; }
+        .selected { background: orange !important; color: black; }
+        .correct { background: green !important; color: white; border-color: #0f0; animation: blink 0.5s 3; }
+        .wrong { background: red !important; animation: shake 0.5s; }
+
+        /* STATUS BAR */
+        #statusBar { position: fixed; bottom: 20px; color: cyan; font-size: 1.2em; font-style: italic; }
+
+        @keyframes blink { 50% { opacity: 0.5; } }
+        @keyframes shake { 0% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } 100% { transform: translateX(0); } }
+    </style>
+</head>
+<body>
+
+<div id="introScreen">
+    <div class="big-logo">🎙️ Eprashala Oral Exam</div>
+    <h2 style="color: #ccc;">"Hot Seat" Mode</h2>
+    <input type="text" id="studentName" placeholder="Enter Student Name..." autocomplete="off">
+    <br>
+    <button id="startBtn" onclick="startGame()">ENTER THE GAME</button>
+    <p style="color: #888; font-size: 0.8em; margin-top: 20px;">*Requires Microphone Permission</p>
+</div>
+
+<div class="prize-ladder" id="ladder"></div>
+<div id="gameArea">
+    <div class="timer-circle" id="timer">30</div>
+    <div class="question-box" id="qText">Loading...</div>
+    <div class="options-grid" id="optContainer"></div>
+    <div id="statusBar">Waiting to start...</div>
+</div>
+
+<script>
+    // --- 1. SETUP & DATA ---
+    let examData = JSON.parse(sessionStorage.getItem('eprashala_exam_data'));
+    
+    // --- SHUFFLE LOGIC ---
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    if (examData && examData.mcq) {
+        // Shuffle Questions
+        shuffleArray(examData.mcq);
+
+        // Shuffle Options for each Question
+        examData.mcq.forEach(item => {
+            let optionsWithStatus = item.options.map((opt, index) => ({
+                text: opt,
+                isCorrect: index === item.correct
+            }));
+            
+            shuffleArray(optionsWithStatus);
+            
+            item.options = optionsWithStatus.map(o => o.text);
+            item.correct = optionsWithStatus.findIndex(o => o.isCorrect);
+        });
+    }
+
+    if(!examData) {
+        alert("Warning: No exam loaded from Engine. Please load a file in exam_engine.html first.");
+    }
+
+    let currentQ = 0;
+    let score = 0;
+    let timerVal = 30;
+    let timerInt;
+    let studentName = "";
+    let isListening = false;
+    let synth = window.speechSynthesis;
+    let recognition;
+    
+    // Money Ladder
+    const prizes = [1000, 2000, 5000, 10000, 20000, 40000, 80000, 160000, 320000, 1000000];
+
+    // --- 2. VOICE ENGINE (TTS & STT) ---
+    
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.continuous = false; 
+        recognition.lang = 'en-IN'; 
+        recognition.interimResults = false;
+
+        recognition.onresult = function(event) {
+            const transcript = event.results[0][0].transcript.toLowerCase().trim();
+            document.getElementById('statusBar').innerText = `Heard: "${transcript}"`;
+            processVoiceAnswer(transcript);
+        };
+
+        recognition.onend = function() {
+            if (isListening) recognition.start(); 
+        };
+        
+        recognition.onerror = function(event) {
+            console.log("Mic Error:", event.error);
+            isListening = false;
+        };
+    } else {
+        alert("Voice recognition not supported in this browser. Please use Google Chrome.");
+    }
+
+    function speak(text, callback) {
+        isListening = false;
+        if(recognition) recognition.stop();
+        if (synth.speaking) synth.cancel();
+
+        const utter = new SpeechSynthesisUtterance(text);
+        const voices = synth.getVoices();
+        const indianVoice = voices.find(v => v.lang.includes('IN') || v.name.includes('Google') || v.name.includes('India'));
+        
+        if (indianVoice) utter.voice = indianVoice;
+        utter.pitch = 0.6; 
+        utter.rate = 0.85; 
+        utter.volume = 1;
+
+        utter.onend = function() {
+            if (callback) callback();
+        };
+        synth.speak(utter);
+    }
+
+    // --- 3. GAME LOGIC ---
+
+    function startGame() {
+        studentName = document.getElementById('studentName').value;
+        if(!studentName) return alert("Please enter a name!");
+        
+        document.getElementById('introScreen').style.display = 'none';
+        document.getElementById('gameArea').style.display = 'block';
+        
+        const ladder = document.getElementById('ladder');
+        ladder.innerHTML = "";
+        const limit = Math.min(examData.mcq.length, 10);
+        for(let i=0; i<limit; i++) {
+            let val = prizes[limit-1-i] || 100;
+            ladder.innerHTML += `<div class="prize-step" id="step-${limit-1-i}">₹${val}</div>`;
+        }
+
+        speak(`Welcome to E Prashala K B C. Today on the hot seat, we have ${studentName}. Let's play!`, () => {
+            loadQuestion();
+        });
+    }
+
+    function loadQuestion() {
+        if(currentQ >= examData.mcq.length || currentQ >= 10) return endGame(true);
+        
+        document.querySelectorAll('.prize-step').forEach(d => d.classList.remove('active'));
+        let step = document.getElementById(`step-${currentQ}`);
+        if(step) step.classList.add('active');
+        
+        document.getElementById('timer').innerText = "30";
+        document.getElementById('timer').classList.remove('listening');
+        
+        const q = examData.mcq[currentQ];
+        document.getElementById('qText').innerText = q.q;
+        
+        const cont = document.getElementById('optContainer');
+        cont.innerHTML = "";
+        
+        q.options.forEach((opt, idx) => {
+            let letter = "ABCD"[idx];
+            let btn = document.createElement('div');
+            btn.className = "opt-btn";
+            btn.id = `opt-${idx}`;
+            btn.innerHTML = `<span>${letter}:</span> ${opt}`;
+            btn.onclick = () => lockAnswer(idx); 
+            cont.appendChild(btn);
+        });
+
+        speak(`Question for ${prizes[currentQ]} rupees. ${q.q}`, () => {
+            let optText = `Option A, ${q.options[0]}. Option B, ${q.options[1]}. Option C, ${q.options[2]}. Option D, ${q.options[3]}.`;
+            speak(optText, () => {
+                startTimer();
+                activateMic();
+            });
+        });
+    }
+
+    function activateMic() {
+        if(!recognition) return;
+        isListening = true;
+        document.getElementById('statusBar').innerText = "🎤 Listening... Say 'Option A' or 'Lock B'";
+        document.getElementById('timer').classList.add('listening');
+        try { recognition.start(); } catch(e) {}
+    }
+
+    function startTimer() {
+        timerVal = 30;
+        timerInt = setInterval(() => {
+            timerVal--;
+            document.getElementById('timer').innerText = timerVal;
+            if(timerVal <= 0) { 
+                clearInterval(timerInt); 
+                speak("Time is up!", () => checkAnswer(-1));
+            }
+        }, 1000);
+    }
+
+    function processVoiceAnswer(text) {
+        let selected = -1;
+        if (text.includes(" a") || text.endsWith(" a") || text === "a") selected = 0;
+        else if (text.includes(" b") || text.endsWith(" b") || text === "b") selected = 1;
+        else if (text.includes(" c") || text.endsWith(" c") || text === "c") selected = 2;
+        else if (text.includes(" d") || text.endsWith(" d") || text === "d") selected = 3;
+
+        if (selected !== -1) {
+            lockAnswer(selected);
+        }
+    }
+
+    function lockAnswer(idx) {
+        if (!isListening && timerVal < 30) return; 
+        isListening = false;
+        clearInterval(timerInt);
+        if(recognition) recognition.stop();
+
+        document.querySelectorAll('.opt-btn').forEach(b => b.style.opacity = '0.5');
+        document.getElementById(`opt-${idx}`).style.opacity = '1';
+        document.getElementById(`opt-${idx}`).classList.add('selected');
+
+        speak(`You selected option ${"ABCD"[idx]}. Computer ji, please lock it.`, () => {
+            setTimeout(() => checkAnswer(idx), 1000);
+        });
+    }
+
+    function checkAnswer(selected) {
+        const correct = examData.mcq[currentQ].correct;
+        const correctLetter = "ABCD"[correct];
+
+        if (selected === correct) {
+            document.getElementById(`opt-${selected}`).classList.remove('selected');
+            document.getElementById(`opt-${selected}`).classList.add('correct');
+            let amount = prizes[currentQ];
+            speak(`Sahi Jawaab! Correct Answer! You have won ${amount} rupees.`, () => {
+                currentQ++;
+                setTimeout(loadQuestion, 1000);
+            });
+        } else {
+            if(selected !== -1) {
+                document.getElementById(`opt-${selected}`).classList.remove('selected');
+                document.getElementById(`opt-${selected}`).classList.add('wrong');
+            }
+            document.getElementById(`opt-${correct}`).classList.add('correct');
+            
+            speak(`Afsoos! Wrong Answer. The correct answer was Option ${correctLetter}.`, () => {
+                setTimeout(() => endGame(false), 2000);
+            });
+        }
+    }
+
+    function endGame(win) {
+        let msg = win ? `Congratulations ${studentName}! You completed the challenge.` : `Game Over ${studentName}. Well played.`;
+        document.body.innerHTML = `
+            <div style="text-align:center">
+                <h1 style="color:gold; font-size:3em">${win ? "CROREPATI!" : "GAME OVER"}</h1>
+                <h2 style="color:white">${msg}</h2>
+                <button onclick="location.reload()" style="padding:20px; font-size:1.5em; cursor:pointer">Play Again</button>
+            </div>
+        `;
+        speak(msg);
+    }
+</script>
+</body>
+</html>

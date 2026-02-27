@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Eprashala Golf</title>
+    <style>
+        body { background: #4CAF50; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; }
+        #gameCanvas { background: url('https://www.transparenttextures.com/patterns/grass.png'), #66bb6a; border: 4px solid #fff; border-radius: 8px; box-shadow: 0 10px 20px rgba(0,0,0,0.3); cursor: crosshair; }
+        #qPanel { background: white; width: 600px; padding: 15px; border-radius: 8px; margin-top: 10px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .hole-label { font-weight: bold; font-size: 1.2em; }
+    </style>
+</head>
+<body>
+
+<canvas id="gameCanvas" width="600" height="400"></canvas>
+<div id="qPanel">
+    <h3 id="qText" style="margin-top:0;">Question Loading...</h3>
+    <p style="font-size: 0.9em; color: #555;">Click the Hole (A, B, C, D) that matches the correct answer.</p>
+    <div id="optionsText" style="text-align:left; padding:10px; border-top: 1px solid #eee;"></div>
+</div>
+
+<script>
+    // --- 1. SETUP & DATA ---
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    let examData = JSON.parse(sessionStorage.getItem('eprashala_exam_data'));
+
+    // Fallback for development/testing
+    if(!examData) {
+        examData = { mcq: [{q:"Golf Test: Which hole is correct?", options:["Hole A","Hole B","Hole C","Hole D"], correct:0}] };
+    }
+
+    // --- 2. SHUFFLE LOGIC ---
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    if (examData && examData.mcq) {
+        // Shuffle the sequence of questions (holes)
+        shuffleArray(examData.mcq);
+
+        // Shuffle options for each individual question
+        examData.mcq.forEach(item => {
+            let optionsWithStatus = item.options.map((opt, index) => ({
+                text: opt,
+                isCorrect: index === item.correct
+            }));
+            
+            shuffleArray(optionsWithStatus);
+            
+            item.options = optionsWithStatus.map(o => o.text);
+            item.correct = optionsWithStatus.findIndex(o => o.isCorrect);
+        });
+    }
+
+    // --- 3. GAME STATE ---
+    let ball = { x: 300, y: 350, r: 10, moving: false, targetX: 300 };
+    let holes = [
+        { x: 100, y: 80, label: 'A', id: 0 },
+        { x: 230, y: 80, label: 'B', id: 1 },
+        { x: 360, y: 80, label: 'C', id: 2 },
+        { x: 500, y: 80, label: 'D', id: 3 }
+    ];
+    let currentQ = 0;
+
+    function draw() {
+        // Background Grass Clear
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw Holes
+        holes.forEach(h => {
+            ctx.beginPath();
+            ctx.arc(h.x, h.y, 25, 0, Math.PI * 2);
+            ctx.fillStyle = '#1b5e20'; // Dark Hole
+            ctx.fill();
+            
+            ctx.fillStyle = 'white';
+            ctx.font = "bold 20px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText(h.label, h.x, h.y + 7);
+        });
+
+        // Draw Ball
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2);
+        ctx.fillStyle = 'white';
+        ctx.fill();
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        if(ball.moving) requestAnimationFrame(updateBall);
+    }
+
+    function updateBall() {
+        // Move towards target hole
+        ball.y -= 8;
+        
+        // Check collision
+        let hit = holes.find(h => Math.hypot(h.x - ball.x, h.y - ball.y) < 25);
+        
+        if(hit) {
+            ball.moving = false;
+            checkAnswer(hit.id);
+        } else if (ball.y < 50) {
+            ball.moving = false;
+            alert("Sand Trap! You missed the holes.");
+            resetBall();
+        } else {
+            draw();
+        }
+    }
+
+    function checkAnswer(selectedIdx) {
+        const q = examData.mcq[currentQ];
+        if(selectedIdx === q.correct) {
+            alert("⛳ GOAL! Correct Answer!");
+            currentQ++;
+            if(currentQ >= examData.mcq.length) {
+                alert("Course Complete! You are a Pro Golfer.");
+                location.reload();
+            } else {
+                loadQuestion();
+            }
+        } else {
+            alert("❌ BOGEY! Wrong hole. Try this shot again!");
+            resetBall();
+        }
+    }
+
+    function resetBall() {
+        ball.x = 300; 
+        ball.y = 350; 
+        ball.moving = false; 
+        draw();
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+        if(ball.moving) return;
+        const rect = canvas.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        
+        // Aim logic: Align ball X to click X for the "putt"
+        ball.x = clickX;
+        ball.moving = true;
+        draw();
+    });
+
+    function loadQuestion() {
+        const q = examData.mcq[currentQ];
+        document.getElementById('qText').innerText = `Hole ${currentQ + 1}: ${q.q}`;
+        let html = "";
+        q.options.forEach((opt, i) => {
+            if(i < 4) html += `<div style="margin:5px 0;"><b>${"ABCD"[i]}</b>: ${opt}</div>`;
+        });
+        document.getElementById('optionsText').innerHTML = html;
+        resetBall();
+    }
+
+    // Initial load
+    loadQuestion();
+</script>
+</body>
+</html>

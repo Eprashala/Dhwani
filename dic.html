@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Eprashala Dictation Master</title>
+    <title>Eprashala Dictation (Optimized)</title>
     <style>
         :root { --primary: #6c5ce7; --accent: #00cec9; --bg: #dfe6e9; --text: #2d3436; --cmd-glow: #0984e3; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); padding: 20px; color: var(--text); }
@@ -31,18 +31,16 @@
             border: 3px solid #e2e8f0; border-radius: 15px; 
             font-size: 1.2em; line-height: 1.6; resize: vertical; 
             font-family: 'Calibri', 'Roboto', sans-serif;
-            transition: all 0.3s ease;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
             outline: none; 
-            caret-color: var(--primary); /* Custom blinking cursor */
+            caret-color: var(--primary);
         }
         
-        /* The Blue Light Effect for Commands */
         #finalText.command-mode {
             border-color: var(--cmd-glow) !important;
-            box-shadow: 0 0 25px rgba(9, 132, 227, 0.5); /* Stronger Blue Glow */
+            box-shadow: 0 0 25px rgba(9, 132, 227, 0.6);
         }
 
-        /* Focus State */
         #finalText:focus { border-color: #a29bfe; }
 
         /* Status Bar */
@@ -60,11 +58,11 @@
 <body>
 
 <div class="container">
-    <h2>🎙️ Eprashala Master Dictation</h2>
-    <div class="tagline">Say "Dhwani", "Dhoni", "Dvani" to command</div>
+    <h2>🎙️ Eprashala Master (Optimized)</h2>
+    <div class="tagline">Say "Dhwani" to command • High Performance Mode</div>
     
     <div class="controls">
-        <select id="langSelect" onchange="resetDictation()">
+        <select id="langSelect" onchange="restartEngine()">
             <option value="en-IN" selected>English (India)</option>
             <option value="hi-IN">Hindi (India)</option>
             <option value="mr-IN">Marathi (India)</option>
@@ -91,95 +89,133 @@
         <div class="help-content">
             <p><strong>Wake Words:</strong> "Dhwani", "Dhoni", "Dvani"</p>
             <p><strong>Commands:</strong> "Dhwani New Line", "Dhwani New Para", "Dhwani Pause", "Dhwani Delete"</p>
-            <p><strong>Auto-Punctuation:</strong> Pause 3s for Comma ( , ) • Pause 5s for Full Stop ( . )</p>
+            <p><strong>Auto-Punctuation:</strong> Pause 1.5s for Comma ( , ) • Pause 3s for Full Stop ( . )</p>
         </div>
     </details>
 </div>
 
 <script>
-    // --- 1. CONFIGURATION ---
+    // --- 1. OPTIMIZED CONFIGURATION ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const synth = window.speechSynthesis;
     
+    // Performance: Pre-compile Regex to avoid creating it 100 times/sec
+    const WAKE_WORD_REGEX = /^(dhwani|dhoni|dvani|dhawani|doni|dwani)\s+/i;
+    
+    // State Flags
     let recognition;
     let isListening = false;
-    let isPaused = false;
+    let isPaused = false; 
     let silenceTimer = null;
     let punctuationStage = 0;
     let selectedVoice = null;
+    let restartTimer = null; // Safety brake for restarts
 
-    const textArea = document.getElementById('finalText');
-    const startBtn = document.getElementById('startBtn');
-    const readBtn = document.getElementById('readBtn');
-    const statusMsg = document.getElementById('statusMsg');
-    const timerMsg = document.getElementById('timerMsg');
-    const langSelect = document.getElementById('langSelect');
+    // DOM Caching (Prevent re-querying DOM)
+    const elements = {
+        textArea: document.getElementById('finalText'),
+        startBtn: document.getElementById('startBtn'),
+        readBtn: document.getElementById('readBtn'),
+        statusMsg: document.getElementById('statusMsg'),
+        timerMsg: document.getElementById('timerMsg'),
+        langSelect: document.getElementById('langSelect')
+    };
 
     if (SpeechRecognition) {
         recognition = new SpeechRecognition();
         recognition.continuous = true;
         recognition.interimResults = true;
         recognition.maxAlternatives = 1;
+
+        // Optimized Event Handlers
+        recognition.onstart = () => updateUI(true);
+        recognition.onend = handleEngineStop;
+        recognition.onerror = (e) => console.warn("Voice Error:", e.error);
+        recognition.onresult = processSpeechResult;
+    } else {
+        alert("Browser not supported. Use Chrome.");
     }
 
-    // Load Voices
-    speechSynthesis.onvoiceschanged = () => {
+    // Load Voices Efficiently
+    const loadVoices = () => {
         const voices = synth.getVoices();
         selectedVoice = voices.find(v => v.lang.includes('mr-IN') && v.name.includes('Google')) || 
                         voices.find(v => v.lang.includes('hi-IN')) || 
                         voices.find(v => v.lang.includes('en-IN')) || 
                         voices[0];
     };
+    if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = loadVoices;
+    loadVoices();
 
-    // --- 2. DICTATION LOGIC ---
+    // --- 2. CONTROL LOGIC ---
     function toggleDictation() { isListening ? stopDictation() : startDictation(); }
 
     function startDictation() {
-        recognition.lang = langSelect.value;
-        try { recognition.start(); } catch(e) {}
+        if (!recognition) return;
+        recognition.lang = elements.langSelect.value;
+        try { recognition.start(); } catch(e) { console.log("Already started"); }
         isListening = true;
         isPaused = false;
-        startBtn.textContent = "Stop Listening";
-        startBtn.classList.add("listening");
-        statusMsg.textContent = "Status: Listening...";
-        textArea.focus();
+        elements.textArea.focus();
     }
 
     function stopDictation() {
-        recognition.stop();
+        if (!recognition) return;
         isListening = false;
-        clearTimeout(silenceTimer); // Kill timer
-        startBtn.textContent = "Start Dictation";
-        startBtn.classList.remove("listening");
-        statusMsg.textContent = "Status: Stopped";
-        timerMsg.classList.remove("visible");
+        recognition.stop();
+        clearTimeout(silenceTimer);
+        clearTimeout(restartTimer);
+        updateUI(false);
     }
 
-    function resetDictation() {
-        if(isListening) { stopDictation(); setTimeout(startDictation, 500); }
+    function restartEngine() {
+        if(isListening) { 
+            recognition.stop(); 
+            // Small buffer to allow engine to fully shut down before restarting
+            setTimeout(startDictation, 400); 
+        }
     }
 
-    // --- 3. SPEECH PROCESSING ---
-    recognition.onresult = (event) => {
-        // Reset timer on ANY sound
+    function updateUI(active) {
+        if (active) {
+            elements.startBtn.textContent = "Stop Listening";
+            elements.startBtn.classList.add("listening");
+            elements.statusMsg.textContent = "Status: Listening...";
+        } else {
+            elements.startBtn.textContent = "Start Dictation";
+            elements.startBtn.classList.remove("listening");
+            elements.statusMsg.textContent = "Status: Stopped";
+            elements.timerMsg.classList.remove("visible");
+        }
+    }
+
+    // --- 3. SAFETY RESTART (FIX FOR HANGING) ---
+    function handleEngineStop() {
+        if (isListening) {
+            // "Safety Brake": Prevent infinite rapid restart loops
+            clearTimeout(restartTimer);
+            restartTimer = setTimeout(() => {
+                try { recognition.start(); } catch(e) {}
+            }, 300); // 300ms cool-down
+        }
+    }
+
+    // --- 4. HIGH PERFORMANCE SPEECH PROCESSING ---
+    function processSpeechResult(event) {
+        // Reset timer immediately on any sound input
         resetSilenceTimer();
 
         for (let i = event.resultIndex; i < event.results.length; ++i) {
-            let transcript = event.results[i][0].transcript;
-
+            // Only process FINAL results to save CPU
             if (event.results[i].isFinal) {
-                let clean = transcript.trim();
-                let wakeWordRegex = /^(dhwani|dhoni|dvani|dhawani|doni|dwani)\s+/i;
+                let clean = event.results[i][0].transcript.trim();
                 
-                if (wakeWordRegex.test(clean)) {
-                    // COMMAND DETECTED
-                    let cmd = clean.replace(wakeWordRegex, "").trim();
-                    
-                    // CRITICAL FIX: Kill punctuation timer immediately when command is heard
-                    clearTimeout(silenceTimer); 
-                    timerMsg.classList.remove("visible");
-                    
-                    triggerCommandMode(); // Blue Light
+                // Use pre-compiled Regex
+                if (WAKE_WORD_REGEX.test(clean)) {
+                    // Command Detected
+                    let cmd = clean.replace(WAKE_WORD_REGEX, "").trim();
+                    killTimer(); // Stop punctuation immediately
+                    triggerVisualFeedback();
                     executeCommand(cmd);
                 } 
                 else if (!isPaused) {
@@ -187,37 +223,44 @@
                 }
             }
         }
-    };
+    }
 
     function insertText(text) {
+        const ta = elements.textArea;
+        let val = ta.value;
+
         // Auto-Capitalize
-        if (textArea.value.length === 0 || textArea.value.endsWith('. ') || textArea.value.endsWith('\n')) {
+        if (val.length === 0 || val.endsWith('. ') || val.endsWith('\n')) {
             text = text.charAt(0).toUpperCase() + text.slice(1);
         }
 
-        // Logic to prevent spaces at start of new line
-        let prefix = " ";
-        if (textArea.value.length === 0 || textArea.value.endsWith('\n') || textArea.value.endsWith(' ')) {
-            prefix = "";
-        }
+        // Smart Spacing
+        let prefix = (val.length > 0 && !val.endsWith(' ') && !val.endsWith('\n')) ? ' ' : '';
         
-        textArea.value += prefix + text;
-        textArea.scrollTop = textArea.scrollHeight;
-        textArea.focus(); // Keep cursor blinking
+        ta.value += prefix + text;
+        
+        // Smooth Scroll using Animation Frame (Prevents UI Jutter)
+        requestAnimationFrame(() => {
+            ta.scrollTop = ta.scrollHeight;
+        });
     }
 
-    // --- 4. AUTO-PUNCTUATION (THE FIX) ---
-    function resetSilenceTimer() {
+    // --- 5. TIMER & AUTO-PUNCTUATION ---
+    function killTimer() {
         clearTimeout(silenceTimer);
-        timerMsg.classList.remove("visible");
+        elements.timerMsg.classList.remove("visible");
+    }
+
+    function resetSilenceTimer() {
+        killTimer();
         punctuationStage = 0;
 
         if (isListening && !isPaused) {
-            // 3s Timer for Comma
+            // 1.5s Timer for Comma
             silenceTimer = setTimeout(() => {
                 applyPunctuation(',');
                 
-                // 5s Total Timer for Dot
+                // +1.5s (Total 3s) for Dot
                 silenceTimer = setTimeout(() => {
                     convertCommaToDot();
                 }, 1500); 
@@ -227,77 +270,72 @@
     }
 
     function applyPunctuation(symbol) {
-        // Safe Trim: Only remove Spaces, NEVER NewLines
-        let val = textArea.value.replace(/ +$/, ""); 
-        
+        let val = elements.textArea.value.replace(/ +$/, ""); // Trim end spaces only
         if (val.length > 0 && !val.endsWith('\n')) {
-            textArea.value = val + symbol + " ";
+            elements.textArea.value = val + symbol + " ";
             punctuationStage = 1;
-            timerMsg.textContent = "Auto-inserted: ,";
-            timerMsg.classList.add("visible");
+            elements.timerMsg.textContent = "Auto-inserted: ,";
+            elements.timerMsg.classList.add("visible");
         }
     }
 
     function convertCommaToDot() {
         if (punctuationStage === 1) {
-            // Safe Trim: Only remove Spaces and the Comma we just added
-            let val = textArea.value.replace(/, $/, "").replace(/,$/, "");
-            
-            // Check again to ensure we don't eat a newline
+            let val = elements.textArea.value.replace(/, $/, "").replace(/,$/, "");
             if (!val.endsWith('\n')) {
-                textArea.value = val + ". ";
-                timerMsg.textContent = "Auto-inserted: .";
-                timerMsg.classList.add("visible");
+                elements.textArea.value = val + ". ";
+                elements.timerMsg.textContent = "Auto-inserted: .";
+                elements.timerMsg.classList.add("visible");
                 punctuationStage = 2;
             }
         }
     }
 
-    // --- 5. COMMAND EXECUTION ---
-    function triggerCommandMode() {
-        textArea.classList.add('command-mode');
-        setTimeout(() => textArea.classList.remove('command-mode'), 800);
+    // --- 6. COMMANDS ---
+    function triggerVisualFeedback() {
+        elements.textArea.classList.add('command-mode');
+        setTimeout(() => elements.textArea.classList.remove('command-mode'), 600);
     }
 
     function executeCommand(cmd) {
         cmd = cmd.toLowerCase();
+        const ta = elements.textArea;
+
+        if (cmd.includes("pause")) { isPaused = true; elements.statusMsg.textContent = "Paused (Say 'Dhwani Start Typing')"; }
+        else if (cmd.includes("start typing")) { isPaused = false; elements.statusMsg.textContent = "Listening..."; }
         
-        if (cmd.includes("pause")) { isPaused = true; statusMsg.textContent = "Paused (Say 'Dhwani Start Typing')"; }
-        else if (cmd.includes("start typing")) { isPaused = false; statusMsg.textContent = "Listening..."; }
-        
-        // Navigation & Format
-        else if (cmd.includes("new para")) textArea.value += "\n\n";
-        else if (cmd.includes("new line") || cmd.includes("next line")) textArea.value += "\n";
+        // Editing
+        else if (cmd.includes("new para")) ta.value += "\n\n";
+        else if (cmd.includes("new line") || cmd.includes("next line")) ta.value += "\n";
         else if (cmd.includes("delete")) {
-             let words = textArea.value.trim().split(/\s+/);
+             let words = ta.value.trim().split(/\s+/);
              words.pop();
-             textArea.value = words.join(" ");
+             ta.value = words.join(" ");
         }
-        else if (cmd.includes("clear")) { if(confirm("Clear All?")) textArea.value = ""; }
+        else if (cmd.includes("clear")) { if(confirm("Clear All?")) ta.value = ""; }
         
         // Punctuation
-        else if (cmd.includes("full stop")) textArea.value += ".";
-        else if (cmd.includes("comma")) textArea.value += ",";
-        else if (cmd.includes("question")) textArea.value += "?";
-        
-        // Always focus back after command
-        textArea.focus();
+        else if (cmd.includes("full stop")) ta.value += ".";
+        else if (cmd.includes("comma")) ta.value += ",";
+        else if (cmd.includes("question")) ta.value += "?";
+
+        ta.focus();
     }
 
-    // --- 6. READ ALOUD ---
+    // --- 7. READ ALOUD ---
     function toggleReadAloud() {
         if (synth.speaking) {
             if (synth.paused) {
                 synth.resume();
-                readBtn.textContent = "⏸ Pause";
-                readBtn.classList.remove("paused");
+                elements.readBtn.textContent = "⏸ Pause";
+                elements.readBtn.classList.remove("paused");
             } else {
                 synth.pause();
-                readBtn.textContent = "▶ Resume";
-                readBtn.classList.add("paused");
+                elements.readBtn.textContent = "▶ Resume";
+                elements.readBtn.classList.add("paused");
             }
         } else {
-            let text = textArea.value;
+            let text = elements.textArea.value;
             if (!text) return alert("Nothing to read!");
             
             let utterance = new SpeechSynthesisUtterance(text);
@@ -305,23 +343,22 @@
             utterance.rate = 0.9;
 
             utterance.onend = () => {
-                readBtn.textContent = "🔊 Read Aloud";
-                readBtn.classList.remove("paused");
+                elements.readBtn.textContent = "🔊 Read Aloud";
+                elements.readBtn.classList.remove("paused");
             };
 
             synth.speak(utterance);
-            readBtn.textContent = "⏸ Pause";
+            elements.readBtn.textContent = "⏸ Pause";
         }
     }
 
     function copyText() {
-        textArea.select();
+        elements.textArea.select();
         document.execCommand('copy');
-        setTimeout(() => textArea.focus(), 100);
+        setTimeout(() => elements.textArea.focus(), 100);
     }
-    function clearText() { textArea.value = ""; textArea.focus(); }
-
-    recognition.onend = () => { if(isListening) recognition.start(); };
+    
+    function clearText() { elements.textArea.value = ""; elements.textArea.focus(); }
 
 </script>
 </body>

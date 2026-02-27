@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eprashala - Exam Editor</title>
+    <style>
+        :root {
+            --primary: #FF9800;
+            --dark: #333;
+            --light: #f4f4f9;
+            --danger: #f44336;
+            --success: #4CAF50;
+            --blue: #2196F3;
+        }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--light); color: var(--dark); padding-bottom: 80px; }
+
+        /* HEADER */
+        header { background: var(--dark); color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+        .toolbar { display: flex; gap: 10px; }
+        button { cursor: pointer; padding: 10px 20px; border-radius: 6px; border: none; font-weight: bold; transition: 0.2s; }
+        .btn-load { background: var(--blue); color: white; }
+        .btn-save { background: var(--success); color: white; font-size: 1em; }
+        .btn-save:hover { background: #43A047; }
+
+        /* CONTAINER */
+        .container { max-width: 800px; margin: 30px auto; padding: 0 20px; }
+
+        /* TITLE BOX */
+        .chapter-box { background: white; padding: 20px; border-radius: 8px; margin-bottom: 25px; border-left: 6px solid var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .chapter-box label { font-size: 0.85em; text-transform: uppercase; color: #888; font-weight: bold; display: block; margin-bottom: 5px; }
+        .chapter-box input { width: 100%; font-size: 1.4em; border: 1px solid #ddd; padding: 10px; border-radius: 4px; color: #333; font-weight: bold; box-sizing: border-box; }
+
+        /* QUESTION CARD */
+        .mcq-card { 
+            background: white; 
+            border: 1px solid #e0e0e0; 
+            padding: 20px; 
+            border-radius: 8px; 
+            margin-bottom: 20px; 
+            position: relative;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            transition: 0.2s;
+        }
+        .mcq-card:hover { border-color: #bbb; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        
+        .card-header { display: flex; justify-content: space-between; margin-bottom: 15px; }
+        .q-number { background: var(--primary); color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 0.9em; height: fit-content; }
+        
+        .delete-btn { 
+            background: #ffebee; color: var(--danger); 
+            border: 1px solid #ffcdd2;
+            padding: 5px 10px; 
+            font-size: 0.9em;
+        }
+        .delete-btn:hover { background: var(--danger); color: white; }
+
+        /* INPUTS */
+        textarea, input[type="text"] { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-family: inherit; margin-bottom: 10px; background: #fafafa; }
+        textarea:focus, input[type="text"]:focus { border-color: var(--primary); outline: none; background: white; }
+        
+        .q-input { font-weight: bold; font-size: 1.1em; margin-bottom: 15px; }
+
+        /* OPTIONS GRID */
+        .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .option-row { display: flex; align-items: center; gap: 10px; background: #f9f9f9; padding: 5px 10px; border-radius: 4px; border: 1px solid transparent; }
+        .option-row:hover { border-color: #ddd; }
+        .option-row.correct-answer { background: #e8f5e9; border-color: var(--success); }
+        
+        input[type="radio"] { width: 20px; height: 20px; accent-color: var(--success); cursor: pointer; }
+        .opt-text { margin-bottom: 0 !important; border: 1px solid #eee !important; }
+
+        /* ADD BUTTON */
+        .btn-add { 
+            width: 100%; 
+            background: white; 
+            color: var(--dark); 
+            border: 2px dashed #ccc; 
+            padding: 15px; 
+            border-radius: 8px; 
+            font-weight: bold;
+            font-size: 1.1em;
+            margin-top: 20px;
+            cursor: pointer;
+        }
+        .btn-add:hover { background: #f5f5f5; border-color: var(--primary); color: var(--primary); }
+
+        /* STATES */
+        #welcomeState { text-align: center; margin-top: 100px; color: #888; }
+        #editorState { display: none; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div style="font-size: 1.3em; font-weight: bold;">Eprashala <span style="font-weight: normal; opacity: 0.7; font-size: 0.8em;">| Exam Editor</span></div>
+    <div class="toolbar">
+        <input type="file" id="examFileLoader" accept=".ex" style="display:none" onchange="loadFile(this)">
+        <button class="btn-load" onclick="document.getElementById('examFileLoader').click()">📂 Load .ex File</button>
+        <button class="btn-save" onclick="saveExam()">💾 Save & Download</button>
+    </div>
+</header>
+
+<div id="welcomeState">
+    <h2>Teacher's Exam Editor</h2>
+    <p>Load an existing <b>.ex</b> file to edit questions, fix keys, or add new content.</p>
+</div>
+
+<div id="editorState" class="container">
+    
+    <div class="chapter-box">
+        <label>Exam / Chapter Title</label>
+        <input type="text" id="chapterTitle" placeholder="e.g. Science Quiz: Chapter 5">
+    </div>
+
+    <div id="questionsContainer">
+        </div>
+
+    <button class="btn-add" onclick="addNewQuestion()">＋ Add New MCQ Question</button>
+
+</div>
+
+<script>
+    let questionCount = 0;
+
+    // --- LOAD LOGIC ---
+    function loadFile(input) {
+        const file = input.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                renderEditor(data);
+            } catch(err) {
+                alert("Invalid File Format. Please select a valid .ex file.");
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    function renderEditor(data) {
+        document.getElementById('welcomeState').style.display = 'none';
+        document.getElementById('editorState').style.display = 'block';
+        document.getElementById('chapterTitle').value = data.chapterTitle || "";
+        document.getElementById('questionsContainer').innerHTML = "";
+        questionCount = 0;
+
+        if (data.mcq && data.mcq.length > 0) {
+            data.mcq.forEach(q => addNewQuestion(q));
+        } else {
+            addNewQuestion(); // Add one blank if empty
+        }
+    }
+
+    // --- RENDER CARD ---
+    function addNewQuestion(data = null) {
+        questionCount++;
+        const container = document.getElementById('questionsContainer');
+        const div = document.createElement('div');
+        div.className = 'mcq-card';
+        div.id = `card_${questionCount}`;
+
+        // Defaults
+        const qText = data ? data.q : "";
+        const opts = data ? data.options : ["", "", "", ""];
+        const correctIdx = data ? data.correct : 0;
+
+        // Generate Option Rows
+        let optionsHTML = "";
+        for(let i=0; i<4; i++) {
+            const isChecked = (i === correctIdx) ? "checked" : "";
+            const rowClass = (i === correctIdx) ? "option-row correct-answer" : "option-row";
+            
+            optionsHTML += `
+                <div class="${rowClass}" onclick="highlightRow(this)">
+                    <input type="radio" name="rad_${questionCount}" value="${i}" ${isChecked}>
+                    <input type="text" class="opt-text" value="${opts[i]}" placeholder="Option ${String.fromCharCode(65+i)}">
+                </div>
+            `;
+        }
+
+        div.innerHTML = `
+            <div class="card-header">
+                <span class="q-number">Q</span>
+                <button class="delete-btn" onclick="removeCard(this)">Delete Question</button>
+            </div>
+            <label style="font-size:0.8em; font-weight:bold; color:#666;">QUESTION TEXT</label>
+            <textarea class="q-input" rows="2" placeholder="Type your question here...">${qText}</textarea>
+            
+            <label style="font-size:0.8em; font-weight:bold; color:#666;">OPTIONS (Select the correct radio button)</label>
+            <div class="options-grid">
+                ${optionsHTML}
+            </div>
+        `;
+        container.appendChild(div);
+    }
+
+    // --- UI HELPERS ---
+    function removeCard(btn) {
+        if(confirm("Are you sure you want to delete this question?")) {
+            btn.closest('.mcq-card').remove();
+        }
+    }
+
+    // Highlights the row green when radio is clicked (visual feedback for teacher)
+    function highlightRow(element) {
+        // If clicked on input/radio, let event bubble, but we need to find the row
+        const row = element.classList.contains('option-row') ? element : element.closest('option-row');
+        if(!row) return;
+
+        // Find parent grid
+        const grid = row.parentElement;
+        
+        // Remove highlight from all siblings
+        Array.from(grid.children).forEach(child => child.classList.remove('correct-answer'));
+        
+        // Check the radio
+        const radio = row.querySelector('input[type="radio"]');
+        radio.checked = true;
+        
+        // Add highlight
+        row.classList.add('correct-answer');
+    }
+
+    // --- SAVE LOGIC ---
+    function saveExam() {
+        const title = document.getElementById('chapterTitle').value;
+        if (!title.trim()) return alert("Please enter an Exam Title");
+
+        const mcqList = [];
+        const cards = document.querySelectorAll('.mcq-card');
+
+        if(cards.length === 0) return alert("Please add at least one question.");
+
+        cards.forEach(card => {
+            const qText = card.querySelector('.q-input').value;
+            // Only save if question has text
+            if(qText.trim()) {
+                const options = [];
+                const optInputs = card.querySelectorAll('.opt-text');
+                optInputs.forEach(inp => options.push(inp.value));
+                
+                let correctIdx = 0;
+                const radios = card.querySelectorAll('input[type="radio"]');
+                radios.forEach((r, i) => { if(r.checked) correctIdx = i; });
+
+                mcqList.push({
+                    q: qText,
+                    options: options,
+                    correct: correctIdx
+                });
+            }
+        });
+
+        const finalData = {
+            chapterTitle: title,
+            mcq: mcqList
+        };
+
+        const jsonStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(finalData, null, 2));
+        const a = document.createElement('a');
+        a.href = jsonStr;
+        a.download = title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + ".ex";
+        document.body.appendChild(a); 
+        a.click(); 
+        a.remove();
+
+        alert("Exam updated and downloaded successfully!");
+    }
+</script>
+
+</body>
+</html>

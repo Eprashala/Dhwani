@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Floating Search</title>
+    <style>
+        html, body {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; background: transparent;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        .search-wrapper {
+            background: white; width: 100%; box-sizing: border-box;
+            border-radius: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            overflow: hidden; display: flex; flex-direction: column;
+        }
+
+        .input-area {
+            display: flex; align-items: center; padding: 5px 15px;
+            height: 45px; box-sizing: border-box;
+        }
+
+        .search-icon { font-size: 18px; color: #888; margin-right: 10px; }
+        
+        input {
+            flex: 1; border: none; outline: none; font-size: 16px; color: #333;
+        }
+
+        /* --- NEW MIC STYLES --- */
+        .mic-btn {
+            background: transparent; border: none; font-size: 20px;
+            cursor: pointer; transition: all 0.2s;
+            border-radius: 50%; width: 35px; height: 35px;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        /* State: INACTIVE (Crossed out) */
+        .mic-btn.inactive {
+            color: #999;
+            position: relative;
+        }
+        .mic-btn.inactive::after {
+            content: '✕'; /* Cross mark overlay */
+            position: absolute; font-size: 12px; color: red;
+            bottom: 0; right: 0; font-weight: bold; background: white;
+            border-radius: 50%; padding: 2px;
+        }
+
+        /* State: ACTIVE (Normal & Pulsing) */
+        .mic-btn.active {
+            color: #FF9800; /* Normal Orange Mic */
+            background: #fff3e0;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 152, 0, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 152, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 152, 0, 0); }
+        }
+
+        .close-btn {
+            margin-left: 10px; color: #999; cursor: pointer;
+            font-size: 18px; display: none;
+        }
+
+        .results-list {
+            list-style: none; padding: 0; margin: 0;
+            max-height: 400px; overflow-y: auto;
+            border-top: 1px solid #eee; display: none;
+        }
+
+        .result-item {
+            padding: 10px 20px; cursor: pointer; display: flex;
+            align-items: center; gap: 10px; border-bottom: 1px solid #f9f9f9;
+        }
+        .result-item:hover { background: #f0f0f0; }
+        .res-icon { font-size: 18px; }
+        .res-text { font-size: 14px; font-weight: 500; color: #444; }
+
+        .results-list::-webkit-scrollbar { width: 6px; }
+        .results-list::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+<div class="search-wrapper" id="searchWrapper">
+    <div class="input-area">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" placeholder="Type or click mic..." autocomplete="off">
+        <span class="close-btn" id="clearBtn" onclick="clearSearch()">✖</span>
+        
+        <button class="mic-btn inactive" id="micBtn" onclick="toggleVoice()">🎙️</button>
+    </div>
+    
+    <ul class="results-list" id="resultsList"></ul>
+</div>
+
+<script>
+    let currentContext = []; // ONLY the files in the active window
+    let recognition = null;
+    let isVoiceActive = false; 
+
+    /* ================= INITIALIZATION ================= */
+    window.addEventListener('message', (event) => {
+        const data = event.data;
+        
+        // 1. Initial Load
+        if (data.type === 'INIT_DATA') {
+            currentContext = data.contextItems || [];
+            document.getElementById('searchInput').focus();
+        }
+        
+        // 2. Real-time Context Update (User navigated folders)
+        if (data.type === 'UPDATE_CONTEXT') {
+            currentContext = data.items || [];
+            // If the search bar is open with text, re-run search on new folder?
+            // Usually better to clear it to avoid confusion.
+            // document.getElementById('searchInput').value = '';
+            // hideResults();
+        }
+
+        // 3. Focus Command
+        if (data.action === 'FOCUS_INPUT') {
+            const input = document.getElementById('searchInput');
+            input.value = ''; 
+            hideResults();
+            input.focus();
+        }
+    });
+
+    /* ================= SEARCH LOGIC ================= */
+    const input = document.getElementById('searchInput');
+    const list = document.getElementById('resultsList');
+    const clearBtn = document.getElementById('clearBtn');
+    const wrapper = document.getElementById('searchWrapper');
+
+    input.addEventListener('input', () => {
+        const query = input.value.trim().toLowerCase();
+        if (query.length === 0) { hideResults(); return; }
+        clearBtn.style.display = 'block';
+        
+        // SEARCH ONLY IN CURRENT CONTEXT
+        const matches = currentContext.filter(item => {
+            if (item.name.endsWith('.qa') || item.name.endsWith('.ex')) return false;
+            return item.name.toLowerCase().includes(query);
+        });
+        renderResults(matches);
+    });
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            const firstItem = list.querySelector('.result-item');
+            if (firstItem) firstItem.click();
+        }
+        if (e.key === 'Escape') tellParentToClose();
+    });
+
+    function renderResults(matches) {
+        list.innerHTML = '';
+        if (matches.length === 0) {
+            list.innerHTML = `<li class="result-item"><span class="res-text" style="color:#888;">No matches in this folder</span></li>`;
+        } else {
+            matches.slice(0, 10).forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'result-item';
+                let icon = '📄';
+                if (item.type === 'folder') icon = '📁';
+                else if (item.name.match(/\.(mp4|webm|enc)$/)) icon = '🎬';
+                else if (item.name.endsWith('.pdf')) icon = '📕';
+
+                li.innerHTML = `<span class="res-icon">${icon}</span><span class="res-text">${item.name}</span>`;
+                
+                li.onclick = () => {
+                    window.parent.postMessage({ action: 'OPEN_FILE', path: item.path }, '*');
+                    input.value = '';
+                    hideResults();
+                    if(isVoiceActive) input.placeholder = "Listening...";
+                };
+                list.appendChild(li);
+            });
+        }
+        list.style.display = 'block';
+        const totalHeight = 45 + list.scrollHeight;
+        window.parent.postMessage({ action: 'RESIZE', height: totalHeight }, '*');
+        wrapper.style.borderRadius = "20px";
+    }
+
+    function hideResults() {
+        list.style.display = 'none';
+        clearBtn.style.display = 'none';
+        wrapper.style.borderRadius = "25px"; 
+        window.parent.postMessage({ action: 'RESIZE', height: 45 }, '*');
+    }
+
+    function clearSearch() {
+        input.value = '';
+        hideResults();
+        input.focus();
+    }
+
+    function tellParentToClose() {
+        if(isVoiceActive) toggleVoice(); 
+        window.parent.postMessage({ action: 'CLOSE_WIDGET' }, '*');
+    }
+
+    /* ================= VOICE LOGIC ================= */
+    const micBtn = document.getElementById('micBtn');
+
+    function toggleVoice() {
+        if (!recognition) initSpeech();
+
+        if (isVoiceActive) {
+            isVoiceActive = false;
+            recognition.stop();
+            micBtn.className = "mic-btn inactive"; 
+            input.placeholder = "Type or click mic...";
+        } else {
+            isVoiceActive = true;
+            try { recognition.start(); } catch(e) {}
+            micBtn.className = "mic-btn active";   
+            input.placeholder = "Listening...";
+        }
+    }
+
+    function initSpeech() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) { alert("Voice not supported."); return; }
+
+        recognition = new SpeechRecognition();
+        recognition.lang = 'en-IN';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        recognition.onend = () => {
+            if (isVoiceActive) { try { recognition.start(); } catch(e) {} } 
+            else { micBtn.className = "mic-btn inactive"; }
+        };
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript.trim();
+            let cleanText = transcript.replace(/^(ninad|open|show|go to|search for)\s+/i, "");
+            cleanText = cleanText.replace(/[.,?!]$/, "");
+
+            input.value = cleanText;
+            const eventInput = new Event('input');
+            input.dispatchEvent(eventInput);
+            
+            setTimeout(() => {
+                const wasClicked = attemptAutoClick(cleanText.toLowerCase());
+                setTimeout(() => {
+                    input.value = '';
+                    hideResults();
+                    input.placeholder = "Listening...";
+                }, 1500);
+            }, 200);
+        };
+    }
+
+    function attemptAutoClick(text) {
+        // Search in visible list (Local Context)
+        const visibleItems = Array.from(document.querySelectorAll('.result-item'));
+        if (visibleItems.length === 0) return false;
+
+        const exactMatch = visibleItems.find(item => {
+            return item.querySelector('.res-text').innerText.toLowerCase() === text;
+        });
+
+        if (exactMatch) {
+            exactMatch.click();
+            return true;
+        } 
+        else if (visibleItems.length === 1 && !visibleItems[0].innerText.includes("No matches")) {
+            visibleItems[0].click();
+            return true;
+        }
+        return false;
+    }
+</script>
+
+</body>
+</html>

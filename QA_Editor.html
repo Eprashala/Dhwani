@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eprashala - Teacher's Editor</title>
+    <style>
+        :root {
+            --primary: #FF9800;
+            --dark: #333;
+            --light: #f4f4f9;
+            --danger: #f44336;
+            --success: #4CAF50;
+            --blue: #2196F3;
+        }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--light); color: var(--dark); padding-bottom: 50px; }
+
+        /* HEADER */
+        header { background: var(--dark); color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+        .toolbar { display: flex; gap: 10px; }
+        button { cursor: pointer; padding: 10px 20px; border-radius: 6px; border: none; font-weight: bold; transition: 0.2s; }
+        .btn-load { background: var(--blue); color: white; }
+        .btn-save { background: var(--success); color: white; font-size: 1em; }
+        .btn-save:hover { background: #43A047; }
+
+        /* MAIN CONTAINER */
+        .container { max-width: 900px; margin: 30px auto; padding: 0 20px; }
+
+        /* CHAPTER TITLE INPUT */
+        .chapter-box { background: white; padding: 20px; border-radius: 8px; margin-bottom: 25px; border-left: 6px solid var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .chapter-box label { font-size: 0.85em; text-transform: uppercase; color: #888; font-weight: bold; display: block; margin-bottom: 5px; }
+        .chapter-box input { width: 100%; font-size: 1.4em; border: 1px solid #ddd; padding: 10px; border-radius: 4px; color: #333; font-weight: bold; box-sizing: border-box; }
+
+        /* ACCORDION MODULES */
+        details { background: white; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); overflow: hidden; transition: 0.3s; }
+        details[open] { padding-bottom: 20px; }
+        
+        summary { 
+            padding: 15px 20px; 
+            cursor: pointer; 
+            background: #fff; 
+            font-weight: bold; 
+            font-size: 1.1em; 
+            color: #444; 
+            list-style: none; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            border-bottom: 1px solid transparent;
+        }
+        
+        details[open] summary { background: #f9f9f9; border-bottom: 1px solid #eee; color: var(--primary); }
+        summary::after { content: '▼'; font-size: 0.8em; color: #999; transition: 0.3s; }
+        details[open] summary::after { transform: rotate(180deg); }
+        
+        /* EDITABLE CARDS */
+        .module-content { padding: 20px; }
+        .qa-card { 
+            background: #fafafa; 
+            border: 1px solid #eee; 
+            padding: 15px; 
+            border-radius: 6px; 
+            margin-bottom: 15px; 
+            position: relative; 
+            animation: fadeIn 0.3s ease; 
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .delete-btn { 
+            position: absolute; top: 10px; right: 10px; 
+            background: #ffebee; color: var(--danger); 
+            width: 30px; height: 30px; padding: 0; 
+            border-radius: 50%; font-size: 1.2em; line-height: 1;
+        }
+        .delete-btn:hover { background: var(--danger); color: white; }
+
+        .input-label { font-size: 0.75em; text-transform: uppercase; color: #999; font-weight: bold; margin-bottom: 4px; display: block; }
+        textarea, input[type="text"] { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-family: inherit; margin-bottom: 10px; background: white; }
+        textarea:focus, input:focus { border-color: var(--primary); outline: none; background: #fffde7; }
+
+        /* ADD BUTTON */
+        .add-row { padding: 0 20px; }
+        .btn-add { 
+            width: 100%; 
+            background: #fff; 
+            color: var(--blue); 
+            border: 2px dashed #bbdefb; 
+            padding: 12px; 
+            border-radius: 6px; 
+            font-weight: bold;
+        }
+        .btn-add:hover { background: #e3f2fd; border-color: var(--blue); }
+
+        /* PAIR STYLING */
+        .pair-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+
+        /* WELCOME SCREEN */
+        #welcomeState { text-align: center; margin-top: 100px; color: #888; }
+        #editorState { display: none; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div style="font-size: 1.3em; font-weight: bold;">Eprashala <span style="font-weight: normal; opacity: 0.7; font-size: 0.8em;">| Content Editor</span></div>
+    <div class="toolbar">
+        <input type="file" id="qaFileLoader" accept=".qa" style="display:none" onchange="loadFile(this)">
+        <button class="btn-load" onclick="document.getElementById('qaFileLoader').click()">📂 Load .qa File</button>
+        <button class="btn-save" onclick="exportFile()">💾 Save Update</button>
+    </div>
+</header>
+
+<div id="welcomeState">
+    <h2>Teacher's QA Editor</h2>
+    <p>Please load a <b>.qa</b> file to begin editing.</p>
+</div>
+
+<div id="editorState" class="container">
+    
+    <div class="chapter-box">
+        <label>Chapter Title</label>
+        <input type="text" id="chapterTitle" placeholder="e.g. Chapter 4: Kinetic Energy">
+    </div>
+
+    <details open>
+        <summary>1. Answer in One Sentence</summary>
+        <div class="module-content" id="container-oneSentence"></div>
+        <div class="add-row">
+            <button class="btn-add" onclick="addNewCard('container-oneSentence', 'qa')">＋ Add New Question</button>
+        </div>
+    </details>
+
+    <details>
+        <summary>2. Fill in the Blanks</summary>
+        <div class="module-content" id="container-fillBlanks"></div>
+        <div class="add-row">
+            <button class="btn-add" onclick="addNewCard('container-fillBlanks', 'qa')">＋ Add New Blank</button>
+        </div>
+    </details>
+
+    <details>
+        <summary>3. Match the Following</summary>
+        <div class="module-content" id="container-matchFollowing"></div>
+        <div class="add-row">
+            <button class="btn-add" onclick="addNewCard('container-matchFollowing', 'pair')">＋ Add New Pair</button>
+        </div>
+    </details>
+
+    <details>
+        <summary>4. Short / Brief Answers</summary>
+        <div class="module-content" id="container-shortAnswer"></div>
+        <div class="add-row">
+            <button class="btn-add" onclick="addNewCard('container-shortAnswer', 'qa')">＋ Add New Short Answer</button>
+        </div>
+    </details>
+
+</div>
+
+<script>
+    // --- LOAD LOGIC ---
+    function loadFile(input) {
+        const file = input.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                renderEditor(data);
+            } catch(err) {
+                alert("Invalid File Format");
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    function renderEditor(data) {
+        document.getElementById('welcomeState').style.display = 'none';
+        document.getElementById('editorState').style.display = 'block';
+
+        document.getElementById('chapterTitle').value = data.chapterTitle || "";
+
+        // Helper to clear and fill containers
+        const fill = (id, items, type) => {
+            const el = document.getElementById(id);
+            el.innerHTML = ""; 
+            if(items) items.forEach(item => addNewCard(id, type, item));
+        };
+
+        fill('container-oneSentence', data.oneSentence, 'qa');
+        fill('container-fillBlanks', data.fillBlanks, 'qa');
+        fill('container-matchFollowing', data.matchFollowing, 'pair');
+        fill('container-shortAnswer', data.shortAnswer, 'qa');
+    }
+
+    // --- CARD CREATION LOGIC ---
+    function addNewCard(containerId, type, data = null) {
+        const container = document.getElementById(containerId);
+        const div = document.createElement('div');
+        div.className = 'qa-card';
+
+        if (type === 'qa') {
+            // Default empty values or loaded data
+            const qVal = data ? data.q : "";
+            const aVal = data ? data.a : "";
+            
+            div.innerHTML = `
+                <button class="delete-btn" onclick="removeCard(this)" title="Delete Question">×</button>
+                <label class="input-label">Question</label>
+                <input type="text" class="field-q" value="${qVal}" placeholder="Enter question...">
+                <label class="input-label">Answer</label>
+                <textarea class="field-a" rows="2" placeholder="Enter answer...">${aVal}</textarea>
+            `;
+        } else if (type === 'pair') {
+            const p1Val = data ? data.pair1 : "";
+            const p2Val = data ? data.pair2 : "";
+
+            div.innerHTML = `
+                <button class="delete-btn" onclick="removeCard(this)" title="Delete Pair">×</button>
+                <div class="pair-grid">
+                    <div>
+                        <label class="input-label">Column A</label>
+                        <input type="text" class="field-p1" value="${p1Val}" placeholder="Item...">
+                    </div>
+                    <div>
+                        <label class="input-label">Column B (Match)</label>
+                        <input type="text" class="field-p2" value="${p2Val}" placeholder="Matches with...">
+                    </div>
+                </div>
+            `;
+        }
+
+        container.appendChild(div);
+    }
+
+    function removeCard(btn) {
+        if(confirm("Delete this item?")) {
+            btn.parentElement.remove();
+        }
+    }
+
+    // --- SAVE LOGIC ---
+    function exportFile() {
+        const title = document.getElementById('chapterTitle').value;
+        if (!title.trim()) return alert("Please enter a Chapter Title");
+
+        // Helper to scrape data from DOM
+        const scrapeQA = (id) => {
+            const list = [];
+            document.getElementById(id).querySelectorAll('.qa-card').forEach(card => {
+                const q = card.querySelector('.field-q').value;
+                const a = card.querySelector('.field-a').value;
+                if (q.trim()) list.push({ q, a });
+            });
+            return list;
+        };
+
+        const scrapePairs = (id) => {
+            const list = [];
+            document.getElementById(id).querySelectorAll('.qa-card').forEach(card => {
+                const p1 = card.querySelector('.field-p1').value;
+                const p2 = card.querySelector('.field-p2').value;
+                if (p1.trim()) list.push({ pair1: p1, pair2: p2 });
+            });
+            return list;
+        };
+
+        const data = {
+            chapterTitle: title,
+            oneSentence: scrapeQA('container-oneSentence'),
+            fillBlanks: scrapeQA('container-fillBlanks'),
+            matchFollowing: scrapePairs('container-matchFollowing'),
+            shortAnswer: scrapeQA('container-shortAnswer'),
+            briefAnswer: [] // Reserved for future
+        };
+
+        const jsonStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+        const a = document.createElement('a');
+        a.href = jsonStr;
+        a.download = title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + "_updated.qa";
+        document.body.appendChild(a); a.click(); a.remove();
+        
+        alert("File Saved Successfully!");
+    }
+</script>
+
+</body>
+</html>

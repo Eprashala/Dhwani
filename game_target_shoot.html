@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Target Shooter Quiz</title>
+<style>
+body {
+  margin: 0;
+  font-family: Arial;
+  background: #0b1d2a;
+  color: white;
+  overflow: hidden;
+}
+
+#question {
+  text-align: center;
+  font-size: 22px;
+  margin: 15px;
+}
+
+.target {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, red, darkred);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: crosshair;
+  font-size: 16px;
+  text-align: center;
+  padding: 10px;
+  box-sizing: border-box;
+  transition: transform 0.1s;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+}
+
+.target:hover {
+  transform: scale(1.1);
+}
+</style>
+</head>
+
+<body>
+
+<div id="question"></div>
+
+<script src="exam_engine.html"></script>
+<script>
+let targets = [];
+
+// --- 1. SHUFFLE HELPER ---
+function shuffleArray(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
+function loadGameQuestion() {
+  // Clear existing targets
+  document.body.querySelectorAll(".target").forEach(t => t.remove());
+  targets = [];
+
+  if (currentQuestionIndex >= questions.length) {
+    showResult();
+    return;
+  }
+
+  // Get current question from engine
+  const q = questions[currentQuestionIndex];
+  document.getElementById("question").innerText = q.question;
+
+  // --- 2. SHUFFLE OPTIONS ---
+  // Create objects to track which option is the correct one before shuffling
+  let shuffledOptions = q.options.map((opt, index) => ({
+    text: opt,
+    isCorrect: index === q.correct
+  }));
+
+  shuffleArray(shuffledOptions);
+
+  // --- 3. RENDER TARGETS ---
+  shuffledOptions.forEach((optObj, i) => {
+    const t = document.createElement("div");
+    t.className = "target";
+    t.innerText = optObj.text;
+
+    // Random initial position
+    t.style.left = Math.random() * (window.innerWidth - 150) + "px";
+    t.style.top = Math.random() * (window.innerHeight - 200) + 80 + "px";
+
+    t.onclick = () => {
+      // Logic: If this shuffled option was originally the correct one
+      if (optObj.isCorrect) {
+        checkAnswer(q.correct); // Pass original correct index to engine
+      } else {
+        // Pass an intentionally wrong index to trigger "Incorrect" in engine
+        checkAnswer(-1); 
+      }
+      
+      // Delay to show visual feedback before moving to next
+      setTimeout(nextQuestion, 300);
+    };
+
+    document.body.appendChild(t);
+    targets.push(t);
+    moveTarget(t);
+  });
+}
+
+function moveTarget(t) {
+  let dx = (Math.random() * 2 + 1) * (Math.random() > 0.5 ? 1 : -1);
+  let dy = (Math.random() * 2 + 1) * (Math.random() > 0.5 ? 1 : -1);
+
+  // Store interval ID on the element to clear it if needed
+  t.moveInterval = setInterval(() => {
+    let x = t.offsetLeft + dx;
+    let y = t.offsetTop + dy;
+
+    // Bounce logic
+    if (x < 0 || x > window.innerWidth - 120) dx *= -1;
+    if (y < 60 || y > window.innerHeight - 120) dy *= -1;
+
+    t.style.left = x + "px";
+    t.style.top = y + "px";
+  }, 30);
+}
+
+// Hook into engine to reload the UI when question changes
+const originalNext = nextQuestion;
+nextQuestion = function() {
+  originalNext();
+  loadGameQuestion();
+};
+
+// Start the game
+// Added a small delay to ensure engine variables are initialized
+window.onload = () => {
+  // Optional: Shuffle the entire questions array once at start if available
+  if (typeof questions !== 'undefined') {
+    shuffleArray(questions);
+  }
+  loadGameQuestion();
+};
+</script>
+
+</body>
+</html>

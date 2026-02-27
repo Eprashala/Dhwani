@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Floating Search</title>
+    <style>
+        /* 1. Transparent Canvas - Only the bar is visible */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: transparent; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* 2. The Search Container (Pill Shape) */
+        .search-wrapper {
+            background: white;
+            width: 100%;
+            box-sizing: border-box;
+            border-radius: 25px; /* Pill shape initially */
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            overflow: hidden;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 3. The Top Input Bar */
+        .input-area {
+            display: flex;
+            align-items: center;
+            padding: 5px 15px;
+            height: 45px; /* Matches Index.html iframe height */
+            box-sizing: border-box;
+        }
+
+        .search-icon {
+            font-size: 18px;
+            color: #888;
+            margin-right: 10px;
+        }
+
+        input {
+            flex: 1;
+            border: none;
+            outline: none;
+            font-size: 16px;
+            color: #333;
+        }
+
+        .mic-btn {
+            background: transparent;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #FF9800; /* Theme Orange */
+            transition: transform 0.2s;
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .mic-btn:hover { background: #fff3e0; }
+        .mic-btn.listening { 
+            color: red; 
+            animation: pulse 1.5s infinite; 
+            background: #ffebee;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.4); }
+            70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(255, 0, 0, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 0, 0, 0); }
+        }
+
+        .close-btn {
+            margin-left: 10px;
+            color: #999;
+            cursor: pointer;
+            font-size: 18px;
+            display: none; /* Only show when typing */
+        }
+
+        /* 4. Results Dropdown */
+        .results-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 400px; /* Scrollable if too many */
+            overflow-y: auto;
+            border-top: 1px solid #eee;
+            display: none; /* Hidden initially */
+        }
+
+        .result-item {
+            padding: 10px 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid #f9f9f9;
+        }
+
+        .result-item:hover { background: #f0f0f0; }
+        .result-item:last-child { border-bottom: none; }
+
+        .res-icon { font-size: 18px; }
+        .res-text { font-size: 14px; font-weight: 500; color: #444; }
+        .res-path { font-size: 11px; color: #999; margin-left: auto; }
+
+        /* Scrollbar styling */
+        .results-list::-webkit-scrollbar { width: 6px; }
+        .results-list::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+<div class="search-wrapper" id="searchWrapper">
+    <div class="input-area">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" placeholder="Type or say 'Open English'..." autocomplete="off">
+        <span class="close-btn" id="clearBtn" onclick="clearSearch()">✖</span>
+        <button class="mic-btn" id="micBtn" onclick="toggleVoice()">🎙️</button>
+    </div>
+    
+    <ul class="results-list" id="resultsList"></ul>
+</div>
+
+<<script>
+    let LIBRARY_DATA = null;
+    let recognition = null;
+    let isListening = false;
+    let flatLibrary = []; 
+
+    /* ================= INITIALIZATION ================= */
+    window.addEventListener('message', (event) => {
+        const data = event.data;
+        if (data.type === 'INIT_DATA') {
+            LIBRARY_DATA = data.library;
+            flattenLibrary(LIBRARY_DATA);
+            document.getElementById('searchInput').focus();
+        }
+        if (data.action === 'FOCUS_INPUT') {
+            const input = document.getElementById('searchInput');
+            input.value = ''; // Reset on re-open
+            hideResults();    // Ensure it starts small
+            input.focus();
+        }
+    });
+
+    function flattenLibrary(root) {
+        flatLibrary = [];
+        if (!root) return;
+        function traverse(node) {
+            flatLibrary.push({ name: node.name, path: node.path, type: node.type });
+            if (node.children) node.children.forEach(child => traverse(child));
+        }
+        traverse(root);
+    }
+
+    /* ================= SEARCH LOGIC ================= */
+    const input = document.getElementById('searchInput');
+    const list = document.getElementById('resultsList');
+    const clearBtn = document.getElementById('clearBtn');
+    const wrapper = document.getElementById('searchWrapper');
+
+    input.addEventListener('input', () => {
+        const query = input.value.trim().toLowerCase();
+        if (query.length === 0) { hideResults(); return; }
+
+        clearBtn.style.display = 'block';
+        
+        const matches = flatLibrary.filter(item => {
+            if (item.name.endsWith('.qa') || item.name.endsWith('.ex')) return false;
+            return item.name.toLowerCase().includes(query);
+        });
+
+        renderResults(matches);
+    });
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            const firstItem = list.querySelector('.result-item');
+            if (firstItem) firstItem.click();
+        }
+        if (e.key === 'Escape') tellParentToClose();
+    });
+
+    function renderResults(matches) {
+        list.innerHTML = '';
+        if (matches.length === 0) {
+            list.innerHTML = `<li class="result-item"><span class="res-text" style="color:#888;">No matches found</span></li>`;
+        } else {
+            matches.slice(0, 10).forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'result-item';
+                
+                let icon = '📄';
+                if (item.type === 'folder') icon = '📁';
+                else if (item.name.match(/\.(mp4|webm|enc)$/)) icon = '🎬';
+                else if (item.name.endsWith('.pdf')) icon = '📕';
+
+                li.innerHTML = `<span class="res-icon">${icon}</span><span class="res-text">${item.name}</span>`;
+                
+                // === THE SELF-CLEANING CLICK ===
+                li.onclick = () => {
+                    // 1. Open File
+                    window.parent.postMessage({ action: 'OPEN_FILE', path: item.path }, '*');
+                    // 2. Clear & Close
+                    input.value = '';
+                    hideResults();
+                };
+                
+                list.appendChild(li);
+            });
+        }
+        
+        list.style.display = 'block';
+        const totalHeight = 45 + list.scrollHeight;
+        window.parent.postMessage({ action: 'RESIZE', height: totalHeight }, '*');
+        wrapper.style.borderRadius = "20px";
+    }
+
+    function hideResults() {
+        list.style.display = 'none';
+        clearBtn.style.display = 'none';
+        wrapper.style.borderRadius = "25px"; 
+        window.parent.postMessage({ action: 'RESIZE', height: 45 }, '*');
+    }
+
+    function clearSearch() {
+        input.value = '';
+        hideResults();
+        input.focus();
+    }
+
+    function tellParentToClose() {
+        window.parent.postMessage({ action: 'CLOSE_WIDGET' }, '*');
+    }
+
+    /* ================= VOICE LOGIC (FIXED) ================= */
+    const micBtn = document.getElementById('micBtn');
+
+    function toggleVoice() {
+        if (!recognition) initSpeech();
+        if (isListening) recognition.stop();
+        else recognition.start();
+    }
+
+    function initSpeech() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            alert("Voice not supported in this browser.");
+            return;
+        }
+
+        recognition = new SpeechRecognition();
+        recognition.lang = 'en-IN';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        recognition.onstart = () => {
+            isListening = true;
+            micBtn.classList.add('listening');
+            input.placeholder = "Listening...";
+        };
+
+        recognition.onend = () => {
+            isListening = false;
+            micBtn.classList.remove('listening');
+            input.placeholder = "Type or say 'Open English'...";
+        };
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript.trim();
+            
+            // 1. Clean Command
+            let cleanText = transcript.replace(/^(ninad|open|show|go to|search for)\s+/i, "");
+            cleanText = cleanText.replace(/[.,?!]$/, "");
+            
+            // 2. Type it in
+            input.value = cleanText;
+            
+            // 3. Trigger Search Filter (Important!)
+            const eventInput = new Event('input');
+            input.dispatchEvent(eventInput);
+            
+            // 4. Auto-Click Best Match
+            setTimeout(() => attemptAutoClick(cleanText.toLowerCase()), 200);
+        };
+    }
+
+    function attemptAutoClick(text) {
+        // A. Check for Exact Match in the currently rendered list
+        const visibleItems = Array.from(document.querySelectorAll('.result-item'));
+        
+        if (visibleItems.length === 0) return;
+
+        // If specific text matches a result exactly, click it
+        const exactMatch = visibleItems.find(item => {
+            const name = item.querySelector('.res-text').innerText.toLowerCase();
+            return name === text;
+        });
+
+        if (exactMatch) {
+            exactMatch.click(); // This triggers OPEN_FILE + Cleanup
+        } 
+        // B. If only one result is left after filtering, click it
+        else if (visibleItems.length === 1 && !visibleItems[0].innerText.includes("No matches")) {
+            visibleItems[0].click(); // This triggers OPEN_FILE + Cleanup
+        }
+    }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Exam Racer</title>
+    <style>
+        body { background: #333; margin: 0; overflow: hidden; font-family: sans-serif; }
+        #road { background: #555; width: 400px; height: 100vh; margin: 0 auto; position: relative; border-left: 10px solid white; border-right: 10px solid white; }
+        .line { width: 10px; height: 100px; background: white; position: absolute; left: 50%; transform: translateX(-50%); animation: moveRoad 1s infinite linear; }
+        @keyframes moveRoad { from { top: -100px; } to { top: 100vh; } }
+        
+        #myCar { width: 50px; height: 100px; background: red; position: absolute; bottom: 20px; left: 40%; border-radius: 5px; box-shadow: 0 4px 10px black; transition: bottom 0.5s; z-index:10; }
+        #myCar::before { content: "ME"; color:white; display:block; text-align:center; padding-top:10px; }
+        
+        #enemyCar { width: 50px; height: 100px; background: blue; position: absolute; bottom: 20px; right: 40%; border-radius: 5px; transition: bottom 0.5s; }
+        
+        #dashboard { position: fixed; bottom: 0; width: 100%; background: #222; color: white; padding: 20px; box-sizing: border-box; border-top: 4px solid #444; height: 200px; display: flex; flex-direction: column; align-items: center; }
+        .opts { display: flex; gap: 10px; width: 100%; justify-content: center; margin-top: 10px; }
+        .btn-race { flex: 1; padding: 15px; background: #444; color: white; border: 1px solid #666; cursor: pointer; font-weight: bold; }
+        .btn-race:hover { background: #666; border-color: gold; }
+    </style>
+</head>
+<body>
+
+<div id="road">
+    <div class="line" style="top:0"></div>
+    <div class="line" style="top:300px"></div>
+    <div class="line" style="top:600px"></div>
+    <div id="myCar"></div>
+    <div id="enemyCar"></div>
+</div>
+
+<div id="dashboard">
+    <div id="qText">Race starting...</div>
+    <div class="opts" id="optContainer"></div>
+</div>
+
+<script>
+    // --- 1. SETUP & DATA ---
+    const rawData = sessionStorage.getItem('eprashala_exam_data');
+    let examData = rawData ? JSON.parse(rawData) : null;
+    
+    // Fallback for testing
+    if(!examData) examData = { mcq: [{q:"Test Q?", options:["A","B","C","D"], correct:0}] };
+
+    // --- 2. SHUFFLE LOGIC ---
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    if (examData && examData.mcq) {
+        // Shuffle the sequence of laps (questions)
+        shuffleArray(examData.mcq);
+
+        // Shuffle options within each question
+        examData.mcq.forEach(item => {
+            let optionsWithStatus = item.options.map((opt, index) => ({
+                text: opt,
+                isCorrect: index === item.correct
+            }));
+            
+            shuffleArray(optionsWithStatus);
+            
+            item.options = optionsWithStatus.map(o => o.text);
+            item.correct = optionsWithStatus.findIndex(o => o.isCorrect);
+        });
+    }
+
+    // --- 3. GAME STATE ---
+    let currentQ = 0;
+    
+    function loadLap() {
+        if(currentQ >= examData.mcq.length) { 
+            document.getElementById('qText').innerText = "🏁 FINISH LINE CROSSED! RACE WON!"; 
+            document.getElementById('optContainer').innerHTML = '<button class="btn-race" onclick="location.reload()">REPLAY RACE</button>';
+            return; 
+        }
+        
+        // Reset cars positions
+        document.getElementById('myCar').style.bottom = "20px";
+        document.getElementById('enemyCar').style.bottom = "20px";
+
+        const q = examData.mcq[currentQ];
+        document.getElementById('qText').innerText = `Lap ${currentQ+1}: ${q.q}`;
+        
+        const container = document.getElementById('optContainer');
+        container.innerHTML = "";
+        
+        q.options.forEach((o, i) => {
+            const b = document.createElement('button');
+            b.className = "btn-race";
+            b.innerText = o;
+            b.onclick = () => drive(i, q.correct);
+            container.appendChild(b);
+        });
+    }
+
+    function drive(selected, correct) {
+        // Disable buttons during animation to prevent double-clicks
+        const buttons = document.querySelectorAll('.btn-race');
+        buttons.forEach(btn => btn.disabled = true);
+
+        if(selected === correct) {
+            // Turbo Boost (Player Wins Lap)
+            document.getElementById('myCar').style.bottom = "400px"; 
+            document.getElementById('qText').innerText = "🔥 TURBO BOOST! Correct!";
+            setTimeout(() => {
+                currentQ++;
+                loadLap();
+            }, 1000);
+        } else {
+            // Spin Out (Enemy Wins Lap)
+            document.getElementById('enemyCar').style.bottom = "400px";
+            document.getElementById('qText').innerText = "⚠️ SPIN OUT! Wrong answer.";
+            setTimeout(() => {
+                currentQ++;
+                loadLap(); 
+            }, 1500);
+        }
+    }
+
+    // Initial load
+    loadLap();
+</script>
+</body>
+</html>

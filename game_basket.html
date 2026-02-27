@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Basketball MCQ</title>
+    <style>
+        body { background: #FFCC80; font-family: sans-serif; text-align: center; overflow: hidden; }
+        .hoop-container { display: flex; justify-content: space-around; margin-top: 50px; }
+        .hoop { width: 100px; height: 100px; border: 5px solid #E65100; border-radius: 50%; position: relative; cursor: pointer; background: rgba(255,255,255,0.2); }
+        .hoop::after { content: attr(data-label); position: absolute; top: 110px; left: 40px; font-weight: bold; font-size: 20px; }
+        .net { width: 80px; height: 80px; border: 2px dashed white; border-top: none; margin: 0 auto; }
+        
+        #ball { width: 50px; height: 50px; background: orange; border-radius: 50%; border: 2px solid #E65100; position: absolute; bottom: 150px; left: 50%; transform: translateX(-50%); transition: all 0.8s ease-in-out; font-size: 30px; display: flex; align-items: center; justify-content: center; z-index: 10; }
+        
+        #qPanel { position: fixed; bottom: 0; width: 100%; background: white; padding: 20px; text-align: left; box-shadow: 0 -5px 15px rgba(0,0,0,0.1); }
+        .option-text { margin-right: 20px; padding: 5px 10px; background: #fff3e0; border-radius: 5px; border: 1px solid #ffe0b2; display: inline-block; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="hoop-container">
+    <div class="hoop" data-label="A" onclick="throwBall(0, this)"><div class="net"></div></div>
+    <div class="hoop" data-label="B" onclick="throwBall(1, this)"><div class="net"></div></div>
+    <div class="hoop" data-label="C" onclick="throwBall(2, this)"><div class="net"></div></div>
+    <div class="hoop" data-label="D" onclick="throwBall(3, this)"><div class="net"></div></div>
+</div>
+
+<div id="ball">🏀</div>
+
+<div id="qPanel">
+    <h3 id="qText" style="margin-top:0;">Loading...</h3>
+    <div id="optList"></div>
+</div>
+
+<script>
+    // --- 1. SETUP & DATA ---
+    let examData = JSON.parse(sessionStorage.getItem('eprashala_exam_data'));
+    
+    // Fallback for testing
+    if(!examData) examData = { mcq: [{q:"Demo Question?", options:["Correct","Wrong","Wrong","Wrong"], correct:0}] };
+
+    // --- 2. SHUFFLE LOGIC ---
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    if (examData && examData.mcq) {
+        // Shuffle the sequence of questions
+        shuffleArray(examData.mcq);
+
+        // Shuffle options for each individual question
+        examData.mcq.forEach(item => {
+            let optionsWithStatus = item.options.map((opt, index) => ({
+                text: opt,
+                isCorrect: index === item.correct
+            }));
+            
+            shuffleArray(optionsWithStatus);
+            
+            item.options = optionsWithStatus.map(o => o.text);
+            item.correct = optionsWithStatus.findIndex(o => o.isCorrect);
+        });
+    }
+
+    // --- 3. GAME STATE ---
+    let currentQ = 0;
+    const ball = document.getElementById('ball');
+
+    function loadQ() {
+        if(currentQ >= examData.mcq.length) {
+            alert("All shots made! You are a MVP!");
+            return location.reload();
+        }
+        
+        // Reset Ball Position and Style
+        ball.style.transition = "none"; // Disable for instant reset
+        ball.style.top = "";
+        ball.style.left = "50%";
+        ball.style.bottom = "150px";
+        ball.style.transform = "translateX(-50%) scale(1)";
+        
+        // Force reflow
+        ball.offsetHeight; 
+        ball.style.transition = "all 0.8s ease-in-out";
+        
+        const q = examData.mcq[currentQ];
+        document.getElementById('qText').innerText = `Shot ${currentQ + 1}: ${q.q}`;
+        
+        let h = "";
+        q.options.forEach((o, i) => {
+            if(i < 4) { // Only show up to 4 options for the 4 hoops
+                h += `<div class="option-text"><b>${"ABCD"[i]}</b>: ${o}</div>`;
+            }
+        });
+        document.getElementById('optList').innerHTML = h;
+    }
+
+    function throwBall(idx, hoopElem) {
+        const q = examData.mcq[currentQ];
+        const rect = hoopElem.getBoundingClientRect();
+        
+        // Animate Ball to Hoop
+        ball.style.bottom = ""; 
+        ball.style.left = (rect.left + 25) + "px";
+        ball.style.top = (rect.top + 25) + "px";
+        ball.style.transform = "scale(0.5)"; 
+
+        setTimeout(() => {
+            if(idx === q.correct) {
+                // Swish! (Correct Answer)
+                setTimeout(() => {
+                    currentQ++;
+                    loadQ();
+                }, 500);
+            } else {
+                // Brick! (Wrong Answer) - Animate falling away
+                ball.style.top = (window.innerHeight + 100) + "px"; 
+                ball.style.left = (rect.left + (Math.random() > 0.5 ? 200 : -200)) + "px";
+                
+                setTimeout(() => {
+                    alert("Brick! Wrong Answer. Try this shot again!");
+                    loadQ(); // Reload same question (since currentQ didn't increment)
+                }, 600);
+            }
+        }, 800);
+    }
+
+    // Initialize the first question
+    loadQ();
+</script>
+</body>
+</html>

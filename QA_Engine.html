@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eprashala Teacher's Engine</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #FF9800;
+            --dark: #333;
+            --light: #f4f4f9;
+            --answer-bg: #e8f5e9;
+            --answer-border: #4CAF50;
+        }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: var(--light); display: flex; flex-direction: column; height: 100vh; }
+
+        /* CONTROL BAR */
+        #controlBar { background: var(--dark); color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 10; }
+        .file-controls { display: flex; gap: 10px; }
+        button { cursor: pointer; padding: 8px 15px; border-radius: 4px; border: none; font-weight: bold; transition: 0.2s; }
+        .btn-exam { background: #F44336; color: white; }
+        .btn-browse { background: #2196F3; color: white; }
+        .btn-create { background: #4CAF50; color: white; }
+        .btn-pdf { background: #673AB7; color: white; } /* Purple for PDF */
+        
+        /* MAIN LAYOUT */
+        #mainContainer { display: flex; flex: 1; overflow: hidden; }
+        #sideNav { width: 220px; background: white; border-right: 1px solid #ddd; overflow-y: auto; padding: 20px 0; }
+        .nav-btn { display: block; width: 100%; text-align: left; padding: 12px 20px; border: none; background: none; cursor: pointer; border-left: 4px solid transparent; font-size: 15px; color: #555; }
+        .nav-btn:hover, .nav-btn.active { background: #fff3e0; border-left-color: var(--primary); color: var(--primary); font-weight: bold; }
+        
+        /* CONTENT AREA */
+        #contentArea { flex: 1; padding: 30px; overflow-y: auto; scroll-behavior: smooth; position: relative; }
+
+        /* DISPLAY MODE STYLES */
+        .qa-card { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #e0e0e0; box-shadow: 0 2px 4px rgba(0,0,0,0.05); page-break-inside: avoid; }
+        .q-text { font-size: 1.1em; font-weight: 600; color: #222; margin-bottom: 10px; }
+        .answer-box { margin-top: 15px; padding: 15px; background-color: var(--answer-bg); border-left: 4px solid var(--answer-border); display: none; }
+        .reveal-btn { background: #eee; color: #555; font-size: 0.9em; padding: 5px 12px; border-radius: 20px; margin-top: 5px; cursor: pointer; }
+        
+        /* Match Table */
+        .match-table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
+        .match-table th, .match-table td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        .match-table th { background-color: var(--primary); color: white; }
+        .hidden-match { filter: blur(4px); opacity: 0.6; cursor: pointer; background: #eee; }
+        .revealed-match { filter: none; opacity: 1; background: #e8f5e9; font-weight: bold; }
+
+        /* CREATOR MODE STYLES */
+        #creatorPanel { display: none; background: white; padding: 30px; max-width: 900px; margin: 0 auto; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .input-group { margin-bottom: 20px; padding: 15px; border: 1px solid #eee; border-radius: 8px; background: #fafafa; }
+        .input-group label { display: block; font-weight: bold; margin-bottom: 5px; color: #555; }
+        .input-group input, .input-group textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .section-header { background: #eee; padding: 10px; font-weight: bold; margin-top: 30px; margin-bottom: 10px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+        .add-btn { background: var(--primary); color: white; font-size: 0.8em; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+        .remove-btn { color: red; cursor: pointer; float: right; font-size: 1.2em; font-weight: bold; margin-left: 10px; }
+
+        /* PDF Styles (Only visible in PDF export) */
+        .pdf-header { display: none; border-bottom: 2px solid #333; margin-bottom: 20px; padding-bottom: 10px; }
+        .pdf-header h1 { margin: 0; color: var(--primary); }
+    </style>
+</head>
+<body>
+
+<div id="controlBar">
+    <div id="fileInfo">No Chapter Loaded</div>
+    <div class="file-controls">
+	<button class="btn-editor" onclick="location.href='QA_Editor.html'">🛠️ Editor</button>
+        <button class="btn-create" onclick="toggleCreatorMode()">➕ Create</button>
+        <button class="btn-pdf" onclick="exportQAPDF()">📄 Export PDF</button>
+        <input type="file" id="qaFileInput" accept=".qa" style="display:none" onchange="handleManualFile(this)">
+        <button class="btn-browse" onclick="document.getElementById('qaFileInput').click()">📂 Load</button>
+        <button class="btn-exam" onclick="goToExam()">📝 Exam</button>
+    </div>
+</div>
+
+<div id="mainContainer">
+    <div id="sideNav">
+        <button class="nav-btn" onclick="scrollToSection('oneSentence')">One Sentence</button>
+        <button class="nav-btn" onclick="scrollToSection('fillBlanks')">Fill in Blanks</button>
+        <button class="nav-btn" onclick="scrollToSection('matchFollowing')">Match Pairs</button>
+        <button class="nav-btn" onclick="scrollToSection('shortAnswer')">Short Answer</button>
+        <button class="nav-btn" onclick="scrollToSection('briefAnswer')">Brief Answer</button>
+    </div>
+
+    <div id="contentArea">
+        <div id="viewerPanel">
+            <div id="pdfHeader" class="pdf-header">
+                <h1>Eprashala Study Material</h1>
+                <p id="pdfSubHeader"></p>
+            </div>
+
+            <div id="qaContent" style="text-align: center; color: #888; margin-top: 100px;">
+                <h2>Teacher's Q&A Engine</h2>
+                <p>Load a .qa file to teach, or click "Create" to build one.</p>
+            </div>
+        </div>
+
+        <div id="creatorPanel">
+            <h2 style="color: var(--primary); margin-top: 0;">Create New Chapter</h2>
+            <div class="input-group">
+                <label>Chapter Title:</label>
+                <input type="text" id="newChapterTitle" placeholder="e.g., Chapter 5: The Maratha Navy">
+            </div>
+
+            <div class="section-header">One Sentence <span class="add-btn" onclick="addInputRow('oneSentenceContainer', 'q-a')">＋ Add</span></div>
+            <div id="oneSentenceContainer"></div>
+
+            <div class="section-header">Fill in the Blanks <span class="add-btn" onclick="addInputRow('fillBlanksContainer', 'q-a')">＋ Add</span></div>
+            <div id="fillBlanksContainer"></div>
+
+            <div class="section-header">Match the Following <span class="add-btn" onclick="addInputRow('matchContainer', 'pair')">＋ Add</span></div>
+            <div id="matchContainer"></div>
+
+            <div class="section-header">Short/Brief Answers <span class="add-btn" onclick="addInputRow('shortAnswerContainer', 'q-a')">＋ Add</span></div>
+            <div id="shortAnswerContainer"></div>
+
+            <div style="margin-top: 30px; text-align: right;">
+                <button class="btn-create" style="padding: 15px 30px; font-size: 1.1em;" onclick="saveAndDownload()">💾 Save & Download .qa File</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentFileName = "";
+    let currentChapterTitle = ""; // Store separately for PDF header
+
+    // --- PDF EXPORT LOGIC ---
+    function exportQAPDF() {
+        if (!currentChapterTitle) return alert("Please load a chapter first.");
+
+        // 1. Prepare PDF Header
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-IN'); // DD/MM/YYYY
+        document.getElementById('pdfHeader').style.display = 'block';
+        document.getElementById('pdfSubHeader').innerHTML = `<strong>Chapter:</strong> ${currentChapterTitle} <span style="float:right"><strong>Date:</strong> ${dateStr}</span>`;
+
+        // 2. Prepare Content (Reveal all answers for printing)
+        const container = document.getElementById('viewerPanel');
+        
+        // Save current state of reveal buttons to restore later
+        const hiddenAnswers = container.querySelectorAll('.answer-box');
+        const revealBtns = container.querySelectorAll('.reveal-btn');
+        
+        // Force show all answers & hide buttons
+        hiddenAnswers.forEach(el => el.style.display = 'block');
+        revealBtns.forEach(el => el.style.display = 'none');
+        
+        // Fix Match Table (Remove Blur)
+        const blurred = container.querySelectorAll('.hidden-match');
+        blurred.forEach(el => {
+            el.classList.add('revealed-match');
+            el.classList.remove('hidden-match');
+        });
+
+        // 3. Generate PDF
+        const opt = {
+            margin:       0.5,
+            filename:     currentChapterTitle.replace(/[^a-z0-9]/gi, '_') + '.pdf',
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2 },
+            jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+
+        html2pdf().set(opt).from(container).save().then(() => {
+            // 4. Restore State (Hide answers again)
+            document.getElementById('pdfHeader').style.display = 'none';
+            hiddenAnswers.forEach(el => el.style.display = 'none');
+            revealBtns.forEach(el => el.style.display = 'inline-block');
+            
+            // Restore Match Table Blur
+            blurred.forEach(el => {
+                el.classList.remove('revealed-match');
+                el.classList.add('hidden-match');
+            });
+        });
+    }
+
+    // --- MODE SWITCHING ---
+    function toggleCreatorMode() {
+        document.getElementById('viewerPanel').style.display = 'none';
+        document.getElementById('creatorPanel').style.display = 'block';
+        document.getElementById('fileInfo').innerText = "Mode: Creating New Content";
+    }
+
+    // --- CREATOR LOGIC ---
+    function addInputRow(containerId, type) {
+        const container = document.getElementById(containerId);
+        const div = document.createElement('div');
+        div.className = 'input-group';
+        
+        if (type === 'q-a') {
+            div.innerHTML = `<span class="remove-btn" onclick="this.parentElement.remove()">×</span><label>Question:</label><input type="text" class="input-q"><label style="margin-top:10px;">Answer:</label><textarea class="input-a" rows="2"></textarea>`;
+        } else if (type === 'pair') {
+            div.innerHTML = `<span class="remove-btn" onclick="this.parentElement.remove()">×</span><div style="display:flex; gap:10px;"><div style="flex:1;"><label>Column A:</label><input type="text" class="input-p1"></div><div style="flex:1;"><label>Column B (Match):</label><input type="text" class="input-p2"></div></div>`;
+        }
+        container.appendChild(div);
+    }
+
+    function saveAndDownload() {
+        const title = document.getElementById('newChapterTitle').value;
+        if (!title) return alert("Please enter a Chapter Title");
+
+        function getData(id, isPair) {
+            const items = [];
+            const rows = document.getElementById(id).getElementsByClassName('input-group');
+            for (let row of rows) {
+                if (isPair) {
+                    const p1 = row.querySelector('.input-p1').value;
+                    const p2 = row.querySelector('.input-p2').value;
+                    if (p1 && p2) items.push({ pair1: p1, pair2: p2 });
+                } else {
+                    const q = row.querySelector('.input-q').value;
+                    const a = row.querySelector('.input-a').value;
+                    if (q && a) items.push({ q: q, a: a });
+                }
+            }
+            return items;
+        }
+
+        const data = {
+            chapterTitle: title,
+            oneSentence: getData('oneSentenceContainer', false),
+            fillBlanks: getData('fillBlanksContainer', false),
+            matchFollowing: getData('matchContainer', true),
+            shortAnswer: getData('shortAnswerContainer', false),
+            briefAnswer: [] 
+        };
+
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+        const a = document.createElement('a');
+        a.href = dataStr;
+        a.download = title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + ".qa";
+        document.body.appendChild(a); a.click(); a.remove();
+        alert("File Downloaded!");
+        location.reload(); 
+    }
+
+    // --- VIEWER LOGIC ---
+    // --- UPDATED AUTO-LOAD LOGIC ---
+window.onload = function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    // Check for the auto-load parameter from Index.html
+    const qaFileUrl = urlParams.get('qaFile');
+    const autoFile = urlParams.get('file'); // Legacy support
+
+    if (qaFileUrl) {
+        // Load the .qa file identified by the matching logic in Index.html
+        loadDataFromUrl(decodeURIComponent(qaFileUrl));
+    } else if (autoFile) {
+        loadData(autoFile);
+    }
+};
+
+    function loadData(fileUrl) {
+        document.getElementById('fileInfo').innerText = "Loading...";
+        currentFileName = fileUrl.replace('.qa', ''); 
+        fetch(fileUrl).then(res => res.json()).then(data => renderQA(data)).catch(err => document.getElementById('fileInfo').innerText = "Error loading file");
+    }
+function loadDataFromUrl(url) {
+    document.getElementById('fileInfo').innerText = "Auto-loading matching Q&A...";
+    
+    fetch(url)
+        .then(res => {
+            if (!res.ok) throw new Error("File not found");
+            return res.json();
+        })
+        .then(data => {
+            renderQA(data);
+            
+            // Store the path but swap the extension from .qa to .ex
+            // This ensures "3.Maratha...qa" becomes "3.Maratha...ex"
+            currentFileName = url.replace(/\.qa$/, ""); 
+            
+            const nameFromUrl = url.split('/').pop().split('?')[0];
+            document.getElementById('fileInfo').innerText = "Teaching: " + decodeURIComponent(nameFromUrl);
+        })
+        .catch(err => {
+            console.error(err);
+            document.getElementById('fileInfo').innerText = "No matching .qa found.";
+        });
+}
+
+function goToExam() {
+    if (!currentFileName) return alert("Load a chapter first.");
+    // Redirect using the full path + .ex extension
+    window.location.href = `exam_engine.html?file=${encodeURIComponent(currentFileName + ".ex")}`;
+}
+// Inside QA_Engine.html <script>
+
+function handleManualFile(input) {
+    const file = input.files[0];
+    if (!file || !file.name.endsWith('.qa')) return alert("Invalid .qa file");
+    
+    // Fix: Strip .qa extension and store only the base name
+    currentFileName = file.name.split('.').slice(0, -1).join('.'); 
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        renderQA(JSON.parse(e.target.result));
+        document.getElementById('fileInfo').innerText = "Teaching: " + file.name;
+    };
+    reader.readAsText(file);
+}
+
+
+    function scrollToSection(id) {
+        document.getElementById('viewerPanel').style.display = 'block'; 
+        document.getElementById('creatorPanel').style.display = 'none';
+        const el = document.getElementById(id);
+        if(el) el.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function renderQA(data) {
+        const container = document.getElementById('qaContent'); // Targeted inner div
+        container.innerHTML = "";
+        container.style.textAlign = "left";  // Forces text to the left
+        container.style.marginTop = "0px";   // Removes the large top margin used for the welcome screen
+        container.style.color = "#333";
+        currentChapterTitle = data.chapterTitle; // Save for PDF Header
+        
+        const title = document.createElement('h1');
+        title.innerText = data.chapterTitle;
+        title.style.color = 'var(--primary)';
+        title.style.textAlign = 'center';
+        container.appendChild(title);
+
+        function createSection(key, titleText) {
+            if (!data[key] || data[key].length === 0) return;
+            const section = document.createElement('div');
+            section.id = key;
+            section.innerHTML = `<h2 style="color:#444; border-bottom:2px solid #ddd; margin-top:40px;">${titleText} <button class="reveal-btn" onclick="revealAll('${key}')" style="float:right; font-size:0.6em;">Show All</button></h2>`;
+            
+            data[key].forEach((item, i) => {
+                const card = document.createElement('div');
+                card.className = 'qa-card';
+                card.innerHTML = `
+                    <div class="q-text"><span style="background:var(--primary); color:white; padding:2px 8px; border-radius:4px; font-size:0.8em;">Q${i+1}</span> ${item.q}</div>
+                    <button class="reveal-btn" onclick="toggleAns(this)">👁️ Show Answer</button>
+                    <div class="answer-box"><strong>Answer:</strong> ${item.a}</div>
+                `;
+                section.appendChild(card);
+            });
+            container.appendChild(section);
+        }
+
+        createSection('oneSentence', 'Answer in One Sentence');
+        createSection('fillBlanks', 'Fill in the Blanks');
+        createSection('shortAnswer', 'Short/Brief Answers');
+        createSection('briefAnswer', 'Brief Answer Questions');
+
+        if (data.matchFollowing && data.matchFollowing.length > 0) {
+            const section = document.createElement('div');
+            section.id = 'matchFollowing';
+            section.innerHTML = `<h2 style="color:#444; border-bottom:2px solid #ddd; margin-top:40px;">Match the Following</h2>`;
+            const table = document.createElement('table');
+            table.className = 'match-table';
+            table.innerHTML = `<thead><tr><th>Column A</th><th>Column B</th></tr></thead><tbody></tbody>`;
+            data.matchFollowing.forEach(pair => {
+                table.querySelector('tbody').innerHTML += `<tr><td>${pair.pair1}</td><td class="hidden-match" onclick="this.className='revealed-match'">${pair.pair2}</td></tr>`;
+            });
+            section.appendChild(table);
+            container.appendChild(section);
+        }
+    }
+
+    function toggleAns(btn) {
+        const box = btn.nextElementSibling;
+        const isHidden = getComputedStyle(box).display === 'none';
+        box.style.display = isHidden ? 'block' : 'none';
+        btn.innerText = isHidden ? '🙈 Hide Answer' : '👁️ Show Answer';
+    }
+
+    function revealAll(id) {
+        document.getElementById(id).querySelectorAll('.answer-box').forEach(b => b.style.display = 'block');
+    }
+
+// Put this in QA_Engine.html <script>
+const urlParams = new URLSearchParams(window.location.search);
+const contextString = urlParams.get('context');
+
+if (contextString) {
+    const context = JSON.parse(decodeURIComponent(contextString));
+    console.log("Playing File:", context.cleanName);
+    console.log("Full Path:", context.fullPath);
+    // Use context.cleanName to load specific questions
+}
+
+</script>
+
+</body>
+</html>

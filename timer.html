@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #fafafa; display: flex; flex-direction: column; height: 100vh; overflow: hidden; text-align: center; }
+        .tabs { display: flex; background: #eeeeee; }
+        .tab { flex: 1; padding: 10px; cursor: pointer; font-weight: bold; color: #555; transition: 0.2s; user-select: none; }
+        .tab.active { background: #FF5722; color: white; }
+        
+        .display { font-size: 60px; font-weight: bold; font-family: monospace; color: #333; margin: 30px 0 10px 0; }
+        
+        .controls { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
+        button { border: none; padding: 8px 15px; font-size: 14px; font-weight: bold; border-radius: 5px; cursor: pointer; transition: 0.1s; color: white; }
+        button:active { transform: scale(0.95); }
+        .btn-start { background: #4CAF50; }
+        .btn-pause { background: #FF9800; }
+        .btn-reset { background: #F44336; }
+        .btn-preset { background: #607D8B; }
+
+        .presets { display: flex; justify-content: center; gap: 5px; flex-wrap: wrap; padding: 0 15px; }
+        
+        .timer-view, .stopwatch-view { display: none; flex-direction: column; align-items: center; }
+        .active-view { display: flex; }
+    </style>
+</head>
+<body>
+
+<div class="tabs">
+    <div class="tab active" id="tabTimer" onclick="switchView('timer')">Countdown</div>
+    <div class="tab" id="tabStopwatch" onclick="switchView('stopwatch')">Stopwatch</div>
+</div>
+
+<div id="viewTimer" class="timer-view active-view">
+    <div class="display" id="timeDisplay">00:00</div>
+    <div class="controls">
+        <button class="btn-start" onclick="startTimer()">Start</button>
+        <button class="btn-pause" onclick="pauseTimer()">Pause</button>
+        <button class="btn-reset" onclick="resetTimer()">Reset</button>
+    </div>
+    <div class="presets">
+        <button class="btn-preset" onclick="addTime(60)">+ 1 Min</button>
+        <button class="btn-preset" onclick="addTime(300)">+ 5 Min</button>
+        <button class="btn-preset" onclick="addTime(600)">+ 10 Min</button>
+        <button class="btn-preset" onclick="clearTime()">Clear</button>
+    </div>
+</div>
+
+<div id="viewStopwatch" class="stopwatch-view">
+    <div class="display" id="swDisplay">00:00.0</div>
+    <div class="controls">
+        <button class="btn-start" onclick="startSw()">Start</button>
+        <button class="btn-pause" onclick="pauseSw()">Pause</button>
+        <button class="btn-reset" onclick="resetSw()">Reset</button>
+    </div>
+</div>
+
+<script>
+    // --- TIMER LOGIC ---
+    let timerInterval = null;
+    let totalSeconds = 0;
+
+    function formatTime(sec) {
+        let m = Math.floor(sec / 60).toString().padStart(2, '0');
+        let s = (sec % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+    }
+
+    function updateTimerDisplay() {
+        const display = document.getElementById('timeDisplay');
+        display.innerText = formatTime(totalSeconds);
+        if(totalSeconds === 0 && timerInterval) {
+            display.style.color = "#F44336";
+        } else {
+            display.style.color = "#333";
+        }
+    }
+
+    function addTime(sec) {
+        totalSeconds += sec;
+        updateTimerDisplay();
+    }
+
+    function clearTime() {
+        totalSeconds = 0;
+        pauseTimer();
+        updateTimerDisplay();
+    }
+
+    function startTimer() {
+        if(timerInterval || totalSeconds <= 0) return;
+        timerInterval = setInterval(() => {
+            if(totalSeconds > 0) {
+                totalSeconds--;
+                updateTimerDisplay();
+            } else {
+                pauseTimer();
+                // Optional: Play a sound here
+            }
+        }, 1000);
+    }
+
+    function pauseTimer() {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+
+    function resetTimer() {
+        pauseTimer();
+        totalSeconds = 0;
+        updateTimerDisplay();
+    }
+
+    // --- STOPWATCH LOGIC ---
+    let swInterval = null;
+    let swTenths = 0;
+
+    function formatSw(tenths) {
+        let m = Math.floor(tenths / 600).toString().padStart(2, '0');
+        let s = Math.floor((tenths % 600) / 10).toString().padStart(2, '0');
+        let t = tenths % 10;
+        return `${m}:${s}.${t}`;
+    }
+
+    function startSw() {
+        if(swInterval) return;
+        swInterval = setInterval(() => {
+            swTenths++;
+            document.getElementById('swDisplay').innerText = formatSw(swTenths);
+        }, 100);
+    }
+
+    function pauseSw() {
+        clearInterval(swInterval);
+        swInterval = null;
+    }
+
+    function resetSw() {
+        pauseSw();
+        swTenths = 0;
+        document.getElementById('swDisplay').innerText = "00:00.0";
+    }
+
+    // --- VIEW SWITCHER ---
+    function switchView(view) {
+        document.getElementById('tabTimer').classList.remove('active');
+        document.getElementById('tabStopwatch').classList.remove('active');
+        document.getElementById('viewTimer').classList.remove('active-view');
+        document.getElementById('viewStopwatch').classList.remove('active-view');
+
+        if(view === 'timer') {
+            document.getElementById('tabTimer').classList.add('active');
+            document.getElementById('viewTimer').classList.add('active-view');
+        } else {
+            document.getElementById('tabStopwatch').classList.add('active');
+            document.getElementById('viewStopwatch').classList.add('active-view');
+        }
+    }
+</script>
+</body>
+</html>

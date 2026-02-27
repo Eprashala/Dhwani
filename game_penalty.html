@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Penalty MCQ</title>
+    <style>
+        body { background: #4CAF50; font-family: sans-serif; text-align: center; }
+        #goal { width: 600px; height: 300px; border: 10px solid white; border-bottom: none; margin: 50px auto; position: relative; background: rgba(0,0,0,0.1); }
+        .zone { width: 50%; height: 50%; float: left; border: 1px dashed rgba(255,255,255,0.3); box-sizing: border-box; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 3em; color: white; opacity: 0.6; }
+        .zone:hover { opacity: 1; background: rgba(255,255,255,0.1); }
+        
+        #keeper { position: absolute; width: 80px; height: 120px; background: #FFEB3B; bottom: 0; left: 260px; border-radius: 10px; transition: all 0.5s; z-index: 5; font-size: 2em; display: flex; align-items: center; justify-content: center; }
+        #ball { width: 40px; height: 40px; background: white; border-radius: 50%; margin: 0 auto; position: relative; top: 20px; transition: all 0.8s; box-shadow: 2px 2px 5px rgba(0,0,0,0.5); font-size: 30px; display: flex; align-items: center; justify-content: center; }
+        
+        #qPanel { background: white; padding: 20px; max-width: 600px; margin: 100px auto 0; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .option-item { padding: 8px; border-bottom: 1px solid #eee; }
+        .option-item:last-child { border-bottom: none; }
+    </style>
+</head>
+<body>
+
+<div id="goal">
+    <div id="keeper">🧤</div>
+    <div class="zone" onclick="shoot(0)">A</div>
+    <div class="zone" onclick="shoot(1)">B</div>
+    <div class="zone" onclick="shoot(2)">C</div>
+    <div class="zone" onclick="shoot(3)">D</div>
+</div>
+
+<div id="ball">⚽</div>
+
+<div id="qPanel">
+    <h3 id="qText" style="margin-top:0;">...</h3>
+    <div id="optList" style="text-align:left;"></div>
+</div>
+
+<script>
+    // --- 1. SETUP & DATA ---
+    const rawData = sessionStorage.getItem('eprashala_exam_data');
+    let examData = rawData ? JSON.parse(rawData) : null;
+    
+    // Fallback for development/testing
+    if(!examData) examData = { mcq: [{q:"Default Question: What is 2+2?", options:["4","3","5","6"], correct:0}] };
+
+    // --- 2. SHUFFLE LOGIC ---
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    if (examData && examData.mcq) {
+        // Shuffle Question Sequence
+        shuffleArray(examData.mcq);
+
+        // Shuffle Options per Question
+        examData.mcq.forEach(item => {
+            let optionsWithStatus = item.options.map((opt, index) => ({
+                text: opt,
+                isCorrect: index === item.correct
+            }));
+            
+            shuffleArray(optionsWithStatus);
+            
+            item.options = optionsWithStatus.map(o => o.text);
+            item.correct = optionsWithStatus.findIndex(o => o.isCorrect);
+        });
+    }
+
+    // --- 3. GAME STATE ---
+    const ball = document.getElementById('ball');
+    const keeper = document.getElementById('keeper');
+    let currentQ = 0;
+
+    function loadQ() {
+        if(currentQ >= examData.mcq.length) {
+            alert("Goal King! You've completed the exam.");
+            return location.reload();
+        }
+        
+        // Reset Visuals
+        ball.style.transition = "none";
+        ball.style.transform = "translate(0,0)";
+        keeper.style.left = "260px";
+        keeper.style.bottom = "0";
+        
+        // Force reflow
+        ball.offsetHeight;
+        ball.style.transition = "all 0.8s";
+        
+        const q = examData.mcq[currentQ];
+        document.getElementById('qText').innerText = `Question ${currentQ + 1}: ${q.q}`;
+        
+        let html = "";
+        q.options.forEach((o, i) => {
+            if(i < 4) { // Penalty zones are A-D
+                html += `<div class="option-item"><b>${"ABCD"[i]}</b>: ${o}</div>`;
+            }
+        });
+        document.getElementById('optList').innerHTML = html;
+    }
+
+    function shoot(zoneIdx) {
+        const q = examData.mcq[currentQ];
+        
+        // Visual Coordinates for zones
+        const coords = [
+            {x: -150, y: -350}, // A: Top Left
+            {x: 150, y: -350},  // B: Top Right
+            {x: -150, y: -200}, // C: Bottom Left
+            {x: 150, y: -200}   // D: Bottom Right
+        ];
+
+        // 1. Determine Keeper's Dive
+        // If correct answer is picked, keeper dives away from user's choice.
+        // If wrong answer is picked, keeper dives toward user's choice to block.
+        let keeperMove;
+        if(zoneIdx === q.correct) {
+            // Divert keeper to a different zone
+            let wrongZones = [0,1,2,3].filter(z => z !== zoneIdx);
+            keeperMove = wrongZones[Math.floor(Math.random() * wrongZones.length)];
+        } else {
+            keeperMove = zoneIdx; // Block it!
+        }
+        
+        // 2. Animate Ball
+        ball.style.transform = `translate(${coords[zoneIdx].x}px, ${coords[zoneIdx].y}px)`;
+
+        // 3. Animate Keeper
+        const kPos = [50, 450, 50, 450]; // Left/Right x values
+        keeper.style.left = kPos[keeperMove] + "px";
+        if(keeperMove < 2) keeper.style.bottom = "100px"; // Jump for top zones
+        else keeper.style.bottom = "0";
+
+        // 4. Evaluate Result
+        setTimeout(() => {
+            if(zoneIdx === q.correct) {
+                alert("⚽ GOAL! Correct Answer!");
+                currentQ++;
+                loadQ();
+            } else {
+                alert("❌ BLOCKED! Wrong Answer. Try this one again.");
+                loadQ(); // Re-load same question to retry
+            }
+        }, 1000);
+    }
+
+    // Initial load
+    loadQ();
+</script>
+</body>
+</html>
