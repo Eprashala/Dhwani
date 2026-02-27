@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Glass Bridge</title>
+    <style>
+        body { margin:0; background: #333; color: white; font-family: 'Arial', sans-serif; text-align: center; }
+        #gameContainer { max-width: 600px; margin: 0 auto; padding-top: 50px; }
+        .glass-row { display: flex; justify-content: space-between; margin-bottom: 20px; }
+        .glass-pane { width: 23%; height: 100px; background: rgba(255, 255, 255, 0.2); border: 2px solid rgba(255,255,255,0.5); border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 2em; transition: 0.3s; position: relative; }
+        .glass-pane:hover { background: rgba(255,255,255,0.4); }
+        .glass-pane.broken { background: none; border: none; transform: scale(0.8); opacity: 0.5; }
+        .glass-pane.broken::after { content: "💥"; font-size: 3em; }
+        .player { position: absolute; font-size: 3em; transition: top 0.5s, left 0.5s; z-index: 10; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+<div id="qDisplay" style="background:white; color:black; padding:20px;">
+    <h2>Survival Mode</h2>
+    <p id="qText">Loading...</p>
+</div>
+
+<div id="gameContainer">
+    <div id="player" class="player" style="top:180px; left:50%; transform:translateX(-50%);">🏃</div>
+
+    <div class="glass-row">
+        <div class="glass-pane" onclick="jump(0)">A</div>
+        <div class="glass-pane" onclick="jump(1)">B</div>
+        <div class="glass-pane" onclick="jump(2)">C</div>
+        <div class="glass-pane" onclick="jump(3)">D</div>
+    </div>
+    
+    <div id="optionsText" style="text-align:left; margin: 20px auto; max-width: 500px; font-size:1.2em;"></div>
+</div>
+
+<script>
+    // --- 1. SETUP & DATA ---
+    const rawData = sessionStorage.getItem('eprashala_exam_data');
+    let examData = rawData ? JSON.parse(rawData) : null;
+    
+    // Fallback for testing
+    if(!examData) examData = { mcq: [{q:"Bridge Test: Which glass is tempered?", options:["Correct Option","Wrong 1","Wrong 2","Wrong 3"], correct:0}] };
+
+    // --- 2. SHUFFLE LOGIC ---
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    if (examData && examData.mcq) {
+        // Shuffle the sequence of levels
+        shuffleArray(examData.mcq);
+
+        // Shuffle options per question
+        examData.mcq.forEach(item => {
+            let optionsWithStatus = item.options.map((opt, index) => ({
+                text: opt,
+                isCorrect: index === item.correct
+            }));
+            
+            shuffleArray(optionsWithStatus);
+            
+            item.options = optionsWithStatus.map(o => o.text);
+            item.correct = optionsWithStatus.findIndex(o => o.isCorrect);
+        });
+    }
+
+    // --- 3. GAME STATE ---
+    let currentQ = 0;
+
+    function loadLevel() {
+        if(currentQ >= examData.mcq.length) {
+            alert("You survived the Glass Bridge! Legend.");
+            return location.reload();
+        }
+        
+        const q = examData.mcq[currentQ];
+        document.getElementById('qText').innerText = `Step ${currentQ + 1}: ${q.q}`;
+        
+        let html = "";
+        q.options.forEach((o, i) => {
+            if(i < 4) { // Grid has 4 panes A-D
+                html += `<p style="margin: 5px 0;"><b>${"ABCD"[i]}</b>: ${o}</p>`;
+            }
+        });
+        document.getElementById('optionsText').innerHTML = html;
+        
+        // Reset panes visual state
+        document.querySelectorAll('.glass-pane').forEach(p => {
+            p.classList.remove('broken');
+            p.style.background = "rgba(255, 255, 255, 0.2)";
+        });
+    }
+
+    function jump(index) {
+        const q = examData.mcq[currentQ];
+        const panes = document.querySelectorAll('.glass-pane');
+        const selected = panes[index];
+
+        if(index === q.correct) {
+            // Success - Correct Glass
+            selected.style.background = "#4CAF50"; 
+            setTimeout(() => {
+                currentQ++;
+                loadLevel();
+            }, 800);
+        } else {
+            // Fail - Glass Breaks
+            selected.classList.add('broken');
+            document.body.style.background = "#500";
+            
+            setTimeout(() => {
+                alert("CRACK! You picked the wrong glass and fell. Try the level again!");
+                document.body.style.background = "#333";
+                loadLevel(); // Reset current level
+            }, 500);
+        }
+    }
+
+    // Initialize the first level
+    loadLevel();
+</script>
+</body>
+</html>

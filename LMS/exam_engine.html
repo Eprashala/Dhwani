@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eprashala Exam Engine</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <style>
+        :root {
+            --primary: #FF9800;
+            --dark: #333;
+            --light: #f4f4f9;
+            --success: #4CAF50;
+            --danger: #F44336;
+            --arcade: #9C27B0; /* Purple for Games */
+        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--light); margin: 0; padding: 20px; color: var(--dark); }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        
+        #topBar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 2px solid #eee; }
+        
+        /* BUTTON STYLES */
+        .btn-load { background: var(--dark); color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
+        .btn-create { background: var(--success); color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; margin-right: 10px; }
+        
+        /* NEW ARCADE BUTTON STYLE */
+        .btn-arcade { 
+            background: var(--arcade); 
+            color: white; 
+            border: none; 
+            padding: 8px 15px; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            margin-right: 10px; 
+            font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            box-shadow: 0 2px 5px rgba(156, 39, 176, 0.3);
+        }
+        .btn-arcade:hover { background: #7B1FA2; transform: translateY(-1px); }
+        
+        .hidden { display: none !important; }
+
+        /* INPUTS & SETUP */
+        .setup-panel { background: #fff3e0; padding: 25px; border-radius: 8px; border: 1px solid #ffe0b2; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        select, .setup-input { padding: 10px; width: 100%; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        
+        /* EXAM CARDS */
+        .question-card { background: #fff; border: 1px solid #eee; padding: 25px; margin-bottom: 25px; border-radius: 8px; border-left: 6px solid var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.05); page-break-inside: avoid; }
+        .q-text { font-size: 1.4em; font-weight: 700; color: #2c3e50; margin-bottom: 20px; line-height: 1.4; }
+        
+        .option-item { display: flex; align-items: center; font-size: 1.1em; padding: 12px 15px; margin: 10px 0; background: #fafafa; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; transition: 0.2s; }
+        .option-item:hover { background: #f0f0f0; border-color: #bbb; }
+        input[type="radio"] { width: auto; margin-right: 15px; transform: scale(1.4); cursor: pointer; }
+
+        /* CREATOR STYLES */
+        #creatorPanel { background: white; padding: 20px; }
+        .creator-card { background: #fafafa; border: 1px solid #ddd; padding: 20px; margin-bottom: 20px; border-radius: 8px; position: relative; }
+        .remove-btn { position: absolute; top: 10px; right: 10px; color: red; font-weight: bold; cursor: pointer; font-size: 1.2em; }
+        .option-row { display: flex; align-items: center; margin-bottom: 10px; gap: 10px; }
+        .option-row input[type="text"] { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .correct-radio { transform: scale(1.5); accent-color: var(--success); }
+
+        /* RESULTS STYLES */
+        .score-box { text-align: center; padding: 30px; background: #E8F5E9; border-radius: 8px; margin-bottom: 20px; border: 1px solid #c8e6c9; }
+        .big-score { font-size: 3em; font-weight: bold; color: var(--success); }
+        .correct { background-color: #d4edda; border-color: #c3e6cb; color: #155724; font-weight: bold; }
+        .wrong { background-color: #f8d7da; border-color: #f5c6cb; color: #721c24; }
+        .missed { border: 2px solid var(--success); background-color: #fff; }
+
+        /* BUTTONS */
+        .btn { display: block; width: 100%; padding: 15px; background: var(--primary); color: white; border: none; border-radius: 6px; font-size: 1.2em; font-weight: bold; cursor: pointer; margin-top: 20px; }
+        .btn:hover { background: #e68900; }
+        .btn-secondary { background: #607D8B; }
+        .btn-pdf { background: #d32f2f; color: white; margin-bottom: 20px; }
+        .btn-pdf:hover { background: #b71c1c; }
+
+        /* PDF Header (Hidden on screen) */
+        #pdfHeader { display: none; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="topBar">
+        <h2 id="examTitle" style="margin:0;">No Exam Loaded</h2>
+        <div>
+            <button id="btnArcade" class="btn-arcade hidden" onclick="openGameArcade()">🎮 Game Arcade</button>
+			
+            <button class="btn-create" onclick="location.href='exam_editor.html'">🛠️ Editor</button>
+            <button class="btn-create" onclick="toggleCreatorMode()">➕ Create New</button>
+            <input type="file" id="examFileInput" accept=".ex" style="display:none" onchange="handleManualExam(this)">
+            <button class="btn-load" onclick="document.getElementById('examFileInput').click()">📂 Load File</button>
+        </div>
+    </div>
+
+    <div id="setupScreen" class="hidden">
+        <div class="setup-panel">
+            <h3 style="margin-top:0;">Configure Exam</h3>
+            <div class="form-group">
+                <label>Number of Questions:</label>
+                <select id="countSelect"></select>
+            </div>
+            <div class="form-group">
+                <label>Mode:</label>
+                <div style="display:flex; gap:20px; margin-top:10px;">
+                    <label style="font-weight:normal; display:flex; align-items:center;">
+                        <input type="radio" name="mode" value="random" checked> Randomize (Shuffle)
+                    </label>
+                    <label style="font-weight:normal; display:flex; align-items:center;">
+                        <input type="radio" name="mode" value="sequential"> Sequential (Order)
+                    </label>
+                </div>
+            </div>
+            <button class="btn" onclick="startExam()">Start Exam</button>
+        </div>
+    </div>
+
+    <div id="creatorScreen" class="hidden">
+        <h2 style="color:var(--primary); margin-top:0;">Create MCQ Exam Bank</h2>
+        <div class="form-group">
+            <label>Exam Title (Chapter Name):</label>
+            <input type="text" id="newExamTitle" class="setup-input" placeholder="e.g. History Chapter 4">
+        </div>
+        <div id="questionsList"></div>
+        <button onclick="addQuestionInput()" style="background:#eee; color:#333; border:1px solid #ccc; padding:10px; width:100%; cursor:pointer; font-weight:bold; margin-bottom:20px;">＋ Add New MCQ Question</button>
+        <button class="btn" style="background:var(--success);" onclick="saveAndDownloadExam()">💾 Save & Download exam File</button>
+    </div>
+
+    <div id="examScreen" class="hidden">
+        <div id="quizContainer"></div>
+        <button class="btn" onclick="submitExam()">Submit Answers</button>
+    </div>
+
+    <div id="resultScreen" class="hidden">
+        <button class="btn btn-pdf" onclick="exportToPDF()">📄 Export Result to PDF</button>
+        <div id="printableArea">
+            <div id="pdfHeader"></div>
+            <div class="score-box">
+                <h3>Result Summary</h3>
+                <div class="big-score" id="scoreDisplay">0 / 0</div>
+                <p id="percentageDisplay"></p>
+            </div>
+            <div id="reviewContainer"></div> 
+        </div>
+        <button class="btn btn-secondary" onclick="location.reload()">Take Another Test</button>
+    </div>
+</div>
+
+<script>
+    let currentExamData = null;  
+    let activeQuestions = [];    
+    let questionCounter = 0; 
+
+  window.onload = function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const autoFile = urlParams.get('file');
+    
+    // Priority 1: Check for session data (if coming back from a game)
+    const storedData = sessionStorage.getItem('eprashala_exam_data');
+    
+    if (autoFile) {
+        // If a file is passed via URL (from QA Engine), load it
+        loadExamFile(autoFile);
+    } else if (storedData) {
+        initExamEngine(JSON.parse(storedData));
+    } else {
+        document.getElementById('examTitle').innerText = "Please load an exam file.";
+    }
+};
+
+    // --- NEW: GAME ARCADE FUNCTION ---
+    function openGameArcade() {
+        if(!currentExamData) {
+            alert("No exam loaded to play!");
+            return;
+        }
+        // Save current exam to session storage so game.html can read it
+        sessionStorage.setItem('eprashala_exam_data', JSON.stringify(currentExamData));
+        // Open the game arcade in a new tab
+        window.location.href = `game.html`;
+    }
+
+    // --- PDF EXPORT LOGIC ---
+    function exportToPDF() {
+        const userName = prompt("Please enter Student Name for the report:", "Student");
+        if (!userName) return;
+
+        const chapterName = currentExamData.chapterTitle;
+        const now = new Date();
+        const dateString = now.toLocaleDateString('en-IN');
+        const timeString = now.toLocaleTimeString();
+        
+        const headerDiv = document.getElementById('pdfHeader');
+        headerDiv.style.display = 'block';
+        headerDiv.innerHTML = `
+            <h1 style="color: #FF9800; margin-bottom:5px;">Eprashala Exam Report</h1>
+            <p><strong>Student Name:</strong> ${userName}</p>
+            <p><strong>Chapter:</strong> ${chapterName}</p>
+            <p><strong>Date:</strong> ${dateString} | <strong>Time:</strong> ${timeString}</p>
+        `;
+
+        const safeName = userName.replace(/[^a-z0-9]/gi, '_');
+        const safeChapter = chapterName.replace(/[^a-z0-9]/gi, '_').substring(0, 15);
+        const safeTime = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const filename = `${safeName}_${safeChapter}_${safeTime}.pdf`;
+
+        const element = document.getElementById('printableArea');
+        const opt = {
+            margin: 0.5,
+            filename: filename,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+
+        html2pdf().set(opt).from(element).save().then(() => {
+            headerDiv.style.display = 'none';
+        });
+    }
+
+    // --- CREATOR LOGIC ---
+    function toggleCreatorMode() {
+        document.getElementById('setupScreen').classList.add('hidden');
+        document.getElementById('examScreen').classList.add('hidden');
+        document.getElementById('resultScreen').classList.add('hidden');
+        document.getElementById('creatorScreen').classList.remove('hidden');
+        document.getElementById('btnArcade').classList.add('hidden'); // Hide arcade in creator mode
+        document.getElementById('examTitle').innerText = "Mode: Exam Creator";
+        if(document.getElementById('questionsList').innerHTML === "") addQuestionInput();
+    }
+
+    function addQuestionInput() {
+        questionCounter++;
+        const container = document.getElementById('questionsList');
+        const div = document.createElement('div');
+        div.className = 'creator-card';
+        div.innerHTML = `
+            <span class="remove-btn" onclick="this.parentElement.remove()">×</span>
+            <label>Question Text:</label>
+            <input type="text" class="setup-input q-input" placeholder="Question..." style="margin-bottom:15px;">
+            <label>Options (Select correct radio):</label>
+            <div class="option-row"><input type="radio" name="correct_${questionCounter}" value="0" class="correct-radio" checked><input type="text" class="opt-input" placeholder="Option A"></div>
+            <div class="option-row"><input type="radio" name="correct_${questionCounter}" value="1" class="correct-radio"><input type="text" class="opt-input" placeholder="Option B"></div>
+            <div class="option-row"><input type="radio" name="correct_${questionCounter}" value="2" class="correct-radio"><input type="text" class="opt-input" placeholder="Option C"></div>
+            <div class="option-row"><input type="radio" name="correct_${questionCounter}" value="3" class="correct-radio"><input type="text" class="opt-input" placeholder="Option D"></div>
+        `;
+        container.appendChild(div);
+    }
+
+    function saveAndDownloadExam() {
+        const title = document.getElementById('newExamTitle').value;
+        if (!title) return alert("Enter Exam Title");
+        const questions = [];
+        const cards = document.getElementsByClassName('creator-card');
+        for (let card of cards) {
+            const qText = card.querySelector('.q-input').value;
+            if (!qText) continue;
+            const optInputs = card.querySelectorAll('.opt-input');
+            const options = [];
+            optInputs.forEach(input => options.push(input.value));
+            const radios = card.querySelectorAll('input[type="radio"]');
+            let correctIndex = 0;
+            radios.forEach((radio, index) => { if (radio.checked) correctIndex = index; });
+            questions.push({ q: qText, options: options, correct: correctIndex });
+        }
+        if (questions.length === 0) return alert("Add at least one question.");
+        const examData = { chapterTitle: title, mcq: questions };
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(examData, null, 2));
+        const a = document.createElement('a');
+        a.href = dataStr;
+        a.download = title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + ".ex";
+        document.body.appendChild(a); a.click(); a.remove();
+        alert("Exam Saved! Load it to test.");
+        location.reload();
+    }
+
+    // --- ENGINE LOGIC ---
+    // Inside exam_engine.html <script>
+
+function loadExamFile(path) {
+    document.getElementById('examTitle').innerText = "Loading Exam...";
+    
+    // Decode the URL in case there are %20 symbols for spaces
+    const decodedPath = decodeURIComponent(path);
+    console.log("Fetching decoded path:", decodedPath);
+
+    fetch(decodedPath)
+        .then(res => { 
+            if(!res.ok) throw new Error(`Status: ${res.status}`); 
+            return res.json(); 
+        })
+        .then(data => initExamEngine(data))
+        .catch(err => {
+            console.error(err);
+            // Displaying the exact string being searched to help you debug
+            alert("Error loading file: " + decodedPath + "\n\nCheck if the file name in your folder matches this EXACTLY (including spaces and dots).");
+        });
+}
+
+    function handleManualExam(input) {
+        const file = input.files[0];
+        if (!file || !file.name.endsWith('.ex')) return alert("Invalid .ex file");
+        document.getElementById('creatorScreen').classList.add('hidden');
+        const reader = new FileReader();
+        reader.onload = function(e) { initExamEngine(JSON.parse(e.target.result)); };
+        reader.readAsText(file);
+    }
+
+    function initExamEngine(data) {
+        currentExamData = data;
+        document.getElementById('examTitle').innerText = data.chapterTitle;
+        
+        // *** ACTIVATE ARCADE BUTTON HERE ***
+        document.getElementById('btnArcade').classList.remove('hidden');
+
+        const total = data.mcq.length;
+        const select = document.getElementById('countSelect');
+        select.innerHTML = "";
+        [5, 10, 15, 20].forEach(num => {
+            if (total >= num) {
+                let opt = document.createElement("option");
+                opt.value = num; opt.innerText = `${num} Questions`; select.appendChild(opt);
+            }
+        });
+        let allOpt = document.createElement("option");
+        allOpt.value = total; allOpt.innerText = `All (${total})`; select.appendChild(allOpt);
+        
+        document.getElementById('setupScreen').classList.remove('hidden');
+        document.getElementById('examScreen').classList.add('hidden');
+        document.getElementById('resultScreen').classList.add('hidden');
+        document.getElementById('creatorScreen').classList.add('hidden');
+    }
+
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+function startExam() {
+    if (!currentExamData) return;
+    
+    const count = parseInt(document.getElementById('countSelect').value);
+    
+    // 1. Create a deep copy of the questions pool
+    let pool = JSON.parse(JSON.stringify(currentExamData.mcq));
+
+    // 2. ALWAYS shuffle the questions (Requirement: Different questions every time)
+    pool = shuffleArray(pool);
+
+    // 3. Process each question to shuffle its options
+    activeQuestions = pool.slice(0, count).map((q) => {
+        // Map options to include their text and a flag for correctness
+        let processedOptions = q.options.map((txt, i) => ({
+            text: txt,
+            isCorrect: (i === q.correct)
+        }));
+
+        // ALWAYS shuffle the options (Requirement: Options shuffle between themselves)
+        processedOptions = shuffleArray(processedOptions);
+
+        return {
+            q: q.q,
+            options: processedOptions
+        };
+    });
+
+    renderQuiz();
+}
+
+    function renderQuiz() {
+        document.getElementById('setupScreen').classList.add('hidden');
+        document.getElementById('examScreen').classList.remove('hidden');
+        const container = document.getElementById('quizContainer');
+        container.innerHTML = '';
+        activeQuestions.forEach((q, qIndex) => {
+            const card = document.createElement('div');
+            card.className = 'question-card';
+            const title = document.createElement('div');
+            title.className = 'q-text';
+            title.innerText = `Q${qIndex + 1}. ${q.q}`;
+            card.appendChild(title);
+            q.options.forEach((opt, oIndex) => {
+                const label = document.createElement('label');
+                label.className = 'option-item';
+                const radio = document.createElement('input');
+                radio.type = 'radio'; radio.name = `question_${qIndex}`; radio.value = oIndex;
+                label.appendChild(radio);
+                label.appendChild(document.createTextNode(opt.text));
+                card.appendChild(label);
+            });
+            container.appendChild(card);
+        });
+        window.scrollTo(0,0);
+    }
+
+    function submitExam() {
+        let score = 0;
+        const container = document.getElementById('quizContainer');
+        const cards = container.getElementsByClassName('question-card');
+        activeQuestions.forEach((q, qIndex) => {
+            const card = cards[qIndex];
+            const labels = card.getElementsByClassName('option-item');
+            const selected = card.querySelector(`input[name="question_${qIndex}"]:checked`);
+            const selectedVal = selected ? parseInt(selected.value) : -1;
+            q.options.forEach((opt, oIndex) => {
+                const label = labels[oIndex];
+                if (opt.isCorrect) {
+                    if (selectedVal === oIndex) { score++; label.classList.add('correct'); label.innerHTML += " ✅"; }
+                    else { label.classList.add('missed'); label.innerHTML += " <b>(Correct Answer)</b>"; }
+                } else if (selectedVal === oIndex) { label.classList.add('wrong'); label.innerHTML += " ❌"; }
+            });
+        });
+        document.getElementById('examScreen').classList.add('hidden');
+        document.getElementById('resultScreen').classList.remove('hidden');
+        document.getElementById('scoreDisplay').innerText = `${score} / ${activeQuestions.length}`;
+        document.getElementById('percentageDisplay').innerText = `Percentage: ${Math.round((score/activeQuestions.length)*100)}%`;
+        
+        const reviewBox = document.getElementById('reviewContainer');
+        reviewBox.innerHTML = "";
+        reviewBox.appendChild(container);
+        reviewBox.querySelectorAll('input').forEach(i => i.disabled = true);
+        window.scrollTo(0,0);
+    }
+</script>
+
+</body>
+</html>

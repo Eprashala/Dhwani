@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Save the Kingdom</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #2c3e50; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
+        
+        /* BATTLE SCENE */
+        #battleField { width: 800px; height: 400px; background: linear-gradient(to bottom, #87CEEB 60%, #4CAF50 40%); position: relative; border: 4px solid #fff; border-radius: 8px; box-shadow: 0 0 20px rgba(0,0,0,0.5); overflow: hidden; }
+        
+        /* SPRITES */
+        .hero { position: absolute; bottom: 50px; left: 100px; font-size: 80px; transition: transform 0.2s; cursor: pointer; }
+        .monster { position: absolute; bottom: 50px; right: 100px; font-size: 100px; transition: transform 0.2s; }
+        
+        /* HUD */
+        .hud-bar { position: absolute; top: 20px; width: 200px; height: 20px; background: #333; border: 2px solid white; border-radius: 10px; overflow: hidden; }
+        .hp-fill { height: 100%; transition: width 0.5s; }
+        #heroHP { left: 20px; } 
+        #heroHP .hp-fill { background: #4CAF50; width: 100%; }
+        #enemyHP { right: 20px; }
+        #enemyHP .hp-fill { background: #F44336; width: 100%; }
+        
+        /* QUESTION PANEL */
+        #uiPanel { width: 800px; height: 200px; background: #fff; color: #333; padding: 20px; box-sizing: border-box; border-radius: 0 0 8px 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        #qText { grid-column: 1 / -1; font-weight: bold; font-size: 1.2em; margin-bottom: 10px; text-align: center; }
+        .btn-atk { background: #FF9800; border: none; padding: 15px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 1em; transition: 0.2s; }
+        .btn-atk:hover { background: #F57C00; transform: scale(1.02); }
+        .btn-atk:disabled { background: #ccc; cursor: not-allowed; }
+
+        /* ANIMATIONS */
+        .shake { animation: shake 0.5s; }
+        .attack-move { animation: lunge 0.3s forwards; }
+        @keyframes shake { 0% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } 100% { transform: translateX(0); } }
+        @keyframes lunge { 0% { transform: translateX(0); } 50% { transform: translateX(50px); } 100% { transform: translateX(0); } }
+    </style>
+</head>
+<body>
+
+<div id="battleField">
+    <div id="heroHP" class="hud-bar"><div class="hp-fill" id="hBar"></div></div>
+    <div id="enemyHP" class="hud-bar"><div class="hp-fill" id="eBar"></div></div>
+    
+    <div class="hero" id="hero">🛡️</div>
+    <div class="monster" id="monster">🐲</div>
+    
+    <div style="position:absolute; top:50px; left:0; right:0; text-align:center; color:white; font-weight:bold; text-shadow:1px 1px 2px black;">
+        LEVEL <span id="lvlDisplay">1</span>
+    </div>
+</div>
+
+<div id="uiPanel">
+    <div id="qText">Loading Battle...</div>
+    <button class="btn-atk" onclick="attack(0)" id="btn0">Option A</button>
+    <button class="btn-atk" onclick="attack(1)" id="btn1">Option B</button>
+    <button class="btn-atk" onclick="attack(2)" id="btn2">Option C</button>
+    <button class="btn-atk" onclick="attack(3)" id="btn3">Option D</button>
+</div>
+
+<script>
+    // --- 1. SETUP & DATA ---
+    const rawData = sessionStorage.getItem('eprashala_exam_data');
+    let examData = rawData ? JSON.parse(rawData) : null;
+
+    // --- 2. SHUFFLE LOGIC ---
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    if (examData && examData.mcq) {
+        // Shuffle Question Sequence
+        shuffleArray(examData.mcq);
+
+        // Shuffle Options per Question
+        examData.mcq.forEach(item => {
+            let optionsWithStatus = item.options.map((opt, index) => ({
+                text: opt,
+                isCorrect: index === item.correct
+            }));
+            
+            shuffleArray(optionsWithStatus);
+            
+            item.options = optionsWithStatus.map(o => o.text);
+            item.correct = optionsWithStatus.findIndex(o => o.isCorrect);
+        });
+    }
+
+    if(!examData) { 
+        document.body.innerHTML = "<h1>Error: No Exam Data Loaded.</h1>"; 
+    }
+
+    // --- 3. GAME STATE ---
+    let currentQ = 0;
+    let heroHealth = 100;
+    let enemyHealth = 100;
+
+    function loadTurn() {
+        if(currentQ >= examData.mcq.length) return victory();
+        
+        enemyHealth = 100;
+        updateBars();
+        
+        const q = examData.mcq[currentQ];
+        document.getElementById('qText').innerText = `Use the correct answer to attack!\n${q.q}`;
+        document.getElementById('lvlDisplay').innerText = currentQ + 1;
+        
+        q.options.forEach((opt, i) => {
+            const btn = document.getElementById(`btn${i}`);
+            btn.innerText = opt;
+            btn.disabled = false;
+            btn.style.background = "#FF9800";
+        });
+        
+        const monsters = ["🐲", "👹", "👾", "🤖", "🦖", "🧛"];
+        document.getElementById('monster').innerText = monsters[currentQ % monsters.length];
+    }
+
+    function attack(choice) {
+        const btns = document.querySelectorAll('.btn-atk');
+        btns.forEach(b => b.disabled = true);
+        
+        const hero = document.getElementById('hero');
+        const monster = document.getElementById('monster');
+        const q = examData.mcq[currentQ];
+
+        if(choice === q.correct) {
+            hero.classList.add('attack-move');
+            setTimeout(() => {
+                hero.classList.remove('attack-move');
+                monster.classList.add('shake');
+                enemyHealth = 0; 
+                updateBars();
+                setTimeout(() => {
+                    monster.classList.remove('shake');
+                    currentQ++;
+                    loadTurn();
+                }, 1000);
+            }, 300);
+        } else {
+            document.getElementById(`btn${choice}`).style.background = "#F44336";
+            monster.classList.add('attack-move'); 
+            setTimeout(() => {
+                monster.classList.remove('attack-move');
+                hero.classList.add('shake');
+                heroHealth -= 20;
+                updateBars();
+                setTimeout(() => {
+                    hero.classList.remove('shake');
+                    if(heroHealth <= 0) gameOver();
+                    else {
+                        currentQ++;
+                        loadTurn();
+                    }
+                }, 1000);
+            }, 300);
+        }
+    }
+
+    function updateBars() {
+        document.getElementById('hBar').style.width = heroHealth + "%";
+        document.getElementById('eBar').style.width = enemyHealth + "%";
+    }
+
+    function victory() {
+        document.body.innerHTML = "<h1 style='color:#4CAF50'>VICTORY! Kingdom Saved!</h1><button onclick='location.reload()' style='padding:10px; cursor:pointer;'>Replay Quest</button>";
+    }
+    function gameOver() {
+        document.body.innerHTML = "<h1 style='color:#F44336'>DEFEAT! The Kingdom has fallen.</h1><button onclick='location.reload()' style='padding:10px; cursor:pointer;'>Try Again</button>";
+    }
+
+    loadTurn();
+</script>
+</body>
+</html>

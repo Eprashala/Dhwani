@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; padding: 15px; background: #f9f9f9; }
+        .preview-img { width: 100%; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 15px; }
+        .option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .opt-btn { 
+            padding: 12px; border: none; border-radius: 8px; cursor: pointer;
+            background: #fff; border: 1px solid #FF9800; color: #E65100;
+            font-weight: bold; font-size: 13px; transition: 0.2s;
+        }
+        .opt-btn:hover { background: #FFF3E0; transform: translateY(-2px); }
+        #responseArea { 
+            margin-top: 20px; padding: 15px; background: white; 
+            border-radius: 8px; border: 1px solid #ccc; min-height: 100px;
+            font-size: 14px; line-height: 1.6; display: none;
+        }
+        .loading { color: #FF9800; font-style: italic; display: none; }
+    </style>
+</head>
+<body>
+    <img id="snipPreview" class="preview-img">
+    
+    <div style="margin-bottom: 15px;">
+        <input type="password" id="apiKey" placeholder="Enter Gemini API Key" 
+               style="width: 100%; padding: 8px; box-sizing: border-box; border-radius: 5px; border: 1px solid #ccc;">
+    </div>
+
+    <div class="option-grid">
+        <button class="opt-btn" onclick="askAI('Explain this concept in detail for students.')">📖 Detailed Explanation</button>
+        <button class="opt-btn" onclick="askAI('Generate 5 short one-sentence Q&A based on this.')">📝 1-Sentence Q&A</button>
+        <button class="opt-btn" onclick="askAI('Generate 3 brief/long answer questions with answers.')">✍️ Brief Q&A</button>
+        <button class="opt-btn" onclick="askAI('Create a fun 5-question MCQ quiz for a classroom game.')">🎮 Quiz Game</button>
+        <button class="opt-btn" onclick="askAI('Identify the key terms and define them.')">🔍 Key Vocab</button>
+        <button class="opt-btn" onclick="askAI('Summarize this into 3 easy bullet points.')">📋 Quick Summary</button>
+    </div>
+
+    <div id="loader" class="loading">Dhwani AI is thinking...</div>
+    <div id="responseArea"></div>
+
+    <script>
+       // Load the captured data from LocalStorage
+const snipImg = localStorage.getItem('snip_image');
+const pdfText = localStorage.getItem('snip_text_context');
+if(snipImg) document.getElementById('snipPreview').src = snipImg;
+
+async function askAI(prompt) {
+    const key = document.getElementById('apiKey').value || localStorage.getItem('gemini_api_key');
+    if(!key) return alert("Please enter Gemini API Key");
+    
+    // Auto-save key for next time
+    localStorage.setItem('gemini_api_key', key);
+
+    const loader = document.getElementById('loader');
+    const area = document.getElementById('responseArea');
+    
+    loader.style.display = 'block';
+    area.style.display = 'none';
+
+    const base64Image = snipImg.split(',')[1];
+
+    // THE EXPERT TEACHER SYSTEM PROMPT
+    const systemInstruction = `You are Ninad (formerly Dhwani), an expert LMS Teaching Assistant.
+IMAGE CONTEXT: The provided image is a screenshot of an LMS. 
+1. IGNORE the orange top-bar, side toolbars, and UI buttons.
+2. FOCUS ONLY on the Video, the Teacher's Blackboard, or the Document Viewer.
+3. Use the provided PDF Text for 100% technical accuracy.
+4. If asked to generate a Quiz, provide a mix of conceptual and factual questions.`;
+
+    const payload = {
+        contents: [{
+            parts: [
+                { text: `${systemInstruction}\n\nTask: ${prompt}\n\nContextual Text: ${pdfText}` },
+                { inline_data: { mime_type: "image/jpeg", data: base64Image } }
+            ]
+        }],
+        generationConfig: {
+            temperature: 0.4, // Lower temperature for more accurate teaching
+            maxOutputTokens: 1024
+        }
+    };
+
+    try {
+        // Using Gemini 1.5 Flash (or 2.0 if available in your region)
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        
+        const data = await res.json();
+        
+        if(data.error) throw new Error(data.error.message);
+
+        const aiText = data.candidates[0].content.parts[0].text;
+        
+        // Convert Markdown-style bold and lists to HTML
+        area.innerHTML = aiText
+            .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+            .replace(/\n/g, '<br>');
+            
+        area.style.display = 'block';
+    } catch (err) {
+        area.innerHTML = "<span style='color:red'>Error: " + err.message + "</span>";
+        area.style.display = 'block';
+    } finally {
+        loader.style.display = 'none';
+    }
+}
+    </script>
+</body>
+</html>

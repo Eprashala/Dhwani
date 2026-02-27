@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ninad AI Teacher</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        MathJax = {
+            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+    
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #fdfdfd; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        
+        /* Chat Bubbles */
+        .message-content { word-wrap: break-word; line-height: 1.5; font-size: 0.9rem; }
+        .message-content p { margin-bottom: 0.5rem; }
+        .message-content p:last-child { margin-bottom: 0; }
+        .message-content ul, .message-content ol { margin-left: 1.5rem; margin-bottom: 0.5rem; }
+        .message-content a { color: #2563eb; text-decoration: underline; }
+        .message-content img { max-width: 100%; border-radius: 8px; margin-top: 5px; }
+        .message-content pre { background: #1e293b; color: #fff; padding: 10px; border-radius: 6px; overflow-x: auto; }
+        
+        /* Mic Pulse Animation */
+        .mic-active { animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite; }
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen text-gray-800 overflow-hidden">
+
+    <div class="bg-orange-500 text-white p-3 shadow-md flex justify-between items-center shrink-0 z-10">
+        <div class="flex items-center gap-2">
+            <span class="text-xl">🤖</span>
+            <div>
+                <h1 class="font-bold text-sm leading-tight">Ninad AI</h1>
+                <div id="context-badge" class="text-[10px] bg-orange-700 px-2 py-0.5 rounded-full opacity-90 truncate max-w-[200px]">Loading Context...</div>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <button onclick="toggleSettings()" class="text-white hover:bg-orange-600 p-1.5 rounded-full transition" title="Settings">⚙️</button>
+        </div>
+    </div>
+
+    <div id="settings-panel" class="hidden bg-gray-100 border-b border-gray-300 p-3 shrink-0 text-xs shadow-inner">
+        <label class="block font-semibold mb-1 text-gray-600">Gemini Flash 3.0 API Key:</label>
+        <input type="password" id="apiKeyInput" class="w-full p-2 border border-gray-300 rounded outline-none focus:border-orange-500" placeholder="AIzaSy..." onchange="saveSettings()">
+        <div class="mt-2 flex items-center gap-2">
+            <input type="checkbox" id="voiceOutputToggle" checked onchange="saveSettings()">
+            <label for="voiceOutputToggle" class="text-gray-600">Enable Voice Responses</label>
+        </div>
+    </div>
+
+    <div id="visual-context-bar" class="bg-gray-50 border-b border-gray-200 p-2 flex gap-2 overflow-x-auto shrink-0 min-h-[45px]">
+        </div>
+
+    <div id="chat-container" class="flex-1 overflow-y-auto p-4 flex flex-col gap-4 bg-white">
+        </div>
+
+    <div class="bg-gray-50 border-t border-gray-200 p-2 overflow-x-auto shrink-0 flex gap-2 whitespace-nowrap scroll-smooth">
+        <button onclick="sendQuickPrompt('Explain this portion in detail.')" class="bg-white border border-orange-400 text-orange-600 px-3 py-1.5 rounded-full text-xs hover:bg-orange-50 transition shadow-sm">Explain in detail</button>
+        <button onclick="sendQuickPrompt('Give more information on this.')" class="bg-white border border-orange-400 text-orange-600 px-3 py-1.5 rounded-full text-xs hover:bg-orange-50 transition shadow-sm">More info</button>
+        <button onclick="sendQuickPrompt('Generate Q&A in one sentence each.')" class="bg-white border border-orange-400 text-orange-600 px-3 py-1.5 rounded-full text-xs hover:bg-orange-50 transition shadow-sm">1-Sentence Q&A</button>
+        <button onclick="sendQuickPrompt('Generate Q&A in brief.')" class="bg-white border border-orange-400 text-orange-600 px-3 py-1.5 rounded-full text-xs hover:bg-orange-50 transition shadow-sm">Brief Q&A</button>
+        <button onclick="sendQuickPrompt('Create a fun multiple-choice quiz based on this topic.')" class="bg-white border border-orange-400 text-orange-600 px-3 py-1.5 rounded-full text-xs hover:bg-orange-50 transition shadow-sm">Play a Quiz</button>
+        <button onclick="sendQuickPrompt('Can you suggest some good YouTube video search terms for this?')" class="bg-white border border-orange-400 text-orange-600 px-3 py-1.5 rounded-full text-xs hover:bg-orange-50 transition shadow-sm">YouTube Links</button>
+    </div>
+
+    <div class="p-3 bg-white border-t border-gray-200 shrink-0 flex items-end gap-2 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+        <button id="micBtn" onclick="toggleMic()" class="bg-gray-100 hover:bg-gray-200 text-gray-600 p-3 rounded-full transition flex-shrink-0 focus:outline-none" title="Voice Input">
+            🎤
+        </button>
+        <textarea id="userInput" rows="1" class="flex-1 bg-gray-100 border-transparent focus:bg-white focus:border-orange-500 border rounded-2xl py-2.5 px-4 outline-none resize-none text-sm transition-all" placeholder="Ask Ninad or use the mic..." onkeydown="handleEnter(event)" oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"></textarea>
+        <button id="sendBtn" onclick="sendMessage()" class="bg-orange-500 hover:bg-orange-600 text-white p-2.5 rounded-full transition flex-shrink-0 focus:outline-none shadow-md" title="Send">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5 ml-0.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
+        </button>
+    </div>
+
+    <script>
+        // --- State Management ---
+        let chatHistory = [];
+        let sysPrompt = "";
+        let isListening = false;
+        let recognition = null;
+        let synth = window.speechSynthesis;
+        
+        // Context Variables
+        let userName = "Student";
+        let std = "Unknown", subject = "Unknown", topic = "Unknown", medium = "Marathi";
+
+        window.onload = () => {
+            loadSettings();
+            parseUrlContext();
+            initSpeechRecognition();
+            
+            // Initial Greeting
+            appendMessage('ai', `नमस्कार ${userName}! I am Ninad. We are studying **${subject}** today. How can I help you with **${topic}**?`);
+            captureVisualContext(); // Initial grab
+        };
+
+        // --- Settings & UI ---
+        function toggleSettings() {
+            const panel = document.getElementById('settings-panel');
+            panel.classList.toggle('hidden');
+        }
+
+        function loadSettings() {
+            const key = localStorage.getItem('ninad_gemini_key');
+            const voice = localStorage.getItem('ninad_voice_enabled');
+            if (key) document.getElementById('apiKeyInput').value = key;
+            if (voice !== null) document.getElementById('voiceOutputToggle').checked = (voice === 'true');
+        }
+
+        function saveSettings() {
+            localStorage.setItem('ninad_gemini_key', document.getElementById('apiKeyInput').value.trim());
+            localStorage.setItem('ninad_voice_enabled', document.getElementById('voiceOutputToggle').checked);
+        }
+
+        // --- Context Parsing (The Magic) ---
+        function parseUrlContext() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const contextPath = urlParams.get('context') || '';
+            userName = urlParams.get('user') || 'Student';
+
+            if (contextPath) {
+                // Determine Medium
+                if (contextPath.toLowerCase().includes('english') || contextPath.toLowerCase().includes('semi')) {
+                    medium = "English (with Marathi explanations if needed)";
+                } else {
+                    medium = "Marathi";
+                }
+
+                // Extract Details from Path (e.g., ./EDU4/STD5/5Maths/1 Geometrical Figures Part 2.enc)
+                const parts = contextPath.split('/');
+                parts.forEach(p => {
+                    const upperP = p.toUpperCase();
+                    if (upperP.startsWith('STD') || upperP.startsWith('CLASS')) {
+                        std = p.replace(/STD|CLASS/i, '');
+                    } else if (p.match(/^\d+[A-Za-z]+/)) {
+                        subject = p.replace(/^\d+/, ''); // Removes prefix number from subject folder
+                    }
+                });
+
+                // The last part is usually the filename/topic
+                let filename = parts[parts.length - 1];
+                topic = decodeURIComponent(filename.replace(/\.[^/.]+$/, "")); // Remove extension
+            }
+
+            // Update UI Badge
+            document.getElementById('context-badge').innerText = `Std ${std} | ${subject}`;
+
+            // Build the Ultimate System Prompt
+            sysPrompt = `You are Ninad, an expert, empathetic AI teacher built into the Eprashala LMS.
+            Student Name: ${userName}
+            Current Standard/Grade: ${std}
+            Current Subject: ${subject}
+            Current Topic: ${topic}
+            Preferred Language Medium: ${medium}
+
+            CRITICAL TEACHING INSTRUCTIONS:
+            1. AGE APPROPRIATENESS: Tailor your vocabulary, tone, and complexity strictly to a student in Standard ${std}. 
+            2. INTERACTIVE LEARNING: Do not just give long lectures. Ask engaging questions. If asked for a quiz, provide multiple-choice questions one by one.
+            3. MATH & SCIENCE: Use LaTeX formatting for any formulas or equations. Enclose inline math in single $ symbols (e.g., $x^2 + y^2 = z^2$) and block equations in double $$ symbols.
+            4. VISUAL AWARENESS: You will be provided with images of the student's Blackboard, Textbook (PDF), or Video. Ground your answers heavily on these images.
+            5. RESOURCES: If suggesting videos, provide formatted links like: [Search YouTube for Topic](https://www.youtube.com/results?search_query=topic).
+            6. LANGUAGE: If the medium is Marathi, respond in Marathi (Devanagari). If English, respond in English but feel free to explain tough concepts in Marathi if it helps.`;
+        }
+
+        // --- Visual Context Extraction (The Eyes) ---
+        function captureVisualContext() {
+            let images = [];
+            const bar = document.getElementById('visual-context-bar');
+            bar.innerHTML = ''; 
+
+            try {
+                const parentDoc = window.parent.document;
+                if(!parentDoc) return images;
+
+                // Grab Board
+                const board = parentDoc.getElementById('boardCanvas');
+                if (board && window.parent.leftPanelState > 0) { 
+                    const data = board.toDataURL('image/jpeg', 0.6);
+                    images.push({ mimeType: 'image/jpeg', data: data.split(',')[1], label: 'Blackboard' });
+                    addThumb(data, 'Board');
+                }
+
+                // Grab PDF
+                const pdf = parentDoc.getElementById('pdfRenderCanvas');
+                if (pdf && pdf.style.display !== 'none' && window.parent.rightPanelState > 0) {
+                    const data = pdf.toDataURL('image/jpeg', 0.6);
+                    images.push({ mimeType: 'image/jpeg', data: data.split(',')[1], label: 'Textbook' });
+                    addThumb(data, 'Textbook');
+                }
+
+                // Grab Video
+                const vid = parentDoc.getElementById('mainVideo');
+                if (vid && parentDoc.getElementById('videoPlayerArea').style.display !== 'none' && vid.readyState >= 2) {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = vid.videoWidth; canvas.height = vid.videoHeight;
+                    canvas.getContext('2d').drawImage(vid, 0, 0);
+                    const data = canvas.toDataURL('image/jpeg', 0.6);
+                    images.push({ mimeType: 'image/jpeg', data: data.split(',')[1], label: 'Video' });
+                    addThumb(data, 'Video');
+                }
+            } catch (e) { console.warn("Cannot access parent visual context."); }
+
+            if(images.length === 0) {
+                bar.innerHTML = '<span class="text-[10px] text-gray-400 italic px-2 py-1">No visual context active</span>';
+            }
+            return images;
+        }
+
+        function addThumb(src, title) {
+            const img = document.createElement('img');
+            img.src = src;
+            img.className = 'h-8 w-auto border border-gray-300 rounded shadow-sm object-contain bg-white';
+            img.title = `Current ${title} View`;
+            document.getElementById('visual-context-bar').appendChild(img);
+        }
+
+        // --- Speech Recognition (The Ear) ---
+        function initSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SpeechRecognition) {
+                recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                
+                // Set language based on medium
+                recognition.lang = medium.includes("English") ? 'en-IN' : 'mr-IN';
+
+                recognition.onstart = () => {
+                    isListening = true;
+                    document.getElementById('micBtn').classList.add('mic-active', 'bg-red-100', 'text-red-600');
+                    document.getElementById('micBtn').classList.remove('bg-gray-100', 'text-gray-600');
+                    if(synth.speaking) synth.cancel(); // Stop talking if user interrupts
+                };
+
+                recognition.onresult = (event) => {
+                    const transcript = event.results[0][0].transcript;
+                    document.getElementById('userInput').value = transcript;
+                    sendMessage();
+                };
+
+                recognition.onend = () => {
+                    isListening = false;
+                    document.getElementById('micBtn').classList.remove('mic-active', 'bg-red-100', 'text-red-600');
+                    document.getElementById('micBtn').classList.add('bg-gray-100', 'text-gray-600');
+                };
+            } else {
+                document.getElementById('micBtn').style.display = 'none'; // Hide if unsupported
+            }
+        }
+
+        function toggleMic() {
+            if (!recognition) return;
+            if (isListening) recognition.stop();
+            else recognition.start();
+        }
+
+        // --- Text to Speech (The Mouth) ---
+        function speakResponse(text) {
+            if (!document.getElementById('voiceOutputToggle').checked) return;
+            if (synth.speaking) synth.cancel();
+
+            // Clean Markdown & LaTeX before speaking
+            let cleanText = text.replace(/\[.*?\]\(.*?\)/g, "Link provided.") // Remove markdown links
+                                .replace(/[*#`]/g, "") // Remove formatting
+                                .replace(/\$.*?\$/g, "an equation") // Replace inline math
+                                .replace(/\$\$.*?\$\$/g, "a complex formula"); // Replace block math
+            
+            const utterance = new SpeechSynthesisUtterance(cleanText);
+            utterance.lang = medium.includes("English") ? 'en-IN' : 'mr-IN';
+            
+            // Adjust speed for younger kids
+            const gradeNum = parseInt(std);
+            if (!isNaN(gradeNum) && gradeNum <= 5) utterance.rate = 0.85;
+            else utterance.rate = 1.0;
+
+            synth.speak(utterance);
+        }
+
+        // --- Chat Logic ---
+        function handleEnter(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function sendQuickPrompt(text) {
+            document.getElementById('userInput').value = text;
+            sendMessage();
+        }
+
+        function appendMessage(sender, text) {
+            const container = document.getElementById('chat-container');
+            const wrapper = document.createElement('div');
+            wrapper.className = `flex w-full ${sender === 'user' ? 'justify-end' : 'justify-start'}`;
+            
+            const bubble = document.createElement('div');
+            bubble.className = `max-w-[85%] rounded-2xl px-4 py-2 message-content shadow-sm ${
+                sender === 'user' 
+                ? 'bg-orange-100 text-orange-900 rounded-br-sm border border-orange-200' 
+                : 'bg-blue-50 text-blue-900 rounded-bl-sm border border-blue-200'
+            }`;
+
+            if (sender === 'ai') {
+                if (text === 'typing') {
+                    bubble.innerHTML = '<span class="animate-pulse text-blue-500">Ninad is thinking...</span>';
+                    bubble.id = 'typing-indicator';
+                } else {
+                    bubble.innerHTML = marked.parse(text);
+                }
+            } else {
+                bubble.innerText = text;
+            }
+
+            wrapper.appendChild(bubble);
+            container.appendChild(wrapper);
+            container.scrollTop = container.scrollHeight;
+            
+            // Trigger MathJax to typeset the new content
+            if (sender === 'ai' && text !== 'typing' && window.MathJax) {
+                MathJax.typesetPromise([bubble]).catch((err) => console.log('MathJax error: ', err));
+            }
+        }
+
+        async function sendMessage() {
+            const inputEl = document.getElementById('userInput');
+            const text = inputEl.value.trim();
+            const apiKey = document.getElementById('apiKeyInput').value.trim();
+
+            if (!text) return;
+            if (!apiKey) { alert("Please enter your Gemini API Key in Settings."); return; }
+
+            // 1. UI Updates
+            appendMessage('user', text);
+            inputEl.value = '';
+            inputEl.style.height = 'auto'; // reset textarea height
+            appendMessage('ai', 'typing');
+
+            // 2. Gather Multimodal Context
+            const visualContext = captureVisualContext();
+            let userParts = [{ text: text }];
+            
+            visualContext.forEach(img => {
+                userParts.push({ inlineData: { mimeType: img.mimeType, data: img.data } });
+            });
+
+            // 3. API Payload
+            const payload = {
+                systemInstruction: { parts: [{ text: sysPrompt }] },
+                contents: [...chatHistory, { role: "user", parts: userParts }],
+                generationConfig: { temperature: 0.7 }
+            };
+
+            // 4. Fetch from Gemini
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                
+                // Remove typing indicator
+                const typingObj = document.getElementById('typing-indicator');
+                if (typingObj) typingObj.parentElement.remove();
+
+                if (data.error) {
+                    appendMessage('ai', `**Error:** ${data.error.message}`);
+                    return;
+                }
+
+                const aiText = data.candidates[0].content.parts[0].text;
+                
+                // Update History
+                chatHistory.push({ role: "user", parts: [{ text: text }] });
+                chatHistory.push({ role: "model", parts: [{ text: aiText }] });
+
+                // Render and Speak
+                appendMessage('ai', aiText);
+                speakResponse(aiText);
+
+            } catch (error) {
+                const typingObj = document.getElementById('typing-indicator');
+                if (typingObj) typingObj.parentElement.remove();
+                appendMessage('ai', `**Connection Error:** Could not reach the server.`);
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>

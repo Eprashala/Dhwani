@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        /* Transparent body so we can see the LMS behind it */
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; color: white; display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: transparent; }
+        
+        .toolbar { background: rgba(0,0,0,0.8); padding: 8px; display: flex; gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap; border-bottom: 1px solid rgba(255,255,255,0.2); }
+        
+        button { background: #4CAF50; border: none; color: white; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; }
+        button:hover { background: #388E3C; }
+        button.btn-stop { background: #F44336; }
+        
+        .label { font-size: 12px; font-weight: bold; color: #ddd; }
+        input[type="range"] { width: 60px; }
+
+        /* The actual reading area */
+        .content-area { flex: 1; padding: 20px; overflow-y: auto; font-size: 24px; line-height: 1.6; outline: none; text-shadow: 1px 1px 3px black; scroll-behavior: smooth; }
+        
+        /* Custom scrollbar to look sleek */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.4); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.7); }
+    </style>
+</head>
+<body>
+
+<div class="toolbar">
+    <button id="btnPlay" onclick="toggleScroll()">▶ Play</button>
+    <button class="btn-stop" onclick="resetScroll()">↺ Reset</button>
+    
+    <span class="label">Speed:</span>
+    <input type="range" id="speedSlider" min="1" max="10" value="3">
+    
+    <span class="label">Font:</span>
+    <button style="background: #555; padding: 5px 8px;" onclick="changeFontSize(2)">A+</button>
+    <button style="background: #555; padding: 5px 8px;" onclick="changeFontSize(-2)">A-</button>
+</div>
+
+<div class="content-area" id="scriptBox" contenteditable="true" spellcheck="false">
+    Paste your lecture notes here...<br><br>
+    Click 'Play' to start the teleprompter.<br><br>
+    Adjust the speed using the slider.<br><br>
+    Change the font size with A+ and A-.<br><br>
+    Because the background is transparent, you can place this right over the video camera or your textbook PDF and never break eye contact with your students.
+    <br><br><br><br><br><br><br><br><br>
+</div>
+
+<script>
+    let isScrolling = false;
+    let scrollInterval = null;
+    let currentFontSize = 24;
+
+    function toggleScroll() {
+        const btn = document.getElementById('btnPlay');
+        if (isScrolling) {
+            // Pause
+            clearInterval(scrollInterval);
+            isScrolling = false;
+            btn.innerText = "▶ Play";
+            btn.style.background = "#4CAF50";
+        } else {
+            // Play
+            isScrolling = true;
+            btn.innerText = "⏸ Pause";
+            btn.style.background = "#FF9800";
+            
+            // Remove focus from the text box so scrolling works smoothly
+            document.getElementById('scriptBox').blur();
+            
+            scrollInterval = setInterval(() => {
+                const speed = document.getElementById('speedSlider').value;
+                const box = document.getElementById('scriptBox');
+                // Incrementally scroll down
+                box.scrollTop += (speed * 0.5);
+                
+                // Optional: Auto-pause at bottom
+                if(box.scrollTop + box.clientHeight >= box.scrollHeight) {
+                    toggleScroll();
+                }
+            }, 50); // Updates 20 times a second
+        }
+    }
+
+    function resetScroll() {
+        if(isScrolling) toggleScroll(); // pause if playing
+        document.getElementById('scriptBox').scrollTop = 0;
+    }
+
+    function changeFontSize(change) {
+        currentFontSize += change;
+        if(currentFontSize < 12) currentFontSize = 12;
+        if(currentFontSize > 72) currentFontSize = 72;
+        document.getElementById('scriptBox').style.fontSize = currentFontSize + 'px';
+    }
+</script>
+</body>
+</html>

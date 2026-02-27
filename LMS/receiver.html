@@ -1,0 +1,36 @@
+<div class="lms-mirror-window">
+    <h3>Mobile Mirror</h3>
+    <video id="remoteVideo" autoplay playsinline style="width: 100%; background: #000;"></video>
+</div>
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script>
+    const socket = io('http://YOUR_IP:3000');
+    const remoteVideo = document.getElementById('remoteVideo');
+    let peerConnection;
+
+    const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+    socket.on('signal', async (data) => {
+        if (!peerConnection) startConnection(false);
+
+        if (data.sdp) {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+            if (data.sdp.type === 'offer') {
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                socket.emit('signal', { sdp: peerConnection.localDescription });
+            }
+        } else if (data.candidate) {
+            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+        }
+    });
+
+    function startConnection(isCaller) {
+        peerConnection = new RTCPeerConnection(config);
+        peerConnection.ontrack = (e) => remoteVideo.srcObject = e.streams[0];
+        peerConnection.onicecandidate = (e) => {
+            if (e.candidate) socket.emit('signal', { candidate: e.candidate });
+        };
+    }
+</script>

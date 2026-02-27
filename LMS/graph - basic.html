@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; background: #fff; overflow: hidden; }
+        
+        /* Top Input Bar */
+        .toolbar { background: #f5f5f5; padding: 10px; display: flex; gap: 10px; align-items: center; border-bottom: 1px solid #ddd; z-index: 10; }
+        
+        .equation-input { display: flex; align-items: center; flex: 1; background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 0 10px; }
+        .equation-input span { font-weight: bold; color: #00BCD4; font-size: 18px; margin-right: 5px; font-style: italic; }
+        .equation-input input { border: none; outline: none; padding: 8px 0; font-size: 16px; flex: 1; font-family: monospace; color: #333;}
+        
+        button.action-btn { background: #00BCD4; border: none; color: white; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.1s; }
+        button.action-btn:hover { background: #00ACC1; }
+        button.btn-icon { background: #00BCD4; border: none; color: white; border-radius: 4px; padding: 8px 10px; font-size: 14px; cursor: pointer;}
+        button.btn-icon:hover { background: #00ACC1; }
+
+        /* Shortcut Bar */
+        .shortcut-bar { background: #eeeeee; padding: 6px 10px; display: flex; gap: 15px; overflow-x: auto; border-bottom: 2px solid #00BCD4; white-space: nowrap; }
+        .shortcut-bar::-webkit-scrollbar { height: 6px; }
+        .shortcut-bar::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+        
+        .sc-group { display: flex; gap: 3px; border-right: 1px solid #ccc; padding-right: 10px; align-items: center; }
+        .sc-group:last-child { border-right: none; }
+        
+        button.sc-btn { background: #fff; border: 1px solid #ddd; color: #333; padding: 4px 8px; border-radius: 3px; cursor: pointer; font-family: 'Segoe UI', sans-serif; font-weight: bold; font-size: 13px; transition: 0.1s; }
+        button.sc-btn:hover { background: #e0f7fa; border-color: #00BCD4; color: #00838F; }
+        button.sc-btn.func { color: #E91E63; }
+        button.sc-btn.var { color: #00BCD4; font-style: italic;}
+        button.sc-btn.ctrl { background: #fff3e0; border-color: #FF9800; color: #E65100; }
+        button.sc-btn.ctrl:hover { background: #ffe0b2; }
+
+        /* Canvas Area */
+        .canvas-container { flex: 1; position: relative; overflow: hidden; cursor: grab; }
+        .canvas-container:active { cursor: grabbing; }
+        canvas { display: block; width: 100%; height: 100%; }
+
+        .tooltip { position: absolute; bottom: 10px; left: 10px; font-size: 11px; color: #777; background: rgba(255,255,255,0.9); padding: 4px 8px; border-radius: 4px; pointer-events: none; border: 1px solid #ddd;}
+    </style>
+</head>
+<body>
+
+<div class="toolbar">
+    <div class="equation-input">
+        <span>y =</span>
+        <input type="text" id="eqInput" value="sin(x)" placeholder="Type or use buttons below..." oninput="draw()" onkeydown="if(event.key === 'Enter') draw()">
+    </div>
+    <button class="action-btn" onclick="draw()">Plot</button>
+    <button class="btn-icon" onclick="zoom(1.2)" title="Zoom In">➕</button>
+    <button class="btn-icon" onclick="zoom(0.8)" title="Zoom Out">➖</button>
+    <button class="btn-icon" onclick="resetView()" title="Center Graph">🎯</button>
+</div>
+
+<div class="shortcut-bar">
+    <div class="sc-group">
+        <button class="sc-btn var" onclick="insertSymbol('x')">x</button>
+        <button class="sc-btn var" onclick="insertSymbol('a')">a</button>
+        <button class="sc-btn var" onclick="insertSymbol('b')">b</button>
+        <button class="sc-btn var" onclick="insertSymbol('c')">c</button>
+    </div>
+    <div class="sc-group">
+        <button class="sc-btn" onclick="insertSymbol('²')">x²</button>
+        <button class="sc-btn" onclick="insertSymbol('³')">x³</button>
+        <button class="sc-btn" onclick="insertSymbol('^')">x^y</button>
+        <button class="sc-btn" onclick="insertSymbol('√(', -1)">√</button>
+        <button class="sc-btn func" onclick="insertSymbol('abs(', -1)">|x|</button>
+    </div>
+    <div class="sc-group">
+        <button class="sc-btn func" onclick="insertSymbol('sin(', -1)">sin</button>
+        <button class="sc-btn func" onclick="insertSymbol('cos(', -1)">cos</button>
+        <button class="sc-btn func" onclick="insertSymbol('tan(', -1)">tan</button>
+        <button class="sc-btn func" onclick="insertSymbol('asin(', -1)">sin⁻¹</button>
+        <button class="sc-btn func" onclick="insertSymbol('acos(', -1)">cos⁻¹</button>
+        <button class="sc-btn func" onclick="insertSymbol('atan(', -1)">tan⁻¹</button>
+    </div>
+    <div class="sc-group">
+        <button class="sc-btn func" onclick="insertSymbol('log(', -1)">log</button>
+        <button class="sc-btn func" onclick="insertSymbol('ln(', -1)">ln</button>
+        <button class="sc-btn" onclick="insertSymbol('e')">e</button>
+        <button class="sc-btn" onclick="insertSymbol('π')">π</button>
+    </div>
+    <div class="sc-group">
+        <button class="sc-btn" onclick="insertSymbol('+')">+</button>
+        <button class="sc-btn" onclick="insertSymbol('-')">−</button>
+        <button class="sc-btn" onclick="insertSymbol('*')">×</button>
+        <button class="sc-btn" onclick="insertSymbol('/')">÷</button>
+        <button class="sc-btn" onclick="insertSymbol('(', 0)">(</button>
+        <button class="sc-btn" onclick="insertSymbol(')', 0)">)</button>
+    </div>
+    <div class="sc-group">
+        <button class="sc-btn ctrl" onclick="backspace()" title="Backspace">⌫</button>
+        <button class="sc-btn" style="color: #d32f2f; font-weight: bold;" onclick="clearInput()">AC</button>
+    </div>
+</div>
+
+<div class="canvas-container" id="canvasContainer">
+    <canvas id="graphCanvas"></canvas>
+    <div class="tooltip">Scroll to Zoom | Drag to Pan</div>
+</div>
+
+<script>
+    const canvas = document.getElementById('graphCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('canvasContainer');
+    const inputField = document.getElementById('eqInput');
+
+    let scale = 40; 
+    let offsetX = 0; 
+    let offsetY = 0; 
+    
+    function resizeCanvas() {
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+        draw();
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    // --- SMART CURSOR CONTROLS ---
+    function insertSymbol(val, cursorOffset = 0) {
+        const start = inputField.selectionStart;
+        const end = inputField.selectionEnd;
+        const text = inputField.value;
+        
+        inputField.value = text.slice(0, start) + val + text.slice(end);
+        
+        const newPos = start + val.length + cursorOffset;
+        inputField.focus();
+        inputField.setSelectionRange(newPos, newPos);
+        
+        draw(); 
+    }
+
+    function backspace() {
+        const start = inputField.selectionStart;
+        const end = inputField.selectionEnd;
+        const text = inputField.value;
+
+        if (start === end && start > 0) {
+            // Delete one character behind cursor
+            inputField.value = text.slice(0, start - 1) + text.slice(end);
+            inputField.focus();
+            inputField.setSelectionRange(start - 1, start - 1);
+        } else if (start !== end) {
+            // Delete highlighted text
+            inputField.value = text.slice(0, start) + text.slice(end);
+            inputField.focus();
+            inputField.setSelectionRange(start, start);
+        }
+        draw();
+    }
+
+    function clearInput() {
+        inputField.value = '';
+        inputField.focus();
+        draw();
+    }
+
+    // --- ADVANCED MATH PARSER ---
+    function compileMathExpression(expr) {
+        if (!expr.trim()) return null;
+        
+        let parsed = expr.toLowerCase()
+            .replace(/\s+/g, '') 
+            .replace(/π/g, 'Math.PI')
+            .replace(/pi/g, 'Math.PI')
+            .replace(/e/g, 'Math.E')
+            .replace(/²/g, '**2')
+            .replace(/³/g, '**3')
+            // Advanced Functions (Order matters here!)
+            .replace(/asin\(/g, 'Math.asin(')
+            .replace(/acos\(/g, 'Math.acos(')
+            .replace(/atan\(/g, 'Math.atan(')
+            .replace(/sin\(/g, 'Math.sin(')
+            .replace(/cos\(/g, 'Math.cos(')
+            .replace(/tan\(/g, 'Math.tan(')
+            .replace(/√\(/g, 'Math.sqrt(')
+            .replace(/sqrt\(/g, 'Math.sqrt(')
+            .replace(/abs\(/g, 'Math.abs(')
+            .replace(/log\(/g, 'Math.log10(')
+            .replace(/ln\(/g, 'Math.log(')
+            .replace(/\^/g, '**'); 
+            
+        // Fix implicit multiplication (e.g., 2x -> 2*x, xsin -> x*sin)
+        parsed = parsed.replace(/(\d)([a-z\(])/g, '$1*$2');
+        parsed = parsed.replace(/([x])([a-z\(])/g, '$1*$2');
+        
+        try {
+            return new Function('x', `
+                const a = 1, b = 2, c = 3, y = 1, z = 1;
+                return ${parsed};
+            `);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    // --- HIGH-PERFORMANCE RENDERING ---
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const centerX = (canvas.width / 2) + offsetX;
+        const centerY = (canvas.height / 2) + offsetY;
+
+        // Grid
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#e0e0e0';
+        ctx.beginPath();
+        const startCol = Math.floor(-centerX / scale);
+        const endCol = Math.ceil((canvas.width - centerX) / scale);
+        for(let i = startCol; i <= endCol; i++) {
+            let x = centerX + i * scale;
+            ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height);
+        }
+        const startRow = Math.floor(-centerY / scale);
+        const endRow = Math.ceil((canvas.height - centerY) / scale);
+        for(let i = startRow; i <= endRow; i++) {
+            let y = centerY + i * scale;
+            ctx.moveTo(0, y); ctx.lineTo(canvas.width, y);
+        }
+        ctx.stroke();
+
+        // Axes
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#333';
+        ctx.beginPath();
+        ctx.moveTo(0, centerY); ctx.lineTo(canvas.width, centerY);
+        ctx.moveTo(centerX, 0); ctx.lineTo(centerX, canvas.height);
+        ctx.stroke();
+
+        // Labels
+        ctx.fillStyle = '#333';
+        ctx.font = '12px Arial';
+        ctx.fillText("0", centerX + 5, centerY + 15);
+        if (scale > 15) { 
+            ctx.fillText("1", centerX + scale + 5, centerY + 15);
+            ctx.fillText("1", centerX + 5, centerY - scale + 15);
+        }
+
+        // Plot Function
+        const expr = inputField.value;
+        const func = compileMathExpression(expr);
+        
+        if (func) {
+            ctx.beginPath();
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = '#E91E63'; 
+            
+            let firstPoint = true;
+            
+            for(let px = 0; px <= canvas.width; px += 2) {
+                let mathX = (px - centerX) / scale;
+                try {
+                    let mathY = func(mathX);
+                    
+                    if(!isFinite(mathY) || isNaN(mathY)) {
+                        firstPoint = true;
+                        continue;
+                    }
+                    let py = centerY - (mathY * scale);
+                    if(py < -5000 || py > canvas.height + 5000) {
+                        firstPoint = true;
+                        continue;
+                    }
+                    if (firstPoint) {
+                        ctx.moveTo(px, py);
+                        firstPoint = false;
+                    } else {
+                        ctx.lineTo(px, py);
+                    }
+                } catch(e) {
+                    break;
+                }
+            }
+            ctx.stroke();
+        }
+    }
+
+    // --- INTERACTIVITY ---
+    function zoom(factor) {
+        scale *= factor;
+        if(scale < 2) scale = 2;
+        if(scale > 500) scale = 500;
+        draw();
+    }
+    
+    function resetView() {
+        scale = 40; offsetX = 0; offsetY = 0;
+        draw();
+    }
+
+    let isDragging = false;
+    let lastX = 0, lastY = 0;
+
+    canvas.addEventListener('mousedown', (e) => {
+        isDragging = true; lastX = e.clientX; lastY = e.clientY;
+    });
+    window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        offsetX += (e.clientX - lastX); offsetY += (e.clientY - lastY);
+        lastX = e.clientX; lastY = e.clientY;
+        draw();
+    });
+    window.addEventListener('mouseup', () => { isDragging = false; });
+    window.addEventListener('mouseleave', () => { isDragging = false; });
+    canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        zoom(e.deltaY > 0 ? 0.9 : 1.1);
+    });
+
+    setTimeout(resizeCanvas, 100);
+</script>
+</body>
+</html>

@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mission: Defuse</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Roboto+Mono:wght@500&display=swap');
+
+        body { 
+            background-color: #111; 
+            color: #eee; 
+            font-family: 'Roboto Mono', monospace; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            height: 100vh; 
+            margin: 0; 
+            overflow: hidden;
+            background-image: radial-gradient(circle at center, #222 0%, #000 100%);
+        }
+
+        /* BOMB TIMER */
+        .bomb-container {
+            background: #222;
+            border: 4px solid #444;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 30px rgba(255, 0, 0, 0.2);
+            text-align: center;
+            width: 90%;
+            max-width: 600px;
+            position: relative;
+        }
+
+        .timer-display {
+            font-family: 'Black Ops One', cursive;
+            font-size: 5em;
+            color: red;
+            background: #000;
+            padding: 10px 30px;
+            border: 2px inset #555;
+            border-radius: 5px;
+            text-shadow: 0 0 10px red;
+            margin-bottom: 20px;
+            letter-spacing: 5px;
+        }
+
+        .question-text {
+            font-size: 1.2em;
+            margin-bottom: 25px;
+            min-height: 60px;
+            color: #fff;
+            border-bottom: 1px solid #444;
+            padding-bottom: 15px;
+        }
+
+        /* WIRES */
+        .wire-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            text-align: left;
+        }
+
+        .wire-btn {
+            background: #333;
+            border: none;
+            padding: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            position: relative;
+            transition: transform 0.2s;
+            display: flex;
+            align-items: center;
+            opacity: 1;
+        }
+
+        .wire-btn:hover { transform: scale(1.02); }
+        .wire-btn.cut { opacity: 0.3; text-decoration: line-through; pointer-events: none; }
+
+        /* Wire Colors */
+        .wire-red { border-left: 10px solid #ff4444; box-shadow: -5px 0 10px rgba(255,0,0,0.2); }
+        .wire-blue { border-left: 10px solid #4488ff; box-shadow: -5px 0 10px rgba(0,100,255,0.2); }
+        .wire-green { border-left: 10px solid #44ff44; box-shadow: -5px 0 10px rgba(0,255,0,0.2); }
+        .wire-yellow { border-left: 10px solid #ffff44; box-shadow: -5px 0 10px rgba(255,255,0,0.2); }
+
+        .wire-label {
+            margin-left: 15px;
+            font-size: 1.1em;
+            color: #ddd;
+        }
+
+        /* MIC STATUS */
+        .status-bar {
+            margin-top: 20px;
+            color: #888;
+            font-size: 0.9em;
+            height: 20px;
+        }
+        .mic-active { color: #0f0; animation: pulse 1s infinite; }
+
+        /* OVERLAYS */
+        .overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 100;
+        }
+        .hidden { display: none; }
+        
+        .btn-start {
+            background: #d32f2f; color: white; border: none;
+            padding: 20px 40px; font-size: 1.5em; font-family: 'Black Ops One';
+            cursor: pointer; border-radius: 5px; letter-spacing: 2px;
+            box-shadow: 0 0 15px #d32f2f;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        @keyframes bounce { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        @keyframes explode { 0% { background: white; } 100% { background: black; } }
+
+        .boom-screen { animation: explode 0.5s ease-out; background: black; color: red; }
+    </style>
+</head>
+<body>
+
+    <div id="startScreen" class="overlay">
+        <h1 style="color:red; font-family:'Black Ops One'; font-size:3em; margin-bottom:10px;">MISSION: DEFUSE</h1>
+        <p style="color:#aaa; max-width:500px; text-align:center; margin-bottom:30px;">
+            Identify the correct answer and say <b>"CUT RED"</b> or <b>"CUT BLUE"</b>.<br>
+            If you cut the wrong wire... BOOM.
+        </p>
+        <button class="btn-start" onclick="initGame()">ARM BOMB</button>
+    </div>
+
+    <div class="bomb-container">
+        <div class="timer-display" id="timer">60:00</div>
+        <div class="question-text" id="qText">Initializing System...</div>
+        
+        <div class="wire-grid" id="wireContainer">
+            </div>
+
+        <div class="status-bar" id="micStatus">System Standby</div>
+    </div>
+
+<script>
+    // --- 1. SETUP & DATA ---
+    const colors = ['red', 'blue', 'green', 'yellow'];
+    let examData = JSON.parse(sessionStorage.getItem('eprashala_exam_data'));
+    
+    // Fallback data for testing if no file loaded
+    if(!examData) examData = { chapterTitle: "Demo", mcq: [{q:"Test Q?", options:["A","B","C","D"], correct:0}] };
+
+    // --- 2. SHUFFLE LOGIC ---
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    if (examData && examData.mcq) {
+        // Shuffle the order of questions
+        shuffleArray(examData.mcq);
+
+        // Shuffle options for each question
+        examData.mcq.forEach(item => {
+            // Map options to objects to track the correct one during shuffle
+            let optionsWithStatus = item.options.map((opt, index) => ({
+                text: opt,
+                isCorrect: index === item.correct
+            }));
+            
+            shuffleArray(optionsWithStatus);
+            
+            // Re-assign shuffled options and find the new index of the correct answer
+            item.options = optionsWithStatus.map(o => o.text);
+            item.correct = optionsWithStatus.findIndex(o => o.isCorrect);
+        });
+    }
+
+    // --- 3. STATE VARIABLES ---
+    let currentQ = 0;
+    let timeLeft = 60; // 60 Seconds total
+    let timerInt;
+    let recognition;
+    let isListening = false;
+    let synth = window.speechSynthesis;
+
+    // --- SOUND FX (Synthetic) ---
+    function playBeep() {
+        const audio = new AudioContext();
+        const osc = audio.createOscillator();
+        const gain = audio.createGain();
+        osc.connect(gain);
+        gain.connect(audio.destination);
+        osc.frequency.value = 800;
+        gain.gain.exponentialRampToValueAtTime(0.00001, audio.currentTime + 0.1);
+        osc.start();
+        osc.stop(0.1);
+    }
+
+    function playBoom() {
+        const audio = new AudioContext();
+        const osc = audio.createOscillator();
+        const gain = audio.createGain();
+        osc.connect(gain);
+        gain.connect(audio.destination);
+        osc.type = 'sawtooth';
+        osc.frequency.value = 100;
+        osc.frequency.exponentialRampToValueAtTime(10, audio.currentTime + 1);
+        gain.gain.exponentialRampToValueAtTime(0.00001, audio.currentTime + 1);
+        osc.start();
+        osc.stop(1);
+    }
+
+    // --- SPEECH RECOGNITION ---
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.continuous = true; 
+        recognition.lang = 'en-IN';
+        recognition.interimResults = false;
+
+        recognition.onresult = function(event) {
+            const last = event.results.length - 1;
+            const command = event.results[last][0].transcript.toLowerCase().trim();
+            document.getElementById('micStatus').innerText = `Cmd: "${command}"`;
+            processCommand(command);
+        };
+        
+        recognition.onend = () => { if(isListening) recognition.start(); };
+    } else {
+        alert("Use Chrome for Voice Features");
+    }
+
+    // --- GAME LOGIC ---
+    function initGame() {
+        document.getElementById('startScreen').classList.add('hidden');
+        speak("Bomb activated. You have 60 seconds. Good luck.");
+        isListening = true;
+        try { recognition.start(); } catch(e){}
+        
+        currentQ = 0;
+        timeLeft = 60;
+        loadQuestion();
+        
+        timerInt = setInterval(() => {
+            timeLeft--;
+            let sec = timeLeft < 10 ? `0${timeLeft}` : timeLeft;
+            document.getElementById('timer').innerText = `00:${sec}`;
+            if(timeLeft % 10 === 0) playBeep(); // Beep every 10s
+            
+            if(timeLeft <= 0) gameOver(false);
+        }, 1000);
+    }
+
+    function loadQuestion() {
+        if(currentQ >= examData.mcq.length) return gameOver(true);
+
+        const q = examData.mcq[currentQ];
+        document.getElementById('qText').innerText = `Q${currentQ+1}: ${q.q}`;
+        
+        const container = document.getElementById('wireContainer');
+        container.innerHTML = "";
+
+        q.options.forEach((opt, idx) => {
+            if(idx > 3) return; // Max 4 wires
+            let btn = document.createElement('button');
+            btn.className = `wire-btn wire-${colors[idx]}`;
+            btn.onclick = () => checkWire(idx); // Click fallback
+            btn.innerHTML = `<span>✂️</span> <span class="wire-label">${opt}</span>`;
+            container.appendChild(btn);
+        });
+
+        document.getElementById('micStatus').classList.add('mic-active');
+    }
+
+    function speak(txt) {
+        if(synth.speaking) synth.cancel();
+        let u = new SpeechSynthesisUtterance(txt);
+        u.rate = 1.1; // Faster for bomb squad
+        u.pitch = 0.8;
+        synth.speak(u);
+    }
+
+    function processCommand(cmd) {
+        // Check Colors
+        if(cmd.includes('red')) checkWire(0);
+        else if(cmd.includes('blue')) checkWire(1);
+        else if(cmd.includes('green')) checkWire(2);
+        else if(cmd.includes('yellow')) checkWire(3);
+        
+        // Check Text (Advanced: Does the spoken command contain the answer?)
+        const q = examData.mcq[currentQ];
+        q.options.forEach((opt, idx) => {
+            if (cmd.includes(opt.toLowerCase())) checkWire(idx);
+        });
+    }
+
+    function checkWire(idx) {
+        const q = examData.mcq[currentQ];
+        if (idx === q.correct) {
+            // Correct
+            playBeep();
+            currentQ++;
+            // Small time bonus
+            timeLeft = Math.min(timeLeft + 5, 60); 
+            speak("Wire cut. Next.");
+            loadQuestion();
+        } else {
+            // Wrong
+            gameOver(false);
+        }
+    }
+
+    function gameOver(win) {
+        clearInterval(timerInt);
+        isListening = false;
+        recognition.stop();
+        
+        const body = document.body;
+        if(win) {
+            body.style.background = "#2e7d32"; // Green
+            document.getElementById('qText').innerText = "BOMB DEFUSED. CITY SAVED.";
+            speak("Mission Accomplished. Bomb Defused.");
+        } else {
+            body.className = "boom-screen";
+            document.getElementById('timer').innerText = "00:00";
+            document.getElementById('qText').innerText = "💥 EXPLOSION DETECTED 💥";
+            playBoom();
+            speak("Mission Failed. Explosion detected.");
+        }
+        
+        setTimeout(() => location.reload(), 4000);
+    }
+
+</script>
+</body>
+</html>
