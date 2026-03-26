@@ -28,7 +28,9 @@
             <h2 class="text-2xl font-bold text-purple-400 border-b border-gray-700 pb-2">Family Voice Enrollment</h2>
             
             <div class="bg-gray-700 p-4 rounded-xl flex flex-col gap-3">
-                <input type="hidden" id="edit-id" value=""> <div class="flex gap-2">
+                <input type="hidden" id="edit-id" value="">
+                
+                <div class="flex gap-2">
                     <select id="enroll-role" class="p-2 rounded bg-gray-900 text-white border border-gray-600 w-1/2">
                         <option value="Child">Child (बाळा)</option>
                         <option value="Mother">Mother (आई)</option>
@@ -47,7 +49,7 @@
 
                 <input type="text" id="enroll-name" placeholder="Name (e.g., Arnav)" class="p-2 rounded bg-gray-900 text-white border border-gray-600">
                 <input type="number" id="enroll-age" placeholder="Age (e.g., 8)" class="p-2 rounded bg-gray-900 text-white border border-gray-600">
-                <input type="text" id="enroll-callsign" placeholder="What the child calls them (e.g., Aai, Dada, Kaka)" class="p-2 rounded bg-gray-900 text-white border border-gray-600">
+                <input type="text" id="enroll-callsign" placeholder="What the child calls them (e.g., Aai, Dada)" class="p-2 rounded bg-gray-900 text-white border border-gray-600">
                 
                 <div class="flex items-center gap-2 mt-2">
                     <button id="save-member-btn" onclick="saveFamilyMember()" class="bg-green-600 hover:bg-green-500 px-4 py-3 rounded font-bold transition w-full shadow-lg">Save Profile</button>
@@ -55,8 +57,7 @@
                 </div>
             </div>
 
-            <div id="family-list" class="mt-4 flex flex-col gap-2">
-                </div>
+            <div id="family-list" class="mt-4 flex flex-col gap-2"></div>
         </div>
 
         <div id="chat-section" class="app-section active flex-col h-full">
@@ -64,21 +65,20 @@
                 
                 <div class="flex justify-between items-center mb-4 shrink-0">
                     <h1 class="text-3xl font-bold"><span class="text-blue-400">ध्वनी</span> Companion</h1>
-                    <div id="status-indicator" class="px-3 py-1 bg-gray-600 rounded-full text-xs font-bold animate-pulse">STANDBY</div>
+                    <div id="status-indicator" class="px-3 py-1 bg-gray-600 rounded-full text-xs font-bold transition-colors">STANDBY</div>
                 </div>
 
-                <div class="mb-4 shrink-0 bg-gray-900 p-2 rounded-xl">
+                <div class="mb-4 shrink-0 bg-gray-900 p-2 rounded-xl border border-gray-700">
                     <p class="text-xs text-gray-400 text-center mb-2">Simulate Speaker Recognition:</p>
-                    <div id="active-speaker-buttons" class="flex flex-wrap justify-center gap-2">
-                        </div>
+                    <div id="active-speaker-buttons" class="flex flex-wrap justify-center gap-2"></div>
                 </div>
 
-                <div id="chat-log" class="flex-grow bg-black/50 rounded-xl p-4 overflow-y-auto space-y-3 mb-4 font-medium text-lg border border-gray-900">
+                <div id="chat-log" class="flex-grow bg-black/60 rounded-xl p-4 overflow-y-auto space-y-3 mb-4 font-medium text-lg border border-gray-800">
                     <div class="text-center text-gray-500 text-sm mt-10">Waiting for Wake Word: "Dhwani, Dhonu, Dhvani..."</div>
                 </div>
 
                 <button id="main-listen-btn" class="w-full py-5 rounded-xl font-bold text-xl transition-all shadow-xl bg-blue-600 hover:bg-blue-500 text-white shrink-0">
-                    Start Listening Array
+                    Start System
                 </button>
             </div>
         </div>
@@ -100,14 +100,14 @@
                 </div>
                 <textarea id="routine-prompt" rows="2" placeholder="Dhwani says: [Name] chal lavkar uth, 7 vajle... (Wait for response, ensure child is polite)" class="w-full p-2 rounded bg-gray-900 text-white border border-gray-600"></textarea>
                 <button onclick="saveRoutine()" class="bg-orange-600 hover:bg-orange-500 py-2 rounded font-bold">Add Routine</button>
-                <div id="routines-list" class="mt-2 text-sm bg-gray-800 p-2 rounded"></div>
+                <div id="routines-list" class="mt-2 text-sm bg-gray-800 p-2 rounded flex flex-col gap-1"></div>
             </div>
         </div>
     </div>
 
     <script>
         /* ==========================================================================
-           1. DATABASE INITIALIZATION (Dexie.js V2 for Gender Support)
+           1. DATABASE INITIALIZATION
            ========================================================================== */
         const db = new Dexie("DhwaniDB");
         db.version(2).stores({
@@ -120,13 +120,18 @@
         /* ==========================================================================
            2. STATE & GLOBAL VARIABLES
            ========================================================================== */
-        let activeSpeaker = null; 
+        // Default fallback speaker to prevent crashes
+        let activeSpeaker = { role: 'Guest', name: 'Guest', callsign: 'दादा', gender: 'Male' }; 
+        
         let wakeLock = null;
         let isListening = false;
-        let recognition;
+        let recognition = null;
         let appState = 'WAKE_WORD_SEARCH'; 
         const synth = window.speechSynthesis;
-        const wakeWords = /ध्वनी|धोनू|धोनुला|dhwani|dhoni|dhonu|dhonulya|dhvani|dhaavni/i;
+        
+        // Expanded regex to catch Google's weird Marathi spellings
+        const wakeWords = /ध्वनी|ध्वनि|धोनू|धोनुला|धोनी|dhwani|dhoni|dhonu|dhonulya|dhvani|dhaavni/i;
+        
         let activeRoutineContext = null; 
 
         /* ==========================================================================
@@ -142,10 +147,11 @@
             await loadSettings();
             await loadRoutinesUI();
             setupSpeechRecognition();
+            startRoutineClock(); // RESTORED: This runs the alarms in the background
         };
 
         /* ==========================================================================
-           4. FAMILY ENROLLMENT (CRUD OPERATIONS)
+           4. FAMILY ENROLLMENT (CRUD)
            ========================================================================== */
         async function saveFamilyMember() {
             const id = document.getElementById('edit-id').value;
@@ -156,16 +162,10 @@
             const callsign = document.getElementById('enroll-callsign').value.trim() || role;
 
             if(!name) return alert("Please enter a name");
-
             const memberData = { role, gender, name, age, callsign };
 
-            if (id) {
-                // Update existing
-                await db.family.update(parseInt(id), memberData);
-            } else {
-                // Add new
-                await db.family.put(memberData);
-            }
+            if (id) await db.family.update(parseInt(id), memberData);
+            else await db.family.put(memberData);
             
             clearForm();
             loadFamilyUI();
@@ -189,7 +189,6 @@
                 document.getElementById('enroll-name').value = member.name;
                 document.getElementById('enroll-age').value = member.age;
                 document.getElementById('enroll-callsign').value = member.callsign;
-                
                 document.getElementById('save-member-btn').textContent = "Update Profile";
                 document.getElementById('cancel-edit-btn').classList.remove('hidden');
                 switchTab('enroll-section');
@@ -197,10 +196,7 @@
         }
 
         async function deleteFamilyMember(id) {
-            if(confirm("Are you sure you want to remove this family member?")) {
-                await db.family.delete(id);
-                loadFamilyUI();
-            }
+            if(confirm("Are you sure?")) { await db.family.delete(id); loadFamilyUI(); }
         }
 
         async function loadFamilyUI() {
@@ -208,18 +204,19 @@
             const listDiv = document.getElementById('family-list');
             const btnsDiv = document.getElementById('active-speaker-buttons');
             
-            listDiv.innerHTML = '';
-            btnsDiv.innerHTML = '';
+            listDiv.innerHTML = ''; btnsDiv.innerHTML = '';
 
-            // Add Default Guest (Dada/Tai Options)
             const guestMale = { role: 'Guest', name: 'Guest', callsign: 'दादा', gender: 'Male' };
             const guestFemale = { role: 'Guest', name: 'Guest', callsign: 'ताई', gender: 'Female' };
             
-            btnsDiv.innerHTML += `<button onclick='setActiveSpeaker(${JSON.stringify(guestMale)})' class="px-3 py-1 bg-gray-600 rounded-full text-xs font-bold">Guest (Dada)</button>`;
-            btnsDiv.innerHTML += `<button onclick='setActiveSpeaker(${JSON.stringify(guestFemale)})' class="px-3 py-1 bg-gray-600 rounded-full text-xs font-bold">Guest (Tai)</button>`;
+            btnsDiv.innerHTML += `<button onclick='setActiveSpeaker(${JSON.stringify(guestMale)})' class="px-3 py-1 bg-gray-600 rounded-full text-xs font-bold shadow hover:scale-105 transition">Guest (Dada)</button>`;
+            btnsDiv.innerHTML += `<button onclick='setActiveSpeaker(${JSON.stringify(guestFemale)})' class="px-3 py-1 bg-gray-600 rounded-full text-xs font-bold shadow hover:scale-105 transition">Guest (Tai)</button>`;
+
+            let childFound = false;
 
             members.forEach(m => {
-                // List UI with Edit/Delete
+                if(m.role === 'Child') childFound = m;
+
                 listDiv.innerHTML += `
                     <div class="bg-gray-700 p-3 rounded-xl flex justify-between items-center shadow">
                         <div>
@@ -232,17 +229,11 @@
                         </div>
                     </div>`;
                 
-                // Speaker Buttons UI
                 let color = m.role === 'Child' ? 'bg-blue-600' : 'bg-purple-600';
                 btnsDiv.innerHTML += `<button onclick='setActiveSpeaker(${JSON.stringify(m)})' class="px-3 py-1 ${color} rounded-full text-xs font-bold shadow-lg transition transform hover:scale-105">${m.name} (${m.callsign})</button>`;
             });
 
-            // Auto-select child if none selected
-            if(!activeSpeaker) {
-                const child = members.find(m => m.role === 'Child');
-                if(child) setActiveSpeaker(child);
-                else setActiveSpeaker(guestMale);
-            }
+            if(childFound) setActiveSpeaker(childFound);
         }
 
         function setActiveSpeaker(memberObj) {
@@ -251,14 +242,34 @@
         }
 
         /* ==========================================================================
-           5. CORE AUDIO & WAKE WORD LOGIC
+           5. CORE AUDIO & WAKE WORD LOGIC (FORTIFIED)
            ========================================================================== */
+        function safeStartRecognition() {
+            if(!recognition || !isListening) return;
+            try { recognition.start(); } catch (e) { /* Ignore "already started" errors silently */ }
+        }
+
+        function safeStopRecognition() {
+            if(!recognition) return;
+            try { recognition.stop(); } catch (e) {}
+        }
+
+        function updateUIState(state) {
+            const ind = document.getElementById('status-indicator');
+            ind.className = 'px-3 py-1 rounded-full text-xs font-bold text-white transition-colors ';
+            if(state === 'WAKE_WORD_SEARCH') { ind.classList.add('bg-blue-500', 'animate-pulse'); ind.textContent = 'LISTENING FOR WAKE WORD'; }
+            else if(state === 'CONVERSATION') { ind.classList.add('bg-green-500', 'animate-pulse'); ind.textContent = 'LISTENING (CHAT)'; }
+            else if(state === 'BUSY') { ind.classList.add('bg-yellow-500'); ind.textContent = 'THINKING/SPEAKING...'; }
+            else { ind.classList.add('bg-gray-600'); ind.textContent = 'STANDBY'; }
+        }
+
         function setupSpeechRecognition() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) return;
             
             recognition = new SpeechRecognition();
             recognition.continuous = true;
+            recognition.interimResults = false;
             recognition.lang = 'mr-IN'; 
 
             recognition.onresult = async (event) => {
@@ -267,74 +278,154 @@
                 if (appState === 'WAKE_WORD_SEARCH') {
                     if (wakeWords.test(transcript)) {
                         appState = 'BUSY';
-                        recognition.stop();
+                        updateUIState('BUSY');
+                        safeStopRecognition();
                         
-                        // Dynamically polite greeting based on gender and role
                         let greeting = "नमस्कार, मी ऐकत आहे.";
                         if (activeSpeaker.role === 'Child') {
                             greeting = activeSpeaker.gender === 'Female' ? `काय ग ${activeSpeaker.name}? बोल ना.` : `काय रे ${activeSpeaker.name}? बोल ना.`;
                         } else if (activeSpeaker.role === 'Guest') {
-                            // Respectful plural for guests (Aho, Yaa, Basa)
                             greeting = `नमस्कार ${activeSpeaker.callsign}, या बसा. मी ध्वनी. बाळाला बोलावू का?`;
                         } else {
-                            // Respectful for elders (Parents/Grandparents/Maid)
                             greeting = `नमस्कार ${activeSpeaker.callsign}, बोला. मी ऐकत आहे.`;
                         }
 
                         logUI('Dhwani', greeting);
                         await speakText(greeting);
+                        
                         appState = 'CONVERSATION';
-                        recognition.start();
+                        updateUIState('CONVERSATION');
+                        safeStartRecognition();
                     }
                 } 
                 else if (appState === 'CONVERSATION') {
                     logUI(activeSpeaker.name, transcript);
                     appState = 'BUSY';
-                    recognition.stop();
+                    updateUIState('BUSY');
+                    safeStopRecognition();
+                    
                     await handleAIResponse(transcript);
+                    
                     appState = 'CONVERSATION';
-                    recognition.start();
+                    updateUIState('CONVERSATION');
+                    safeStartRecognition();
                 }
             };
 
-            recognition.onend = () => { if (isListening && appState !== 'BUSY') recognition.start(); };
+            // This ensures it auto-restarts if it times out
+            recognition.onend = () => {
+                if (isListening && appState !== 'BUSY') {
+                    setTimeout(safeStartRecognition, 200);
+                }
+            };
+            
+            recognition.onerror = (e) => {
+                console.warn("Speech Error:", e.error);
+                if(e.error === 'not-allowed') toggleListening(); // Shut down if denied
+            };
         }
 
         document.getElementById('main-listen-btn').addEventListener('click', toggleListening);
 
         async function toggleListening() {
+            const btn = document.getElementById('main-listen-btn');
             if (isListening) { 
                 isListening = false;
-                appState = 'WAKE_WORD_SEARCH';
-                if (wakeLock) wakeLock.release();
-                recognition.stop();
+                appState = 'STANDBY';
+                if (wakeLock) { wakeLock.release(); wakeLock = null; }
+                safeStopRecognition();
                 if (synth.speaking) synth.cancel();
-                document.getElementById('main-listen-btn').textContent = "Start Listening Array";
-                document.getElementById('main-listen-btn').classList.replace('bg-red-600', 'bg-blue-600');
-                document.getElementById('status-indicator').textContent = 'STANDBY';
+                
+                btn.textContent = "Start System";
+                btn.classList.replace('bg-red-600', 'bg-blue-600');
+                updateUIState('STANDBY');
             } else {
                 try {
                     if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
                     isListening = true;
                     appState = 'WAKE_WORD_SEARCH';
-                    document.getElementById('main-listen-btn').textContent = "⏹️ Stop System";
-                    document.getElementById('main-listen-btn').classList.replace('bg-blue-600', 'bg-red-600');
-                    document.getElementById('status-indicator').textContent = 'LISTENING FOR WAKE WORD';
-                    recognition.start();
+                    
+                    btn.textContent = "⏹️ Stop System";
+                    btn.classList.replace('bg-blue-600', 'bg-red-600');
+                    updateUIState('WAKE_WORD_SEARCH');
+                    safeStartRecognition();
                 } catch (e) { console.error(e); }
             }
         }
 
         /* ==========================================================================
-           6. THE BRAIN (Grammar & Sanskar Prompting)
+           6. SCHEDULING & ALARMS (RESTORED & FIXED)
+           ========================================================================== */
+        async function saveRoutine() {
+            const time = document.getElementById('routine-time').value;
+            const name = document.getElementById('routine-name').value;
+            const prompt = document.getElementById('routine-prompt').value;
+            if(!time || !prompt) return alert("Please fill time and prompt!");
+            await db.schedules.put({ time, name, prompt });
+            document.getElementById('routine-time').value = '';
+            document.getElementById('routine-name').value = '';
+            document.getElementById('routine-prompt').value = '';
+            loadRoutinesUI();
+        }
+
+        async function loadRoutinesUI() {
+            const routines = await db.schedules.toArray();
+            const list = document.getElementById('routines-list');
+            list.innerHTML = routines.map(r => `
+                <div class="border-b border-gray-600 py-2 flex justify-between items-center">
+                    <div><b>${r.time}</b>: ${r.name}</div>
+                    <button onclick="deleteRoutine(${r.id})" class="text-xs bg-red-600 hover:bg-red-500 px-2 py-1 rounded">Del</button>
+                </div>`).join('');
+        }
+
+        async function deleteRoutine(id) {
+            await db.schedules.delete(id);
+            loadRoutinesUI();
+        }
+
+        function startRoutineClock() {
+            setInterval(async () => {
+                if (!isListening) return; // Only trigger if doll is turned ON
+                
+                const now = new Date();
+                const currentTimeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+                
+                if (now.getSeconds() !== 0) return; // Execute only at the 0th second of the minute
+
+                const routines = await db.schedules.toArray();
+                const matchingRoutine = routines.find(r => r.time === currentTimeStr);
+                
+                if (matchingRoutine) {
+                    console.log("ROUTINE TRIGGERED:", matchingRoutine.name);
+                    triggerRoutine(matchingRoutine);
+                }
+            }, 1000);
+        }
+
+        async function triggerRoutine(routine) {
+            // Force system to pause listening to environment while processing routine
+            appState = 'BUSY';
+            updateUIState('BUSY');
+            safeStopRecognition();
+            
+            logUI('System', `Alarm Triggered: ${routine.name}`);
+            activeRoutineContext = routine.prompt;
+            
+            // Generate the proactive greeting
+            await handleAIResponse(`[SYSTEM INTERNAL COMMAND: Trigger the routine defined as: "${routine.prompt}". Speak the initial greeting to the child now.]`);
+            
+            appState = 'CONVERSATION';
+            updateUIState('CONVERSATION');
+            safeStartRecognition();
+        }
+
+        /* ==========================================================================
+           7. THE BRAIN (Gemini Integration)
            ========================================================================== */
         async function handleAIResponse(userText) {
-            document.getElementById('status-indicator').textContent = 'THINKING...';
-
             const childContext = await db.family.where('role').equals('Child').first();
             const childName = childContext ? childContext.name : 'बाळा';
 
-            // Advanced Linguistic & Psychological Prompt
             let systemPrompt = `
                 You are Dhwani, a friendly, highly cultured AI companion doll in Maharashtra.
                 Target Child: ${childName}.
@@ -353,7 +444,7 @@
             if (activeSpeaker.role === 'Child') {
                 systemPrompt += `
                 - Address the child affectionately. 
-                - Because the child's gender is ${activeSpeaker.gender}, ensure your Marathi verbs match. (e.g., If Female: "तू आलीस", "तू खाल्लेस". If Male: "तू आलास", "तू खाल्लास").
+                - Match Marathi verbs to the child's gender (${activeSpeaker.gender}).
                 - Gently correct rude behavior by modeling polite alternatives.
                 - End with a fun, engaging question.`;
             } else {
@@ -361,8 +452,11 @@
                 - You are speaking to an Elder or a Guest.
                 - CRITICAL LINGUISTIC RULE: You MUST use 'Aadararthi Bahuvachan' (आदरार्थी बहुवचन - Respectful Plural) at all times. 
                 - Use 'अहो', 'तुम्ही', 'आलात', 'बसलात', 'घ्या'. Never use singular 'तू' with them.
-                - Always address them as '${activeSpeaker.callsign}'.
-                - Be obedient, polite, and deeply respectful.`;
+                - Address them as '${activeSpeaker.callsign}'.`;
+            }
+
+            if (activeRoutineContext) {
+                systemPrompt += `\n\nIMMEDIATE CONTEXT: You just triggered an alarm/routine. The instruction for this routine is: "${activeRoutineContext}". Evaluate the user's response based on this routine. If they are delaying, gently encourage them to hurry.`;
             }
 
             await db.chatHistory.add({ role: 'user', text: userText, timestamp: Date.now() });
@@ -385,13 +479,13 @@
                 await db.chatHistory.add({ role: 'model', text: aiText, timestamp: Date.now() });
                 logUI('Dhwani', aiText);
                 await speakText(aiText);
+                
+                activeRoutineContext = null; // Clear routine context after responding once
             } catch (error) { logUI('System', 'API Error.'); }
-            
-            document.getElementById('status-indicator').textContent = 'LISTENING...';
         }
 
         /* ==========================================================================
-           7. THE MOUTH (Upgraded Child-Like Female Voice)
+           8. THE MOUTH (TTS Engine)
            ========================================================================== */
         async function speakText(text) {
             if (synth.speaking) synth.cancel();
@@ -403,7 +497,6 @@
                 let selectedVoice = null;
                 const marathiVoices = voices.filter(v => v.lang.includes('mr'));
                 
-                // Aggressively seek Female voice
                 selectedVoice = marathiVoices.find(v => v.name.toLowerCase().includes('female')) || 
                                 marathiVoices.find(v => !v.name.toLowerCase().includes('male')) || 
                                 marathiVoices[0];
@@ -433,19 +526,7 @@
             });
         }
 
-        // --- SCHEDULING & SETTINGS HELPERS ---
-        async function saveRoutine() {
-            const time = document.getElementById('routine-time').value;
-            const name = document.getElementById('routine-name').value;
-            const prompt = document.getElementById('routine-prompt').value;
-            if(!time || !prompt) return;
-            await db.schedules.put({ time, name, prompt });
-            loadRoutinesUI();
-        }
-        async function loadRoutinesUI() {
-            const routines = await db.schedules.toArray();
-            document.getElementById('routines-list').innerHTML = routines.map(r => `<div class="border-b border-gray-600 py-1"><b>${r.time}</b>: ${r.name}</div>`).join('');
-        }
+        // Settings Helpers
         async function saveSettings() {
             const key = document.getElementById('api-key-input').value.trim();
             if(key) { await db.settings.put({ key: 'gemini_api', value: key }); alert("API Key Saved"); }
