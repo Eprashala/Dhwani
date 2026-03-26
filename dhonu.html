@@ -470,19 +470,62 @@
         /* ==========================================================================
            9. UTILITIES (TTS, Logging, Settings)
            ========================================================================== */
+        /* ==========================================================================
+           9. UTILITIES (TTS, Logging, Settings) - UPGRADED VOICE ENGINE
+           ========================================================================== */
         async function speakText(text) {
             if (synth.speaking) synth.cancel();
+            
             return new Promise((resolve) => {
                 const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'mr-IN';
+                utterance.lang = 'mr-IN'; // Default to Marathi
                 
-                // Child-like adjustments
-                utterance.pitch = 1.3; 
-                utterance.rate = 0.9;  
+                // 1. Fetch available device voices
+                let voices = synth.getVoices();
+                
+                // 2. Aggressive Filtering for Female Voices
+                let selectedVoice = null;
+                
+                // Search for Marathi voices first
+                const marathiVoices = voices.filter(v => v.lang.includes('mr'));
+                
+                // Try to specifically find a female Marathi voice (avoids 'Male' tags)
+                selectedVoice = marathiVoices.find(v => v.name.toLowerCase().includes('female')) || 
+                                marathiVoices.find(v => !v.name.toLowerCase().includes('male')) || 
+                                marathiVoices[0];
+
+                // Fallback to Hindi Female if Marathi is completely missing from the device
+                if (!selectedVoice) {
+                    const hindiVoices = voices.filter(v => v.lang.includes('hi'));
+                    selectedVoice = hindiVoices.find(v => v.name.toLowerCase().includes('female')) || 
+                                    hindiVoices.find(v => !v.name.toLowerCase().includes('male')) || 
+                                    hindiVoices[0];
+                }
+
+                // Apply the selected voice if found
+                if (selectedVoice) {
+                    utterance.voice = selectedVoice;
+                }
+
+                // 3. Child-Like Acoustic Modifiers
+                // Default pitch is 1.0. Raising it to 1.5 - 1.7 simulates smaller vocal cords.
+                utterance.pitch = 1.6; 
+                
+                // Default rate is 1.0. A slight bump makes her sound more energetic and youthful.
+                utterance.rate = 1.05; 
                 
                 utterance.onend = resolve;
                 utterance.onerror = resolve;
-                synth.speak(utterance);
+                
+                // Ensure voices are loaded before speaking (Safari/iOS quirk fix)
+                if (voices.length === 0) {
+                    window.speechSynthesis.onvoiceschanged = () => {
+                        utterance.voice = synth.getVoices().find(v => v.lang.includes('mr')) || utterance.voice;
+                        synth.speak(utterance);
+                    };
+                } else {
+                    synth.speak(utterance);
+                }
             });
         }
 
