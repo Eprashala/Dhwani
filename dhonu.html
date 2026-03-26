@@ -22,7 +22,7 @@
         <button onclick="switchTab('parent-section')" class="px-4 py-2 bg-teal-600 rounded-lg font-bold hover:bg-teal-500 transition">⚙️ Controls</button>
     </nav>
 
-    <div class="w-full max-w-3xl flex-grow flex flex-col relative h-[80vh]">
+    <div class="w-full max-w-3xl flex-grow flex flex-col relative h-[85vh]">
 
         <div id="enroll-section" class="app-section flex-col gap-4 bg-gray-800 p-6 rounded-2xl h-full overflow-y-auto">
             <h2 class="text-2xl font-bold text-purple-400 border-b border-gray-700 pb-2">Family Voice Enrollment</h2>
@@ -37,8 +37,7 @@
                         <option value="Father">Father (बाबा)</option>
                         <option value="Sibling">Sibling (भाऊ/बहीण)</option>
                         <option value="Maid">Maid (मावशी)</option>
-                        <option value="Grandparent">Grandparent (आजी/आजोबा)</option>
-                        <option value="Other">Other Relative</option>
+                        <option value="Guest">Guest (पाहुणे)</option>
                     </select>
 
                     <select id="enroll-gender" class="p-2 rounded bg-gray-900 text-white border border-gray-600 w-1/2">
@@ -49,7 +48,7 @@
 
                 <input type="text" id="enroll-name" placeholder="Name (e.g., Arnav)" class="p-2 rounded bg-gray-900 text-white border border-gray-600">
                 <input type="number" id="enroll-age" placeholder="Age (e.g., 8)" class="p-2 rounded bg-gray-900 text-white border border-gray-600">
-                <input type="text" id="enroll-callsign" placeholder="What the child calls them (e.g., Aai, Dada)" class="p-2 rounded bg-gray-900 text-white border border-gray-600">
+                <input type="text" id="enroll-callsign" placeholder="Child calls them (e.g., Aai, Dada)" class="p-2 rounded bg-gray-900 text-white border border-gray-600">
                 
                 <div class="flex items-center gap-2 mt-2">
                     <button id="save-member-btn" onclick="saveFamilyMember()" class="bg-green-600 hover:bg-green-500 px-4 py-3 rounded font-bold transition w-full shadow-lg">Save Profile</button>
@@ -73,8 +72,12 @@
                     <div id="active-speaker-buttons" class="flex flex-wrap justify-center gap-2"></div>
                 </div>
 
-                <div id="chat-log" class="flex-grow bg-black/60 rounded-xl p-4 overflow-y-auto space-y-3 mb-4 font-medium text-lg border border-gray-800">
-                    <div class="text-center text-gray-500 text-sm mt-10">Waiting for Wake Word: "Dhwani, Dhonu, Dhvani..."</div>
+                <div id="chat-log" class="flex-grow bg-black/60 rounded-xl p-4 overflow-y-auto space-y-3 mb-2 font-medium text-lg border border-gray-800">
+                    <div class="text-center text-gray-500 text-sm mt-10">Press 'Start System' to begin...</div>
+                </div>
+
+                <div id="debug-console" class="h-16 bg-gray-900 border border-red-900 text-red-400 text-xs p-2 overflow-y-auto mb-4 rounded font-mono hidden">
+                    --- System Diagnostics ---<br>
                 </div>
 
                 <button id="main-listen-btn" class="w-full py-5 rounded-xl font-bold text-xl transition-all shadow-xl bg-blue-600 hover:bg-blue-500 text-white shrink-0">
@@ -98,7 +101,7 @@
                     <input type="time" id="routine-time" class="p-2 rounded bg-gray-900 text-white border border-gray-600 w-1/3">
                     <input type="text" id="routine-name" placeholder="e.g., Morning Wakeup" class="p-2 rounded bg-gray-900 text-white border border-gray-600 w-2/3">
                 </div>
-                <textarea id="routine-prompt" rows="2" placeholder="Dhwani says: [Name] chal lavkar uth, 7 vajle... (Wait for response, ensure child is polite)" class="w-full p-2 rounded bg-gray-900 text-white border border-gray-600"></textarea>
+                <textarea id="routine-prompt" rows="2" placeholder="Dhwani says: [Name] chal lavkar uth... (Wait for response, ensure polite)" class="w-full p-2 rounded bg-gray-900 text-white border border-gray-600"></textarea>
                 <button onclick="saveRoutine()" class="bg-orange-600 hover:bg-orange-500 py-2 rounded font-bold">Add Routine</button>
                 <div id="routines-list" class="mt-2 text-sm bg-gray-800 p-2 rounded flex flex-col gap-1"></div>
             </div>
@@ -120,19 +123,24 @@
         /* ==========================================================================
            2. STATE & GLOBAL VARIABLES
            ========================================================================== */
-        // Default fallback speaker to prevent crashes
         let activeSpeaker = { role: 'Guest', name: 'Guest', callsign: 'दादा', gender: 'Male' }; 
-        
         let wakeLock = null;
         let isListening = false;
         let recognition = null;
-        let appState = 'WAKE_WORD_SEARCH'; 
+        let isRecognizing = false; // NEW: Critical safety lock for microphone
+        let appState = 'STANDBY'; 
         const synth = window.speechSynthesis;
-        
-        // Expanded regex to catch Google's weird Marathi spellings
         const wakeWords = /ध्वनी|ध्वनि|धोनू|धोनुला|धोनी|dhwani|dhoni|dhonu|dhonulya|dhvani|dhaavni/i;
-        
         let activeRoutineContext = null; 
+
+        // Debug Logger
+        function debugLog(msg) {
+            console.log("[DEBUG]", msg);
+            const consoleDiv = document.getElementById('debug-console');
+            consoleDiv.classList.remove('hidden');
+            consoleDiv.innerHTML += `> ${msg}<br>`;
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        }
 
         /* ==========================================================================
            3. UI NAVIGATION & SETUP
@@ -147,7 +155,12 @@
             await loadSettings();
             await loadRoutinesUI();
             setupSpeechRecognition();
-            startRoutineClock(); // RESTORED: This runs the alarms in the background
+            startRoutineClock(); 
+            
+            // Warning if running via file://
+            if(window.location.protocol === 'file:') {
+                debugLog("WARNING: Running via file:// protocol. The microphone will likely break. Please run on localhost.");
+            }
         };
 
         /* ==========================================================================
@@ -216,7 +229,6 @@
 
             members.forEach(m => {
                 if(m.role === 'Child') childFound = m;
-
                 listDiv.innerHTML += `
                     <div class="bg-gray-700 p-3 rounded-xl flex justify-between items-center shadow">
                         <div>
@@ -230,7 +242,7 @@
                     </div>`;
                 
                 let color = m.role === 'Child' ? 'bg-blue-600' : 'bg-purple-600';
-                btnsDiv.innerHTML += `<button onclick='setActiveSpeaker(${JSON.stringify(m)})' class="px-3 py-1 ${color} rounded-full text-xs font-bold shadow-lg transition transform hover:scale-105">${m.name} (${m.callsign})</button>`;
+                btnsDiv.innerHTML += `<button onclick='setActiveSpeaker(${JSON.stringify(m)})' class="px-3 py-1 ${color} rounded-full text-xs font-bold shadow-lg transition hover:scale-105">${m.name} (${m.callsign})</button>`;
             });
 
             if(childFound) setActiveSpeaker(childFound);
@@ -238,20 +250,28 @@
 
         function setActiveSpeaker(memberObj) {
             activeSpeaker = memberObj;
-            logUI('System', `Active Speaker set to: ${memberObj.name} (${memberObj.gender})`);
+            logUI('System', `Active Speaker: ${memberObj.name}`);
         }
 
         /* ==========================================================================
-           5. CORE AUDIO & WAKE WORD LOGIC (FORTIFIED)
+           5. CORE AUDIO & WAKE WORD LOGIC (FORTIFIED WITH SAFETY LOCKS)
            ========================================================================== */
         function safeStartRecognition() {
-            if(!recognition || !isListening) return;
-            try { recognition.start(); } catch (e) { /* Ignore "already started" errors silently */ }
+            if(!recognition || !isListening || isRecognizing) return;
+            try { 
+                recognition.start(); 
+            } catch (e) { 
+                debugLog("Start Mic Error: " + e.message); 
+            }
         }
 
         function safeStopRecognition() {
-            if(!recognition) return;
-            try { recognition.stop(); } catch (e) {}
+            if(!recognition || !isRecognizing) return;
+            try { 
+                recognition.stop(); 
+            } catch (e) { 
+                debugLog("Stop Mic Error: " + e.message); 
+            }
         }
 
         function updateUIState(state) {
@@ -265,63 +285,61 @@
 
         function setupSpeechRecognition() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) return;
+            if (!SpeechRecognition) {
+                alert("Speech Recognition not supported in this browser. Use Chrome.");
+                return;
+            }
             
             recognition = new SpeechRecognition();
-            recognition.continuous = true;
+            recognition.continuous = false; // Changed to false to force clean restarts
             recognition.interimResults = false;
             recognition.lang = 'mr-IN'; 
 
+            recognition.onstart = () => { isRecognizing = true; };
+
             recognition.onresult = async (event) => {
                 const transcript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
+                debugLog("Heard: " + transcript);
                 
                 if (appState === 'WAKE_WORD_SEARCH') {
                     if (wakeWords.test(transcript)) {
-                        appState = 'BUSY';
-                        updateUIState('BUSY');
-                        safeStopRecognition();
+                        appState = 'BUSY'; updateUIState('BUSY'); safeStopRecognition();
                         
-                        let greeting = "नमस्कार, मी ऐकत आहे.";
-                        if (activeSpeaker.role === 'Child') {
-                            greeting = activeSpeaker.gender === 'Female' ? `काय ग ${activeSpeaker.name}? बोल ना.` : `काय रे ${activeSpeaker.name}? बोल ना.`;
-                        } else if (activeSpeaker.role === 'Guest') {
-                            greeting = `नमस्कार ${activeSpeaker.callsign}, या बसा. मी ध्वनी. बाळाला बोलावू का?`;
-                        } else {
-                            greeting = `नमस्कार ${activeSpeaker.callsign}, बोला. मी ऐकत आहे.`;
-                        }
+                        let greeting = activeSpeaker.role === 'Child' 
+                            ? (activeSpeaker.gender === 'Female' ? `काय ग ${activeSpeaker.name}? बोल ना.` : `काय रे ${activeSpeaker.name}? बोल ना.`)
+                            : `नमस्कार ${activeSpeaker.callsign}, बोला. मी ऐकत आहे.`;
 
                         logUI('Dhwani', greeting);
                         await speakText(greeting);
                         
-                        appState = 'CONVERSATION';
-                        updateUIState('CONVERSATION');
-                        safeStartRecognition();
+                        appState = 'CONVERSATION'; updateUIState('CONVERSATION'); safeStartRecognition();
                     }
                 } 
                 else if (appState === 'CONVERSATION') {
                     logUI(activeSpeaker.name, transcript);
-                    appState = 'BUSY';
-                    updateUIState('BUSY');
-                    safeStopRecognition();
+                    appState = 'BUSY'; updateUIState('BUSY'); safeStopRecognition();
                     
                     await handleAIResponse(transcript);
                     
-                    appState = 'CONVERSATION';
-                    updateUIState('CONVERSATION');
-                    safeStartRecognition();
+                    appState = 'CONVERSATION'; updateUIState('CONVERSATION'); safeStartRecognition();
                 }
             };
 
-            // This ensures it auto-restarts if it times out
             recognition.onend = () => {
+                isRecognizing = false;
+                // Auto-restart if we are supposed to be listening and not speaking/thinking
                 if (isListening && appState !== 'BUSY') {
-                    setTimeout(safeStartRecognition, 200);
+                    setTimeout(safeStartRecognition, 300);
                 }
             };
             
             recognition.onerror = (e) => {
-                console.warn("Speech Error:", e.error);
-                if(e.error === 'not-allowed') toggleListening(); // Shut down if denied
+                debugLog("Mic Error: " + e.error);
+                isRecognizing = false;
+                if(e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+                    toggleListening(); // Force shut down
+                    alert("Microphone access denied or blocked by browser.");
+                }
             };
         }
 
@@ -349,12 +367,12 @@
                     btn.classList.replace('bg-blue-600', 'bg-red-600');
                     updateUIState('WAKE_WORD_SEARCH');
                     safeStartRecognition();
-                } catch (e) { console.error(e); }
+                } catch (e) { debugLog("WakeLock Error: " + e.message); }
             }
         }
 
         /* ==========================================================================
-           6. SCHEDULING & ALARMS (RESTORED & FIXED)
+           6. SCHEDULING & ALARMS
            ========================================================================== */
         async function saveRoutine() {
             const time = document.getElementById('routine-time').value;
@@ -378,50 +396,45 @@
                 </div>`).join('');
         }
 
-        async function deleteRoutine(id) {
-            await db.schedules.delete(id);
-            loadRoutinesUI();
-        }
+        async function deleteRoutine(id) { await db.schedules.delete(id); loadRoutinesUI(); }
 
         function startRoutineClock() {
             setInterval(async () => {
-                if (!isListening) return; // Only trigger if doll is turned ON
-                
+                if (!isListening) return; 
                 const now = new Date();
                 const currentTimeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
-                
-                if (now.getSeconds() !== 0) return; // Execute only at the 0th second of the minute
+                if (now.getSeconds() !== 0) return; 
 
                 const routines = await db.schedules.toArray();
                 const matchingRoutine = routines.find(r => r.time === currentTimeStr);
                 
                 if (matchingRoutine) {
-                    console.log("ROUTINE TRIGGERED:", matchingRoutine.name);
+                    debugLog("Routine Triggered: " + matchingRoutine.name);
                     triggerRoutine(matchingRoutine);
                 }
             }, 1000);
         }
 
         async function triggerRoutine(routine) {
-            // Force system to pause listening to environment while processing routine
-            appState = 'BUSY';
-            updateUIState('BUSY');
-            safeStopRecognition();
-            
+            appState = 'BUSY'; updateUIState('BUSY'); safeStopRecognition();
             logUI('System', `Alarm Triggered: ${routine.name}`);
             activeRoutineContext = routine.prompt;
-            
-            // Generate the proactive greeting
             await handleAIResponse(`[SYSTEM INTERNAL COMMAND: Trigger the routine defined as: "${routine.prompt}". Speak the initial greeting to the child now.]`);
-            
-            appState = 'CONVERSATION';
-            updateUIState('CONVERSATION');
-            safeStartRecognition();
+            appState = 'CONVERSATION'; updateUIState('CONVERSATION'); safeStartRecognition();
         }
 
         /* ==========================================================================
-           7. THE BRAIN (Gemini Integration)
+           7. THE BRAIN (Gemini Integration with Error Recovery)
            ========================================================================== */
+        function logUI(sender, message) {
+            const div = document.createElement('div');
+            const color = sender === 'Dhwani' ? 'text-cyan-400' : (sender === 'System' ? 'text-gray-500' : 'text-green-400');
+            div.innerHTML = `<span class="${color} font-bold">${sender}:</span> ${message}`;
+            const log = document.getElementById('chat-log');
+            log.appendChild(div);
+            log.scrollTop = log.scrollHeight;
+        }
+
         async function handleAIResponse(userText) {
             const childContext = await db.family.where('role').equals('Child').first();
             const childName = childContext ? childContext.name : 'बाळा';
@@ -432,31 +445,17 @@
                 Language: Marathi (Devanagari script). 
                 Format: Max 2-3 short sentences. Conversational.
 
-                CURRENT SPEAKER DETAILS:
-                Name: ${activeSpeaker.name}
-                Role: ${activeSpeaker.role}
-                Gender: ${activeSpeaker.gender}
-                Callsign: ${activeSpeaker.callsign}
-
-                STRICT MARATHI GRAMMAR & SANSKAR RULES:
+                CURRENT SPEAKER DETAILS: Name: ${activeSpeaker.name}, Role: ${activeSpeaker.role}, Gender: ${activeSpeaker.gender}, Callsign: ${activeSpeaker.callsign}.
             `;
 
             if (activeSpeaker.role === 'Child') {
-                systemPrompt += `
-                - Address the child affectionately. 
-                - Match Marathi verbs to the child's gender (${activeSpeaker.gender}).
-                - Gently correct rude behavior by modeling polite alternatives.
-                - End with a fun, engaging question.`;
+                systemPrompt += ` Address child affectionately. Match Marathi verbs to gender (${activeSpeaker.gender}). Gently correct rude behavior. End with an engaging question.`;
             } else {
-                systemPrompt += `
-                - You are speaking to an Elder or a Guest.
-                - CRITICAL LINGUISTIC RULE: You MUST use 'Aadararthi Bahuvachan' (आदरार्थी बहुवचन - Respectful Plural) at all times. 
-                - Use 'अहो', 'तुम्ही', 'आलात', 'बसलात', 'घ्या'. Never use singular 'तू' with them.
-                - Address them as '${activeSpeaker.callsign}'.`;
+                systemPrompt += ` CRITICAL: Use 'Aadararthi Bahuvachan' (Respectful Plural). Address them as '${activeSpeaker.callsign}'.`;
             }
 
             if (activeRoutineContext) {
-                systemPrompt += `\n\nIMMEDIATE CONTEXT: You just triggered an alarm/routine. The instruction for this routine is: "${activeRoutineContext}". Evaluate the user's response based on this routine. If they are delaying, gently encourage them to hurry.`;
+                systemPrompt += ` IMMEDIATE CONTEXT: Trigger routine "${activeRoutineContext}".`;
             }
 
             await db.chatHistory.add({ role: 'user', text: userText, timestamp: Date.now() });
@@ -464,15 +463,26 @@
             const formattedHistory = rawHistory.reverse().map(msg => ({ role: msg.role, parts: [{ text: msg.text }] }));
 
             const apiKey = await getApiKey();
-            if (!apiKey) return logUI('System', 'API Key Missing.');
+            if (!apiKey) {
+                logUI('System', 'API Key Missing. Set in Parent Controls.');
+                debugLog("API Key missing.");
+                return;
+            }
 
             try {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`, {
+                // FIXED: Changed model to the universally stable gemini-1.5-flash
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+                
+                const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ contents: formattedHistory, systemInstruction: { parts: [{ text: systemPrompt }] } })
                 });
                 
+                if (!response.ok) {
+                    throw new Error(`HTTP Error: ${response.status}`);
+                }
+
                 const result = await response.json();
                 let aiText = result.candidates[0].content.parts[0].text.trim().replace(/[\*#`]/g, '');
                 
@@ -480,8 +490,11 @@
                 logUI('Dhwani', aiText);
                 await speakText(aiText);
                 
-                activeRoutineContext = null; // Clear routine context after responding once
-            } catch (error) { logUI('System', 'API Error.'); }
+                activeRoutineContext = null; 
+            } catch (error) { 
+                logUI('System', 'Failed to reach AI. Check internet and API key.'); 
+                debugLog("Gemini API Error: " + error.message);
+            }
         }
 
         /* ==========================================================================
@@ -507,8 +520,6 @@
                 }
 
                 if (selectedVoice) utterance.voice = selectedVoice;
-                
-                // Child-like acoustic modifiers
                 utterance.pitch = 1.6; 
                 utterance.rate = 1.05; 
                 
