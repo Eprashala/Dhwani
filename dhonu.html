@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eप्रशाला ध्वनी AI शिक्षिका (Sanskar Edition)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* ANIMATION: Pulse effect */
+        .listening-pulse { animation: pulse 1.5s infinite ease-in-out; }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+
+        .icon-btn {
+            @apply p-3 rounded-full text-white transition-all duration-200
+                   bg-gray-700 hover:bg-gray-600 shadow-lg
+                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-blue-500
+                   disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none;
+        }
+        
+        .utility-btn {
+            @apply w-full py-3 px-2 rounded-lg text-sm font-semibold transition-colors
+                   bg-gray-700 text-white hover:bg-gray-600
+                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-blue-500
+                   disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed;
+        }
+
+        .custom-checkbox { @apply w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-600 focus:ring-2 ring-offset-gray-800; }
+        
+        .custom-input {
+            @apply block w-3/4 mx-auto text-center border border-gray-500 rounded-lg p-3 outline-none transition-all;
+            background-color: #000000 !important; color: #ffffff !important; caret-color: #ffffff !important;       
+        }
+        .custom-input::placeholder { color: #9ca3af !important; opacity: 1 !important; }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4" oncontextmenu="return false;">
+
+    <div class="bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-2xl flex flex-col h-[95vh] md:h-auto">
+        
+        <div class="flex items-center justify-between mb-4 shrink-0">
+            <h1 class="text-2xl md:text-3xl font-bold text-white">
+                <span class="text-blue-400">Eप्रशाला</span> ध्वनी <span class="text-pink-500">AI</span>
+            </h1>
+            <div id="status-indicator" class="w-4 h-4 rounded-full bg-gray-500 transition-colors" title="Offline"></div>
+        </div>
+
+        <div id="conversation-log" class="flex-grow overflow-y-auto bg-gray-900 rounded-lg p-4 mb-4 border border-gray-700 space-y-4 shadow-inner min-h-[200px]">
+            <div class="text-gray-400 text-center mt-10">
+                System Initializing...<br>
+                <span class="text-sm opacity-70">Ensure your API Key is set below.</span>
+            </div>
+        </div>
+
+        <div class="w-full mb-4 flex justify-center gap-2 shrink-0 bg-gray-900 p-2 rounded-xl border border-gray-700">
+            <button id="btn-child" onclick="setSpeaker('Child', 'बाळा')" class="speaker-btn bg-blue-600 ring-4 ring-blue-400 text-white px-4 py-2 rounded-full text-sm font-semibold transition-all">बाळा (Child)</button>
+            <button id="btn-parent" onclick="setSpeaker('Parent', 'आई/बाबा')" class="speaker-btn bg-gray-700 text-white px-4 py-2 rounded-full text-sm transition-all">आई/बाबा (Parent)</button>
+            <button id="btn-maid" onclick="setSpeaker('Maid', 'मावशी')" class="speaker-btn bg-gray-700 text-white px-4 py-2 rounded-full text-sm transition-all">मावशी (Maid)</button>
+        </div>
+
+        <div class="flex justify-center gap-8 mb-4 shrink-0 bg-gray-800/50 p-2 rounded-xl">
+            <button id="pause-resume-button" class="icon-btn bg-blue-900/30 hover:bg-blue-800" title="Pause/Resume" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" /></svg>
+            </button>
+            <button id="stop-speech-button" class="icon-btn bg-red-900/30 hover:bg-red-800" title="Stop Speaking" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z" /></svg>
+            </button>
+            <button id="replay-button" class="icon-btn bg-green-900/30 hover:bg-green-800" title="Replay Last Message" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+            </button>
+        </div>
+
+        <div class="w-full flex flex-col items-center justify-center mb-4 shrink-0">
+            <button id="advance-toggle-btn" class="text-xs text-blue-400 hover:text-blue-300 underline mb-2 focus:outline-none">
+                ▼ API Settings (Required)
+            </button>
+
+            <div id="advance-container" class="hidden w-full bg-gray-800/80 border border-gray-700 rounded-lg p-4 flex flex-col gap-3 transition-all">
+                <input type="text" id="custom-api-key-input" class="custom-input text-xs w-full !w-full" placeholder="Paste your Gemini API Key here (AIza...)">
+                <button id="paste-key-btn" type="button" class="w-full py-2 px-4 bg-gray-600 hover:bg-gray-500 text-white text-xs rounded transition-colors flex items-center justify-center gap-2">
+                    Paste API Key
+                </button>
+            </div>
+        </div>
+
+        <button id="talk-button" class="w-full py-4 px-6 rounded-lg text-lg font-semibold transition-all duration-300 ease-in-out shrink-0
+                       bg-blue-600 text-white shadow-lg shadow-blue-900/50
+                       hover:bg-blue-500 hover:shadow-blue-500/50 hover:-translate-y-0.5
+                       focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50
+                       disabled:bg-gray-600 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-y-0">
+            Start Session
+        </button>
+
+        <div class="mt-4 grid grid-cols-2 gap-3 shrink-0">
+            <button id="clear-db-button" class="utility-btn">Clear Memory</button>
+            <button id="end-chat-button" class="utility-btn text-red-200 hover:bg-red-900/40" disabled>End Chat</button>
+        </div>
+    </div>
+
+    <script>
+        /* ==========================================================================
+           DHWANI DB (IndexedDB Integration)
+           ========================================================================== */
+        const db = new Dexie("DhwaniDB");
+        db.version(1).stores({
+            chatHistory: '++id, speakerName, role, text, timestamp'
+        });
+
+        async function saveMessageToDB(speakerName, role, text) {
+            await db.chatHistory.add({
+                speakerName: speakerName,
+                role: role,
+                text: text,
+                timestamp: new Date().getTime()
+            });
+        }
+
+        async function getRecentHistoryForAI() {
+            // Fetch last 15 messages for context
+            const rawHistory = await db.chatHistory.orderBy('timestamp').reverse().limit(15).toArray();
+            
+            // Format strictly for Gemini: role must be 'user' or 'model'
+            return rawHistory.reverse().map(msg => ({
+                role: msg.role === 'model' ? 'model' : 'user',
+                parts: [{ text: msg.role === 'user' ? `[${msg.speakerName} said]: ${msg.text}` : msg.text }]
+            }));
+        }
+
+        /* ==========================================================================
+           CORE LOGIC & STATE
+           ========================================================================== */
+        const talkButton = document.getElementById('talk-button');
+        const statusIndicator = document.getElementById('status-indicator');
+        const conversationLog = document.getElementById('conversation-log');
+        const customApiKeyInput = document.getElementById('custom-api-key-input');
+        
+        let appState = 'IDLE'; 
+        let currentSpeakerRole = 'Child'; 
+        let currentSpeakerName = 'बाळा'; 
+        let systemInstruction = '';
+        let recognition;
+        let lastSpokenText = ''; 
+        let speechManuallyStopped = false; 
+        const synth = window.speechSynthesis;
+        let voices = [];
+        let wakeLock = null;
+
+        // --- INITIALIZATION ---
+        window.onload = async () => {
+            if (synth.speaking) synth.cancel();
+            loadApiKey();
+            loadVoices();
+            buildSanskarPrompt();
+            
+            // Load previous UI history if it exists in DB
+            const history = await db.chatHistory.orderBy('timestamp').toArray();
+            conversationLog.innerHTML = '';
+            if (history.length > 0) {
+                history.forEach(msg => {
+                    logMessage(msg.role === 'model' ? 'Dhwani' : msg.speakerName, msg.text);
+                });
+                logMessage('System', 'Previous memory loaded. Ready to continue.');
+            } else {
+                conversationLog.innerHTML = '<div class="text-gray-400 text-center mt-10">Press Start Session to begin.</div>';
+            }
+        };
+
+        // --- SPEAKER SELECTION LOGIC (The Family Room) ---
+        function setSpeaker(role, name) {
+            currentSpeakerRole = role;
+            currentSpeakerName = name;
+            
+            // Update Button Visuals
+            document.querySelectorAll('.speaker-btn').forEach(btn => {
+                btn.classList.remove('ring-4', 'ring-blue-400', 'bg-blue-600');
+                btn.classList.add('bg-gray-700');
+            });
+            const activeBtn = document.getElementById(`btn-${role.toLowerCase()}`);
+            if(activeBtn) {
+                activeBtn.classList.remove('bg-gray-700');
+                activeBtn.classList.add('bg-blue-600', 'ring-4', 'ring-blue-400');
+            }
+            
+            buildSanskarPrompt(); // Instantly update AI persona
+            logMessage('System', `Now listening to: ${name}`);
+        }
+
+        // --- DYNAMIC SANSKAR PROMPTING (The Brain) ---
+        function buildSanskarPrompt() {
+            let roleInstructions = "";
+
+            if (currentSpeakerRole === 'Child') {
+                roleInstructions = `
+                    You are speaking to the CHILD. You are a friendly, cheerful elder sibling companion.
+                    Focus: Subtly teach good manners (sanskar). If the child speaks rudely, gently correct them by modeling polite behavior. Encourage respect for elders, daily routines, and schoolwork.
+                    Tone: Do not sound like a strict teacher; sound like a helpful, sweet best friend.
+                `;
+            } else if (currentSpeakerRole === 'Parent') {
+                roleInstructions = `
+                    You are speaking to the child's PARENT (Aai/Baba).
+                    Focus: Be highly respectful. You can briefly mention what you and the child were discussing, but maintain an obedient, helpful tone.
+                `;
+            } else if (currentSpeakerRole === 'Maid') {
+                roleInstructions = `
+                    You are speaking to the HOUSEHOLD HELP (Maid). 
+                    Focus: You MUST be exceedingly polite and respectful. Address her respectfully (e.g., 'मावशी'). 
+                    Your primary goal here is to model perfect manners so the child overhears and learns how to treat domestic workers with deep respect and kindness.
+                `;
+            }
+
+            systemInstruction = `
+                You are "Dhwani," an intelligent, empathetic companion from Maharashtra.
+                You must converse primarily in natural, conversational Marathi (Devanagari script). Use simple English words only if necessary.
+                
+                CURRENT SPEAKER: ${currentSpeakerRole} (${currentSpeakerName})
+                
+                ${roleInstructions}
+                
+                STRICT RULE: Keep responses concise (Max 2-3 short sentences) so they are easy to speak aloud. Never use formatting like bold (**), italics, or code blocks.
+            `;
+        }
+
+        // --- API & SETTINGS ---
+        document.getElementById('advance-toggle-btn').addEventListener('click', () => {
+            const container = document.getElementById('advance-container');
+            container.classList.toggle('hidden');
+            container.classList.toggle('flex');
+        });
+
+        document.getElementById('paste-key-btn').addEventListener('click', async () => {
+            try {
+                const text = await navigator.clipboard.readText();
+                if(text) {
+                    customApiKeyInput.value = text;
+                    localStorage.setItem('dhwani_api_key', text.trim());
+                    document.getElementById('paste-key-btn').textContent = "Pasted!";
+                }
+            } catch (err) { alert('Could not paste. Please type manually.'); }
+        });
+
+        customApiKeyInput.addEventListener('input', () => {
+            localStorage.setItem('dhwani_api_key', customApiKeyInput.value.trim());
+        });
+
+        function loadApiKey() {
+            const savedKey = localStorage.getItem('dhwani_api_key');
+            if (savedKey) customApiKeyInput.value = savedKey;
+        }
+
+        function getApiKey() {
+            const key = customApiKeyInput.value.trim();
+            if (!key) alert("Please enter your Gemini API Key in the settings.");
+            return key;
+        }
+
+        // --- SPEECH RECOGNITION (The Ear) ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false; 
+            recognition.interimResults = false;
+            recognition.lang = 'mr-IN'; 
+
+            recognition.onresult = handleSpeechResult;
+            recognition.onend = () => { if (appState === 'CONVERSATION') startRecognitionSafe(); };
+            recognition.onerror = (event) => {
+                if (event.error === 'no-speech' && appState === 'CONVERSATION') startRecognitionSafe();
+                else if (event.error === 'not-allowed') setState('IDLE');
+            };
+        } else {
+            alert("Speech Recognition not supported in this browser. Please use Chrome on Android.");
+        }
+
+        function startRecognitionSafe() {
+            if (!recognition) return;
+            try { recognition.start(); } catch (e) {}
+        }
+
+        // --- MAIN INTERACTION FLOW ---
+        talkButton.addEventListener('click', async () => {
+            if (appState === 'IDLE') {
+                if (!getApiKey()) return;
+                setState('CONVERSATION');
+                await acquireWakeLock();
+                const welcomeMsg = `नमस्कार ${currentSpeakerName}, बोला.`;
+                logMessage('Dhwani', welcomeMsg);
+                await speakText(welcomeMsg);
+                startRecognitionSafe();
+            } else {
+                setState('IDLE');
+                recognition.stop();
+                if (synth.speaking) synth.cancel();
+                await releaseWakeLock();
+            }
+        });
+
+        async function handleSpeechResult(event) {
+            const transcript = event.results[event.results.length - 1][0].transcript.trim();
+            if (!transcript) return;
+            
+            recognition.stop(); 
+            setState('BUSY');
+
+            // 1. Save user input
+            logMessage(currentSpeakerName, transcript);
+            await saveMessageToDB(currentSpeakerName, 'user', transcript);
+
+            try {
+                // 2. Fetch Context & Call AI
+                const recentHistory = await getRecentHistoryForAI();
+                const aiResponseText = await getAIResponse(recentHistory);
+                const cleanedResponseText = cleanTextForTTS(aiResponseText);
+
+                // 3. Save & Speak AI Response
+                await saveMessageToDB('Dhwani', 'model', cleanedResponseText);
+                logMessage('Dhwani', cleanedResponseText);
+                
+                await speakText(cleanedResponseText);
+                
+                setState('CONVERSATION');
+                startRecognitionSafe();
+            } catch (error) {
+                console.error(error);
+                logMessage('Error', 'Connection failed. Check API key or internet.');
+                setState('CONVERSATION');
+                startRecognitionSafe();
+            }
+        }
+
+        async function getAIResponse(historyData) {
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${getApiKey()}`;
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: historyData,
+                    systemInstruction: { parts: [{ text: systemInstruction }] }
+                })
+            });
+            const result = await response.json();
+            return result.candidates[0].content.parts[0].text.trim();
+        }
+
+        function cleanTextForTTS(text) { return text.replace(/[\*#`]/g, '').trim(); }
+
+        // --- SPEECH SYNTHESIS (The Mouth) ---
+        function loadVoices() {
+            voices = synth.getVoices();
+            if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => { voices = synth.getVoices(); };
+        }
+
+        async function speakText(text) {
+            if (synth.speaking) synth.cancel();
+            return new Promise((resolve) => {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.onend = () => resolve();
+                utterance.onerror = () => resolve();
+                
+                let marathiVoice = voices.find(v => v.lang === 'mr-IN') || voices.find(v => v.lang === 'hi-IN');
+                if (marathiVoice) utterance.voice = marathiVoice;
+                utterance.lang = 'mr-IN';
+                
+                // Adjust speed based on who she is talking to
+                utterance.rate = currentSpeakerRole === 'Child' ? 0.85 : 1.0; 
+                synth.speak(utterance);
+            });
+        }
+
+        // --- UI & UTILITY HELPERS ---
+        function setState(newState) {
+            appState = newState;
+            if (newState === 'IDLE') {
+                talkButton.textContent = 'Start Session';
+                statusIndicator.className = 'w-4 h-4 rounded-full bg-gray-500 transition-colors';
+                talkButton.className = "w-full py-4 px-6 rounded-lg text-lg font-semibold transition-all duration-300 ease-in-out shrink-0 bg-blue-600 text-white shadow-lg hover:bg-blue-500";
+            } else if (newState === 'BUSY') {
+                talkButton.textContent = 'Thinking...';
+                statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-400 transition-colors';
+            } else if (newState === 'CONVERSATION') {
+                talkButton.textContent = 'Stop Session';
+                statusIndicator.className = 'w-4 h-4 rounded-full bg-blue-500 listening-pulse transition-colors';
+                talkButton.className = "w-full py-4 px-6 rounded-lg text-lg font-semibold transition-all duration-300 ease-in-out shrink-0 bg-red-600 text-white shadow-lg hover:bg-red-500";
+            }
+        }
+
+        function logMessage(sender, message) {
+            const div = document.createElement('div');
+            let senderClass = sender === 'Dhwani' ? 'text-cyan-300 font-semibold' : 'text-green-300 font-semibold';
+            if(sender === 'System') senderClass = 'text-gray-400 italic';
+            div.innerHTML = `<strong class="${senderClass}">${sender}:</strong> <span class="text-white">${message}</span>`;
+            conversationLog.appendChild(div);
+            conversationLog.scrollTop = conversationLog.scrollHeight;
+        }
+
+        // Memory Wipe
+        document.getElementById('clear-db-button').addEventListener('click', async () => {
+            if(confirm("Are you sure you want to delete all memory?")) {
+                await db.chatHistory.clear();
+                conversationLog.innerHTML = '<div class="text-gray-400 text-center mt-10">Memory Cleared.</div>';
+            }
+        });
+
+        // Wake Lock
+        async function acquireWakeLock() {
+            if ('wakeLock' in navigator) { 
+                try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {} 
+            }
+        }
+        async function releaseWakeLock() {
+            if (wakeLock) { try { await wakeLock.release(); wakeLock = null; } catch (e) {} }
+        }
+        document.addEventListener('visibilitychange', () => {
+            if (appState !== 'IDLE' && document.visibilityState === 'visible') acquireWakeLock();
+        });
+    </script>
+</body>
+</html>
