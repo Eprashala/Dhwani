@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dhwani Acoustic Reader PoC</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f4f9; padding: 20px; max-width: 600px; margin: auto; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h2 { border-bottom: 2px solid #333; padding-bottom: 5px; }
+        button { background: #0056b3; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-size: 16px; margin-top: 10px; }
+        button:hover { background: #004494; }
+        input[type="text"], input[type="password"] { padding: 10px; width: calc(100% - 22px); margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        .hidden { display: none; }
+        #status { font-weight: bold; color: #d9534f; margin-top: 15px; }
+        .db-controls { display: flex; gap: 10px; margin-top: 15px; }
+    </style>
+</head>
+<body>
+
+    <h1>Dhwani Acoustic Reader</h1>
+    <div id="status">Status: Waiting to start...</div>
+
+    <div class="card" id="identifierModule">
+        <h2>Identifier Module</h2>
+        <p>Place the coin exactly 1cm from the bottom microphone and press Detect.</p>
+        <button onclick="detectCoin()">🔊 Detect Coin</button>
+        <h3 id="resultDisplay">Result: --</h3>
+    </div>
+
+    <div class="card" id="loginModule">
+        <h2>Admin Access</h2>
+        <input type="password" id="adminPassword" placeholder="Enter Admin Password">
+        <button onclick="checkPassword()">Login to Learner</button>
+    </div>
+
+    <div class="card hidden" id="learnerModule">
+        <h2>Learner Module (Admin)</h2>
+        <input type="text" id="coinName" placeholder="e.g., Rs 5, Rs 10">
+        <button onclick="learnCoin()">🎙️ Learn Coin Profile</button>
+        
+        <div class="db-controls">
+            <button onclick="exportJSON()" style="background:#28a745;">💾 Export JSON</button>
+            <input type="file" id="jsonUpload" accept=".json" style="display:none" onchange="importJSON(event)">
+            <button onclick="document.getElementById('jsonUpload').click()" style="background:#17a2b8;">📂 Import JSON</button>
+        </div>
+        <p><small>Learned profiles: <span id="dbCount">0</span></small></p>
+    </div>
+
+<script>
+    // --- Audio System Variables ---
+    let audioCtx;
+    let analyser;
+    let micStream;
+    let coinDatabase = JSON.parse(localStorage.getItem('dhwaniDB')) || {};
+    
+    // Update UI count on load
+    document.getElementById('dbCount').innerText = Object.keys(coinDatabase).length;
+
+    // --- Admin Authentication ---
+    function checkPassword() {
+        const pass = document.getElementById('adminPassword').value;
+        if (pass === 'Admin@123') {
+            document.getElementById('loginModule').classList.add('hidden');
+            document.getElementById('learnerModule').classList.remove('hidden');
+            setStatus("Admin logged in. Ready to learn.", "green");
+        } else {
+            setStatus("Incorrect Password", "red");
+        }
+    }
+
+    // --- Core Acoustic Engine ---
+    async function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+            
+            const source = audioCtx.createMediaStreamSource(micStream);
+            analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 2048; // High resolution
+            analyser.smoothingTimeConstant = 0.2; // Fast response
+            source.connect(analyser);
+        }
+        if (audioCtx.state === 'suspended') {
+            await audioCtx.resume();
+        }
+    }
+
+    // Fires the 12kHz - 18kHz Chirp and records the FFT echo
+    async function captureAcousticSignature() {
+        await initAudio();
+        
+        return new Promise((resolve) => {
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            osc.type = 'sine';
+            const now = audioCtx.currentTime;
+            
+            // FMCW Sweep: 12kHz to 18kHz over 100ms
+            osc.frequency.setValueAtTime(12000, now);
+            osc.frequency.exponentialRampToValueAtTime(18000, now + 0.1);
+            
+            osc.start(now);
+            osc.stop(now + 0.1);
+
+            // Wait exactly 50ms into the chirp to capture the peak reflection
+            setTimeout(() => {
+                const dataArray = new Float32Array(analyser.frequencyBinCount);
+                analyser.getFloatFrequencyData(dataArray);
+                
+                // We only care about high frequencies. Slice the array to isolate ~10kHz and above
+                const highFreqData = Array.from(dataArray).slice(450, 900); 
+                resolve(highFreqData);
+            }, 50); 
+        });
+    }
+
+    // --- Learner Function ---
+    async function learnCoin() {
+        const name = document.getElementById('coinName').value.trim();
+        if (!name) return alert("Please enter a name for the coin.");
+        
+        setStatus("Learning... Keep still.", "blue");
+        
+        // Take 3 samples and average them for stability
+        let signatures = [];
+        for(let i=0; i<3; i++) {
+            let sig = await captureAcousticSignature();
+            signatures.push(sig);
+            await new Promise(r => setTimeout(r, 200)); // Pause between chirps
+        }
+
+        // Calculate average array
+        let masterProfile = signatures[0].map((_, colIndex) => 
+            signatures.reduce((acc, row) => acc + row[colIndex], 0) / signatures.length
+        );
+
+        coinDatabase[name] = masterProfile;
+        localStorage.setItem('dhwaniDB', JSON.stringify(coinDatabase));
+        document.getElementById('dbCount').innerText = Object.keys(coinDatabase).length;
+        
+        setStatus(`Successfully learned: ${name}`, "green");
+        document.getElementById('coinName').value = '';
+    }
+
+    // --- Identifier Function ---
+    async function detectCoin() {
+        if (Object.keys(coinDatabase).length === 0) {
+            return setStatus("Database is empty. Learn a coin first.", "red");
+        }
+
+        setStatus("Detecting...", "blue");
+        const liveSignature = await captureAcousticSignature();
+        
+        let bestMatch = "Unknown";
+        let highestScore = -1;
+
+        for (const [coinName, savedProfile] of Object.entries(coinDatabase)) {
+            let score = cosineSimilarity(liveSignature, savedProfile);
+            if (score > highestScore) {
+                highestScore = score;
+                bestMatch = coinName;
+            }
+        }
+
+        // Define a strict threshold. If the echo is totally different, it's not recognized.
+        if (highestScore > 0.95) { 
+            document.getElementById('resultDisplay').innerText = `Result: ${bestMatch} (Confidence: ${(highestScore*100).toFixed(1)}%)`;
+            speakAloud(bestMatch);
+            setStatus("Match found!", "green");
+        } else {
+            document.getElementById('resultDisplay').innerText = `Result: No Match Found`;
+            speakAloud("No Match Found");
+            setStatus("Below confidence threshold.", "red");
+        }
+    }
+
+    // --- Math: Cosine Similarity ---
+    function cosineSimilarity(A, B) {
+        let dotProduct = 0, normA = 0, normB = 0;
+        for (let i = 0; i < A.length; i++) {
+            dotProduct += A[i] * B[i];
+            normA += A[i] * A[i];
+            normB += B[i] * B[i];
+        }
+        if (normA === 0 || normB === 0) return 0;
+        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    }
+
+    // --- Text to Speech ---
+    function speakAloud(text) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1.0;
+        window.speechSynthesis.speak(utterance);
+    }
+
+    // --- JSON Database Management ---
+    function exportJSON() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(coinDatabase, null, 2));
+        const dlAnchorElem = document.createElement('a');
+        dlAnchorElem.setAttribute("href", dataStr);
+        dlAnchorElem.setAttribute("download", "dhwani_database.json");
+        dlAnchorElem.click();
+    }
+
+    function importJSON(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                coinDatabase = JSON.parse(e.target.result);
+                localStorage.setItem('dhwaniDB', JSON.stringify(coinDatabase));
+                document.getElementById('dbCount').innerText = Object.keys(coinDatabase).length;
+                setStatus("JSON imported successfully.", "green");
+            } catch (err) {
+                setStatus("Invalid JSON file.", "red");
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    // --- Helpers ---
+    function setStatus(msg, color) {
+        const el = document.getElementById('status');
+        el.innerText = `Status: ${msg}`;
+        el.style.color = color;
+    }
+</script>
+</body>
+</html>
