@@ -3,155 +3,134 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dhwani Pro - Multi-Template Reader</title>
+    <title>Dhwani PoC - Demo Day Edition</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #e9ecef; padding: 20px; max-width: 650px; margin: auto; }
-        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        h2 { border-bottom: 2px solid #333; padding-bottom: 5px; margin-top: 0; }
-        button { background: #0056b3; color: white; border: none; padding: 12px 18px; border-radius: 4px; cursor: pointer; font-size: 16px; margin-top: 10px; font-weight: bold; }
-        button:hover { background: #004494; }
-        input[type="text"], input[type="password"] { padding: 12px; width: calc(100% - 26px); margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px;}
-        .hidden { display: none; }
-        #status { font-weight: bold; color: #d9534f; margin-top: 15px; font-size: 18px; }
-        .db-controls { display: flex; gap: 10px; margin-top: 15px; }
-        .badge { background: #17a2b8; color: white; padding: 4px 8px; border-radius: 12px; font-size: 12px; }
+        body { font-family: sans-serif; background: #222; color: white; padding: 20px; max-width: 500px; margin: auto; }
+        .card { background: #333; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        button { background: #007bff; color: white; border: none; padding: 15px; width: 100%; border-radius: 6px; font-size: 18px; margin-top: 10px; font-weight: bold; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .btn-green { background: #28a745; }
+        .btn-green:hover { background: #218838; }
+        .btn-red { background: #dc3545; }
+        input[type="text"] { padding: 12px; width: calc(100% - 26px); margin-bottom: 10px; border-radius: 4px; font-size: 16px; border: none; }
+        h2 { border-bottom: 1px solid #555; padding-bottom: 10px; margin-top: 0; color: #f8f9fa; }
+        #status { color: #ffc107; font-size: 18px; font-weight: bold; text-align: center; margin-bottom: 15px; }
+        #resultDisplay { text-align: center; font-size: 28px; color: #00ff00; margin-top: 20px; }
+        .step-badge { background: #ffc107; color: black; padding: 3px 8px; border-radius: 10px; font-size: 14px; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <h1>Dhwani Acoustic Reader (Pro)</h1>
-    <div id="status">Status: Waiting to start...</div>
+    <h1 style="text-align: center; color: #007bff;">Dhwani Acoustic Reader</h1>
+    <div id="status">Status: Ready. Please Calibrate Background.</div>
 
-    <div class="card" id="identifierModule">
-        <h2>Identifier Module</h2>
-        <p>Ensure the environment is quiet. Place the coin and press Detect.</p>
-        <button onclick="detectCoin()" style="width: 100%; background: #28a745; font-size: 20px;">🔊 Detect Coin</button>
-        <h3 id="resultDisplay" style="text-align: center; font-size: 24px; margin-top: 20px;">Result: --</h3>
+    <div class="card" id="calibModule">
+        <h2><span class="step-badge">Step 1</span> Environment Setup</h2>
+        <p style="font-size: 14px; color: #ccc;">Ensure the table is completely empty. Place the phone flat.</p>
+        <button onclick="calibrateBaseline()" class="btn-red">🎯 Calibrate Empty Table</button>
     </div>
 
-    <div class="card" id="loginModule">
-        <h2>Admin Access</h2>
-        <input type="password" id="adminPassword" placeholder="Enter Admin Password">
-        <button onclick="checkPassword()">Login to Learner</button>
+    <div class="card" id="learnerModule" style="display: none;">
+        <h2><span class="step-badge">Step 2</span> Train Coins</h2>
+        <input type="text" id="coinName" placeholder="e.g., Rs 5, Rs 10">
+        <button onclick="learnCoinDelta()">🎙️ Learn Coin Signature</button>
+        <p style="font-size: 12px; color: #aaa; text-align: center; margin-top: 10px;">Move coin 1mm and learn 5 times per coin.</p>
     </div>
 
-    <div class="card hidden" id="learnerModule">
-        <h2>Learner Module (Multi-Template)</h2>
-        <p style="font-size: 14px; color: #555;"><strong>Crucial:</strong> First, learn an "Empty Table" profile with no coin present. Then, learn your coins. Move the coin slightly (1-2mm) between each learn click.</p>
-        
-        <input type="text" id="coinName" placeholder="e.g., Rs 5, Rs 10, Empty Table">
-        <button onclick="learnSingleProfile()">🎙️ Add Profile to Coin</button>
-        
-        <div id="dbStats" style="margin-top: 15px; font-size: 14px; background: #f8f9fa; padding: 10px; border-radius: 4px;">
-            <strong>Current Database:</strong> <span id="dbDetails">Empty</span>
-        </div>
-
-        <div class="db-controls">
-            <button onclick="exportJSON()" style="background:#6c757d;">💾 Export JSON</button>
-            <input type="file" id="jsonUpload" accept=".json" style="display:none" onchange="importJSON(event)">
-            <button onclick="document.getElementById('jsonUpload').click()" style="background:#6c757d;">📂 Import</button>
-            <button onclick="clearDatabase()" style="background:#dc3545;">🗑️ Clear DB</button>
-        </div>
+    <div class="card" id="identifierModule" style="display: none;">
+        <h2><span class="step-badge">Step 3</span> Live Detection</h2>
+        <button onclick="detectCoinDelta()" class="btn-green">🔊 Detect Object</button>
+        <h3 id="resultDisplay">--</h3>
     </div>
 
 <script>
     let audioCtx;
     let analyser;
-    let micStream;
-    let coinDatabase = JSON.parse(localStorage.getItem('dhwaniDBPro')) || {};
-    
-    updateDBStats();
-
-    function checkPassword() {
-        const pass = document.getElementById('adminPassword').value;
-        if (pass === 'Admin@123') {
-            document.getElementById('loginModule').classList.add('hidden');
-            document.getElementById('learnerModule').classList.remove('hidden');
-            setStatus("Admin logged in. Ready to train.", "green");
-        } else {
-            setStatus("Incorrect Password", "red");
-        }
-    }
+    let baselineProfile = null;
+    let coinDatabase = {};
 
     async function initAudio() {
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
-            
+            const micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
             const source = audioCtx.createMediaStreamSource(micStream);
             analyser = audioCtx.createAnalyser();
-            analyser.fftSize = 2048; 
-            analyser.smoothingTimeConstant = 0.1; 
+            analyser.fftSize = 2048;
             source.connect(analyser);
         }
         if (audioCtx.state === 'suspended') await audioCtx.resume();
     }
 
-    async function captureAcousticSignature() {
+    async function captureRawSignature() {
         await initAudio();
         return new Promise((resolve) => {
             const osc = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
-            
-            osc.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
             
             osc.type = 'sine';
             const now = audioCtx.currentTime;
-            
-            // Sweep from 10kHz to 18kHz
             osc.frequency.setValueAtTime(10000, now);
             osc.frequency.exponentialRampToValueAtTime(18000, now + 0.1);
             
             osc.start(now);
             osc.stop(now + 0.1);
 
-            // Capture exact reflection timing
             setTimeout(() => {
-                const dataArray = new Float32Array(analyser.frequencyBinCount);
-                analyser.getFloatFrequencyData(dataArray);
-                // Isolate high frequencies
-                const highFreqData = Array.from(dataArray).slice(400, 900); 
-                resolve(highFreqData);
+                const data = new Float32Array(analyser.frequencyBinCount);
+                analyser.getFloatFrequencyData(data);
+                resolve(Array.from(data).slice(400, 900)); 
             }, 60); 
         });
     }
 
-    async function learnSingleProfile() {
-        const name = document.getElementById('coinName').value.trim();
-        if (!name) return alert("Please enter a name for the coin.");
-        
-        setStatus(`Capturing profile for ${name}...`, "blue");
-        
-        let signature = await captureAcousticSignature();
-
-        // Initialize array if this is a new coin class
-        if (!coinDatabase[name]) {
-            coinDatabase[name] = [];
+    // NEW MATH: Subtract the table's echo from the coin's echo
+    function calculateDelta(rawSig, baseSig) {
+        let delta = [];
+        for(let i=0; i<rawSig.length; i++) {
+            delta.push(Math.abs(rawSig[i] - baseSig[i]));
         }
-        
-        coinDatabase[name].push(signature);
-        localStorage.setItem('dhwaniDBPro', JSON.stringify(coinDatabase));
-        
-        updateDBStats();
-        setStatus(`Profile added! (${coinDatabase[name].length} total for ${name})`, "green");
+        return delta;
     }
 
-    async function detectCoin() {
-        if (Object.keys(coinDatabase).length === 0) {
-            return setStatus("Database is empty.", "red");
-        }
+    async function calibrateBaseline() {
+        setStatus("Calibrating... Keep silent.", "orange");
+        baselineProfile = await captureRawSignature();
+        
+        document.getElementById('learnerModule').style.display = 'block';
+        document.getElementById('identifierModule').style.display = 'block';
+        setStatus("Background Calibrated. Ready to Learn.", "#00ff00");
+    }
 
-        setStatus("Analyzing echo...", "blue");
-        const liveSignature = await captureAcousticSignature();
+    async function learnCoinDelta() {
+        if (!baselineProfile) return alert("Calibrate first!");
+        const name = document.getElementById('coinName').value.trim();
+        if (!name) return alert("Enter coin name.");
+        
+        setStatus(`Scanning ${name}...`, "orange");
+        let rawSig = await captureRawSignature();
+        let deltaSig = calculateDelta(rawSig, baselineProfile);
+
+        if (!coinDatabase[name]) coinDatabase[name] = [];
+        coinDatabase[name].push(deltaSig);
+        
+        setStatus(`Learned ${name}! (${coinDatabase[name].length} profiles)`, "#007bff");
+    }
+
+    async function detectCoinDelta() {
+        if (!baselineProfile || Object.keys(coinDatabase).length === 0) return alert("Learn a coin first!");
+        
+        setStatus("Detecting...", "orange");
+        let liveRaw = await captureRawSignature();
+        let liveDelta = calculateDelta(liveRaw, baselineProfile);
         
         let bestMatch = "Unknown";
         let highestScore = -1;
 
-        // Iterate through every single saved profile for every coin
         for (const [coinName, profiles] of Object.entries(coinDatabase)) {
             for (const savedProfile of profiles) {
-                let score = cosineSimilarity(liveSignature, savedProfile);
+                let score = cosineSimilarity(liveDelta, savedProfile);
                 if (score > highestScore) {
                     highestScore = score;
                     bestMatch = coinName;
@@ -159,23 +138,17 @@
             }
         }
 
-        // Extremely Stringent Threshold
-        if (highestScore > 0.975) { 
-            if (bestMatch === "Empty Table") {
-                document.getElementById('resultDisplay').innerText = `Result: No Coin Present`;
-                document.getElementById('resultDisplay').style.color = "#888";
-                setStatus("Clear.", "black");
-            } else {
-                document.getElementById('resultDisplay').innerText = `Result: ${bestMatch}`;
-                document.getElementById('resultDisplay').style.color = "#28a745";
-                speakAloud(bestMatch);
-                setStatus(`Match Confidence: ${(highestScore*100).toFixed(2)}%`, "green");
-            }
+        // Demo threshold set to 0.92 (92%) due to Delta Math being more sensitive
+        if (highestScore > 0.92) {
+            document.getElementById('resultDisplay').innerText = bestMatch;
+            document.getElementById('resultDisplay').style.color = "#00ff00";
+            speakAloud(bestMatch);
+            setStatus(`Match: ${(highestScore*100).toFixed(1)}%`, "#00ff00");
         } else {
-            document.getElementById('resultDisplay').innerText = `Result: Unrecognized Object`;
-            document.getElementById('resultDisplay').style.color = "#d9534f";
-            speakAloud("Unrecognized");
-            setStatus(`Failed. Best guess was ${bestMatch} at ${(highestScore*100).toFixed(2)}%`, "red");
+            document.getElementById('resultDisplay').innerText = "Not Recognized";
+            document.getElementById('resultDisplay').style.color = "red";
+            speakAloud("Not Recognized");
+            setStatus(`Too low: ${(highestScore*100).toFixed(1)}%`, "red");
         }
     }
 
@@ -191,56 +164,14 @@
     }
 
     function speakAloud(text) {
+        window.speechSynthesis.cancel(); // Stop current speech
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = 1.0;
         window.speechSynthesis.speak(utterance);
-    }
-
-    function updateDBStats() {
-        let statsHtml = "";
-        for (const [coinName, profiles] of Object.entries(coinDatabase)) {
-            statsHtml += `<span class="badge">${coinName}: ${profiles.length} profiles</span> `;
-        }
-        document.getElementById('dbDetails').innerHTML = statsHtml || "Empty";
-    }
-
-    function clearDatabase() {
-        if(confirm("Are you sure you want to delete all learned profiles?")) {
-            coinDatabase = {};
-            localStorage.setItem('dhwaniDBPro', JSON.stringify(coinDatabase));
-            updateDBStats();
-            setStatus("Database cleared.", "red");
-        }
-    }
-
-    function exportJSON() {
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(coinDatabase, null, 2));
-        const dlAnchorElem = document.createElement('a');
-        dlAnchorElem.setAttribute("href", dataStr);
-        dlAnchorElem.setAttribute("download", "dhwani_pro_database.json");
-        dlAnchorElem.click();
-    }
-
-    function importJSON(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                coinDatabase = JSON.parse(e.target.result);
-                localStorage.setItem('dhwaniDBPro', JSON.stringify(coinDatabase));
-                updateDBStats();
-                setStatus("Database imported.", "green");
-            } catch (err) {
-                setStatus("Invalid JSON.", "red");
-            }
-        };
-        reader.readAsText(file);
     }
 
     function setStatus(msg, color) {
         const el = document.getElementById('status');
-        el.innerText = `Status: ${msg}`;
+        el.innerText = msg;
         el.style.color = color;
     }
 </script>
