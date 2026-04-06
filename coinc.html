@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dhwani Acoustic Detector v2</title>
+<title>Dhwani Acoustic Detector v3</title>
 
 <style>
 body {
@@ -39,7 +39,7 @@ button {
 
 <body>
 
-<h2>Dhwani Acoustic Detector (v2)</h2>
+<h2>Dhwani Acoustic Detector (v3)</h2>
 <div id="status">Ready</div>
 
 <div class="card">
@@ -61,7 +61,9 @@ let audioCtx;
 let processor;
 let recordedData = [];
 let database = {};
+let chirpSignal = [];
 
+// 🎤 INIT AUDIO
 async function initAudio() {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -74,6 +76,7 @@ async function initAudio() {
     });
 
     const source = audioCtx.createMediaStreamSource(stream);
+
     processor = audioCtx.createScriptProcessor(4096, 1, 1);
 
     source.connect(processor);
@@ -87,81 +90,109 @@ async function initAudio() {
     setStatus("Audio Initialized ✅");
 }
 
+// 📢 STATUS
 function setStatus(msg) {
     document.getElementById("status").innerText = msg;
 }
 
-// 🔊 Chirp
-function playChirp() {
+// 🔊 GENERATE CHIRP
+function generateChirp() {
     const duration = 0.2;
     const sampleRate = audioCtx.sampleRate;
     const length = sampleRate * duration;
 
-    let buffer = audioCtx.createBuffer(1, length, sampleRate);
-    let data = buffer.getChannelData(0);
+    chirpSignal = new Float32Array(length);
 
     for (let i = 0; i < length; i++) {
         let t = i / sampleRate;
-        let freq = 2000 + (6000 * t / duration);
-        data[i] = Math.sin(2 * Math.PI * freq * t);
+        let freq = 2000 + (4000 * t / duration);
+        chirpSignal[i] = Math.sin(2 * Math.PI * freq * t);
     }
 
-    let source = audioCtx.createBufferSource();
-    source.buffer = buffer;
-    source.connect(audioCtx.destination);
-    source.start();
+    return chirpSignal;
 }
 
-// 🎯 Capture
-async function capture() {
+// 🔊 PLAY CHIRP
+function playChirp() {
+    let data = generateChirp();
+
+    let buffer = audioCtx.createBuffer(1, data.length, audioCtx.sampleRate);
+    buffer.copyToChannel(data, 0);
+
+    let src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(audioCtx.destination);
+    src.start();
+}
+
+// 🎯 CAPTURE + PROCESS
+async function captureFeature() {
     recordedData = [];
 
     playChirp();
 
-    await new Promise(r => setTimeout(r, 400));
+    await new Promise(r => setTimeout(r, 500));
 
-    return recordedData.slice();
+    let signal = recordedData.slice();
+
+    let corr = crossCorrelate(signal, chirpSignal);
+
+    return extractPeaks(corr);
 }
 
-// 📊 Feature extraction
-function extractFeature(signal) {
-    let step = 200;
-    let features = [];
+// 🔁 CROSS CORRELATION
+function crossCorrelate(signal, pattern) {
+    let len = signal.length - pattern.length;
+    let result = new Float32Array(len);
 
-    for (let i = 0; i < signal.length; i += step) {
-        let chunk = signal.slice(i, i + step);
-        let energy = 0;
+    for (let i = 0; i < len; i++) {
+        let sum = 0;
 
-        for (let j = 0; j < chunk.length; j++) {
-            energy += chunk[j] * chunk[j];
+        for (let j = 0; j < pattern.length; j++) {
+            sum += signal[i + j] * pattern[j];
         }
 
-        features.push(energy);
+        result[i] = sum;
     }
 
-    return features;
+    return result;
 }
 
-// 🔁 Compare
-function compare(a, b) {
+// 📊 EXTRACT PEAKS
+function extractPeaks(corr) {
+    let peaks = [];
+
+    for (let i = 1; i < corr.length - 1; i++) {
+        if (corr[i] > corr[i-1] && corr[i] > corr[i+1]) {
+            peaks.push(corr[i]);
+        }
+    }
+
+    peaks.sort((a,b) => b-a);
+
+    return peaks.slice(0, 10);
+}
+
+// 🔍 COMPARE
+function comparePeaks(a, b) {
+    let len = Math.min(a.length, b.length);
     let diff = 0;
 
-    for (let i = 0; i < Math.min(a.length, b.length); i++) {
+    for (let i = 0; i < len; i++) {
         diff += Math.abs(a[i] - b[i]);
     }
 
     return 1 / (1 + diff);
 }
 
-// 🎓 Learn
+// 🎓 LEARN
 async function learn() {
     let name = document.getElementById("coinName").value.trim();
     if (!name) return alert("Enter coin name");
 
-    setStatus("Learning " + name + "...");
+    setStatus("Learning... keep phone still");
 
-    let signal = await capture();
-    let feature = extractFeature(signal);
+    let feature = await captureFeature();
 
     if (!database[name]) database[name] = [];
     database[name].push(feature);
@@ -169,7 +200,7 @@ async function learn() {
     setStatus(name + " learned (" + database[name].length + ")");
 }
 
-// 🔍 Detect
+// 🔍 DETECT
 async function detect() {
     if (Object.keys(database).length === 0) {
         alert("Train first!");
@@ -178,15 +209,14 @@ async function detect() {
 
     setStatus("Detecting...");
 
-    let signal = await capture();
-    let feature = extractFeature(signal);
+    let feature = await captureFeature();
 
     let best = "Unknown";
     let bestScore = 0;
 
     for (let coin in database) {
         for (let sample of database[coin]) {
-            let score = compare(feature, sample);
+            let score = comparePeaks(feature, sample);
 
             if (score > bestScore) {
                 bestScore = score;
@@ -195,12 +225,12 @@ async function detect() {
         }
     }
 
-    if (bestScore > 0.6) {
+    if (bestScore > 0.7) {
         document.getElementById("result").innerText = best;
         setStatus("Match: " + (bestScore * 100).toFixed(1) + "%");
     } else {
         document.getElementById("result").innerText = "Not Recognized";
-        setStatus("Low confidence");
+        setStatus("Weak signal (" + (bestScore*100).toFixed(1) + "%)");
     }
 }
 </script>
