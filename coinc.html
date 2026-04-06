@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dhwani Acoustic Detector v2</title>
+
+<style>
+body {
+    font-family: sans-serif;
+    background: #111;
+    color: white;
+    padding: 20px;
+    max-width: 500px;
+    margin: auto;
+}
+.card {
+    background: #222;
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 15px;
+}
+button {
+    width: 100%;
+    padding: 15px;
+    margin-top: 10px;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+}
+.green { background: #28a745; }
+.red { background: #dc3545; }
+.blue { background: #007bff; }
+#status { margin-bottom: 10px; font-weight: bold; }
+#result { font-size: 24px; text-align: center; margin-top: 15px; }
+</style>
+</head>
+
+<body>
+
+<h2>Dhwani Acoustic Detector (v2)</h2>
+<div id="status">Ready</div>
+
+<div class="card">
+    <button class="red" onclick="initAudio()">🎤 Init Audio</button>
+</div>
+
+<div class="card">
+    <input id="coinName" placeholder="Enter coin name" style="width:100%; padding:10px;">
+    <button class="blue" onclick="learn()">🎓 Learn Coin</button>
+</div>
+
+<div class="card">
+    <button class="green" onclick="detect()">🔍 Detect</button>
+    <div id="result">--</div>
+</div>
+
+<script>
+let audioCtx;
+let processor;
+let recordedData = [];
+let database = {};
+
+async function initAudio() {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false
+        }
+    });
+
+    const source = audioCtx.createMediaStreamSource(stream);
+    processor = audioCtx.createScriptProcessor(4096, 1, 1);
+
+    source.connect(processor);
+    processor.connect(audioCtx.destination);
+
+    processor.onaudioprocess = (e) => {
+        let input = e.inputBuffer.getChannelData(0);
+        recordedData.push(...input);
+    };
+
+    setStatus("Audio Initialized ✅");
+}
+
+function setStatus(msg) {
+    document.getElementById("status").innerText = msg;
+}
+
+// 🔊 Chirp
+function playChirp() {
+    const duration = 0.2;
+    const sampleRate = audioCtx.sampleRate;
+    const length = sampleRate * duration;
+
+    let buffer = audioCtx.createBuffer(1, length, sampleRate);
+    let data = buffer.getChannelData(0);
+
+    for (let i = 0; i < length; i++) {
+        let t = i / sampleRate;
+        let freq = 2000 + (6000 * t / duration);
+        data[i] = Math.sin(2 * Math.PI * freq * t);
+    }
+
+    let source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioCtx.destination);
+    source.start();
+}
+
+// 🎯 Capture
+async function capture() {
+    recordedData = [];
+
+    playChirp();
+
+    await new Promise(r => setTimeout(r, 400));
+
+    return recordedData.slice();
+}
+
+// 📊 Feature extraction
+function extractFeature(signal) {
+    let step = 200;
+    let features = [];
+
+    for (let i = 0; i < signal.length; i += step) {
+        let chunk = signal.slice(i, i + step);
+        let energy = 0;
+
+        for (let j = 0; j < chunk.length; j++) {
+            energy += chunk[j] * chunk[j];
+        }
+
+        features.push(energy);
+    }
+
+    return features;
+}
+
+// 🔁 Compare
+function compare(a, b) {
+    let diff = 0;
+
+    for (let i = 0; i < Math.min(a.length, b.length); i++) {
+        diff += Math.abs(a[i] - b[i]);
+    }
+
+    return 1 / (1 + diff);
+}
+
+// 🎓 Learn
+async function learn() {
+    let name = document.getElementById("coinName").value.trim();
+    if (!name) return alert("Enter coin name");
+
+    setStatus("Learning " + name + "...");
+
+    let signal = await capture();
+    let feature = extractFeature(signal);
+
+    if (!database[name]) database[name] = [];
+    database[name].push(feature);
+
+    setStatus(name + " learned (" + database[name].length + ")");
+}
+
+// 🔍 Detect
+async function detect() {
+    if (Object.keys(database).length === 0) {
+        alert("Train first!");
+        return;
+    }
+
+    setStatus("Detecting...");
+
+    let signal = await capture();
+    let feature = extractFeature(signal);
+
+    let best = "Unknown";
+    let bestScore = 0;
+
+    for (let coin in database) {
+        for (let sample of database[coin]) {
+            let score = compare(feature, sample);
+
+            if (score > bestScore) {
+                bestScore = score;
+                best = coin;
+            }
+        }
+    }
+
+    if (bestScore > 0.6) {
+        document.getElementById("result").innerText = best;
+        setStatus("Match: " + (bestScore * 100).toFixed(1) + "%");
+    } else {
+        document.getElementById("result").innerText = "Not Recognized";
+        setStatus("Low confidence");
+    }
+}
+</script>
+
+</body>
+</html>
