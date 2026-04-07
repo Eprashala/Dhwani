@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dhwani Acoustic Reader V4</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a1a; color: #f0f0f0; padding: 20px; max-width: 600px; margin: auto; }
+        .card { background: #2a2a2a; padding: 20px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); margin-bottom: 20px; border: 1px solid #444; }
+        h2 { border-bottom: 2px solid #555; padding-bottom: 5px; color: #fff; margin-top: 0; }
+        button { background: #007bff; color: white; border: none; padding: 12px 15px; border-radius: 4px; cursor: pointer; font-size: 16px; margin-top: 10px; font-weight: bold; width: 100%; transition: 0.2s; }
+        button:hover { background: #0056b3; }
+        .btn-green { background: #28a745; }
+        .btn-green:hover { background: #218838; }
+        input[type="text"] { padding: 12px; width: calc(100% - 26px); margin-bottom: 10px; border: 1px solid #555; border-radius: 4px; font-size: 16px; background: #333; color: white; }
+        #status { font-weight: bold; color: #ffc107; margin-top: 10px; text-align: center; font-size: 18px; }
+        canvas { width: 100%; height: 120px; background: #000; border-radius: 4px; margin-top: 15px; border: 1px solid #444; }
+        #resultDisplay { text-align: center; font-size: 28px; margin-top: 15px; font-weight: bold; }
+        .db-list { margin-top: 15px; font-size: 14px; color: #aaa; }
+    </style>
+</head>
+<body>
+
+    <h1 style="text-align: center; color: #007bff;">Dhwani PoC V4</h1>
+    <div id="status">Status: Awaiting Initialization</div>
+
+    <div class="card">
+        <h2>Acoustic Spectrum</h2>
+        <p style="font-size: 12px; color: #888;">Ensure the graph peaks remain stable. Use a physical 1cm spacer.</p>
+        <canvas id="visualizer"></canvas>
+    </div>
+
+    <div class="card" id="identifierModule">
+        <h2>1. Identify Coin</h2>
+        <button onclick="detectCoin()" class="btn-green">🔊 Scan & Identify</button>
+        <div id="resultDisplay">--</div>
+    </div>
+
+    <div class="card" id="learnerModule">
+        <h2>2. Train New Coin</h2>
+        <input type="text" id="coinName" placeholder="Name (e.g., Rs 5)">
+        <button onclick="learnCoin()">🎙️ Capture Profile</button>
+        <div class="db-list" id="dbStats">Learned Profiles: 0</div>
+        <button onclick="clearDatabase()" style="background: #dc3545; margin-top: 20px;">🗑️ Wipe Database</button>
+    </div>
+
+<script>
+    let audioCtx;
+    let analyser;
+    let canvas = document.getElementById('visualizer');
+    let canvasCtx = canvas.getContext('2d');
+    
+    // Store data in localStorage
+    let coinDatabase = JSON.parse(localStorage.getItem('dhwaniDB_v4')) || {};
+    updateDBStats();
+
+    // --- Core Audio Initialization ---
+    async function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+            
+            const source = audioCtx.createMediaStreamSource(micStream);
+            analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 2048; 
+            analyser.smoothingTimeConstant = 0.1; 
+            
+            // Set threshold limits to ignore background room noise
+            analyser.minDecibels = -85;
+            analyser.maxDecibels = -25;
+            
+            source.connect(analyser);
+        }
+        if (audioCtx.state === 'suspended') await audioCtx.resume();
+    }
+
+    // --- Emit Chirp and Capture Byte Data ---
+    async function captureAcousticSignature() {
+        await initAudio();
+        return new Promise((resolve) => {
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            osc.type = 'sine';
+            const now = audioCtx.currentTime;
+            
+            // Sweep from 10kHz to 18kHz
+            osc.frequency.setValueAtTime(10000, now);
+            osc.frequency.exponentialRampToValueAtTime(18000, now + 0.1);
+            
+            osc.start(now);
+            osc.stop(now + 0.1);
+
+            setTimeout(() => {
+                // IMPORTANT FIX: Using Byte array (0-255) instead of Float (Decibels)
+                const dataArray = new Uint8Array(analyser.frequencyBinCount);
+                analyser.getByteFrequencyData(dataArray);
+                
+                // Isolate high frequencies (bins ~400 to 800)
+                const highFreqData = Array.from(dataArray).slice(400, 800); 
+                drawVisualizer(highFreqData);
+                resolve(highFreqData);
+            }, 60); 
+        });
+    }
+
+    // --- Draw the Soundwave ---
+    function drawVisualizer(dataArray) {
+        canvasCtx.fillStyle = 'rgb(0, 0, 0)';
+        canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        const barWidth = (canvas.width / dataArray.length) * 2.5;
+        let barHeight;
+        let x = 0;
+
+        for(let i = 0; i < dataArray.length; i++) {
+            barHeight = dataArray[i] / 2; // Scale down to fit canvas
+            canvasCtx.fillStyle = `rgb(${barHeight + 100}, 50, 255)`;
+            canvasCtx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+            x += barWidth + 1;
+        }
+    }
+
+    // --- Learn Function ---
+    async function learnCoin() {
+        const name = document.getElementById('coinName').value.trim();
+        if (!name) return alert("Enter a name first.");
+        
+        setStatus(`Capturing ${name}... Hold still.`, "#007bff");
+        
+        let signature = await captureAcousticSignature();
+
+        if (!coinDatabase[name]) coinDatabase[name] = [];
+        coinDatabase[name].push(signature);
+        
+        localStorage.setItem('dhwaniDB_v4', JSON.stringify(coinDatabase));
+        updateDBStats();
+        setStatus(`Saved ${name}! (${coinDatabase[name].length} variations)`, "#28a745");
+        document.getElementById('coinName').value = '';
+    }
+
+    // --- Detect Function ---
+    async function detectCoin() {
+        if (Object.keys(coinDatabase).length === 0) return setStatus("Database empty.", "#dc3545");
+
+        setStatus("Analyzing...", "#007bff");
+        const liveSignature = await captureAcousticSignature();
+        
+        let bestMatch = "Unknown";
+        let highestScore = -1;
+
+        for (const [coinName, profiles] of Object.entries(coinDatabase)) {
+            for (const savedProfile of profiles) {
+                let score = cosineSimilarity(liveSignature, savedProfile);
+                if (score > highestScore) {
+                    highestScore = score;
+                    bestMatch = coinName;
+                }
+            }
+        }
+
+        // Display Results
+        if (highestScore > 0.94) { // 94% Threshold for Byte Data
+            document.getElementById('resultDisplay').innerText = bestMatch;
+            document.getElementById('resultDisplay').style.color = "#28a745";
+            speakAloud(bestMatch);
+            setStatus(`Match: ${(highestScore*100).toFixed(1)}%`, "#28a745");
+        } else {
+            document.getElementById('resultDisplay').innerText = "No Match";
+            document.getElementById('resultDisplay').style.color = "#dc3545";
+            speakAloud("Unrecognized Object");
+            setStatus(`Too low: ${(highestScore*100).toFixed(1)}%`, "#dc3545");
+        }
+    }
+
+    // --- Math: Cosine Similarity ---
+    function cosineSimilarity(A, B) {
+        let dotProduct = 0, normA = 0, normB = 0;
+        for (let i = 0; i < A.length; i++) {
+            dotProduct += A[i] * B[i];
+            normA += A[i] * A[i];
+            normB += B[i] * B[i];
+        }
+        if (normA === 0 || normB === 0) return 0;
+        return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    }
+
+    function speakAloud(text) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        window.speechSynthesis.speak(utterance);
+    }
+
+    function updateDBStats() {
+        let count = 0;
+        for (let coin in coinDatabase) count += coinDatabase[coin].length;
+        document.getElementById('dbStats').innerText = `Learned Profiles: ${count} total across ${Object.keys(coinDatabase).length} coin types.`;
+    }
+
+    function clearDatabase() {
+        if(confirm("Wipe all data?")) {
+            coinDatabase = {};
+            localStorage.removeItem('dhwaniDB_v4');
+            updateDBStats();
+            setStatus("Database wiped.", "#dc3545");
+            document.getElementById('resultDisplay').innerText = "--";
+            canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+    }
+
+    function setStatus(msg, color) {
+        const el = document.getElementById('status');
+        el.innerText = msg;
+        el.style.color = color;
+    }
+</script>
+</body>
+</html>
