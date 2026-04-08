@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>प्रगत वैदिक पंचांग आणि उत्सव - गुरुजी</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.8.0/suncalc.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Baloo+Bhai+2:wght@400;600;700&family=Mukta:wght@300;400;600;700&display=swap');
+        
+        body { 
+            font-family: 'Mukta', sans-serif; 
+            background-color: #fffaf0; 
+            background-image: url('https://www.transparenttextures.com/patterns/cream-paper.png');
+        }
+        h1, h2, h3, .title-font { font-family: 'Baloo Bhai 2', sans-serif; line-height: 1.4; }
+        
+        .bhagwa-gradient { background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%); }
+        .gold-gradient { background: linear-gradient(135deg, #fef08a 0%, #f59e0b 100%); }
+        
+        .card {
+            background: white;
+            border-top: 4px solid #ea580c;
+            box-shadow: 0 10px 25px -5px rgba(234, 88, 12, 0.1), 0 8px 10px -6px rgba(234, 88, 12, 0.1);
+        }
+        
+        .festival-card {
+            background: linear-gradient(to right bottom, #fffbeb, #fef3c7);
+            border: 2px solid #f59e0b;
+            box-shadow: 0 10px 25px -5px rgba(245, 158, 11, 0.2);
+        }
+        
+        .suggestions-box {
+            position: absolute; top: 100%; left: 0; right: 0;
+            background: white; border: 1px solid #ea580c;
+            border-radius: 0.5rem; z-index: 50; max-height: 200px;
+            overflow-y: auto; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+        .suggestion-item { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #fbd38d; }
+        .suggestion-item:hover { background-color: #fffaf0; color: #ea580c; font-weight: bold; }
+        
+        .loader {
+            border: 4px solid #fed7aa; border-top: 4px solid #ea580c;
+            border-radius: 50%; width: 40px; height: 40px;
+            animation: spin 1s linear infinite; display: none;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="text-gray-800 min-h-screen pb-10">
+
+    <header class="bhagwa-gradient text-white py-6 shadow-lg mb-8 text-center">
+        <div class="container mx-auto px-4">
+            <h1 class="text-4xl md:text-5xl font-bold mb-2">संपूर्ण वैदिक पंचांग आणि उत्सव</h1>
+            <p class="text-orange-100 text-lg">।। श्री गणेशाय नमः ।। धर्मशास्त्र आणि खगोलविज्ञानावर आधारित</p>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-4 max-w-6xl">
+
+        <div class="card rounded-xl p-5 mb-8 bg-gradient-to-r from-orange-50 to-white flex flex-col md:flex-row justify-between items-center border border-orange-200">
+            <div class="text-center md:text-left mb-4 md:mb-0 w-full md:w-1/2 border-b md:border-b-0 md:border-r border-orange-200 pr-4">
+                <h3 class="text-orange-800 font-bold title-font text-xl mb-1">सध्याची वेळ (इंग्रजी)</h3>
+                <p id="clock-gregorian" class="text-2xl font-semibold text-gray-800 tracking-wide"></p>
+            </div>
+            <div class="text-center md:text-right w-full md:w-1/2 pl-4">
+                <h3 class="text-orange-800 font-bold title-font text-xl mb-1">सध्याची वेळ (हिंदू वैदिक)</h3>
+                <p id="clock-hindu" class="text-lg font-bold text-red-700"></p>
+                <p class="text-sm text-gray-600 mt-1">सूर्योदयापासून मोजलेली: घटी (२४ मि), पळे (२४ से), निमिष</p>
+            </div>
+        </div>
+        
+        <div class="card rounded-xl p-6 mb-8 text-center relative">
+            <p class="mb-6 text-gray-600 font-medium text-lg">दिनांक आणि शहर प्रविष्ट करा</p>
+            <div class="flex flex-col md:flex-row gap-4 justify-center items-center relative w-full md:w-3/4 mx-auto">
+                <input type="date" id="dateInput" class="w-full md:w-1/3 px-4 py-3 border border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 bg-orange-50 font-semibold outline-none">
+                
+                <div class="relative w-full md:w-1/3">
+                    <input type="text" id="cityInput" placeholder="शहराचे नाव टाईप करा..." autocomplete="off" class="w-full px-4 py-3 border border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 bg-orange-50 font-semibold outline-none">
+                    <div id="suggestions" class="suggestions-box text-left"></div>
+                </div>
+
+                <button onclick="generatePanchang()" class="w-full md:w-1/3 bhagwa-gradient text-white px-8 py-3 rounded-lg font-bold hover:shadow-lg transition-transform transform hover:-translate-y-1">पंचांग पहा</button>
+            </div>
+            <div id="loading" class="mt-6 flex justify-center"><div class="loader"></div></div>
+            <p id="error-msg" class="text-red-500 mt-4 font-bold hidden"></p>
+        </div>
+
+        <div id="results" class="hidden space-y-6">
+            
+            <div class="text-center mb-6 border-b-2 border-orange-200 pb-4">
+                <h2 id="display-date-city" class="text-3xl font-bold text-orange-700 title-font mb-2"></h2>
+                <p class="text-gray-600 font-semibold text-lg">अक्षांश: <span id="r-lat" class="text-gray-800"></span> | रेखांश: <span id="r-lon" class="text-gray-800"></span></p>
+            </div>
+
+            <div id="festival-section" class="hidden mb-6 festival-card rounded-xl p-6 relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-4 opacity-20">
+                    <svg width="100" height="100" viewBox="0 0 24 24" fill="currentColor" class="text-orange-600"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+                </div>
+                <h2 class="text-3xl font-bold text-orange-800 mb-2 title-font" id="fest-name">सणाचे नाव</h2>
+                <p class="text-gray-700 mb-4 font-medium text-lg border-b border-orange-300 pb-2" id="fest-cause"></p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div class="bg-white/60 p-4 rounded-lg border border-orange-200">
+                        <h4 class="font-bold text-orange-700 mb-1">📜 प्राचीन संदर्भ:</h4>
+                        <p class="text-sm text-gray-800" id="fest-ancient"></p>
+                    </div>
+                    <div class="bg-white/60 p-4 rounded-lg border border-orange-200">
+                        <h4 class="font-bold text-blue-700 mb-1">🔬 वैज्ञानिक आणि खगोलशास्त्रीय महत्त्व:</h4>
+                        <p class="text-sm text-gray-800" id="fest-science"></p>
+                    </div>
+                </div>
+                
+                <div class="bg-green-100 p-4 rounded-lg border border-green-300">
+                    <h4 class="font-bold text-green-800 mb-1 text-lg">✅ आजच्या दिवशी हे नक्की करा (शुभ फळे):</h4>
+                    <p class="text-green-900 font-medium" id="fest-goodfor"></p>
+                </div>
+            </div>
+
+            <div class="card p-5 rounded-xl bg-orange-100/50 border border-orange-200 mb-6 text-center shadow-inner">
+                <h3 class="text-xl text-orange-800 font-bold mb-3 title-font">वैदिक संवत्सर आणि मास</h3>
+                <div class="flex flex-wrap justify-center gap-4 text-sm md:text-base font-semibold text-gray-800">
+                    <span class="bg-white px-4 py-2 rounded-lg shadow-sm border border-orange-100">विक्रम संवत: <span id="r-vikram" class="text-orange-700"></span></span>
+                    <span class="bg-white px-4 py-2 rounded-lg shadow-sm border border-orange-100">शक संवत: <span id="r-shaka" class="text-orange-700"></span></span>
+                    <span class="bg-white px-4 py-2 rounded-lg shadow-sm border border-orange-100">अयन: <span id="r-ayana" class="text-orange-700"></span></span>
+                    <span class="bg-white px-4 py-2 rounded-lg shadow-sm border border-orange-100">ऋतू: <span id="r-ritu" class="text-orange-700"></span></span>
+                    <span class="bg-white px-4 py-2 rounded-lg shadow-sm border border-orange-100">मास: <span id="r-maas" class="text-orange-700"></span></span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="card p-4 rounded-xl text-center">
+                    <h3 class="text-orange-600 font-bold mb-2 border-b border-orange-100 pb-1 title-font">सूर्य व चंद्र काळ</h3>
+                    <p class="text-sm mb-2">सूर्योदय: <br><span id="r-sunrise" class="font-bold text-gray-900 text-base"></span></p>
+                    <p class="text-sm mb-2">सूर्यास्त: <br><span id="r-sunset" class="font-bold text-gray-900 text-base"></span></p>
+                    <p class="text-sm text-blue-800 mb-2">चंद्रोदय: <br><span id="r-moonrise" class="font-bold text-base"></span></p>
+                    <p class="text-sm text-blue-800">चंद्रास्त: <br><span id="r-moonset" class="font-bold text-base"></span></p>
+                </div>
+                <div class="card p-4 rounded-xl text-center">
+                    <h3 class="text-orange-600 font-bold mb-2 border-b border-orange-100 pb-1 title-font">पंचांग अंग</h3>
+                    <p class="text-sm mb-1">तिथी: <span id="r-tithi" class="font-bold text-gray-900"></span></p>
+                    <p class="text-sm mb-1">नक्षत्र: <span id="r-nakshatra" class="font-bold text-gray-900"></span></p>
+                    <p class="text-sm mb-1">योग: <span id="r-yoga" class="font-bold text-gray-900"></span></p>
+                    <p class="text-sm">वार: <span id="r-vaar" class="font-bold text-gray-900"></span></p>
+                </div>
+                <div class="card p-4 rounded-xl text-center">
+                    <h3 class="text-orange-600 font-bold mb-2 border-b border-orange-100 pb-1 title-font">राशी आणि करण</h3>
+                    <p class="text-sm mb-1">सूर्य रास: <span id="r-sunsign" class="font-bold text-orange-700"></span></p>
+                    <p class="text-sm mb-1">चंद्र रास: <span id="r-moonsign" class="font-bold text-blue-700"></span></p>
+                    <p class="text-sm mb-1">१ले करण: <span id="r-karana1" class="font-bold text-gray-900"></span></p>
+                    <p class="text-sm">२रे करण: <span id="r-karana2" class="font-bold text-gray-900"></span></p>
+                </div>
+                <div class="card p-4 rounded-xl text-center bg-orange-50">
+                    <h3 class="text-red-600 font-bold mb-2 border-b border-red-200 pb-1 title-font">विशेष योग</h3>
+                    <p class="text-sm font-medium mb-1">विष्टी (भद्रा काळ): <br><span id="r-bhadra" class="text-red-700 font-bold"></span></p>
+                    <p class="text-sm font-medium mt-2">ग्रहण योग: <br><span id="r-grahan" class="text-gray-700 font-bold"></span></p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                <div class="card p-5 rounded-xl bg-green-50 border-t-4 border-green-500">
+                    <h3 class="text-2xl text-green-800 mb-4 border-b border-green-200 pb-2 title-font">शुभ काळ आणि फळे</h3>
+                    
+                    <div class="mb-4 bg-white p-4 rounded-lg border border-green-200 shadow-sm">
+                        <div class="flex flex-col xl:flex-row xl:justify-between font-bold text-green-800 text-lg border-b border-green-100 pb-2">
+                            <span>अभिजित मुहूर्त:</span> <span id="t-abhijit"></span>
+                        </div>
+                        <p class="text-sm text-green-700 mt-2"><strong>लाभ:</strong> घर खरेदी, वाहन खरेदी, वास्तू शांती यासाठी अतिशय लाभदायक.</p>
+                    </div>
+
+                    <h4 class="font-bold text-gray-800 mb-3 mt-4 text-lg title-font">शुभ चौघडिया (दिवसाचे):</h4>
+                    <p class="text-xs text-red-600 mb-3 font-semibold">* टीप: ज्योतिष शास्त्रानुसार, जर चौघडियाची वेळ राहु/यमगंडशी ओव्हरलॅप होत असेल तर ती अशुभ मानली जाते.</p>
+                    <div id="choghadiya-list" class="space-y-3"></div>
+                </div>
+
+                <div class="card p-5 rounded-xl bg-red-50 border-t-4 border-red-500">
+                    <h3 class="text-2xl text-red-800 mb-4 border-b border-red-200 pb-2 title-font">अशुभ काळ आणि शास्त्रोक्त उपाय</h3>
+                    <div class="space-y-4">
+                        <div class="bg-white p-4 rounded-lg border border-red-200 shadow-sm">
+                            <div class="flex flex-col xl:flex-row xl:justify-between font-bold text-red-800 text-lg border-b border-red-100 pb-2">
+                                <span>राहु काळ:</span> <span id="t-rahu"></span>
+                            </div>
+                            <p class="text-sm mt-2 text-gray-800"><strong>❌ पूर्णपणे टाळा:</strong> नवीन व्यवसाय, विवाह, प्रवासाची सुरुवात.</p>
+                            <div class="mt-2 p-2 bg-orange-50 rounded border border-orange-100">
+                                <p class="text-sm text-orange-800 font-bold">📿 उपाय:</p>
+                                <p class="text-xs text-orange-700">स्कंद पुराणानुसार 'कालभैरव अष्टक' पठण करावे.</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-4 rounded-lg border border-red-200 shadow-sm">
+                            <div class="flex flex-col xl:flex-row xl:justify-between font-bold text-red-800 text-lg border-b border-red-100 pb-2">
+                                <span>यमगंड:</span> <span id="t-yama"></span>
+                            </div>
+                            <p class="text-sm mt-2 text-gray-800"><strong>❌ पूर्णपणे टाळा:</strong> वैद्यकीय उपचार सुरू करणे, शस्त्रक्रिया.</p>
+                            <div class="mt-2 p-2 bg-orange-50 rounded border border-orange-100">
+                                <p class="text-sm text-orange-800 font-bold">📿 उपाय:</p>
+                                <p class="text-xs text-orange-700">महाभारत (अनुशासन पर्व) नुसार 'विष्णु सहस्रनाम' पठण करावे.</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-4 rounded-lg border border-red-200 shadow-sm">
+                            <div class="flex flex-col xl:flex-row xl:justify-between font-bold text-red-800 text-lg border-b border-red-100 pb-2">
+                                <span>गुलिक काळ:</span> <span id="t-gulika"></span>
+                            </div>
+                            <p class="text-sm mt-2 text-gray-800"><strong>❌ पूर्णपणे टाळा:</strong> कर्ज घेणे, अंत्यसंस्काराची कामे.</p>
+                            <div class="mt-2 p-2 bg-orange-50 rounded border border-orange-100">
+                                <p class="text-sm text-orange-800 font-bold">📿 उपाय:</p>
+                                <p class="text-xs text-orange-700">शिव पुराणानुसार 'महामृत्युंजय मंत्राचा' जप करावा.</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-4 rounded-lg border border-red-200 shadow-sm">
+                            <div class="flex flex-col xl:flex-row xl:justify-between font-bold text-red-800 text-lg border-b border-red-100 pb-2">
+                                <span>दुर्मुहूर्त:</span> <span id="t-duru"></span>
+                            </div>
+                            <p class="text-sm mt-2 text-gray-800"><strong>❌ टाळा:</strong> कोणतेही शुभ किंवा मांगलिक कार्य.</p>
+                            <div class="mt-2 p-2 bg-orange-50 rounded border border-orange-100">
+                                <p class="text-sm text-orange-800 font-bold">📿 उपाय:</p>
+                                <p class="text-xs text-orange-700">श्रीमद्भागवत पुराणानुसार भगवान नृसिंहाचे स्मरण करावे.</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-4 rounded-lg border border-red-200 shadow-sm">
+                            <div class="flex flex-col xl:flex-row xl:justify-between font-bold text-red-800 text-lg border-b border-red-100 pb-2">
+                                <span>अर्ध प्रहर:</span> <span id="t-ardha"></span>
+                            </div>
+                            <p class="text-sm mt-2 text-gray-800"><strong>⚠️ सावधान:</strong> महत्त्वाचे निर्णय घेऊ नयेत.</p>
+                            <div class="mt-2 p-2 bg-orange-50 rounded border border-orange-100">
+                                <p class="text-sm text-orange-800 font-bold">📿 उपाय:</p>
+                                <p class="text-xs text-orange-700">भविष्य पुराणानुसार भगवान सूर्याची उपासना करावी ('आदित्य हृदय स्तोत्र').</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-4 rounded-lg border border-red-200 shadow-sm">
+                            <div class="flex flex-col xl:flex-row xl:justify-between font-bold text-red-800 text-lg border-b border-red-100 pb-2">
+                                <span>मृत्यू काळ:</span> <span id="t-mrityu"></span>
+                            </div>
+                            <p class="text-sm mt-2 text-gray-800"><strong>❌ टाळा:</strong> प्रवास आणि कोणत्याही नवीन कामाची सुरुवात.</p>
+                            <div class="mt-2 p-2 bg-orange-50 rounded border border-orange-100">
+                                <p class="text-sm text-orange-800 font-bold">📿 उपाय:</p>
+                                <p class="text-xs text-orange-700">लिंग पुराणानुसार 'रुद्र गायत्री मंत्र' किंवा 'ॐ नमः शिवाय' जप करावा.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('dateInput').valueAsDate = new Date();
+
+        // --- LOCAL STORAGE KEYS ---
+        const STORAGE_KEY_CITY = 'panchang_last_city';
+        const STORAGE_KEY_LAT = 'panchang_last_lat';
+        const STORAGE_KEY_LON = 'panchang_last_lon';
+
+        const TITHIS = ["प्रतिपदा", "द्वितीया", "तृतीया", "चतुर्थी", "पंचमी", "षष्ठी", "सप्तमी", "अष्टमी", "नवमी", "दशमी", "एकादशी", "द्वादशी", "त्रयोदशी", "चतुर्दशी", "पौर्णिमा", "प्रतिपदा", "द्वितीया", "तृतीया", "चतुर्थी", "पंचमी", "षष्ठी", "सप्तमी", "अष्टमी", "नवमी", "दशमी", "एकादशी", "द्वादशी", "त्रयोदशी", "चतुर्दशी", "अमावास्या"];
+        const NAKSHATRAS = ["अश्विनी", "भरणी", "कृत्तिका", "रोहिणी", "मृगशीर्ष", "आर्द्रा", "पुनर्वसु", "पुष्य", "आश्लेषा", "मघा", "पूर्वा फाल्गुनी", "उत्तरा फाल्गुनी", "हस्त", "चित्रा", "स्वाती", "विशाखा", "अनुराधा", "ज्येष्ठा", "मूळ", "पूर्वाषाढा", "उत्तराषाढा", "श्रवण", "धनिष्ठा", "शततारका", "पूर्वा भाद्रपदा", "उत्तरा भाद्रपदा", "रेवती"];
+        const RASHIS = ["मेष", "वृषभ", "मिथुन", "कर्क", "सिंह", "कन्या", "तूळ", "वृश्चिक", "धनु", "मकर", "कुंभ", "मीन"];
+        const YOGAS = ["विष्कंभ", "प्रीती", "आयुष्मान", "सौभाग्य", "शोभन", "अतिगंड", "सुकर्मा", "धृती", "शूल", "गंड", "वृद्धी", "ध्रुव", "व्याघात", "हर्षण", "वज्र", "सिद्धी", "व्यतिपात", "वरीयान", "परिघ", "शिव", "सिद्ध", "साध्य", "शुभ", "शुक्ल", "ब्रह्म", "ऐंद्र", "वैधृती"];
+        const KARANAS = ["बव", "बालव", "कौलव", "तैतिल", "गर", "वणिज", "विष्टी", "शकुनी", "चतुष्पाद", "नाग", "किंस्तुघ्न"];
+        const VAAR = ["रविवार", "सोमवार", "मंगळवार", "बुधवार", "गुरुवार", "शुक्रवार", "शनिवार"];
+        const MONTHS = ["चैत्र", "वैशाख", "ज्येष्ठ", "आषाढ", "श्रावण", "भाद्रपद", "अश्विन", "कार्तिक", "मार्गशीर्ष", "पौष", "माघ", "फाल्गुन"];
+        const CHOGHADIYA_NAMES = ["उद्वेग", "चल", "लाभ", "अमृत", "काळ", "शुभ", "रोग"];
+        
+        const CHOGHADIYA_BENEFITS = {
+            "अमृत": "वाहने खरेदी, प्रवास, विद्यारंभ आणि शुभ कामे करण्यासाठी सर्वोत्तम.",
+            "शुभ": "विवाह, वास्तू शांती, देवकार्य, आणि नवीन घर खरेदीसाठी लाभदायक.",
+            "लाभ": "आर्थिक व्यवहार, नवीन व्यवसाय सुरू करणे, आणि गुंतवणुकीसाठी फायदेशीर."
+        };
+
+        // --- FESTIVAL DATABASE ---
+        const FESTIVALS = {
+            "चैत्र_शुक्ल पक्ष_प्रतिपदा": {
+                name: "गुढीपाडवा (हिंदू नववर्ष)",
+                cause: "ब्रह्मदेवाने सृष्टीची निर्मिती केली आणि प्रभू श्रीराम अयोध्येत परतले तो हा मंगल दिवस.",
+                ancient: "ब्रह्म पुराण (चैत्र माहात्म्य) आणि हेमाद्रीचा चतुर्वर्ग चिंतामणी.",
+                science: "वसंत ऋतूची सुरुवात. कडुनिंबाच्या पानांचे सेवन आरोग्यासाठी आणि रक्तशुद्धीसाठी अतिशय लाभदायक असते.",
+                goodFor: "वर्षाचा संकल्प करणे, सोने खरेदी, नवीन व्यवसाय सुरू करणे, घर/वाहन खरेदी."
+            },
+            "चैत्र_शुक्ल पक्ष_नवमी": {
+                name: "श्री राम नवमी",
+                cause: "मर्यादा पुरुषोत्तम प्रभू श्री रामांचा जन्मदिवस.",
+                ancient: "वाल्मिकी रामायण (बालकांड) आणि अग्नी पुराण.",
+                science: "सूर्याची प्रखरता वाढत असते, त्यामुळे उपवास आणि हलका आहार पचनसंस्थेसाठी उत्तम मानला जातो.",
+                goodFor: "रामरक्षा स्तोत्र पठण, दान-धर्म, आध्यात्मिक संकल्प, and नवीन विद्याभ्यास सुरू करणे."
+            },
+            "वैशाख_शुक्ल पक्ष_तृतीया": {
+                name: "अक्षय्य तृतीया",
+                cause: "त्रेतायुगाचा आरंभ, परशुराम जयंती आणि महर्षी व्यासांनी महाभारत लिहायला सुरुवात केली तो दिवस.",
+                ancient: "भविष्य पुराण आणि मदनरत्न.",
+                science: "या दिवशी सूर्य आणि चंद्र दोन्ही त्यांच्या 'उच्च' राशीत आणि सर्वाधिक प्रखर अवस्थेत असतात, जे ऊर्जेचे प्रतीक आहे.",
+                goodFor: "सुवर्ण खरेदी, शाश्वत गुंतवणूक, विवाह, दान (विशेषतः जलदान), आणि गृहप्रवेश."
+            },
+            "ज्येष्ठ_शुक्ल पक्ष_पौर्णिमा": {
+                name: "वटपौर्णिमा",
+                cause: "सावित्रीने आपल्या तपस्येने सत्यवानाचे प्राण यमाकडून परत आणले.",
+                ancient: "महाभारत (वनपर्व - सावित्री-सत्यवान आख्यान).",
+                science: "वटवृक्ष (Banyan Tree) हा सर्वाधिक ऑक्सिजन आणि सावली देणारा वृक्ष आहे. निसर्गाप्रती कृतज्ञता व्यक्त करण्याचा हा दिवस.",
+                goodFor: "वृक्षारोपण, सौभाग्याचे वाण देणे, आणि आरोग्यदायी संकल्प करणे."
+            },
+            "श्रावण_शुक्ल पक्ष_पौर्णिमा": {
+                name: "रक्षाबंधन / नारळी पौर्णिमा",
+                cause: "बहीण-भावाच्या पवित्र प्रेमाचा सण आणि समुद्रदेवतेची कृतज्ञता.",
+                ancient: "भविष्य पुराण (इंद्राणीने इंद्राला राखी बांधली).",
+                science: "पावसाळ्याचा जोर कमी होऊन समुद्र शांत होतो, त्यामुळे कोळी बांधव मासेमारीसाठी पुन्हा सुरुवात करतात.",
+                goodFor: "कौटुंबिक सलोखा वाढवणे, नवीन करारांवर सह्या करणे, आणि संरक्षण/विमा क्षेत्रातील गुंतवणूक."
+            },
+            "श्रावण_कृष्ण पक्ष_अष्टमी": {
+                name: "श्रीकृष्ण जन्माष्टमी",
+                cause: "भगवान श्रीकृष्णाचा मथुरा येथे जन्म.",
+                ancient: "श्रीमद्भागवत पुराण (दशम स्कंध).",
+                science: "पावसाळ्याच्या मध्यभागी येणारा हा सण, उपवासातून शरीर शुद्धी आणि दहिकाला/गोपाळकाल्यातून सात्विक पोषण देतो.",
+                goodFor: "गीतेचे वाचन, नवीन कला शिकणे, मुलांच्या शिक्षणाची सुरुवात आणि दुग्धव्यवसायात गुंतवणूक."
+            },
+            "भाद्रपद_शुक्ल पक्ष_चतुर्थी": {
+                name: "गणेश चतुर्थी",
+                cause: "बुद्धी आणि विघ्नहर्ता भगवान श्री गणेशाचा प्रकट दिन.",
+                ancient: "गणेश पुराण आणि मुद्गल पुराण.",
+                science: "पावसाळ्यात नद्यांच्या काठची माती आणून मूर्ती बनवणे आणि विसर्जन करणे यातून जलसंवर्धन आणि निसर्गचक्राचे पालन होते.",
+                goodFor: "नवीन विद्येचा आरंभ, गृहप्रवेश, नवीन वाहन खरेदी आणि कोणत्याही शुभ कार्याचा श्रीगणेशा."
+            },
+            "अश्विन_शुक्ल पक्ष_दशमी": {
+                name: "विजयादशमी (दसरा)",
+                cause: "प्रभू श्रीरामांचा रावणावर विजय आणि देवी दुर्गेने महिषासुराचा वध केला.",
+                ancient: "रामायण आणि देवी भागवत पुराण.",
+                science: "पावसाळा संपून शरद ऋतूचा उत्तम काळ सुरू होतो. पूर्वीच्या काळी युद्धासाठी आणि व्यापारासाठी हा काळ पोषक असायचा (सीमोल्लंघन).",
+                goodFor: "शस्त्र पूजा, वाहन पूजा, नवीन मालमत्ता खरेदी, नवीन नोकरी/व्यवसाय सुरू करणे (साडेतीन मुहूर्तांपैकी एक)."
+            },
+            "अश्विन_कृष्ण पक्ष_अमावास्या": {
+                name: "लक्ष्मीपूजन (दिवाळी)",
+                cause: "समुद्रमंथनातून माता लक्ष्मीचे प्रकटीकरण आणि रामांचे अयोध्येत आगमन.",
+                ancient: "पद्म पुराण आणि कार्तिक माहात्म्य.",
+                science: "थंडीची सुरुवात असते. दिव्यांच्या उष्णतेने आणि सुगंधी उटण्याने शरीराला ऊर्जा मिळते. तसेच दिव्यांमुळे पावसाळी कीटकांचा नाश होतो.",
+                goodFor: "चोपडी पूजन (नवीन हिशोब सुरू करणे), आर्थिक गुंतवणूक, सोन्याची खरेदी आणि वास्तूमध्ये सकारात्मक बदल."
+            },
+            "फाल्गुन_शुक्ल पक्ष_पौर्णिमा": {
+                name: "होळी / हुताशनी पौर्णिमा",
+                cause: "भक्त प्रल्हादाचे रक्षण आणि होलिका दहन.",
+                ancient: "विष्णु पुराण आणि नारद पुराण.",
+                science: "हिवाळा संपून उन्हाळ्याची चाहूल लागते. होळीच्या अग्नीमुळे वातावरणातील जंतू नष्ट होतात आणि हवेची शुद्धी होते.",
+                goodFor: "नकारात्मक विचार सोडून देणे, जुन्या वादांवर पडदा टाकणे, आणि मानसिक शांतीचे उपाय करणे."
+            }
+        };
+
+        const SOLAR_FESTIVALS = {
+            "मकर संक्रांती": {
+                name: "मकर संक्रांती",
+                cause: "सूर्यदेवाचे मकर राशीत (उत्तरायण) संक्रमण.",
+                ancient: "सूर्य सिद्धांत आणि महाभारत (भीष्म पितामहांनी देहत्यागासाठी हाच काळ निवडला).",
+                science: "सूर्य उत्तरेकडे सरकतो, ज्यामुळे दिवसाचा कालावधी वाढतो. थंडीत शरीराला उष्णता देण्यासाठी तीळ-गुळाचे सेवन अत्यंत वैज्ञानिक आहे.",
+                goodFor: "तीळ-गुळाचे दान, सूर्यनमस्कार, नवीन शेती किंवा जमिनीची खरेदी, आणि वडीलधाऱ्यांचा आशीर्वाद घेणे."
+            }
+        };
+
+        // Default to Pune if nothing saved
+        let currentLat = 18.5204; 
+        let currentLon = 73.8567;
+        let todaySunrise = null;
+        let searchTimeout = null;
+
+        const cityInput = document.getElementById('cityInput');
+        const suggestionsBox = document.getElementById('suggestions');
+
+        // --- LOAD SAVED CITY ON PAGE LOAD ---
+        window.addEventListener('load', () => {
+            const savedCity = localStorage.getItem(STORAGE_KEY_CITY);
+            const savedLat = localStorage.getItem(STORAGE_KEY_LAT);
+            const savedLon = localStorage.getItem(STORAGE_KEY_LON);
+
+            if (savedCity && savedLat && savedLon) {
+                cityInput.value = savedCity;
+                currentLat = parseFloat(savedLat);
+                currentLon = parseFloat(savedLon);
+            }
+        });
+
+        cityInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            const query = this.value.trim();
+            if(query.length < 3) { suggestionsBox.style.display = 'none'; return; }
+            
+            searchTimeout = setTimeout(async () => {
+                try {
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5&addressdetails=1`);
+                    const data = await res.json();
+                    suggestionsBox.innerHTML = '';
+                    if(data.length > 0) {
+                        data.forEach(item => {
+                            const div = document.createElement('div');
+                            div.className = 'suggestion-item';
+                            const state = item.address.state ? `, ${item.address.state}` : '';
+                            const country = item.address.country ? `, ${item.address.country}` : '';
+                            const fullCityName = `${item.name}${state}${country}`;
+                            div.innerText = fullCityName;
+                            
+                            div.onclick = () => {
+                                cityInput.value = fullCityName;
+                                currentLat = parseFloat(item.lat);
+                                currentLon = parseFloat(item.lon);
+                                
+                                // SAVE TO LOCAL STORAGE IMMEDIATELY
+                                localStorage.setItem(STORAGE_KEY_CITY, fullCityName);
+                                localStorage.setItem(STORAGE_KEY_LAT, currentLat);
+                                localStorage.setItem(STORAGE_KEY_LON, currentLon);
+                                
+                                suggestionsBox.style.display = 'none';
+                            };
+                            suggestionsBox.appendChild(div);
+                        });
+                        suggestionsBox.style.display = 'block';
+                    }
+                } catch(e) {}
+            }, 600);
+        });
+
+        document.addEventListener('click', function(e) {
+            if (e.target !== cityInput && e.target !== suggestionsBox) {
+                suggestionsBox.style.display = 'none';
+            }
+        });
+
+        setInterval(() => {
+            const now = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+            document.getElementById('clock-gregorian').innerText = now.toLocaleString('mr-IN', options);
+
+            if (todaySunrise) {
+                let msSinceSunrise = now.getTime() - todaySunrise.getTime();
+                if (msSinceSunrise < 0) {
+                    const yesterday = new Date(now.getTime() - 86400000);
+                    const yTimes = SunCalc.getTimes(yesterday, currentLat, currentLon);
+                    msSinceSunrise = now.getTime() - yTimes.sunrise.getTime();
+                }
+                
+                const totalSeconds = Math.floor(msSinceSunrise / 1000);
+                const ghati = Math.floor(totalSeconds / 1440);
+                const remainingSecs1 = totalSeconds % 1440;
+                const pala = Math.floor(remainingSecs1 / 24);
+                const remainingSecs2 = remainingSecs1 % 24;
+                const nimisha = Math.floor(remainingSecs2 / 0.2133);
+                const muhurta = Math.floor(totalSeconds / 2880) + 1; 
+
+                document.getElementById('clock-hindu').innerText = `${ghati} घटी, ${pala} पळे, ${nimisha} निमिष | ${muhurta} वा मुहूर्त`;
+            } else {
+                document.getElementById('clock-hindu').innerText = "माहिती संकलित करत आहे...";
+            }
+        }, 1000);
+
+        function formatTimeWithDate(timeObj, baseDate) {
+            if (!timeObj || isNaN(timeObj)) return "--:--";
+            let timeStr = timeObj.toLocaleTimeString('mr-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+            
+            if (timeObj.getDate() !== baseDate.getDate() || timeObj.getMonth() !== baseDate.getMonth()) {
+                const nextDayStr = timeObj.toLocaleDateString('mr-IN', { day: 'numeric', month: 'short' });
+                timeStr += ` <span class="text-xs bg-red-100 text-red-800 border border-red-200 px-2 py-0.5 rounded font-bold ml-1 inline-block mt-1 md:mt-0">पुढील दिन: ${nextDayStr}</span>`;
+            }
+            return timeStr;
+        }
+
+        function calculateVedicAstrology(date, lat, lon) {
+            const times = SunCalc.getTimes(date, lat, lon);
+            const calcTime = times.sunrise || date; 
+            todaySunrise = times.sunrise; 
+
+            const jd = (calcTime.getTime() / 86400000) + 2440587.5;
+            const d = jd - 2451545.0; 
+
+            let L_sun = (280.459 + 0.98564736 * d) % 360;
+            let g_sun = (357.529 + 0.98560028 * d) % 360;
+            let sun_true = (L_sun + 1.915 * Math.sin(g_sun * Math.PI/180) + 0.020 * Math.sin(2 * g_sun * Math.PI/180)) % 360;
+            if(sun_true < 0) sun_true += 360;
+
+            let L_moon = (218.316 + 13.1763964 * d) % 360;
+            let M_moon = (134.963 + 13.064993 * d) % 360;
+            let moon_true = (L_moon + 6.289 * Math.sin(M_moon * Math.PI/180) - 1.274 * Math.sin((L_moon - L_sun) * 2 * Math.PI/180 - M_moon * Math.PI/180)) % 360;
+            if(moon_true < 0) moon_true += 360;
+
+            const ayanamsa = 24.11 + ((calcTime.getFullYear() - 2024) * 0.01396);
+            let sun_nirayana = (sun_true - ayanamsa + 360) % 360;
+            let moon_nirayana = (moon_true - ayanamsa + 360) % 360;
+
+            let diff = moon_nirayana - sun_nirayana;
+            if (diff < 0) diff += 360;
+            let tithiIndex = Math.floor(diff / 12);
+            let paksha = tithiIndex < 15 ? "शुक्ल पक्ष" : "कृष्ण पक्ष";
+            let tithiName = TITHIS[tithiIndex];
+
+            let nakshatraIndex = Math.floor(moon_nirayana / (360/27));
+            let yogaIndex = Math.floor(((sun_nirayana + moon_nirayana) % 360) / (360/27));
+
+            let karanaIndex = Math.floor(diff / 6);
+            let k1_name, k2_name;
+            if (karanaIndex === 0) { k1_name = "किंस्तुघ्न"; k2_name = "बव"; }
+            else if (karanaIndex >= 57) {
+                let endKaranas = ["शकुनी", "चतुष्पाद", "नाग", "किंस्तुघ्न"];
+                k1_name = endKaranas[karanaIndex - 57];
+                k2_name = (karanaIndex === 59) ? "किंस्तुघ्न" : endKaranas[karanaIndex - 56];
+            } else {
+                k1_name = KARANAS[(karanaIndex - 1) % 7];
+                k2_name = KARANAS[karanaIndex % 7];
+            }
+
+            let sunSignIndex = Math.floor(sun_nirayana / 30);
+            let moonSignIndex = Math.floor(moon_nirayana / 30);
+            let amantaMonthIdx = Math.floor(sun_nirayana / 30);
+            
+            return {
+                tithi: tithiName, paksha: paksha, nakshatra: NAKSHATRAS[nakshatraIndex],
+                yoga: YOGAS[yogaIndex], karana1: k1_name, karana2: k2_name,
+                sunSign: RASHIS[sunSignIndex], moonSign: RASHIS[moonSignIndex],
+                amantaMonth: MONTHS[amantaMonthIdx],
+                vaar: VAAR[calcTime.getDay()], dayOfWeek: calcTime.getDay(),
+                isBhadra: (k1_name === "विष्टी" || k2_name === "विष्टी"),
+                isGrahanPossible: (tithiName === "पौर्णिमा" || tithiName === "अमावास्या")
+            };
+        }
+
+        function calculateMuhurats(baseDate, lat, lon, dayOfWeek) {
+            const times = SunCalc.getTimes(baseDate, lat, lon);
+            if(!times.sunrise || !times.sunset) return null;
+            
+            const segmentMs = (times.sunset.getTime() - times.sunrise.getTime()) / 8; 
+            const addTime = (start, ms) => new Date(start.getTime() + ms);
+            const formatPeriod = (start, end) => `${formatTimeWithDate(start, baseDate)} ते ${formatTimeWithDate(end, baseDate)}`;
+
+            const rahuSeg = [8, 2, 7, 5, 6, 4, 3][dayOfWeek]; 
+            const yamaSeg = [5, 4, 3, 2, 1, 7, 6][dayOfWeek];
+            const gulikaSeg = [7, 6, 5, 4, 3, 2, 1][dayOfWeek];
+            const getSegTimes = (segNum) => formatPeriod(addTime(times.sunrise, (segNum-1)*segmentMs), addTime(times.sunrise, segNum*segmentMs));
+
+            const abhijitStart = new Date(times.solarNoon.getTime() - 1440000);
+            const abhijitEnd = new Date(times.solarNoon.getTime() + 1440000);
+
+            const duruSeg1 = [9, 6, 3, 6, 4, 4, 2][dayOfWeek]; 
+            const muhuratMs = (times.sunset.getTime() - times.sunrise.getTime()) / 15;
+            const getDuru = (seg) => formatPeriod(addTime(times.sunrise, (seg-1)*muhuratMs), addTime(times.sunrise, seg*muhuratMs));
+
+            let choghadiyas = [];
+            const choghadiyaStartIdx = [0, 3, 6, 2, 5, 1, 4][dayOfWeek]; 
+            for(let i=0; i<8; i++) {
+                let name = CHOGHADIYA_NAMES[(choghadiyaStartIdx + i) % 7];
+                if(["अमृत", "शुभ", "लाभ"].includes(name)) {
+                    let overlapDanger = "";
+                    if ((i+1) === rahuSeg) overlapDanger = "राहु काळ";
+                    else if ((i+1) === yamaSeg) overlapDanger = "यमगंड";
+                    else if ((i+1) === gulikaSeg) overlapDanger = "गुलिक काळ";
+
+                    choghadiyas.push({ 
+                        name: name, time: getSegTimes(i+1), benefit: CHOGHADIYA_BENEFITS[name], overlap: overlapDanger
+                    });
+                }
+            }
+
+            return {
+                rahu: getSegTimes(rahuSeg), yama: getSegTimes(yamaSeg), gulika: getSegTimes(gulikaSeg),
+                duru: getDuru(duruSeg1), ardha: getSegTimes(Math.max(1, (rahuSeg-1) % 8)),
+                mrityu: getSegTimes(Math.max(1, (yamaSeg+1) % 8)), abhijit: formatPeriod(abhijitStart, abhijitEnd),
+                goodChoghadiyas: choghadiyas
+            };
+        }
+
+        async function generatePanchang() {
+            const dateVal = document.getElementById('dateInput').value;
+            const cityVal = document.getElementById('cityInput').value;
+            const errorMsg = document.getElementById('error-msg');
+
+            if (!dateVal || !cityVal) {
+                errorMsg.textContent = "कृपया तारीख आणि शहर दोन्ही टाका.";
+                errorMsg.classList.remove('hidden'); return;
+            }
+
+            // Ensure manual entries are also saved to storage
+            localStorage.setItem(STORAGE_KEY_CITY, cityVal);
+            localStorage.setItem(STORAGE_KEY_LAT, currentLat);
+            localStorage.setItem(STORAGE_KEY_LON, currentLon);
+
+            errorMsg.classList.add('hidden');
+            document.getElementById('results').classList.add('hidden');
+            document.getElementById('festival-section').classList.add('hidden');
+            document.getElementById('loading').style.display = 'block';
+
+            try {
+                const parts = dateVal.split('-');
+                const targetDate = new Date(parts[0], parts[1]-1, parts[2], 12, 0, 0); 
+                
+                const times = SunCalc.getTimes(targetDate, currentLat, currentLon);
+                let moonTimes = SunCalc.getMoonTimes(targetDate, currentLat, currentLon);
+                
+                let mRise = moonTimes.rise;
+                if (!mRise) {
+                    let nextDay = new Date(targetDate.getTime() + 86400000);
+                    mRise = SunCalc.getMoonTimes(nextDay, currentLat, currentLon).rise;
+                }
+
+                let mSet = moonTimes.set;
+                if (!mSet) {
+                    let nextDay = new Date(targetDate.getTime() + 86400000);
+                    mSet = SunCalc.getMoonTimes(nextDay, currentLat, currentLon).set;
+                }
+
+                const vedic = calculateVedicAstrology(targetDate, currentLat, currentLon);
+                const muhurats = calculateMuhurats(targetDate, currentLat, currentLon, vedic.dayOfWeek);
+
+                // --- Festival Logic Check ---
+                let festKey = `${vedic.amantaMonth}_${vedic.paksha}_${vedic.tithi}`;
+                let festivalData = FESTIVALS[festKey];
+
+                if (targetDate.getMonth() === 0 && (targetDate.getDate() === 14 || targetDate.getDate() === 15)) {
+                    festivalData = SOLAR_FESTIVALS["मकर संक्रांती"];
+                }
+
+                if (festivalData) {
+                    document.getElementById('fest-name').innerText = festivalData.name;
+                    document.getElementById('fest-cause').innerText = festivalData.cause;
+                    document.getElementById('fest-ancient').innerText = festivalData.ancient;
+                    document.getElementById('fest-science').innerText = festivalData.science;
+                    document.getElementById('fest-goodfor').innerText = festivalData.goodFor;
+                    document.getElementById('festival-section').classList.remove('hidden');
+                }
+
+                document.getElementById('display-date-city').innerText = `${targetDate.toLocaleDateString('mr-IN', {day:'numeric', month:'long', year:'numeric'})} | ${cityVal.split(',')[0]}`;
+                document.getElementById('r-lat').innerText = currentLat.toFixed(4);
+                document.getElementById('r-lon').innerText = currentLon.toFixed(4);
+
+                document.getElementById('r-sunrise').innerHTML = formatTimeWithDate(times.sunrise, targetDate);
+                document.getElementById('r-sunset').innerHTML = formatTimeWithDate(times.sunset, targetDate);
+                document.getElementById('r-moonrise').innerHTML = formatTimeWithDate(mRise, targetDate);
+
+                let moonsetHtml = formatTimeWithDate(mSet, targetDate);
+                if (mRise && mSet && mSet.getTime() < mRise.getTime()) {
+                    moonsetHtml += `<br><span class="text-xs text-orange-700 font-bold">(हा आधीच्या चंद्रोदयाचा अस्त आहे)</span>`;
+                }
+                document.getElementById('r-moonset').innerHTML = moonsetHtml;
+
+                document.getElementById('r-tithi').innerText = `${vedic.paksha} ${vedic.tithi}`;
+                document.getElementById('r-nakshatra').innerText = vedic.nakshatra;
+                document.getElementById('r-yoga').innerText = vedic.yoga;
+                document.getElementById('r-vaar').innerText = vedic.vaar;
+                document.getElementById('r-sunsign').innerText = vedic.sunSign;
+                document.getElementById('r-moonsign').innerText = vedic.moonSign;
+                document.getElementById('r-karana1').innerText = vedic.karana1;
+                document.getElementById('r-karana2').innerText = vedic.karana2;
+
+                const RITUS = ["वसंत", "ग्रीष्म", "वर्षा", "शरद", "हेमंत", "शिशिर"];
+                let sunSignIdx = RASHIS.indexOf(vedic.sunSign);
+                let ritu = RITUS[Math.floor(sunSignIdx / 2)] || "अज्ञात";
+
+                document.getElementById('r-vikram').innerText = targetDate.getFullYear() + 57;
+                document.getElementById('r-shaka').innerText = targetDate.getFullYear() - 78;
+                document.getElementById('r-ayana').innerText = (targetDate.getMonth() > 0 && targetDate.getMonth() < 6) ? "उत्तरायण" : "दक्षिणायन";
+                document.getElementById('r-ritu').innerText = ritu;
+                document.getElementById('r-maas').innerText = vedic.amantaMonth;
+
+                if(vedic.isBhadra) {
+                    document.getElementById('r-bhadra').innerHTML = "✅ भद्रा काळ सुरू आहे<br><span class='text-xs text-orange-600 font-normal'>उपाय: 'भद्रेच्या १२ नावांचे स्मरण' करावे.</span>";
+                } else {
+                    document.getElementById('r-bhadra').innerText = "❌ नाही";
+                }
+                document.getElementById('r-grahan').innerText = vedic.isGrahanPossible ? "⚠️ शक्य आहे (पौर्णिमा/अमावास्या)" : "❌ आज नाही";
+
+                document.getElementById('t-rahu').innerHTML = muhurats.rahu;
+                document.getElementById('t-yama').innerHTML = muhurats.yama;
+                document.getElementById('t-gulika').innerHTML = muhurats.gulika;
+                document.getElementById('t-duru').innerHTML = muhurats.duru;
+                document.getElementById('t-ardha').innerHTML = muhurats.ardha;
+                document.getElementById('t-mrityu').innerHTML = muhurats.mrityu;
+                
+                if(vedic.dayOfWeek === 3) {
+                    document.getElementById('t-abhijit').innerHTML = "<span class='text-red-600'>बुधवारी अभिजित मुहूर्त ग्राह्य नसतो.</span>";
+                } else {
+                    document.getElementById('t-abhijit').innerHTML = muhurats.abhijit;
+                }
+
+                const chList = document.getElementById('choghadiya-list');
+                chList.innerHTML = '';
+                muhurats.goodChoghadiyas.forEach(c => {
+                    let warningHtml = c.overlap ? `<div class="text-xs text-red-700 bg-red-100 p-2 rounded mt-2 font-bold border border-red-300">⚠️ शास्त्र नियम: हा चौघडिया '${c.overlap}' च्या काळात येत असल्यामुळे अशुभ मानला जाईल. शुभ कार्य करू नये.</div>` : '';
+                    let opacityClass = c.overlap ? 'opacity-80' : '';
+                    
+                    chList.innerHTML += `<div class="bg-white p-3 rounded-lg border border-green-200 shadow-sm ${opacityClass}">
+                        <div class="flex flex-col xl:flex-row xl:justify-between font-bold text-green-800 border-b border-green-100 pb-1">
+                            <span class="${c.overlap ? 'line-through text-red-500' : ''}">${c.name} चौघडिया:</span> 
+                            <span class="text-gray-700">${c.time}</span>
+                        </div>
+                        <p class="text-sm text-green-700 mt-1"><strong>लाभ:</strong> ${c.benefit}</p>
+                        ${warningHtml}
+                    </div>`;
+                });
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('results').classList.remove('hidden');
+
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                errorMsg.textContent = "माहिती मिळवताना त्रुटी आली. कृपया इंटरनेट तपासा.";
+                errorMsg.classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
