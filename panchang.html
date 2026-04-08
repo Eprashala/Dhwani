@@ -252,6 +252,11 @@
     <script>
         document.getElementById('dateInput').valueAsDate = new Date();
 
+        // --- LOCAL STORAGE KEYS ---
+        const STORAGE_KEY_CITY = 'panchang_last_city';
+        const STORAGE_KEY_LAT = 'panchang_last_lat';
+        const STORAGE_KEY_LON = 'panchang_last_lon';
+
         const TITHIS = ["प्रतिपदा", "द्वितीया", "तृतीया", "चतुर्थी", "पंचमी", "षष्ठी", "सप्तमी", "अष्टमी", "नवमी", "दशमी", "एकादशी", "द्वादशी", "त्रयोदशी", "चतुर्दशी", "पौर्णिमा", "प्रतिपदा", "द्वितीया", "तृतीया", "चतुर्थी", "पंचमी", "षष्ठी", "सप्तमी", "अष्टमी", "नवमी", "दशमी", "एकादशी", "द्वादशी", "त्रयोदशी", "चतुर्दशी", "अमावास्या"];
         const NAKSHATRAS = ["अश्विनी", "भरणी", "कृत्तिका", "रोहिणी", "मृगशीर्ष", "आर्द्रा", "पुनर्वसु", "पुष्य", "आश्लेषा", "मघा", "पूर्वा फाल्गुनी", "उत्तरा फाल्गुनी", "हस्त", "चित्रा", "स्वाती", "विशाखा", "अनुराधा", "ज्येष्ठा", "मूळ", "पूर्वाषाढा", "उत्तराषाढा", "श्रवण", "धनिष्ठा", "शततारका", "पूर्वा भाद्रपदा", "उत्तरा भाद्रपदा", "रेवती"];
         const RASHIS = ["मेष", "वृषभ", "मिथुन", "कर्क", "सिंह", "कन्या", "तूळ", "वृश्चिक", "धनु", "मकर", "कुंभ", "मीन"];
@@ -281,7 +286,7 @@
                 cause: "मर्यादा पुरुषोत्तम प्रभू श्री रामांचा जन्मदिवस.",
                 ancient: "वाल्मिकी रामायण (बालकांड) आणि अग्नी पुराण.",
                 science: "सूर्याची प्रखरता वाढत असते, त्यामुळे उपवास आणि हलका आहार पचनसंस्थेसाठी उत्तम मानला जातो.",
-                goodFor: "रामरक्षा स्तोत्र पठण, दान-धर्म, आध्यात्मिक संकल्प, आणि नवीन विद्याभ्यास सुरू करणे."
+                goodFor: "रामरक्षा स्तोत्र पठण, दान-धर्म, आध्यात्मिक संकल्प, and नवीन विद्याभ्यास सुरू करणे."
             },
             "वैशाख_शुक्ल पक्ष_तृतीया": {
                 name: "अक्षय्य तृतीया",
@@ -341,7 +346,6 @@
             }
         };
 
-        // Solar Festivals
         const SOLAR_FESTIVALS = {
             "मकर संक्रांती": {
                 name: "मकर संक्रांती",
@@ -352,6 +356,7 @@
             }
         };
 
+        // Default to Pune if nothing saved
         let currentLat = 18.5204; 
         let currentLon = 73.8567;
         let todaySunrise = null;
@@ -359,6 +364,19 @@
 
         const cityInput = document.getElementById('cityInput');
         const suggestionsBox = document.getElementById('suggestions');
+
+        // --- LOAD SAVED CITY ON PAGE LOAD ---
+        window.addEventListener('load', () => {
+            const savedCity = localStorage.getItem(STORAGE_KEY_CITY);
+            const savedLat = localStorage.getItem(STORAGE_KEY_LAT);
+            const savedLon = localStorage.getItem(STORAGE_KEY_LON);
+
+            if (savedCity && savedLat && savedLon) {
+                cityInput.value = savedCity;
+                currentLat = parseFloat(savedLat);
+                currentLon = parseFloat(savedLon);
+            }
+        });
 
         cityInput.addEventListener('input', function() {
             clearTimeout(searchTimeout);
@@ -376,11 +394,19 @@
                             div.className = 'suggestion-item';
                             const state = item.address.state ? `, ${item.address.state}` : '';
                             const country = item.address.country ? `, ${item.address.country}` : '';
-                            div.innerText = `${item.name}${state}${country}`;
+                            const fullCityName = `${item.name}${state}${country}`;
+                            div.innerText = fullCityName;
+                            
                             div.onclick = () => {
-                                cityInput.value = div.innerText;
+                                cityInput.value = fullCityName;
                                 currentLat = parseFloat(item.lat);
                                 currentLon = parseFloat(item.lon);
+                                
+                                // SAVE TO LOCAL STORAGE IMMEDIATELY
+                                localStorage.setItem(STORAGE_KEY_CITY, fullCityName);
+                                localStorage.setItem(STORAGE_KEY_LAT, currentLat);
+                                localStorage.setItem(STORAGE_KEY_LON, currentLon);
+                                
                                 suggestionsBox.style.display = 'none';
                             };
                             suggestionsBox.appendChild(div);
@@ -547,6 +573,11 @@
                 errorMsg.classList.remove('hidden'); return;
             }
 
+            // Ensure manual entries are also saved to storage
+            localStorage.setItem(STORAGE_KEY_CITY, cityVal);
+            localStorage.setItem(STORAGE_KEY_LAT, currentLat);
+            localStorage.setItem(STORAGE_KEY_LON, currentLon);
+
             errorMsg.classList.add('hidden');
             document.getElementById('results').classList.add('hidden');
             document.getElementById('festival-section').classList.add('hidden');
@@ -578,7 +609,6 @@
                 let festKey = `${vedic.amantaMonth}_${vedic.paksha}_${vedic.tithi}`;
                 let festivalData = FESTIVALS[festKey];
 
-                // Check Solar Festival (Makar Sankranti around Jan 14-15)
                 if (targetDate.getMonth() === 0 && (targetDate.getDate() === 14 || targetDate.getDate() === 15)) {
                     festivalData = SOLAR_FESTIVALS["मकर संक्रांती"];
                 }
@@ -592,7 +622,6 @@
                     document.getElementById('festival-section').classList.remove('hidden');
                 }
 
-                // UI Population
                 document.getElementById('display-date-city').innerText = `${targetDate.toLocaleDateString('mr-IN', {day:'numeric', month:'long', year:'numeric'})} | ${cityVal.split(',')[0]}`;
                 document.getElementById('r-lat').innerText = currentLat.toFixed(4);
                 document.getElementById('r-lon').innerText = currentLon.toFixed(4);
