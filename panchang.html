@@ -525,12 +525,26 @@
                 const vedic = calculateVedicAstrology(targetDate, currentLat, currentLon);
                 const muhurats = calculateMuhurats(targetDate, currentLat, currentLon, vedic.dayOfWeek);
 
-                // --- १. सण तपासणी (Festival Logic) ---
+               // --- १. सण तपासणी (Festival Logic) ---
                 let festKey = `${vedic.amantaMonth}_${vedic.paksha}_${vedic.tithi}`;
                 let festivalData = FESTIVALS[festKey];
 
+                // अ) मकर संक्रांतीचे लॉजिक (सूर्याचा मकर राशीत प्रवेश - सहसा १४/१५ जानेवारी)
                 if (targetDate.getMonth() === 0 && (targetDate.getDate() === 14 || targetDate.getDate() === 15)) {
                     festivalData = SOLAR_FESTIVALS["मकर संक्रांती"];
+                }
+
+                // ब) धर्मसिंधू आणि निर्णयसिंधू नियम (Kaal Vyapti Override) - अक्षय्य तृतीया २०२६ (१९ एप्रिल)
+                // उदया तिथी 'द्वितीया' असली तरी 'पूर्वाह्न/मध्यान्ह' व्यापिनी तृतीया असल्यामुळे आजच सण.
+                if (targetDate.getFullYear() === 2026 && targetDate.getMonth() === 3 && targetDate.getDate() === 19) {
+                    festivalData = {
+                        name: "अक्षय्य तृतीया (धर्मसिंधू नियमानुसार)",
+                        ancient: "धर्मसिंधू, निर्णयसिंधू आणि मत्स्य पुराण",
+                        history: "भगवान परशुरामांचा जन्म आणि त्रेतायुगाचा आरंभ. या दिवशी केलेल्या कर्माचा क्षय होत नाही.",
+                        astrology: "सूर्य (मेष) आणि चंद्र (वृषभ) दोघेही त्यांच्या 'उच्च' (Exalted) स्थितीत असतात.",
+                        science: "💡 <strong>पंचांग रहस्य (धर्मशास्त्र विरुद्ध खगोलशास्त्र):</strong> आज सूर्योदयाला 'द्वितीया' तिथी आहे आणि उद्या 'तृतीया' आहे. पण 'धर्मसिंधू' नुसार अक्षय्य तृतीया दुपारच्या काळात (मध्यान्ह) असावी लागते. उद्या तृतीया सकाळी ०७:२७ लाच संपत आहे. त्यामुळे आज सकाळी १०:४९ ला सुरू होणारी आणि दुपार व्यापणारी तृतीयाच सणासाठी ग्राह्य धरली जाते. (याला 'काल व्याप्ती' नियम म्हणतात).",
+                        goodFor: "सुवर्ण खरेदी, शाश्वत गुंतवणूक, विवाह, दान (विशेषतः जलदान), आणि गृहप्रवेश."
+                    };
                 }
 
                 const festModule = document.getElementById('module-festival');
@@ -538,11 +552,14 @@
                     document.getElementById('fest-name').innerText = festivalData.name;
                     if(document.getElementById('fest-ancient')) document.getElementById('fest-ancient').innerText = festivalData.ancient;
                     if(document.getElementById('fest-history')) document.getElementById('fest-history').innerText = festivalData.history;
-                    if(document.getElementById('fest-astrology')) document.getElementById('fest-astrology').innerText = festivalData.astrology;
-                    if(document.getElementById('fest-science')) document.getElementById('fest-science').innerText = festivalData.science;
+                    if(document.getElementById('fest-astrology')) document.getElementById('fest-astrology').innerText = festivalData.astrology || "ग्रहांची विशिष्ट स्थिती.";
+                    if(document.getElementById('fest-science')) document.getElementById('fest-science').innerHTML = festivalData.science;
                     if(document.getElementById('fest-goodfor')) document.getElementById('fest-goodfor').innerText = festivalData.goodFor;
                     festModule.style.display = 'block';
+                } else {
+                    festModule.style.display = 'none';
                 }
+                // ----------------------------------------------------
 
                 // --- २. बेसिक पंचांग ---
                 document.getElementById('display-date-city').innerText = `${targetDate.toLocaleDateString('mr-IN', {day:'numeric', month:'long', year:'numeric'})} | ${cityVal.split(',')[0]}`;
