@@ -277,7 +277,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
                     <div id="r-bhadra-container" class="p-3 bg-white rounded-lg border border-gray-200 shadow-sm h-full"></div>
                     <div id="r-panchak-container" class="p-3 bg-white rounded-lg border border-gray-200 shadow-sm h-full"></div>
-                    <div class="p-3 bg-white rounded-lg border border-gray-200 shadow-sm h-full">
+                    <div id="r-grahan-container" class="p-3 bg-white rounded-lg border border-gray-200 shadow-sm h-full transition-all duration-300">
                         <p class="text-sm font-medium mb-1 text-gray-700">ग्रहण योग:</p>
                         <span id="r-grahan" class="text-gray-900 font-bold text-lg"></span>
                     </div>
@@ -683,6 +683,28 @@
             let moonSignIndex = Math.floor(moon_nirayana / 30);
             let amantaMonthIdx = (sunSignIndex + 1) % 12; 
             
+            // --- अचूक ग्रहण लॉजिक (Rahu/Ketu Nodes Calculation) ---
+            let rahu_mean = (125.04452 - 0.0529537648 * d) % 360;
+            if(rahu_mean < 0) rahu_mean += 360;
+            let ketu_mean = (rahu_mean + 180) % 360;
+            
+            // सूर्याचे राहु आणि केतूपासूनचे कोनीय अंतर (Angular Distance)
+            let distRahu = Math.abs(sun_true - rahu_mean);
+            let distKetu = Math.abs(sun_true - ketu_mean);
+            distRahu = Math.min(distRahu, 360 - distRahu);
+            distKetu = Math.min(distKetu, 360 - distKetu);
+            let nodeDist = Math.min(distRahu, distKetu);
+
+            let eclipseType = "none";
+            // खगोलशास्त्रानुसार: सूर्याचे Node पासूनचे अंतर 18.5° पेक्षा कमी असल्यास सूर्यग्रहण, 
+            // आणि 12.2° पेक्षा कमी असल्यास चंद्रग्रहण संभवते.
+            if (tithiName === "अमावास्या" && nodeDist < 18.5) {
+                eclipseType = "solar";
+            } else if (tithiName === "पौर्णिमा" && nodeDist < 12.2) {
+                eclipseType = "lunar";
+            }
+            // ----------------------------------------------------
+
             return {
                 tithiIndex: tithiIndex,
                 tithi: tithiName, paksha: paksha, 
@@ -692,7 +714,7 @@
                 sunSign: RASHIS[sunSignIndex], moonSign: RASHIS[moonSignIndex],
                 amantaMonth: MONTHS[amantaMonthIdx], vaar: VAAR[calcTime.getDay()], dayOfWeek: calcTime.getDay(),
                 isBhadra: (k1_name === "विष्टी" || k2_name === "विष्टी"),
-                isGrahanPossible: (tithiName === "पौर्णिमा" || tithiName === "अमावास्या")
+                eclipseType: eclipseType // नवीन जोडलेला पॅरामीटर
             };
         }
 
@@ -940,15 +962,108 @@
                     gandantContainer.innerHTML = `<h4 class="text-md font-bold text-green-800">✅ गंडांत / गंडमूळ नक्षत्र: नाही (शुभ काळ)</h4>`;
                 }
 
+                // --- 9. भद्रा आणि पंचक (Detailed Expansion) ---
                 const bhadraContainer = document.getElementById('r-bhadra-container');
-                if(vedic.isBhadra) bhadraContainer.innerHTML = `<p class='text-red-700 font-bold text-lg mb-2'>✅ भद्रा काळ सुरू आहे</p><p class='text-xs text-red-900'>शुभ कार्ये अत्यंत वर्ज्य.</p>`;
-                else bhadraContainer.innerHTML = `<p class="text-sm font-medium text-gray-700">विष्टी (भद्रा काळ):</p><span class="text-green-600 font-bold text-lg mt-1">❌ नाही</span>`;
+                if(vedic.isBhadra) {
+                    bhadraContainer.className = "p-4 bg-red-50 rounded-lg border border-red-400 shadow-md h-full col-span-1 md:col-span-3 transition-all";
+                    bhadraContainer.innerHTML = `
+                        <h4 class="text-xl font-bold text-red-900 mb-3 flex items-center">🌋 विष्टी करण (भद्रा काळ) सुरू आहे</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                            <div class="border-l-2 border-purple-400 pl-3">
+                                <strong class="text-purple-800 block mb-1">🕉️ अध्यात्म आणि रहस्य:</strong>भद्रा ही सूर्यदेव आणि माता छायेची कन्या व शनीची बहीण आहे. तिचा स्वभाव अत्यंत क्रोधी आणि विध्वंसक असल्याने ब्रह्मदेवाने तिला 'विष्टी' करणात स्थान दिले. या काळात केलेले कोणतेही शुभ कार्य निर्फळ ठरते.
+                            </div>
+                            <div class="border-l-2 border-blue-400 pl-3">
+                                <strong class="text-blue-800 block mb-1">🪐 खगोलशास्त्र:</strong>पंचांगातील करण म्हणजे तिथीचा अर्धा भाग. जेव्हा चंद्र आणि सूर्याच्या कोनीय अंतरातील विशिष्ट ६ अंशांचा टप्पा येतो, तेव्हा विष्टी करण होते. हे ग्रहांचे अत्यंत तणावपूर्ण 'अँगल' मानले जाते.
+                            </div>
+                            <div class="border-l-2 border-green-500 pl-3">
+                                <strong class="text-green-800 block mb-1">🔬 विज्ञान आणि उपाय:</strong>या विशिष्ट वेळेत चंद्र-सूर्याची गुरुत्वाकर्षण शक्ती (Tidal forces) पृथ्वीच्या इलेक्ट्रोमॅग्नेटिक फील्डमध्ये 'डिस्ट्रक्टिव्ह रेझोनन्स' निर्माण करते. यामुळे मानवी मज्जासंस्थेवर ताण येऊन निर्णय चुकतात. <br><strong class="text-red-700 mt-1 inline-block">📿 उपाय:</strong> तातडीच्या कामासाठी भद्रेच्या १२ नावांचे स्मरण करावे किंवा भगवान शिवाची आराधना करावी.
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    bhadraContainer.className = "p-3 bg-white rounded-lg border border-gray-200 shadow-sm h-full transition-all";
+                    bhadraContainer.innerHTML = `
+                        <div class="flex flex-col justify-center h-full">
+                            <p class="text-sm font-medium text-gray-700">विष्टी (भद्रा काळ):</p>
+                            <span class="text-green-600 font-bold text-lg mt-1">❌ नाही (शुभ काळ)</span>
+                        </div>
+                    `;
+                }
                 
                 const panchakContainer = document.getElementById('r-panchak-container');
-                if(vedic.moonSign === "कुंभ" || vedic.moonSign === "मीन") panchakContainer.innerHTML = `<p class='text-purple-800 font-bold text-lg mb-2'>⚠️ पंचक काळ सुरू आहे</p><p class='text-xs text-purple-900'>दक्षिणेकडे प्रवास व लाकूड गोळा करणे वर्ज्य.</p>`;
-                else panchakContainer.innerHTML = `<p class="text-sm font-medium text-gray-700">पंचक काळ:</p><span class="text-green-600 font-bold text-lg mt-1">❌ नाही</span>`;
+                let isPanchak = (vedic.moonSign === "कुंभ" || vedic.moonSign === "मीन");
+                if(isPanchak) {
+                    panchakContainer.className = "p-4 bg-purple-50 rounded-lg border border-purple-400 shadow-md h-full col-span-1 md:col-span-3 transition-all";
+                    
+                    // जर भद्रा नसेल तर पंचक वर दिसावे म्हणून मार्जिन ऍडजस्टमेंट
+                    if(!vedic.isBhadra) panchakContainer.classList.add("mt-4"); 
 
-                document.getElementById('r-grahan').innerText = vedic.isGrahanPossible ? "⚠️ शक्य आहे" : "❌ आज नाही";
+                    panchakContainer.innerHTML = `
+                        <h4 class="text-xl font-bold text-purple-900 mb-3 flex items-center">⭐ पंचक काळ सुरू आहे</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                            <div class="border-l-2 border-purple-400 pl-3">
+                                <strong class="text-purple-800 block mb-1">🕉️ अध्यात्म आणि रहस्य:</strong>पाच नक्षत्रांच्या या समूहात कोणतेही शुभ किंवा अशुभ कार्य केल्यास त्याची ५ पटीने पुनरावृत्ती होते अशी मान्यता आहे. या काळात दक्षिणेकडे प्रवास, घराचे छत टाकणे, लाकूड/इंधन गोळा करणे आणि पलंग बनवणे पूर्णपणे वर्ज्य आहे.
+                            </div>
+                            <div class="border-l-2 border-blue-400 pl-3">
+                                <strong class="text-blue-800 block mb-1">🪐 खगोलशास्त्र:</strong>जेव्हा चंद्र धनिष्ठा नक्षत्राच्या तिसऱ्या चरणातून रेवती नक्षत्राच्या संपेपर्यंत (शेवटची ५ नक्षत्रे) प्रवास करतो, तेव्हा पंचक असते. हे कुंभ आणि मीन राशीच्या बरोबर ३६० अंशांच्या शेवटी येते.
+                            </div>
+                            <div class="border-l-2 border-green-500 pl-3">
+                                <strong class="text-green-800 block mb-1">🔬 विज्ञान आणि उपाय:</strong>या काळात चंद्राचे 'Gravitational Pull' पृथ्वीच्या उत्तर आणि दक्षिण ध्रुवांवर अत्यंत अस्थिर असते. 'अपान वायू'चा प्रभाव वाढल्याने स्ट्रक्चरल कामांमध्ये (उदा. छत टाकणे) अपघात होण्याची शक्यता वाढते. <br><strong class="text-purple-700 mt-1 inline-block">📿 उपाय:</strong> 'पंचक शांती' पूजा करावी. नवीन लाकूड खरेदी करणे व साठवणे टाळावे.
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    panchakContainer.className = "p-3 bg-white rounded-lg border border-gray-200 shadow-sm h-full transition-all";
+                    panchakContainer.innerHTML = `
+                        <div class="flex flex-col justify-center h-full">
+                            <p class="text-sm font-medium text-gray-700">पंचक काळ:</p>
+                            <span class="text-green-600 font-bold text-lg mt-1">❌ नाही</span>
+                        </div>
+                    `;
+                }
+                // --- 9.5 ग्रहण लॉजिक (Solar & Lunar Eclipse Detail) ---
+                const grahanContainer = document.getElementById('r-grahan-container');
+                if (vedic.eclipseType === "solar") {
+                    grahanContainer.className = "p-4 bg-red-50 rounded-lg border border-red-400 shadow-md h-full col-span-1 md:col-span-3 transition-all";
+                    grahanContainer.innerHTML = `
+                        <h4 class="text-xl font-bold text-red-900 mb-3 flex items-center">🌑 सूर्यग्रहण (Solar Eclipse)</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                            <div class="border-l-2 border-purple-400 pl-3">
+                                <strong class="text-purple-800 block mb-1">🕉️ अध्यात्म आणि रहस्य:</strong>जेव्हा राहु किंवा केतू सूर्याला ग्रासतात, तेव्हा सूर्याची चैतन्यदायी ऊर्जा खंडित होते. हा आत्मचिंतन आणि मंत्र सिद्धीसाठी वर्षातील सर्वात मोठा व प्रबळ काळ मानला जातो.
+                            </div>
+                            <div class="border-l-2 border-blue-400 pl-3">
+                                <strong class="text-blue-800 block mb-1">🪐 खगोलशास्त्र:</strong>आज अमावास्या आहे आणि सूर्य-चंद्र हे राहु/केतूच्या अक्षावर (Nodes) अगदी १८ अंशांच्या आत आले आहेत. पृथ्वी, चंद्र आणि सूर्य एका सरळ रेषेत (Syzygy) आहेत.
+                            </div>
+                            <div class="border-l-2 border-green-500 pl-3">
+                                <strong class="text-green-800 block mb-1">🔬 विज्ञान आणि उपाय:</strong>सूर्याची अतिनील (UV) किरणे विस्कळीत होतात व वातावरणात जिवाणूंची वाढ वेगाने होते. <br><strong class="text-red-700">उपाय:</strong> ग्रहण काळात अन्न ग्रहण करू नये. अन्नात तुळशीपत्र टाकावे. थेट सूर्याकडे पाहू नये.
+                            </div>
+                        </div>
+                    `;
+                } else if (vedic.eclipseType === "lunar") {
+                    grahanContainer.className = "p-4 bg-indigo-50 rounded-lg border border-indigo-400 shadow-md h-full col-span-1 md:col-span-3 transition-all";
+                    grahanContainer.innerHTML = `
+                        <h4 class="text-xl font-bold text-indigo-900 mb-3 flex items-center">🌕 चंद्रग्रहण (Lunar Eclipse)</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                            <div class="border-l-2 border-purple-400 pl-3">
+                                <strong class="text-purple-800 block mb-1">🕉️ अध्यात्म आणि रहस्य:</strong>चंद्र हा मनाचा कारक आहे. ग्रहणात चंद्रावर राहु/केतूचा प्रभाव पडल्याने मानवी मन आणि भावना अत्यंत अस्थिर होतात. साधनेसाठी व नामस्मरणासाठी हा उत्कृष्ट काळ आहे.
+                            </div>
+                            <div class="border-l-2 border-blue-400 pl-3">
+                                <strong class="text-blue-800 block mb-1">🪐 खगोलशास्त्र:</strong>आज पौर्णिमा असून चंद्र हा पृथ्वीच्या सावलीतून (Umbra/Penumbra) जात आहे. राहु-केतू अक्षावर चंद्र आल्याने हा योग जुळून आला आहे.
+                            </div>
+                            <div class="border-l-2 border-green-500 pl-3">
+                                <strong class="text-green-800 block mb-1">🔬 विज्ञान आणि उपाय:</strong>पृथ्वीच्या गुरुत्वाकर्षणात आणि समुद्राच्या भरतीत मोठे बदल होतात, जे मानवी शरीरातील 'पाण्यावर' प्रभाव टाकतात (Bio-rhythm disturbance). <br><strong class="text-indigo-700">उपाय:</strong> ध्यान करावे, प्रवासात व मोठ्या निर्णयात काळजी घ्यावी.
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    grahanContainer.className = "p-3 bg-white rounded-lg border border-gray-200 shadow-sm h-full transition-all";
+                    grahanContainer.innerHTML = `
+                        <div class="flex flex-col justify-center h-full">
+                            <p class="text-sm font-medium text-gray-700">ग्रहण योग:</p>
+                            <span class="text-green-600 font-bold text-lg mt-1">❌ नाही</span>
+                        </div>
+                    `;
+                }
 
                 // --- 10. विज्ञान आणि मुहूर्त (Science & Muhurats - RESTORED) ---
                 let mahaDoshaList = [];
