@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>High-Precision Parashari & Astronomical Engine</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0;}
+        .container { display: flex; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 1400px; gap: 15px;}
+        .panel { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .input-panel { width: 320px; height: fit-content; }
+        .chart-panel { display: flex; flex-direction: column; align-items: center; background-color: #fdfaf6; }
+        
+        label { font-weight: bold; font-size: 13px; color: #34495e; margin-top: 10px; display: block; }
+        input { width: 100%; padding: 10px; margin: 5px 0 15px 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 5px; }
+        .btn-calc { width: 100%; padding: 12px; background-color: #c0392b; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 15px; transition: 0.3s;}
+        .btn-calc:hover { background-color: #922b21; }
+        
+        #suggestions { list-style: none; padding: 0; margin: -10px 0 15px 0; border: 1px solid #ccc; border-radius: 4px; max-height: 150px; overflow-y: auto; display: none; background: white;}
+        #suggestions li { padding: 8px; cursor: pointer; font-size: 13px; border-bottom: 1px solid #eee; }
+        #suggestions li:hover { background-color: #f0f0f0; }
+        
+        .hidden-coords { display: flex; gap: 10px; }
+        .hidden-coords input { background-color: #eee; color: #7f8c8d; }
+        
+        /* Sky Map Container & Fullscreen styling */
+        #skyContainer { position: relative; width: 750px; height: 750px; background-color: #050b14; border-radius: 8px; overflow: hidden; display: flex; justify-content: center; align-items: center;}
+        #skyContainer:-webkit-full-screen { width: 100vw; height: 100vh; border-radius: 0; }
+        #skyContainer:-moz-full-screen { width: 100vw; height: 100vh; border-radius: 0; }
+        #skyContainer:fullscreen { width: 100vw; height: 100vh; border-radius: 0; }
+        
+        canvas { display: block; }
+        #skyCanvas { cursor: grab; width: 100%; height: 100%; }
+        #skyCanvas:active { cursor: grabbing; }
+        #kundaliCanvas { background-color: #fdfaf6; cursor: default;}
+        
+        h3 { margin-top: 0; color: #2c3e50; text-align: center; }
+        .sky-title { color: #f1c40f; margin-bottom: 10px; font-size: 20px; text-align: center;}
+
+        /* Floating UI Controls */
+        .controls-overlay { position: absolute; top: 15px; right: 15px; display: flex; flex-direction: column; gap: 8px; z-index: 10; }
+        .ctrl-btn { background: rgba(255,255,255,0.15); color: white; border: 1px solid rgba(255,255,255,0.4); border-radius: 5px; width: 40px; height: 40px; font-size: 20px; cursor: pointer; backdrop-filter: blur(5px); transition: 0.2s;}
+        .ctrl-btn:hover { background: rgba(255,255,255,0.3); transform: scale(1.05);}
+        
+        .legend-overlay { position: absolute; bottom: 15px; left: 15px; color: rgba(255,255,255,0.6); font-size: 11px; z-index: 10; pointer-events: none; background: rgba(0,0,0,0.5); padding: 8px; border-radius: 5px;}
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="panel input-panel">
+            <h3>Jataka Details</h3>
+            <label>Native's Name</label>
+            <input type="text" id="name" placeholder="Enter full name" value="Pramod">
+            <label>Date of Birth</label>
+            <input type="date" id="date" value="1982-02-11">
+            <label>Time of Birth (with Seconds)</label>
+            <input type="time" id="time" step="1" value="11:51:00">
+            <label>Place of Birth</label>
+            <input type="text" id="placeSearch" placeholder="Type city and select..." autocomplete="off">
+            <ul id="suggestions"></ul>
+            <div class="hidden-coords">
+                <div><label>Latitude</label><input type="text" id="lat" value="19.3654" readonly></div>
+                <div><label>Longitude</label><input type="text" id="lon" value="73.3685" readonly></div>
+            </div>
+            <button class="btn-calc" onclick="generateChart()">Calculate Cosmic Map</button>
+            <p id="error-msg" style="color: red; font-size: 13px; text-align: center; margin-top: 10px;"></p>
+        </div>
+
+        <div class="panel chart-panel">
+            <h3>Spashtha Lagna Kundali</h3>
+            <canvas id="kundaliCanvas" width="550" height="550"></canvas>
+        </div>
+
+        <div class="panel chart-panel" style="background-color: #1e293b; padding: 15px;">
+            <h3 class="sky-title">Khagol Mandal (Top-Down Geocentric Map)</h3>
+            
+            <div id="skyContainer">
+                <div class="controls-overlay">
+                    <button class="ctrl-btn" onclick="toggleFullScreen()" title="Full Screen">⛶</button>
+                    <button class="ctrl-btn" onclick="zoom(0.15)" title="Zoom In">+</button>
+                    <button class="ctrl-btn" onclick="zoom(-0.15)" title="Zoom Out">−</button>
+                    <button class="ctrl-btn" onclick="resetView()" title="Recenter">⌂</button>
+                </div>
+                <div class="legend-overlay">
+                    Scroll to Zoom • Drag to Pan<br>
+                    - - - Lunar Orbit (Path of Nodes)<br>
+                    ····· Kala Vela Vectors
+                </div>
+                <canvas id="skyCanvas" width="1600" height="1600"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('kundaliCanvas');
+        const ctx = canvas.getContext('2d');
+        const skyCanvas = document.getElementById('skyCanvas');
+        const skyCtx = skyCanvas.getContext('2d');
+
+        // --- Interactive State ---
+        let skyData = [];
+        let zoomLevel = 1.0;
+        let offsetX = 0;
+        let offsetY = 0;
+        let isDragging = false;
+        let dragStartX, dragStartY;
+
+        // --- Geolocation ---
+        const placeSearch = document.getElementById('placeSearch');
+        const suggestions = document.getElementById('suggestions');
+        let timeout = null;
+
+        placeSearch.addEventListener('input', function() {
+            clearTimeout(timeout);
+            const query = this.value;
+            if (query.length < 3) { suggestions.style.display = 'none'; return; }
+            timeout = setTimeout(async () => {
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`);
+                const data = await response.json();
+                suggestions.innerHTML = '';
+                if (data.length > 0) {
+                    suggestions.style.display = 'block';
+                    data.forEach(place => {
+                        const li = document.createElement('li');
+                        li.textContent = place.display_name;
+                        li.onclick = () => {
+                            placeSearch.value = place.name;
+                            document.getElementById('lat').value = parseFloat(place.lat).toFixed(4);
+                            document.getElementById('lon').value = parseFloat(place.lon).toFixed(4);
+                            suggestions.style.display = 'none';
+                        };
+                        suggestions.appendChild(li);
+                    });
+                }
+            }, 500);
+        });
+
+        // --- Vedic Constants ---
+        function formatDegree(decimalDeg) {
+            if (decimalDeg === undefined || decimalDeg === null) return "";
+            const deg = Math.floor(decimalDeg);
+            const mins = Math.floor((decimalDeg % 1) * 60);
+            return `${deg}°${mins.toString().padStart(2, '0')}'`;
+        }
+
+        const symbols = {
+            'Surya': '☉', 'Chandra': '☽', 'Mangal': '♂', 'Budh': '☿',
+            'Guru': '♃', 'Shukra': '♀', 'Shani': '♄', 'Rahu': '☊', 'Ketu': '☋'
+        };
+
+        const rashiSymbols = ['♈ Mesh', '♉ Vrish', '♊ Mithun', '♋ Karka', '♌ Simha', '♍ Kanya', '♎ Tula', '♏ Vrishchik', '♐ Dhanu', '♑ Makar', '♒ Kumbha', '♓ Meen'];
+
+        // VEDIC PLANETARY COLORS
+        const pColors = {
+            'Surya': '#f1c40f',    // Gold
+            'Chandra': '#ffffff',  // White
+            'Mangal': '#ff4d4d',   // Red/Maroon
+            'Budh': '#2ecc71',     // Green
+            'Guru': '#f39c12',     // Yellow
+            'Shukra': '#ffb6c1',   // Pink/White
+            'Shani': '#1a252f',    // Dark Blue/Black
+            'Rahu': '#7f8c8d',     // Grey
+            'Ketu': '#8d6e63'      // Brown
+        };
+
+        async function generateChart() {
+            const btn = document.querySelector('.btn-calc');
+            btn.innerText = "Aligning Cosmos...";
+            
+            let timeStr = document.getElementById('time').value;
+            if (timeStr.split(':').length === 2) timeStr += ":00";
+
+            const payload = {
+                date: document.getElementById('date').value,
+                time: timeStr,
+                lat: document.getElementById('lat').value,
+                lon: document.getElementById('lon').value
+            };
+
+            try {
+                const response = await fetch('https://eprashala.pythonanywhere.com/calculate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await response.json();
+                if (data.status === 'success') {
+                    document.getElementById('error-msg').innerText = "";
+                    skyData = data.houses; 
+                    populateChart(data.houses, data.asc_sign);
+                    resetView(); // Center and draw
+                } else {
+                    document.getElementById('error-msg').innerText = data.message;
+                }
+            } catch (err) {
+                document.getElementById('error-msg').innerText = "Python server error. Ensure it is running.";
+            } finally {
+                btn.innerText = "Calculate Cosmic Map";
+            }
+        }
+
+        // --- Traditional Kundali Drawing ---
+        function populateChart(houses, ascSign) {
+            const w = canvas.width; const pad = 30;
+            ctx.clearRect(0, 0, w, w); ctx.strokeStyle = '#e67e22'; ctx.lineWidth = 2.5;
+            ctx.beginPath(); ctx.rect(pad, pad, w - 2*pad, w - 2*pad);
+            ctx.moveTo(pad, pad); ctx.lineTo(w - pad, w - pad); ctx.moveTo(w - pad, pad); ctx.lineTo(pad, w - pad);
+            ctx.moveTo(w/2, pad); ctx.lineTo(w - pad, w/2); ctx.lineTo(w/2, w - pad); ctx.lineTo(pad, w/2);
+            ctx.closePath(); ctx.stroke();
+
+            const coords = [
+                {x: w/2, y: w*0.18}, {x: w*0.25, y: w*0.12}, {x: w*0.12, y: w*0.25}, {x: w*0.25, y: w*0.5},
+                {x: w*0.12, y: w*0.75}, {x: w*0.25, y: w*0.88}, {x: w/2, y: w*0.82}, {x: w*0.75, y: w*0.88},
+                {x: w*0.88, y: w*0.75}, {x: w*0.75, y: w*0.5}, {x: w*0.88, y: w*0.25}, {x: w*0.75, y: w*0.12}
+            ];
+
+            ctx.textAlign = "center";
+            houses.forEach((bodies, idx) => {
+                const cx = coords[idx].x; const cy = coords[idx].y;
+                const currentSign = ((ascSign + idx - 1) % 12) + 1;
+                ctx.fillStyle = "#95a5a6"; ctx.font = "bold 14px Arial"; ctx.fillText(currentSign, cx, cy + 40);
+
+                const sortedBodies = bodies.sort((a, b) => {
+                    if (a.type === 'graha' && b.type !== 'graha') return -1;
+                    if (a.type !== 'graha' && b.type === 'graha') return 1;
+                    return 0;
+                });
+
+                let startY = cy - ((sortedBodies.length * 13) / 2) + 5;
+                sortedBodies.forEach((b, i) => {
+                    const textY = startY + (i * 13);
+                    const degText = formatDegree(b.deg);
+                    if (b.type === 'graha') {
+                        ctx.fillStyle = pColors[b.name] || "#c0392b";
+                        if(b.name === 'Shani' || b.name === 'Rahu') ctx.fillStyle = '#2c3e50'; // Darker for white bg
+                        ctx.font = "bold 12px Arial";
+                        ctx.fillText(`${symbols[b.name] || ''} ${b.name} ${degText}`, cx, textY);
+                    } else {
+                        ctx.fillStyle = "#8e44ad"; ctx.font = "italic 10px Arial";
+                        ctx.fillText(`•${b.name} ${degText}`, cx, textY);
+                    }
+                });
+            });
+        }
+
+        // --- Astronomical Cosmos Interactivity ---
+        function toggleFullScreen() {
+            const container = document.getElementById('skyContainer');
+            if (!document.fullscreenElement) {
+                container.requestFullscreen().catch(err => console.log(err));
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        function zoom(amount) {
+            zoomLevel += amount;
+            if (zoomLevel < 0.3) zoomLevel = 0.3; 
+            if (zoomLevel > 5.0) zoomLevel = 5.0; 
+            if(skyData.length > 0) requestAnimationFrame(drawSkyMap);
+        }
+
+        function resetView() {
+            zoomLevel = window.innerWidth < 800 ? 0.6 : 1.0; 
+            offsetX = 0; offsetY = 0;
+            if(skyData.length > 0) requestAnimationFrame(drawSkyMap);
+        }
+
+        const skyContainer = document.getElementById('skyContainer');
+        skyContainer.addEventListener('wheel', (e) => {
+            e.preventDefault(); zoom(e.deltaY > 0 ? -0.1 : 0.1);
+        }, {passive: false});
+
+        skyContainer.addEventListener('mousedown', (e) => {
+            isDragging = true; dragStartX = e.clientX - offsetX; dragStartY = e.clientY - offsetY;
+            skyCanvas.style.cursor = 'grabbing';
+        });
+        skyContainer.addEventListener('mousemove', (e) => {
+            if(!isDragging) return;
+            offsetX = e.clientX - dragStartX; offsetY = e.clientY - dragStartY;
+            requestAnimationFrame(drawSkyMap);
+        });
+        window.addEventListener('mouseup', () => { isDragging = false; skyCanvas.style.cursor = 'grab'; });
+
+        // --- Anti-Overlap Engine ---
+        function checkOverlap(rect, drawnRects) {
+            for (let r of drawnRects) {
+                if (rect.x < r.x + r.w && rect.x + rect.w > r.x && rect.y < r.y + r.h && rect.y + rect.h > r.y) return true;
+            }
+            return false;
+        }
+
+        // --- The Parashari & Aryabhata Rendering Engine ---
+        function drawSkyMap() {
+            if (!skyData || skyData.length === 0) return;
+
+            const w = skyCanvas.width; const h = skyCanvas.height;
+            const cx = w / 2; const cy = h / 2;
+            const maxRadius = 450; 
+            
+            skyCtx.clearRect(0, 0, w, h);
+            
+            skyCtx.save();
+            // Apply Pan & Zoom
+            skyCtx.translate(cx + offsetX, cy + offsetY);
+            skyCtx.scale(zoomLevel, zoomLevel);
+            skyCtx.translate(-cx, -cy);
+
+            // 1. Draw Earth at Center
+            skyCtx.beginPath(); skyCtx.arc(cx, cy, 18, 0, 2 * Math.PI);
+            skyCtx.fillStyle = "#3498db"; skyCtx.fill();
+            skyCtx.shadowBlur = 20; skyCtx.shadowColor = "#3498db";
+            skyCtx.fillStyle = "white"; skyCtx.font = "bold 12px Arial"; skyCtx.textAlign = "center";
+            skyCtx.fillText("Bhu", cx, cy + 32);
+            skyCtx.shadowBlur = 0; 
+
+            // 2. Draw 12 Rashi Sectors (Deep Space Dial)
+            skyCtx.lineWidth = 1; skyCtx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+            for (let i = 0; i < 12; i++) {
+                const startAngle = (i * 30 - 90) * (Math.PI / 180); 
+                const endAngle = ((i + 1) * 30 - 90) * (Math.PI / 180);
+                
+                skyCtx.beginPath(); skyCtx.moveTo(cx + 35 * Math.cos(startAngle), cy + 35 * Math.sin(startAngle));
+                skyCtx.lineTo(cx + maxRadius * Math.cos(startAngle), cy + maxRadius * Math.sin(startAngle)); skyCtx.stroke();
+                
+                skyCtx.beginPath(); skyCtx.arc(cx, cy, maxRadius, startAngle, endAngle); skyCtx.stroke();
+
+                const midAngle = (i * 30 + 15 - 90) * (Math.PI / 180);
+                const textX = cx + (maxRadius + 18) * Math.cos(midAngle);
+                const textY = cy + (maxRadius + 18) * Math.sin(midAngle);
+                skyCtx.fillStyle = "rgba(241, 196, 15, 0.5)"; skyCtx.font = "14px Arial"; skyCtx.textAlign = "center";
+                skyCtx.fillText(rashiSymbols[i], textX, textY + 5);
+            }
+
+            let flatBodies = [];
+            skyData.forEach(house => { house.forEach(b => { if(b.abs_deg !== undefined) flatBodies.push(b); }); });
+
+            // Geocentric Distances
+            const orbitRadii = {
+                'Chandra': 70,    
+                'Budh': 130,      
+                'Shukra': 170,    
+                'Surya': 220,     // Ecliptic Base
+                'Mangal': 270,
+                'Guru': 330,
+                'Shani': 390      
+            };
+            const upagrahaOrbit = 420;
+
+            // Visualizing the Nodes (Rahu/Ketu Formation)
+            // Draw a dashed tilted lunar orbit intersecting the Ecliptic (Sun's Orbit)
+            let rahu = flatBodies.find(b => b.name === 'Rahu');
+            let ketu = flatBodies.find(b => b.name === 'Ketu');
+            if(rahu && ketu) {
+                skyCtx.beginPath();
+                // Draw Lunar path overlapping solar orbit distance
+                skyCtx.arc(cx, cy, orbitRadii['Surya'], 0, 2 * Math.PI);
+                skyCtx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+                skyCtx.setLineDash([5, 10]);
+                skyCtx.stroke();
+                skyCtx.setLineDash([]);
+            }
+
+            // Draw Standard Orbit Rings
+            Object.keys(orbitRadii).forEach(key => {
+                skyCtx.beginPath(); skyCtx.arc(cx, cy, orbitRadii[key], 0, 2 * Math.PI);
+                skyCtx.strokeStyle = key === 'Surya' ? "rgba(241, 196, 15, 0.2)" : "rgba(255, 255, 255, 0.03)";
+                skyCtx.stroke();
+            });
+
+            function getCoords(abs_deg, radius) {
+                const rad = (abs_deg - 90) * (Math.PI / 180);
+                return { x: cx + radius * Math.cos(rad), y: cy + radius * Math.sin(rad), rad: rad };
+            }
+
+            let drawnLabels = []; 
+
+            // 3. Visualizing Mathematical Kala Velas (Shadow Vectors from Sun)
+            let sun = flatBodies.find(b => b.name === 'Surya');
+            if (sun) {
+                flatBodies.forEach(b => {
+                    if (b.type === 'upagraha') {
+                        const uPos = getCoords(b.abs_deg, upagrahaOrbit);
+                        skyCtx.beginPath();
+                        skyCtx.moveTo(cx, cy);
+                        skyCtx.lineTo(uPos.x, uPos.y);
+                        skyCtx.strokeStyle = "rgba(155, 89, 182, 0.25)"; 
+                        skyCtx.lineWidth = 1;
+                        skyCtx.setLineDash([2, 6]); // Shadow derivation lines
+                        skyCtx.stroke();
+                        skyCtx.setLineDash([]); 
+                    }
+                });
+            }
+
+            // 4. Draw Entities & Anti-Overlap Engine
+            flatBodies.forEach(b => {
+                let radius;
+                if (b.name === 'Rahu' || b.name === 'Ketu') {
+                    radius = orbitRadii['Surya']; // Nodes exist on the Ecliptic intersection
+                } else {
+                    radius = orbitRadii[b.name] || upagrahaOrbit;
+                }
+                
+                const pos = getCoords(b.abs_deg, radius);
+                const isGraha = b.type === 'graha';
+                const color = pColors[b.name] || "#9b59b6";
+
+                // Draw Planet/Node
+                skyCtx.beginPath();
+                if (isGraha) {
+                    skyCtx.arc(pos.x, pos.y, b.name==='Surya'?10:7, 0, 2 * Math.PI);
+                    skyCtx.fillStyle = color;
+                    // Add glow for dark planets so they don't disappear
+                    if (b.name === 'Shani' || b.name === 'Rahu') {
+                        skyCtx.strokeStyle = "rgba(255,255,255,0.8)";
+                        skyCtx.lineWidth = 1.5;
+                        skyCtx.stroke();
+                    }
+                    skyCtx.fill();
+                } else {
+                    // Upagrahas are ethereal squares
+                    skyCtx.fillStyle = "rgba(155, 89, 182, 0.8)"; 
+                    skyCtx.fillRect(pos.x - 3, pos.y - 3, 6, 6);
+                }
+
+                // Text Formatting
+                const sym = symbols[b.name] || '';
+                const degTxt = formatDegree(b.deg);
+                const labelText = `${sym} ${b.name} ${degTxt}`;
+                skyCtx.font = isGraha ? "bold 12px Arial" : "italic 11px Arial";
+                
+                const metrics = skyCtx.measureText(labelText);
+                const textW = metrics.width + 4; const textH = 16; 
+                
+                let textRadiusOffset = 16;
+                let textX = pos.x + textRadiusOffset * Math.cos(pos.rad);
+                let textY = pos.y + textRadiusOffset * Math.sin(pos.rad);
+                
+                let isRightSide = Math.cos(pos.rad) >= 0;
+                let rectX = isRightSide ? textX : textX - textW;
+                let rectY = textY - textH/2;
+                
+                // Anti-Overlap Shift
+                let rect = { x: rectX, y: rectY, w: textW, h: textH };
+                while (checkOverlap(rect, drawnLabels)) {
+                    textRadiusOffset += 16; 
+                    textX = pos.x + textRadiusOffset * Math.cos(pos.rad);
+                    textY = pos.y + textRadiusOffset * Math.sin(pos.rad);
+                    rectX = isRightSide ? textX : textX - textW;
+                    rectY = textY - textH/2;
+                    rect = { x: rectX, y: rectY, w: textW, h: textH };
+                }
+                drawnLabels.push(rect); 
+
+                // Leader Line
+                if (textRadiusOffset > 16) {
+                    skyCtx.beginPath(); skyCtx.moveTo(pos.x, pos.y); skyCtx.lineTo(textX, textY);
+                    skyCtx.strokeStyle = "rgba(255, 255, 255, 0.3)"; skyCtx.lineWidth = 1; skyCtx.stroke();
+                }
+
+                // Render Text
+                skyCtx.fillStyle = color;
+                if (b.name === 'Shani' || b.name === 'Rahu' || b.name === 'Ketu') skyCtx.fillStyle = "#ffffff"; // Readability override
+                skyCtx.textAlign = isRightSide ? "left" : "right";
+                
+                // Add a faint text shadow for depth
+                skyCtx.shadowBlur = 4; skyCtx.shadowColor = "black";
+                skyCtx.fillText(labelText, textX, textY + 4);
+                skyCtx.shadowBlur = 0;
+            });
+
+            skyCtx.restore(); 
+        }
+
+        window.onload = () => {
+            const w = canvas.width; const pad = 30;
+            ctx.strokeStyle = '#e67e22'; ctx.lineWidth = 2.5;
+            ctx.beginPath(); ctx.rect(pad, pad, w - 2*pad, w - 2*pad);
+            ctx.moveTo(pad, pad); ctx.lineTo(w - pad, w - pad); ctx.moveTo(w - pad, pad); ctx.lineTo(pad, w - pad);
+            ctx.moveTo(w/2, pad); ctx.lineTo(w - pad, w/2); ctx.lineTo(w/2, w - pad); ctx.lineTo(pad, w/2);
+            ctx.closePath(); ctx.stroke();
+            
+            const skyW = skyCanvas.width;
+            skyCtx.beginPath(); skyCtx.arc(skyW/2, skyW/2, 18, 0, 2*Math.PI);
+            skyCtx.fillStyle = "#3498db"; skyCtx.fill();
+        };
+
+        // Handle Escape key from Fullscreen
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) resetView();
+        });
+    </script>
+</body>
+</html>
