@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>High-Precision Parashari Engine</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; display: flex; padding: 20px; }
+        .panel { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin: 10px; }
+        .input-panel { width: 300px; }
+        .chart-panel { flex-grow: 1; display: flex; justify-content: center; align-items: center; background-color: #fdfaf6; }
+        input { width: 100%; padding: 10px; margin: 8px 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 5px; }
+        button { width: 100%; padding: 12px; background-color: #c0392b; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        button:hover { background-color: #922b21; }
+        canvas { background-color: #fdfaf6; }
+    </style>
+</head>
+<body>
+
+    <div class="panel input-panel">
+        <h3>Birth Details</h3>
+        <input type="text" id="date" placeholder="YYYY-MM-DD" value="1982-02-11">
+        <input type="text" id="time" placeholder="HH:MM (24-hour)" value="11:51">
+        <input type="text" id="lat" placeholder="Latitude" value="19.3654">
+        <input type="text" id="lon" placeholder="Longitude" value="73.3685">
+        <button onclick="generateChart()">Calculate Chart</button>
+        <p id="error-msg" style="color: red; font-size: 12px;"></p>
+    </div>
+
+    <div class="panel chart-panel">
+        <canvas id="kundaliCanvas" width="550" height="550"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('kundaliCanvas');
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width;
+        const pad = 20;
+
+        function drawGrid() {
+            ctx.clearRect(0, 0, w, w);
+            ctx.strokeStyle = '#e67e22';
+            ctx.lineWidth = 2;
+            
+            // Draw North Indian Diamond Grid
+            ctx.beginPath();
+            ctx.rect(pad, pad, w - 2*pad, w - 2*pad);
+            ctx.moveTo(pad, pad); ctx.lineTo(w - pad, w - pad);
+            ctx.moveTo(w - pad, pad); ctx.lineTo(pad, w - pad);
+            ctx.moveTo(w/2, pad); ctx.lineTo(w - pad, w/2);
+            ctx.lineTo(w/2, w - pad); ctx.lineTo(pad, w/2);
+            ctx.closePath();
+            ctx.stroke();
+        }
+
+        async function generateChart() {
+            const payload = {
+                date: document.getElementById('date').value,
+                time: document.getElementById('time').value.replace('.', ':'),
+                lat: document.getElementById('lat').value,
+                lon: document.getElementById('lon').value
+            };
+
+            try {
+                // Point this to your Python backend URL when hosted
+                // NEW LIVE SERVER URL
+					const response = await fetch('https://eprashala.pythonanywhere.com/calculate',  {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await response.json();
+                if (data.status === 'success') {
+                    document.getElementById('error-msg').innerText = "";
+                    populateChart(data.houses, data.asc_sign);
+                } else {
+                    document.getElementById('error-msg').innerText = data.message;
+                }
+            } catch (err) {
+                document.getElementById('error-msg').innerText = "Make sure the Python Flask server is running!";
+            }
+        }
+
+        function populateChart(houses, ascSign) {
+            drawGrid();
+            
+            // Coordinates mapped exactly to your Python logic
+            const coords = [
+                {x: w/2, y: w*0.18}, {x: w*0.25, y: w*0.12}, {x: w*0.12, y: w*0.25}, {x: w*0.25, y: w*0.5},
+                {x: w*0.12, y: w*0.75}, {x: w*0.25, y: w*0.88}, {x: w/2, y: w*0.82}, {x: w*0.75, y: w*0.88},
+                {x: w*0.88, y: w*0.75}, {x: w*0.75, y: w*0.5}, {x: w*0.88, y: w*0.25}, {x: w*0.75, y: w*0.12}
+            ];
+
+            ctx.textAlign = "center";
+
+            houses.forEach((bodies, idx) => {
+                const cx = coords[idx].x;
+                const cy = coords[idx].y;
+                const currentSign = ((ascSign + idx - 1) % 12) + 1;
+
+                // Draw Sign Number
+                ctx.fillStyle = "#95a5a6";
+                ctx.font = "bold 12px Arial";
+                ctx.fillText(currentSign, cx, cy + 30);
+
+                const grahas = bodies.filter(b => b.type === 'graha').map(b => b.name);
+                const upagrahas = bodies.filter(b => b.type === 'upagraha').map(b => b.name);
+
+                // Draw Base Grahas (Red, Bold)
+                if (grahas.length > 0) {
+                    ctx.fillStyle = "#c0392b";
+                    ctx.font = "bold 16px Arial";
+                    ctx.fillText(grahas.join(", "), cx, cy - (upagrahas.length ? 10 : 0));
+                }
+
+                // Draw Upagrahas (Purple, Italic)
+                if (upagrahas.length > 0) {
+                    ctx.fillStyle = "#8e44ad";
+                    ctx.font = "italic 11px Arial";
+                    
+                    // Split into chunks of 3 for readability
+                    for(let i = 0; i < upagrahas.length; i += 3) {
+                        const chunk = upagrahas.slice(i, i+3).map(u => `•${u}`).join(", ");
+                        const offset = (grahas.length ? 10 : -5) + ((i/3) * 15);
+                        ctx.fillText(chunk, cx, cy + offset);
+                    }
+                }
+            });
+        }
+
+        // Draw initial empty grid on load
+        window.onload = drawGrid;
+    </script>
+</body>
+</html>
