@@ -92,7 +92,8 @@
                 <h3 class="text-orange-800 font-bold text-xl mb-1">सध्याची वेळ (इंग्रजी)</h3>
                 <p id="clock-gregorian" class="text-2xl font-semibold text-gray-800 tracking-wide">लोड होत आहे...</p>
                 <p class="text-md text-orange-900 font-bold mt-2 bg-orange-100/80 inline-block px-3 py-1 rounded border border-orange-200">सध्याची होरा (Hora): <span id="current-hora" class="text-red-700">...</span></p>
-            </div>
+				<a href="#" onclick="showHoraList(); return false;" class="block text-sm text-indigo-600 hover:text-indigo-800 hover:underline mt-2 transition-colors font-semibold"><i class="fas fa-list-ul mr-1"></i>संपूर्ण दिवसाची होरा पहा</a>
+			</div>
             <div class="text-center md:text-right w-full md:w-1/2 pl-4">
                 <h3 class="text-orange-800 font-bold text-xl mb-1">सध्याची वेळ (हिंदू वैदिक)</h3>
                 <p id="clock-hindu" class="text-lg font-bold text-red-700">लोड होत आहे...</p>
@@ -323,7 +324,15 @@
             </div>
         </div>
     </div>
-
+	<div id="hora-modal" class="fixed top-0 left-0 w-full h-full bg-black/60 hidden justify-center items-center z-[1000]" onclick="if(event.target === this) this.style.display='none'">
+        <div class="bg-white p-5 rounded-xl w-11/12 max-w-md max-h-[85vh] flex flex-col relative shadow-2xl border-t-4 border-orange-500">
+            <div class="flex justify-between items-center mb-4 border-b pb-3">
+                <h3 class="text-xl font-bold text-orange-800 title-font"><i class="fas fa-clock mr-2"></i>संपूर्ण दिवसाची होरा</h3>
+                <button onclick="document.getElementById('hora-modal').style.display='none'" class="text-gray-500 hover:text-red-500 transition-colors"><i class="fas fa-times text-2xl"></i></button>
+            </div>
+            <div id="hora-list-container" class="space-y-2 overflow-y-auto pr-2 custom-scrollbar"></div>
+        </div>
+    </div>
     <script>
         const TITHIS = ["प्रतिपदा", "द्वितीया", "तृतीया", "चतुर्थी", "पंचमी", "षष्ठी", "सप्तमी", "अष्टमी", "नवमी", "दशमी", "एकादशी", "द्वादशी", "त्रयोदशी", "चतुर्दशी", "पौर्णिमा", "प्रतिपदा", "द्वितीया", "तृतीया", "चतुर्थी", "पंचमी", "षष्ठी", "सप्तमी", "अष्टमी", "नवमी", "दशमी", "एकादशी", "द्वादशी", "त्रयोदशी", "चतुर्दशी", "अमावास्या"];
         const NAKSHATRAS = ["अश्विनी", "भरणी", "कृत्तिका", "रोहिणी", "मृगशीर्ष", "आर्द्रा", "पुनर्वसु", "पुष्य", "आश्लेषा", "मघा", "पूर्वा फाल्गुनी", "उत्तरा फाल्गुनी", "हस्त", "चित्रा", "स्वाती", "विशाखा", "अनुराधा", "ज्येष्ठा", "मूळ", "पूर्वाषाढा", "उत्तराषाढा", "श्रवण", "धनिष्ठा", "शततारका", "पूर्वा भाद्रपदा", "उत्तरा भाद्रपदा", "रेवती"];
@@ -1259,7 +1268,57 @@
                 window.speechSynthesis.speak(utterance);
             }
         }
+function showHoraList() {
+            if (!todaySunrise) {
+                alert("सूर्योदयाची वेळ अद्याप निश्चित झालेली नाही. कृपया लोकेशन लोड होण्याची प्रतीक्षा करा.");
+                return;
+            }
 
+            const horaLords = ["सूर्य", "शुक्र", "बुध", "चंद्र", "शनि", "गुरु", "मंगळ"];
+            const dayToStartLordIndex = [0, 3, 6, 2, 5, 1, 4];
+            
+            let currentDayOfWeek = todaySunrise.getDay();
+            let startLordIndex = dayToStartLordIndex[currentDayOfWeek];
+            
+            let html = '';
+            let baseDate = todaySunrise.getDate();
+            let now = new Date();
+
+            // Loop through 24 hours starting from Sunrise
+            for (let i = 0; i < 24; i++) {
+                let horaStartTime = new Date(todaySunrise.getTime() + (i * 3600000));
+                let horaEndTime = new Date(horaStartTime.getTime() + 3600000);
+                
+                let currentLord = horaLords[(startLordIndex + i) % 7];
+                
+                let timeStrStart = horaStartTime.toLocaleTimeString('mr-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+                let timeStrEnd = horaEndTime.toLocaleTimeString('mr-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+                
+                let nextDayMarker = "";
+                if (horaStartTime.getDate() !== baseDate) {
+                    nextDayMarker = `<span class="text-[10px] bg-red-100 text-red-800 border border-red-200 px-1.5 py-0.5 rounded font-bold ml-2">पुढील दिवस</span>`;
+                }
+
+                let isCurrent = (now >= horaStartTime && now < horaEndTime);
+                let bgClass = isCurrent ? "bg-orange-100 border-orange-400 shadow-sm" : "bg-gray-50 border-gray-200";
+                let textClass = isCurrent ? "text-orange-900 font-bold" : "text-gray-700";
+                let indicator = isCurrent ? `<span class="text-[10px] bg-orange-500 text-white px-2 py-0.5 rounded-full ml-2 animate-pulse">सध्या सुरू</span>` : "";
+
+                html += `
+                    <div class="flex justify-between items-center p-3 rounded-lg border ${bgClass} transition-all hover:bg-orange-50">
+                        <div class="text-sm ${textClass} flex items-center">
+                            ${timeStrStart} - ${timeStrEnd} ${nextDayMarker}
+                        </div>
+                        <div class="text-base font-bold ${textClass} flex items-center">
+                            ${currentLord} ${indicator}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            document.getElementById('hora-list-container').innerHTML = html;
+            document.getElementById('hora-modal').style.display = 'flex';
+        }
         window.onload = init;
     </script>
 </body>
