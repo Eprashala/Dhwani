@@ -324,13 +324,14 @@
             </div>
         </div>
     </div>
-	<div id="hora-modal" class="fixed top-0 left-0 w-full h-full bg-black/60 hidden justify-center items-center z-[1000]" onclick="if(event.target === this) this.style.display='none'">
-        <div class="bg-white p-5 rounded-xl w-11/12 max-w-md max-h-[85vh] flex flex-col relative shadow-2xl border-t-4 border-orange-500">
-            <div class="flex justify-between items-center mb-4 border-b pb-3">
+	<div id="hora-modal" class="fixed top-0 left-0 w-full h-full bg-black/70 hidden justify-center items-center z-[1000]" onclick="if(event.target === this) this.style.display='none'">
+        <div class="bg-white p-4 rounded-xl w-11/12 max-w-md max-h-[90vh] flex flex-col relative shadow-2xl border-t-4 border-orange-500">
+            <div class="flex justify-between items-center mb-3 border-b pb-2">
                 <h3 class="text-xl font-bold text-orange-800 title-font"><i class="fas fa-clock mr-2"></i>संपूर्ण दिवसाची होरा</h3>
                 <button onclick="document.getElementById('hora-modal').style.display='none'" class="text-gray-500 hover:text-red-500 transition-colors"><i class="fas fa-times text-2xl"></i></button>
             </div>
-            <div id="hora-list-container" class="space-y-2 overflow-y-auto pr-2 custom-scrollbar"></div>
+            
+            <div id="hora-list-container" class="overflow-y-auto pr-1 custom-scrollbar flex-grow pb-2 space-y-2"></div>
         </div>
     </div>
     <script>
@@ -1268,9 +1269,20 @@
                 window.speechSynthesis.speak(utterance);
             }
         }
-function showHoraList() {
+			const HORA_DATA = {
+            "गुरु": { color: "bg-yellow-400 text-yellow-900 border-yellow-500", catName: "अति शुभ", desc: "नवीन नोकरी, शिक्षण, कायदेशीर बाबी आणि सोने खरेदीसाठी उत्तम." },
+            "शुक्र": { color: "bg-pink-500 text-white border-pink-600", catName: "अति शुभ", desc: "विवाह, प्रणय, चैनीच्या वस्तू खरेदी आणि सर्जनशील कामासाठी शुभ." },
+            "चंद्र": { color: "bg-white text-gray-800 border-gray-300", catName: "अति शुभ", desc: "बागकाम, शेती, प्रवास, भावनिक आणि सर्जनशील कामासाठी चांगले." },
+            "बुध": { color: "bg-green-500 text-white border-green-600", catName: "शुभ", desc: "व्यापार, व्यवसाय, कागदपत्रांवर स्वाक्षरी आणि शिक्षणासाठी उत्तम." },
+            "सूर्य": { color: "bg-orange-500 text-white border-orange-600", catName: "शुभ", desc: "सरकारी कामे, नेतृत्व आणि नवीन प्रकल्प सुरू करण्यासाठी फायदेशीर." },
+            "मंगळ": { color: "bg-red-500 text-white border-red-600", catName: "मध्यम", desc: "तातडीची कामे, स्पर्धा, खेळ किंवा शस्त्रक्रियेसाठी चांगले. (नवीन सुरुवातीसाठी कठोर)" },
+            "शनि": { color: "bg-blue-900 text-white border-blue-950", catName: "अशुभ", desc: "नवीन प्रकल्पांसाठी वर्ज्य. केवळ मजुरी, लोखंड/तेल विक्री आणि प्रलंबित कामांसाठी योग्य." }
+        };
+
+        
+        function showHoraList() {
             if (!todaySunrise) {
-                alert("सूर्योदयाची वेळ अद्याप निश्चित झालेली नाही. कृपया लोकेशन लोड होण्याची प्रतीक्षा करा.");
+                alert("सूर्योदयाची वेळ अद्याप निश्चित झालेली नाही. कृपया प्रतीक्षा करा.");
                 return;
             }
 
@@ -1284,33 +1296,40 @@ function showHoraList() {
             let baseDate = todaySunrise.getDate();
             let now = new Date();
 
-            // Loop through 24 hours starting from Sunrise
             for (let i = 0; i < 24; i++) {
                 let horaStartTime = new Date(todaySunrise.getTime() + (i * 3600000));
                 let horaEndTime = new Date(horaStartTime.getTime() + 3600000);
                 
                 let currentLord = horaLords[(startLordIndex + i) % 7];
+                let lordData = HORA_DATA[currentLord];
                 
                 let timeStrStart = horaStartTime.toLocaleTimeString('mr-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
                 let timeStrEnd = horaEndTime.toLocaleTimeString('mr-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
                 
                 let nextDayMarker = "";
                 if (horaStartTime.getDate() !== baseDate) {
-                    nextDayMarker = `<span class="text-[10px] bg-red-100 text-red-800 border border-red-200 px-1.5 py-0.5 rounded font-bold ml-2">पुढील दिवस</span>`;
+                    nextDayMarker = `<span class="text-[9px] bg-black/20 text-current px-1.5 py-0.5 rounded font-bold ml-1">पुढील दिवस</span>`;
                 }
 
                 let isCurrent = (now >= horaStartTime && now < horaEndTime);
-                let bgClass = isCurrent ? "bg-orange-100 border-orange-400 shadow-sm" : "bg-gray-50 border-gray-200";
-                let textClass = isCurrent ? "text-orange-900 font-bold" : "text-gray-700";
-                let indicator = isCurrent ? `<span class="text-[10px] bg-orange-500 text-white px-2 py-0.5 rounded-full ml-2 animate-pulse">सध्या सुरू</span>` : "";
+                let activeStyle = isCurrent ? "border-l-[6px] border-r-[6px] shadow-lg transform scale-[1.02] my-3" : "border";
+                let indicator = isCurrent ? `<span class="text-[10px] bg-white/90 text-black px-2 py-0.5 rounded-full ml-1 shadow animate-pulse">सध्या सुरू</span>` : "";
 
                 html += `
-                    <div class="flex justify-between items-center p-3 rounded-lg border ${bgClass} transition-all hover:bg-orange-50">
-                        <div class="text-sm ${textClass} flex items-center">
-                            ${timeStrStart} - ${timeStrEnd} ${nextDayMarker}
+                    <div class="flex flex-col p-3 rounded-lg ${activeStyle} ${lordData.color} transition-all">
+                        <div class="flex justify-between items-start mb-1">
+                            <div class="text-sm font-semibold flex flex-col">
+                                <span>${timeStrStart} - ${timeStrEnd}</span>
+                                <div>${nextDayMarker}</div>
+                            </div>
+                            <div class="text-base font-bold text-right flex flex-col items-end">
+                                <span>${lordData.catName} - ${currentLord}</span>
+                                <div class="mt-1">${indicator}</div>
+                            </div>
                         </div>
-                        <div class="text-base font-bold ${textClass} flex items-center">
-                            ${currentLord} ${indicator}
+                        <hr class="my-1.5 border-current opacity-20">
+                        <div class="text-[13px] leading-snug opacity-95">
+                            ${lordData.desc}
                         </div>
                     </div>
                 `;
