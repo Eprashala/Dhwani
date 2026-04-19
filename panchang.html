@@ -226,9 +226,17 @@
                 </div>
             </div>
 
-            <div class="card p-6 rounded-xl bg-white border-t-4 border-indigo-600 shadow-lg mt-6 mb-6">
-                <h3 class="text-2xl text-indigo-800 font-bold mb-4 border-b-2 border-indigo-100 pb-2 title-font">दैनिक सूक्ष्म काळ आणि वैदिक रहस्ये</h3>
-                <div class="space-y-6">
+           <div class="card p-6 rounded-xl bg-white border-t-4 border-indigo-600 shadow-lg mt-6 mb-6">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 border-b-2 border-indigo-100 pb-2">
+                    <h3 class="text-2xl text-indigo-800 font-bold title-font">दैनिक सूक्ष्म काळ आणि वैदिक रहस्ये</h3>
+                    <button id="chrono-toggle-btn" onclick="toggleChronologicalView()" class="mt-2 md:mt-0 bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-bold px-4 py-2 rounded-lg transition-colors border border-indigo-300 flex items-center shadow-sm">
+                        <i class="fas fa-list-ol mr-2"></i> कालक्रमानुसार पहा
+                    </button>
+                </div>
+                
+                <div id="chrono-view-container" class="hidden space-y-2 mt-4 max-h-[600px] overflow-y-auto custom-scrollbar pr-2"></div>
+
+                <div id="normal-view-container" class="space-y-6">
                     
                     <div class="bg-orange-50 rounded-lg p-4 border border-orange-200">
                         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-3">
@@ -759,13 +767,29 @@
             const muhuratMs = (times.sunset.getTime() - times.sunrise.getTime()) / 15;
             const getDuru = (seg) => formatPeriod(addTime(times.sunrise, (seg-1)*muhuratMs), addTime(times.sunrise, seg*muhuratMs));
 
+            // --- CHRONOLOGICAL DATA ENGINE ---
+            let rawEvents = [];
+            const addEv = (n, s, e, t, sev) => { if(s && e) rawEvents.push({name: n, start: s, end: e, type: t, severity: sev}); };
+
+            addEv("ब्राह्म मुहूर्त", brahmaStart, brahmaEnd, "मुहूर्त", "अति शुभ");
+            addEv("गोधूलि काळ", godhuliStart, godhuliEnd, "मुहूर्त", "शुभ");
+            addEv("राहु काळ", addTime(times.sunrise, (rahuSeg-1)*segmentMs), addTime(times.sunrise, rahuSeg*segmentMs), "दोष", "अति अशुभ");
+            addEv("यमगंड", addTime(times.sunrise, (yamaSeg-1)*segmentMs), addTime(times.sunrise, yamaSeg*segmentMs), "दोष", "अशुभ");
+            addEv("गुलिक काळ", addTime(times.sunrise, (gulikaSeg-1)*segmentMs), addTime(times.sunrise, gulikaSeg*segmentMs), "दोष", "अशुभ");
+            addEv("अभिजित मुहूर्त", abhijitStart, abhijitEnd, "मुहूर्त", "अति शुभ");
+
+            // Choghadiyas Logic
             let choghadiyas = [];
+            const chSev = {"अमृत": "अति शुभ", "शुभ": "शुभ", "लाभ": "शुभ", "चल": "मध्यम", "उद्वेग": "अशुभ", "रोग": "अशुभ", "काळ": "अति अशुभ"};
             const choghadiyaStartIdx = [0, 3, 6, 2, 5, 1, 4][dayOfWeek]; 
             for(let i=0; i<8; i++) {
                 let name = CHOGHADIYA_NAMES[(choghadiyaStartIdx + i) % 7];
+                let segStart = addTime(times.sunrise, i * segmentMs);
+                let segEnd = addTime(times.sunrise, (i + 1) * segmentMs);
+                
+                addEv(name + " चौघडिया", segStart, segEnd, "चौघडिया", chSev[name]); // Add to chronological
+
                 if(["अमृत", "शुभ", "लाभ"].includes(name)) {
-                    let segStart = addTime(times.sunrise, i * segmentMs);
-                    let segEnd = addTime(times.sunrise, (i + 1) * segmentMs);
                     let overlapDanger = "";
                     if ((i+1) === rahuSeg) overlapDanger = "राहु काळ";
                     else if ((i+1) === yamaSeg) overlapDanger = "यमगंड";
@@ -774,6 +798,20 @@
                     choghadiyas.push({ name: name, time: formatPeriod(segStart, segEnd), benefit: CHOGHADIYA_BENEFITS[name], overlap: overlapDanger, isMahaYoga: isMahaYoga });
                 }
             }
+
+            // Horas Logic
+            const horaLords = ["सूर्य", "शुक्र", "बुध", "चंद्र", "शनि", "गुरु", "मंगळ"];
+            const horaSev = {"गुरु":"अति शुभ", "शुक्र":"अति शुभ", "चंद्र":"अति शुभ", "बुध":"शुभ", "सूर्य":"शुभ", "मंगळ":"मध्यम", "शनि":"अति अशुभ"};
+            let hStartIdx = [0, 3, 6, 2, 5, 1, 4][dayOfWeek];
+            for(let i=0; i<24; i++) {
+                let hStart = new Date(times.sunrise.getTime() + (i * 3600000));
+                let hEnd = new Date(hStart.getTime() + 3600000);
+                let lord = horaLords[(hStartIdx + i) % 7];
+                addEv(lord + " होरा", hStart, hEnd, "होरा", horaSev[lord]);
+            }
+
+            // Sort everything strictly by time
+            rawEvents.sort((a, b) => a.start.getTime() - b.start.getTime());
 
             return {
                 brahma: formatPeriod(brahmaStart, brahmaEnd),
@@ -788,9 +826,11 @@
                 ardha: formatPeriod(addTime(times.sunrise, Math.max(0, (rahuSeg-2))*segmentMs), addTime(times.sunrise, Math.max(1, (rahuSeg-1))*segmentMs)),
                 mrityu: formatPeriod(addTime(times.sunrise, Math.max(0, yamaSeg)*segmentMs), addTime(times.sunrise, Math.max(1, yamaSeg+1)*segmentMs)), 
                 abhijit: formatPeriod(abhijitStart, abhijitEnd),
-                goodChoghadiyas: choghadiyas
+                goodChoghadiyas: choghadiyas,
+                rawEvents: rawEvents // Pass to UI renderer
             };
         }
+            
 
         function calculateAndLoadModules() {
             const dateVal = document.getElementById('dateInput').value;
@@ -1138,7 +1178,7 @@
                     }
                 }
 
-                // --- 11. निष्कर्ष मॉड्युल (Conclusion - RESTORED) ---
+                // --- 11. निष्कर्ष मॉड्युल (Conclusion & BPHS Rules) ---
                 if(document.getElementById('conc-summary')) {
                     let summaryText = `आज ${targetDate.toLocaleDateString('mr-IN')} रोजी चंद्र <strong>${vedic.moonSign}</strong> राशीत आणि <strong>${vedic.nakshatra}</strong> नक्षत्रात आहे. एकंदर ग्रहांची स्थिती पाहता दिवस सामान्य स्वरूपाचा आहे.`;
                     let dosText = "महत्त्वाची कामे अभिजित मुहूर्त किंवा शुभ चौघडियामध्ये पूर्ण करावीत.";
@@ -1149,20 +1189,78 @@
                         dosText = festivalData.goodFor;
                     }
 
-                    if (mahaYogaList.length > 0) {
-                        summaryText += `<br><br><span class="bg-yellow-100 text-yellow-900 px-3 py-2 rounded-lg block border border-yellow-400 mt-2 shadow-sm">🌟 <strong>महायोग (शुभ + शुभ):</strong> आज <strong>${mahaYogaList.join(' तसेच ')}</strong> एकत्र येत आहेत. हा अत्यंत दुर्मिळ आणि शक्तिशाली योग आहे. या काळात घेतलेले निर्णय १००% यशस्वी होतात.</span>`;
-                        dosText += ` <br><br><span class="text-green-700 font-bold">🌟 विशेष:</span> महायोगाच्या काळात मोठी गुंतवणूक, करार किंवा मंगल कार्य अवश्य करावे.`;
+                    // --- BPHS Overlap Engine (Hora + Period) ---
+                    let bphsDoshas = [];
+                    let bphsYogas = [];
+                    
+                    if (muhurats && muhurats.rawEvents) {
+                        let rahuEvent = muhurats.rawEvents.find(e => e.name === "राहु काळ");
+                        let abhijitEvent = muhurats.rawEvents.find(e => e.name === "अभिजित मुहूर्त");
+
+                        if (rahuEvent) {
+                            let badHoras = muhurats.rawEvents.filter(e => e.type === "होरा" && e.severity.includes("अशुभ") && e.start < rahuEvent.end && e.end > rahuEvent.start);
+                            badHoras.forEach(h => bphsDoshas.push(`'${h.name}' आणि 'राहु काळ'`));
+                        }
+                        if (abhijitEvent) {
+                            let goodHoras = muhurats.rawEvents.filter(e => e.type === "होरा" && e.severity === "अति शुभ" && e.start < abhijitEvent.end && e.end > abhijitEvent.start);
+                            goodHoras.forEach(h => bphsYogas.push(`'${h.name}' आणि 'अभिजित मुहूर्त'`));
+                        }
                     }
 
+                    // Append Overlaps to UI
+                    if (mahaYogaList.length > 0) {
+                        summaryText += `<br><br><span class="bg-yellow-100 text-yellow-900 px-3 py-2 rounded-lg block border border-yellow-400 mt-2 shadow-sm">🌟 <strong>महायोग (शुभ + शुभ):</strong> आज <strong>${mahaYogaList.join(' तसेच ')}</strong> एकत्र येत आहेत. या काळात घेतलेले निर्णय १००% यशस्वी होतात.</span>`;
+                    }
+                    if (bphsYogas.length > 0) {
+                        summaryText += `<br><br><span class="bg-green-100 text-green-900 px-3 py-2 rounded-lg block border border-green-500 mt-2 shadow-sm">👑 <strong>BPHS राजयोग:</strong> आज <strong>${bphsYogas.join(', ')}</strong> एकत्र येत आहेत. पराशर होरा शास्त्रानुसार हा काळ सर्व कार्य सिद्धीस नेणारा 'सुवर्णकाळ' आहे!</span>`;
+                    }
+                    
                     if (mahaDoshaList.length > 0) {
-                        summaryText += `<br><br><span class="bg-red-100 text-red-900 px-3 py-2 rounded-lg block border border-red-400 mt-2 shadow-sm">⚠️ <strong>महादोष / अतिक्रूर काळ (शुभ + अशुभ):</strong> आज <strong>${mahaDoshaList.join(' तसेच ')}</strong> एकत्र येत आहेत. विज्ञानानुसार दोन विरुद्ध ऊर्जा लहरींचे (Destructive Resonance) येथे घर्षण होत आहे.</span>`;
-                        dontsText += ` <br><br><span class="text-red-700 font-bold">🚨 महादोष इशारा:</span> ${mahaDoshaList.join(', ')} च्या काळात प्रवास, आर्थिक व्यवहार, शस्त्रक्रिया किंवा नवीन सुरुवात <strong>पूर्णपणे टाळा</strong>. <br><span class="text-orange-800 font-bold mt-1 inline-block">📿 उपाय:</span> या काळात जागेवर बसून 'ॐ नमः शिवाय' किंवा इष्टदेवतेचा जप करावा.`;
+                        summaryText += `<br><br><span class="bg-orange-100 text-orange-900 px-3 py-2 rounded-lg block border border-orange-400 mt-2 shadow-sm">⚠️ <strong>अतिक्रूर काळ (शुभ + अशुभ):</strong> आज <strong>${mahaDoshaList.join(' तसेच ')}</strong> एकत्र येत आहेत. दोन विरुद्ध ऊर्जा लहरींचे घर्षण होत आहे.</span>`;
+                    }
+                    if (bphsDoshas.length > 0) {
+                        summaryText += `<br><br><span class="bg-red-100 text-red-900 px-3 py-2 rounded-lg block border border-red-500 mt-2 shadow-sm">☠️ <strong>BPHS महादोष:</strong> आज <strong>${bphsDoshas.join(', ')}</strong> एकत्र येत आहेत. पराशर होरा शास्त्रानुसार हा काळ अत्यंत विनाशकारी आहे. या काळात कोणताही मोठा निर्णय घेऊ नये!</span>`;
                     }
 
                     document.getElementById('conc-summary').innerHTML = summaryText;
                     document.getElementById('conc-dos').innerHTML = dosText;
                     document.getElementById('conc-donts').innerHTML = dontsText;
                 }
+
+                // --- Generate Chronological View UI ---
+                if (muhurats && muhurats.rawEvents) {
+                    let chronoHtml = '';
+                    const sevColors = {
+                        "अति शुभ": "bg-green-50 text-green-900 border-green-500",
+                        "शुभ": "bg-blue-50 text-blue-900 border-blue-400",
+                        "मध्यम": "bg-yellow-50 text-yellow-900 border-yellow-400",
+                        "अशुभ": "bg-orange-50 text-orange-900 border-orange-400",
+                        "अति अशुभ": "bg-red-50 text-red-900 border-red-500"
+                    };
+                    const sevIcons = { "अति शुभ": "🌟", "शुभ": "✅", "मध्यम": "⚖️", "अशुभ": "⚠️", "अति अशुभ": "🚨" };
+
+                    muhurats.rawEvents.forEach(ev => {
+                        let tStart = formatTimeWithDate(ev.start, targetDate);
+                        let tEnd = formatTimeWithDate(ev.end, targetDate);
+                        let cClass = sevColors[ev.severity] || "bg-gray-50 border-gray-400 text-gray-800";
+                        let icon = sevIcons[ev.severity] || "🔹";
+
+                        chronoHtml += `
+                            <div class="flex justify-between items-center p-3 rounded-lg border-l-[5px] shadow-sm ${cClass} transition-all hover:shadow-md">
+                                <div class="flex-1 pr-2">
+                                    <strong class="text-base md:text-lg block text-gray-900">${icon} ${ev.name} <span class="text-xs opacity-70 font-normal ml-1">(${ev.type})</span></strong>
+                                    <span class="text-xs md:text-sm font-semibold opacity-80">${tStart} - ${tEnd}</span>
+                                </div>
+                                <div class="font-bold px-3 py-1.5 bg-white/80 rounded-md border border-current text-[11px] md:text-xs shadow-sm whitespace-nowrap text-right uppercase tracking-wide">
+                                    ${ev.severity}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    document.getElementById('chrono-view-container').innerHTML = chronoHtml;
+                }
+
+                document.getElementById('loading').style.display = 'none';
 
                 document.getElementById('loading').style.display = 'none';
 
@@ -1338,7 +1436,10 @@
             document.getElementById('hora-list-container').innerHTML = html;
             document.getElementById('hora-modal').style.display = 'flex';
         }
-        window.onload = init;
+        
+				
+		
+		window.onload = init;
     </script>
 </body>
 </html>
