@@ -812,52 +812,124 @@
             });
         }
 
-        const bphsData = {
-            'Surya': { exalt: 0, own: [4], debil: 6, color: '#e67e22', desc: 'Atmakaraka (Soul). Represents the king, father, authority, vitality, and your true inner self.' },
-            'Chandra': { exalt: 1, own: [3], debil: 7, color: '#7f8c8d', desc: 'Manakaraka (Mind). Represents the queen, mother, emotions, perception, and nourishment.' },
-            'Mangal': { exalt: 9, own: [0, 7], debil: 3, color: '#c0392b', desc: 'Bhratrukaraka (Siblings). Represents the commander, courage, logic, physical energy, and action.' },
-            'Budh': { exalt: 5, own: [2, 5], debil: 11, color: '#27ae60', desc: 'Vidyakaraka (Intellect). Represents the prince, speech, commerce, intellect, and adaptability.' },
-            'Guru': { exalt: 3, own: [8, 11], debil: 9, color: '#f1c40f', desc: 'Dhanakaraka & Putrakaraka (Wealth & Children). Represents the minister, wisdom, expansion, dharma, and fortune.' },
-            'Shukra': { exalt: 11, own: [1, 6], debil: 5, color: '#e056fd', desc: 'Kalatrakaraka (Spouse). Represents romance, luxury, beauty, material comforts, and the arts.' },
-            'Shani': { exalt: 6, own: [9, 10], debil: 0, color: '#2c3e50', desc: 'Ayushkaraka (Longevity). Represents the servant, discipline, delay, karma, sorrow, and hard work.' },
-            'Rahu': { exalt: 1, own: [5, 10], debil: 7, color: '#34495e', desc: 'Chhaya Graha (North Node). Represents worldly desires, illusion, foreigners, innovation, and obsession.' },
-            'Ketu': { exalt: 7, own: [11, 7], debil: 1, color: '#8d6e63', desc: 'Chhaya Graha (South Node). Represents moksha, detachment, asceticism, intuition, and sudden liberation.' }
-        };
+ // THE TRUE PARASHARI KNOWLEDGE BASE
+const bphsDeepData = {
+    'Surya': { exaltSign: 0, paramUcha: 10, own: [4], debilSign: 6, paramNeecha: 10, digBalaHouse: 10, friends: [1,2,3,7,8,11], enemies: [9,10,1,6], combustRange: 0, color: '#e67e22', desc: 'Atmakaraka (Soul)' },
+    'Chandra': { exaltSign: 1, paramUcha: 3, own: [3], debilSign: 7, paramNeecha: 3, digBalaHouse: 4, friends: [0,4,5,7,8,11], enemies: [], combustRange: 12, color: '#64748b', desc: 'Manakaraka (Mind)' },
+    'Mangal': { exaltSign: 9, paramUcha: 28, own: [0, 7], debilSign: 3, paramNeecha: 28, digBalaHouse: 10, friends: [3,4,8,11], enemies: [2,5], combustRange: 17, color: '#dc2626', desc: 'Bhratrukaraka (Siblings)' },
+    'Budh': { exaltSign: 5, paramUcha: 15, own: [2, 5], debilSign: 11, paramNeecha: 15, digBalaHouse: 1, friends: [0,4,1,6], enemies: [3], combustRange: 14, color: '#059669', desc: 'Vidyakaraka (Intellect)' },
+    'Guru': { exaltSign: 3, paramUcha: 5, own: [8, 11], debilSign: 9, paramNeecha: 5, digBalaHouse: 1, friends: [0,3,4,7], enemies: [1,2,5,6], combustRange: 11, color: '#d97706', desc: 'Dhanakaraka (Wealth)' },
+    'Shukra': { exaltSign: 11, paramUcha: 27, own: [1, 6], debilSign: 5, paramNeecha: 27, digBalaHouse: 4, friends: [2,5,9,10], enemies: [3,4], combustRange: 10, color: '#c026d3', desc: 'Kalatrakaraka (Spouse)' },
+    'Shani': { exaltSign: 6, paramUcha: 20, own: [9, 10], debilSign: 0, paramNeecha: 20, digBalaHouse: 7, friends: [1,2,5,6], enemies: [0,3,4,7], combustRange: 15, color: '#334155', desc: 'Ayushkaraka (Longevity)' },
+    // Nodes don't have true Dig Bala or Combustion in the physical sense
+    'Rahu': { exaltSign: 1, paramUcha: 15, own: [5, 10], debilSign: 7, paramNeecha: 15, digBalaHouse: -1, friends: [2,6,9], enemies: [3,4], combustRange: 0, color: '#475569', desc: 'Chhaya (Illusion)' },
+    'Ketu': { exaltSign: 7, paramUcha: 15, own: [8, 11], debilSign: 1, paramNeecha: 15, digBalaHouse: -1, friends: [0,3,4], enemies: [1,6], combustRange: 0, color: '#78716c', desc: 'Chhaya (Moksha)' }
+};
 
-        function calculateGrahaStrength(housesArray) {
-            let scores = [];
-            const calcPlanets = ['Surya', 'Chandra', 'Mangal', 'Budh', 'Guru', 'Shukra', 'Shani', 'Rahu', 'Ketu'];
+function calculateGrahaStrength(housesArray) {
+    let scores = [];
+    const calcPlanets = ['Surya', 'Chandra', 'Mangal', 'Budh', 'Guru', 'Shukra', 'Shani', 'Rahu', 'Ketu'];
+    
+    // Find Sun's position first for Combustion checks
+    let sunData = null;
+    for(let i=0; i<12; i++) {
+        let found = housesArray[i].find(b => b.name === 'Surya');
+        if(found) { sunData = found; break; }
+    }
 
-            calcPlanets.forEach(pName => {
-                let pData = null; let houseNum = -1;
-                for(let i=0; i<12; i++) {
-                    let found = housesArray[i].find(b => b.name === pName);
-                    if(found) { pData = found; houseNum = i + 1; break; }
-                }
-
-                if(pData && pData.abs_deg !== undefined) {
-                    let score = 50; 
-                    let signIndex = Math.floor(pData.abs_deg / 30); 
-                    let bphs = bphsData[pName];
-                    let log = ["Base: 50"];
-
-                    if (signIndex === bphs.exalt) { score += 30; log.push("Ucha (Exalted) +30"); } 
-                    else if (Array.isArray(bphs.own) ? bphs.own.includes(signIndex) : signIndex === bphs.own) { score += 20; log.push("Swa-Rashi (Own Sign) +20"); } 
-                    else if (signIndex === bphs.debil) { score -= 20; log.push("Neecha (Debilitated) -20"); } 
-                    else { log.push("Neutral Sign +0"); }
-
-                    if ([1, 4, 7, 10].includes(houseNum)) { score += 15; log.push(`Kendra Bhava (${houseNum}) +15`); } 
-                    else if ([5, 9].includes(houseNum)) { score += 12; log.push(`Trikona Bhava (${houseNum}) +12`); } 
-                    else if ([6, 8, 12].includes(houseNum)) { score -= 10; log.push(`Dusthana Bhava (${houseNum}) -10`); } 
-                    else { log.push(`Neutral Bhava (${houseNum}) +0`); }
-
-                    scores.push({ name: pName, total: score, sign: signIndex, house: houseNum, reasons: log, color: bphs.color, desc: bphs.desc });
-                }
-            });
-
-            scores.sort((a, b) => b.total - a.total);
-            renderRanking(scores);
+    calcPlanets.forEach(pName => {
+        let pData = null; let houseNum = -1;
+        for(let i=0; i<12; i++) {
+            let found = housesArray[i].find(b => b.name === pName);
+            if(found) { pData = found; houseNum = i + 1; break; }
         }
+
+        if(pData && pData.abs_deg !== undefined) {
+            let score = 50; 
+            let signIndex = Math.floor(pData.abs_deg / 30); 
+            let degInSign = pData.abs_deg % 30;
+            let bphs = bphsDeepData[pName]; 
+            let log = ["Base: 50"];
+
+            // 1. DIGNITY & PARAM UCHA (Deep Exaltation)
+            if (signIndex === bphs.exaltSign) { 
+                // Calculate proximity to Deep Exaltation degree
+                let dist = Math.abs(degInSign - bphs.paramUcha);
+                let exaltBonus = 30 - Math.floor(dist / 2); // Max 30, drops as it gets further
+                score += exaltBonus; 
+                log.push(`Ucha (+${exaltBonus})`); 
+            } 
+            else if (Array.isArray(bphs.own) ? bphs.own.includes(signIndex) : signIndex === bphs.own) { 
+                score += 20; log.push("Swa-Rashi (+20)"); 
+            } 
+            else if (signIndex === bphs.debilSign) { 
+                let dist = Math.abs(degInSign - bphs.paramNeecha);
+                let debilPenalty = 20 - Math.floor(dist / 2);
+                score -= debilPenalty; 
+                log.push(`Neecha (-${debilPenalty})`); 
+            } 
+            else if (bphs.friends.includes(signIndex)) {
+                score += 10; log.push("Mitra Rashi (+10)");
+            }
+            else if (bphs.enemies.includes(signIndex)) {
+                score -= 10; log.push("Shatru Rashi (-10)");
+            }
+
+            // 2. DIG BALA (Directional Strength)
+            if (houseNum === bphs.digBalaHouse) {
+                score += 20; log.push("Dig Bala (+20)");
+            } else if (Math.abs(houseNum - bphs.digBalaHouse) === 6) {
+                // Opposite of Dig Bala loses strength
+                score -= 10; log.push("Zero Dig Bala (-10)");
+            }
+
+            // 3. BHAVA BALA (House Placement)
+            if ([1, 4, 7, 10].includes(houseNum)) { 
+                score += 15; log.push(`Kendra (${houseNum}) +15`); 
+            } 
+            else if ([5, 9].includes(houseNum)) { 
+                score += 12; log.push(`Trikona (${houseNum}) +12`); 
+            } 
+            else if (houseNum === 11) { 
+                score += 15; log.push("Labha/Upachaya (+15)"); 
+            }
+            else if ([6, 8, 12].includes(houseNum)) { 
+                // Malefics get slightly less penalty in 6th
+                if (houseNum === 6 && ['Surya', 'Mangal', 'Shani', 'Rahu', 'Ketu'].includes(pName)) {
+                    score -= 5; log.push(`Upachaya Malefic (-5)`);
+                } else {
+                    score -= 15; log.push(`Dusthana (${houseNum}) -15`); 
+                }
+            } 
+
+            // 4. ASTANGATA (Combustion Check)
+            if (pName !== 'Surya' && pName !== 'Rahu' && pName !== 'Ketu' && sunData) {
+                let distToSun = Math.abs(pData.abs_deg - sunData.abs_deg);
+                // Handle 359 to 1 degree wrap-around
+                if (distToSun > 180) distToSun = 360 - distToSun; 
+                
+                if (distToSun <= bphs.combustRange) {
+                    score -= 25; log.push(`Astangata/Combust (-25)`);
+                }
+            }
+
+            // Floor the score so it doesn't go below 0
+            if (score < 0) score = 0;
+
+            scores.push({ name: pName, total: score, sign: signIndex, house: houseNum, reasons: log, color: bphs.color, desc: bphs.desc });
+        }
+    });
+
+    // Sort by final calculated strength
+    scores.sort((a, b) => b.total - a.total);
+    
+    // Assign ranking numeral after sort
+    scores.forEach((s, i) => s.rankNum = i + 1);
+    globalScores = scores;
+    
+    renderRanking(scores);
+    renderDeepBhavaOccupants(housesArray, scores);
+}
 
         function renderRanking(scores) {
             const listDiv = document.getElementById('rankingList');
@@ -889,6 +961,84 @@
             });
         }
 
+// --- COPY FROM HERE ---
+        const grahaKnowledge = {
+            'Surya': { adhyatmik: "Represents the eternal Atman (Soul), pure consciousness, and the cosmic father principle.", astronomical: "A G-type main-sequence star containing 99.8% of the solar system's mass.", scientific: "Emits vital life-sustaining photons; regulates biological circadian rhythms.", benefits: "Grants supreme vitality, unwavering self-confidence, leadership.", remedy: "Adhyatmik: Chant Aditya Hrudayam. Astro/Sci: Morning sunlight exposure." },
+            'Chandra': { adhyatmik: "Manas (Mind) and perception. The cosmic mother principle.", astronomical: "Earth's only natural satellite. Tidally locked to Earth.", scientific: "Its gravitational pull drives ocean tides and subtly modulates human neuro-fluid dynamics.", benefits: "Grants deep empathy, emotional stability, intuitive perception.", remedy: "Adhyatmik: Meditate on Lord Shiva. Astro/Sci: Maintain strict sleep hygiene." },
+            'Mangal': { adhyatmik: "Ahankara (Ego in action), willpower, and Bhratrukaraka.", astronomical: "The Red Planet, a terrestrial body covered in iron-oxide dust.", scientific: "Symbolically aligns with the body's adrenal system and cortisol regulation.", benefits: "Grants fearless logic, executive execution, physical stamina.", remedy: "Adhyatmik: Read Hanuman Chalisa. Astro/Sci: High-intensity physical exertion." },
+            'Budh': { adhyatmik: "Buddhi (Intellect), discrimination, and speech.", astronomical: "The smallest and fastest planet, orbiting closest to the sun.", scientific: "Governs neural plasticity and synaptic firing speed.", benefits: "Grants rapid learning, articulate communication, commercial acumen.", remedy: "Adhyatmik: Chant Vishnu Sahasranama. Astro/Sci: Learn new languages." },
+            'Guru': { adhyatmik: "The Guru, Dharma, expansion of consciousness, and divine grace.", astronomical: "The largest gas giant, acting as a massive gravitational shield.", scientific: "Correlates with neurogenesis and the brain's capacity for dopaminergic optimism.", benefits: "Grants profound wisdom, wealth, ethical morality.", remedy: "Adhyatmik: Respect teachers. Astro/Sci: Deep philosophical study." },
+            'Shukra': { adhyatmik: "Kama (Desire), harmony, beauty, and Ojas (vital essence).", astronomical: "The hottest planet due to runaway greenhouse effect, rotating retrograde.", scientific: "Regulates the endocrine system, specifically oxytocin and dopamine.", benefits: "Grants luxurious comforts, romantic fulfillment, artistic genius.", remedy: "Adhyatmik: Respect partners/women. Astro/Sci: Engage in creative arts." },
+            'Shani': { adhyatmik: "Karma, time, boundaries, and Vairagya (detachment).", astronomical: "A massive gas giant distinguished by a complex ring system.", scientific: "Represents biological senescence (aging) and structural neuro-adaptations.", benefits: "Grants unparalleled discipline, structural endurance, profound wisdom.", remedy: "Adhyatmik: Serve the marginalized. Astro/Sci: Implement rigid daily routines." },
+            'Rahu': { adhyatmik: "Material illusion (Maya), insatiable desire, and unorthodox elements.", astronomical: "The ascending mathematical node where the Moon's orbit crosses the ecliptic.", scientific: "Represents neuro-chemical disruption and massive dopamine spikes.", benefits: "Grants technological innovation, mass media success, worldly conquests.", remedy: "Adhyatmik: Worship Durga. Astro/Sci: Ground the body electromagnetically." },
+            'Ketu': { adhyatmik: "Moksha (Liberation), past-life mastery, the void, and absolute detachment.", astronomical: "The descending mathematical node of the lunar orbit.", scientific: "Correlates with the activation of the brain's Default Mode Network (DMN).", benefits: "Grants profound intuition, occult mastery, sudden spiritual awakenings.", remedy: "Adhyatmik: Practice Vipassana meditation. Astro/Sci: Engage in sensory deprivation." }
+        };
+
+        function renderDeepBhavaOccupants(housesArray, scores) {
+            let flatHouses = [[],[],[],[],[],[],[],[],[],[],[],[]];
+            housesArray.forEach((h, i) => flatHouses[i] = [...h]);
+            let outer = injectOuterPlanets([]);
+            outer.forEach(b => {
+                const house_idx = (Math.floor(b.abs_deg / 30) + 1 - asc_sign_global) % 12;
+                flatHouses[house_idx >= 0 ? house_idx : house_idx+12].push(b);
+            });
+
+            for (let i = 0; i < 12; i++) {
+                const bhavaDiv = document.getElementById(`bhava-occ-${i+1}`);
+                if(!bhavaDiv) continue;
+                bhavaDiv.innerHTML = ''; 
+                
+                const occupants = flatHouses[i];
+                if(occupants.length === 0 || (occupants.length === 1 && occupants[0].name === 'Earth')) {
+                    bhavaDiv.innerHTML = '<div style="font-size:12px; color:#94a3b8; padding:5px;">Empty House (Void of physical Grahas). Evaluate House Lord for results.</div>';
+                    continue;
+                }
+
+                occupants.forEach(b => {
+                    if (b.name === 'Earth') return;
+
+                    const localName = (i18n[currentLang] && i18n[currentLang].names[b.name]) ? i18n[currentLang].names[b.name] : b.name;
+                    const isMainGraha = Object.keys(grahaKnowledge).includes(b.name);
+                    let pCol = pColors[b.name] || '#64748b';
+                    let degStr = formatDegree(b.deg);
+                    let nakStr = getNakshatraLocal(b.abs_deg);
+
+                    if (isMainGraha) {
+                        const scoreData = scores.find(s => s.name === b.name);
+                        const kData = grahaKnowledge[b.name];
+                        
+                        bhavaDiv.innerHTML += `
+                            <div class="occ-card" style="--p-color: ${pCol};">
+                                <div class="occ-header">
+                                    <div class="occ-title-main">${symbols[b.name]} ${localName}</div>
+                                    <div class="occ-stats">
+                                        Angle: ${degStr} (${nakStr.split(' ')[1]||nakStr})<br>
+                                        Rank: <span class="occ-stat-hl">#${scoreData ? scoreData.rankNum : '-'}</span> | BPHS Pts: <span class="occ-stat-hl">${scoreData ? scoreData.total : '-'}</span>
+                                    </div>
+                                </div>
+                                <div class="occ-grid">
+                                    <div class="occ-box"><div class="occ-box-title">Adhyatmik Reality</div><div class="occ-box-text">${kData.adhyatmik}</div></div>
+                                    <div class="occ-box"><div class="occ-box-title">Astronomical Reality</div><div class="occ-box-text">${kData.astronomical}</div></div>
+                                    <div class="occ-box"><div class="occ-box-title">Scientific Correlation</div><div class="occ-box-text">${kData.scientific}</div></div>
+                                </div>
+                                <div class="occ-remedy-box">
+                                    <div class="occ-remedy-title">Benefits & Remedies</div>
+                                    <div class="occ-remedy-text"><strong>Benefits:</strong> ${kData.benefits}<br><strong>Remedy:</strong> ${kData.remedy}</div>
+                                </div>
+                            </div>`;
+                    } else {
+                        bhavaDiv.innerHTML += `
+                            <div class="occ-card" style="--p-color: ${pCol}; padding: 10px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <strong style="color:${pCol}; font-size:13px;">${symbols[b.name]||'•'} ${localName}</strong>
+                                    <span style="font-size:12px; color:#64748b;">Angle: ${degStr}</span>
+                                </div>
+                            </div>`;
+                    }
+                });
+            }
+        }
+        // --- END COPY ---
         function toggleFullScreen() { if (!document.fullscreenElement) container.requestFullscreen(); else document.exitFullscreen(); }
         window.addEventListener('resize', () => { const width = container.clientWidth; const height = container.clientHeight; camera.aspect = width / height; camera.updateProjectionMatrix(); renderer.setSize(width, height); canvas2D.width = width; canvas2D.height = height; });
         window.onload = () => { changeLanguage(); populateKundali([[],[],[],[],[],[],[],[],[],[],[],[]], 1); init3D(); };
