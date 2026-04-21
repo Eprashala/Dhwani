@@ -179,7 +179,7 @@
 
         <div class="panel ledger-panel">
             <div class="ledger-header">
-                <h3 data-i18n="graha_bala">Parashari Graha Strength Ledger (Shubhatva)</h3>
+                <h3 data-i18n="graha_bala">Parashari Sthana & Dig Bala Ledger</h3>
             </div>
             <div id="rankingList" class="ranking-grid">
                 <p style="text-align:center; font-size: 14px; color: #7f8c8d; grid-column: 1 / -1;" data-i18n="awaiting_calc">Calculate chart to reveal the deep karmic ranking of your Grahas...</p>
@@ -488,29 +488,35 @@
 
         function resetCamera() { camera.position.set(0, 2200, 0); camera.lookAt(0, 0, 0); }
 
-        async function generateChart() {
+		async function generateChart() {
             const btn = document.querySelector('.btn-calc'); btn.innerText = "Aligning Cosmos...";
             let timeStr = document.getElementById('time').value; if (timeStr.split(':').length === 2) timeStr += ":00";
             const payload = { date: document.getElementById('date').value, time: timeStr, lat: document.getElementById('lat').value, lon: document.getElementById('lon').value };
 
             try {
+                // Ensure this URL matches your actual PythonAnywhere domain!
                 const response = await fetch('https://eprashala.pythonanywhere.com/calculate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 const data = await response.json();
+                
                 if (data.status === 'success') {
                     document.getElementById('error-msg').innerText = "";
-                    skyData = data.houses; asc_sign_global = data.asc_sign;
+                    skyData = data.houses; 
+                    asc_sign_global = data.asc_sign;
                     updateAllViews();
-                    calculateGrahaStrength(skyData);
+                    
+                    // NEW: Pass the absolute truth from the backend directly to the UI
+                    if(data.grahas_data) {
+                        renderBackendStrength(data.grahas_data, skyData);
+                    }
                 } else {
                     document.getElementById('error-msg').innerText = data.message;
                 }
             } catch (err) { 
                 console.error("Connection Diagnostic:", err);
-                document.getElementById('error-msg').innerHTML = "<strong>Network Blocked:</strong> " + err.message + "<br><span style='font-size:11px; color:#555;'>Press F12 (Console) for details. If using PythonAnywhere, ensure flask-cors is installed and the web server is reloaded.</span>"; 
+                document.getElementById('error-msg').innerHTML = "<strong>Network Blocked:</strong> " + err.message + "<br><span style='font-size:11px; color:#555;'>Check if PythonAnywhere server is running and flask-cors is installed.</span>"; 
             } 
             finally { btn.innerText = i18n[currentLang].btn_calc; }
         }
-
         function injectOuterPlanets(flatBodies) {
             const epoch2026 = { 'Arun': 56, 'Varun': 358, 'Yama': 301 }; 
             Object.keys(epoch2026).forEach(p => { 
@@ -858,124 +864,48 @@
             });
         }
 
- // THE TRUE PARASHARI KNOWLEDGE BASE
-const bphsDeepData = {
-    'Surya': { exaltSign: 0, paramUcha: 10, own: [4], debilSign: 6, paramNeecha: 10, digBalaHouse: 10, friends: [1,2,3,7,8,11], enemies: [9,10,1,6], combustRange: 0, color: '#e67e22', desc: 'Atmakaraka (Soul)' },
-    'Chandra': { exaltSign: 1, paramUcha: 3, own: [3], debilSign: 7, paramNeecha: 3, digBalaHouse: 4, friends: [0,4,5,7,8,11], enemies: [], combustRange: 12, color: '#64748b', desc: 'Manakaraka (Mind)' },
-    'Mangal': { exaltSign: 9, paramUcha: 28, own: [0, 7], debilSign: 3, paramNeecha: 28, digBalaHouse: 10, friends: [3,4,8,11], enemies: [2,5], combustRange: 17, color: '#dc2626', desc: 'Bhratrukaraka (Siblings)' },
-    'Budh': { exaltSign: 5, paramUcha: 15, own: [2, 5], debilSign: 11, paramNeecha: 15, digBalaHouse: 1, friends: [0,4,1,6], enemies: [3], combustRange: 14, color: '#059669', desc: 'Vidyakaraka (Intellect)' },
-    'Guru': { exaltSign: 3, paramUcha: 5, own: [8, 11], debilSign: 9, paramNeecha: 5, digBalaHouse: 1, friends: [0,3,4,7], enemies: [1,2,5,6], combustRange: 11, color: '#d97706', desc: 'Dhanakaraka (Wealth)' },
-    'Shukra': { exaltSign: 11, paramUcha: 27, own: [1, 6], debilSign: 5, paramNeecha: 27, digBalaHouse: 4, friends: [2,5,9,10], enemies: [3,4], combustRange: 10, color: '#c026d3', desc: 'Kalatrakaraka (Spouse)' },
-    'Shani': { exaltSign: 6, paramUcha: 20, own: [9, 10], debilSign: 0, paramNeecha: 20, digBalaHouse: 7, friends: [1,2,5,6], enemies: [0,3,4,7], combustRange: 15, color: '#334155', desc: 'Ayushkaraka (Longevity)' },
-    // Nodes don't have true Dig Bala or Combustion in the physical sense
-    'Rahu': { exaltSign: 1, paramUcha: 15, own: [5, 10], debilSign: 7, paramNeecha: 15, digBalaHouse: -1, friends: [2,6,9], enemies: [3,4], combustRange: 0, color: '#475569', desc: 'Chhaya (Illusion)' },
-    'Ketu': { exaltSign: 7, paramUcha: 15, own: [8, 11], debilSign: 1, paramNeecha: 15, digBalaHouse: -1, friends: [0,3,4], enemies: [1,6], combustRange: 0, color: '#78716c', desc: 'Chhaya (Moksha)' }
-};
+ function renderBackendStrength(backendGrahas, housesArray) {
+            // Keep the UI aesthetic data (colors and short descriptions) on the frontend
+            const uiMeta = {
+                'Surya': { color: '#e67e22', desc: 'Atmakaraka (Soul)' },
+                'Chandra': { color: '#64748b', desc: 'Manakaraka (Mind)' },
+                'Mangal': { color: '#dc2626', desc: 'Bhratrukaraka (Siblings)' },
+                'Budh': { color: '#059669', desc: 'Vidyakaraka (Intellect)' },
+                'Guru': { color: '#d97706', desc: 'Dhanakaraka (Wealth)' },
+                'Shukra': { color: '#c026d3', desc: 'Kalatrakaraka (Spouse)' },
+                'Shani': { color: '#334155', desc: 'Ayushkaraka (Longevity)' },
+                'Rahu': { color: '#475569', desc: 'Chhaya (Illusion)' },
+                'Ketu': { color: '#78716c', desc: 'Chhaya (Moksha)' }
+            };
 
-function calculateGrahaStrength(housesArray) {
-    let scores = [];
-    const calcPlanets = ['Surya', 'Chandra', 'Mangal', 'Budh', 'Guru', 'Shukra', 'Shani', 'Rahu', 'Ketu'];
-    
-    // Find Sun's position first for Combustion checks
-    let sunData = null;
-    for(let i=0; i<12; i++) {
-        let found = housesArray[i].find(b => b.name === 'Surya');
-        if(found) { sunData = found; break; }
-    }
-
-    calcPlanets.forEach(pName => {
-        let pData = null; let houseNum = -1;
-        for(let i=0; i<12; i++) {
-            let found = housesArray[i].find(b => b.name === pName);
-            if(found) { pData = found; houseNum = i + 1; break; }
-        }
-
-        if(pData && pData.abs_deg !== undefined) {
-            let score = 50; 
-            let signIndex = Math.floor(pData.abs_deg / 30); 
-            let degInSign = pData.abs_deg % 30;
-            let bphs = bphsDeepData[pName]; 
-            let log = ["Base: 50"];
-
-            // 1. DIGNITY & PARAM UCHA (Deep Exaltation)
-            if (signIndex === bphs.exaltSign) { 
-                // Calculate proximity to Deep Exaltation degree
-                let dist = Math.abs(degInSign - bphs.paramUcha);
-                let exaltBonus = 30 - Math.floor(dist / 2); // Max 30, drops as it gets further
-                score += exaltBonus; 
-                log.push(`Ucha (+${exaltBonus})`); 
-            } 
-            else if (Array.isArray(bphs.own) ? bphs.own.includes(signIndex) : signIndex === bphs.own) { 
-                score += 20; log.push("Swa-Rashi (+20)"); 
-            } 
-            else if (signIndex === bphs.debilSign) { 
-                let dist = Math.abs(degInSign - bphs.paramNeecha);
-                let debilPenalty = 20 - Math.floor(dist / 2);
-                score -= debilPenalty; 
-                log.push(`Neecha (-${debilPenalty})`); 
-            } 
-            else if (bphs.friends.includes(signIndex)) {
-                score += 10; log.push("Mitra Rashi (+10)");
-            }
-            else if (bphs.enemies.includes(signIndex)) {
-                score -= 10; log.push("Shatru Rashi (-10)");
-            }
-
-            // 2. DIG BALA (Directional Strength)
-            if (houseNum === bphs.digBalaHouse) {
-                score += 20; log.push("Dig Bala (+20)");
-            } else if (Math.abs(houseNum - bphs.digBalaHouse) === 6) {
-                // Opposite of Dig Bala loses strength
-                score -= 10; log.push("Zero Dig Bala (-10)");
-            }
-
-            // 3. BHAVA BALA (House Placement)
-            if ([1, 4, 7, 10].includes(houseNum)) { 
-                score += 15; log.push(`Kendra (${houseNum}) +15`); 
-            } 
-            else if ([5, 9].includes(houseNum)) { 
-                score += 12; log.push(`Trikona (${houseNum}) +12`); 
-            } 
-            else if (houseNum === 11) { 
-                score += 15; log.push("Labha/Upachaya (+15)"); 
-            }
-            else if ([6, 8, 12].includes(houseNum)) { 
-                // Malefics get slightly less penalty in 6th
-                if (houseNum === 6 && ['Surya', 'Mangal', 'Shani', 'Rahu', 'Ketu'].includes(pName)) {
-                    score -= 5; log.push(`Upachaya Malefic (-5)`);
-                } else {
-                    score -= 15; log.push(`Dusthana (${houseNum}) -15`); 
+            let scores = [];
+            
+            // Map the pure mathematical data from Python to the UI object
+            backendGrahas.forEach(g => {
+                if (uiMeta[g.name]) {
+                    scores.push({
+                        name: g.name,
+                        total: g.shadbala,        // Exact Parashari Virupas
+                        sign: g.sign,
+                        house: g.house,
+                        reasons: g.shadbala_log,  // Exact Log from Python
+                        color: uiMeta[g.name].color,
+                        desc: uiMeta[g.name].desc
+                    });
                 }
-            } 
+            });
 
-            // 4. ASTANGATA (Combustion Check)
-            if (pName !== 'Surya' && pName !== 'Rahu' && pName !== 'Ketu' && sunData) {
-                let distToSun = Math.abs(pData.abs_deg - sunData.abs_deg);
-                // Handle 359 to 1 degree wrap-around
-                if (distToSun > 180) distToSun = 360 - distToSun; 
-                
-                if (distToSun <= bphs.combustRange) {
-                    score -= 25; log.push(`Astangata/Combust (-25)`);
-                }
-            }
-
-            // Floor the score so it doesn't go below 0
-            if (score < 0) score = 0;
-
-            scores.push({ name: pName, total: score, sign: signIndex, house: houseNum, reasons: log, color: bphs.color, desc: bphs.desc });
+            // Sort by final calculated strength (Highest Virupas to Lowest)
+            scores.sort((a, b) => b.total - a.total);
+            
+            // Assign ranking numeral after sort
+            scores.forEach((s, i) => s.rankNum = i + 1);
+            globalScores = scores;
+            
+            // Call your existing pristine render functions
+            renderRanking(scores);
+            renderDeepBhavaOccupants(housesArray, scores);
         }
-    });
-
-    // Sort by final calculated strength
-    scores.sort((a, b) => b.total - a.total);
-    
-    // Assign ranking numeral after sort
-    scores.forEach((s, i) => s.rankNum = i + 1);
-    globalScores = scores;
-    
-    renderRanking(scores);
-    renderDeepBhavaOccupants(housesArray, scores);
-}
 
         function renderRanking(scores) {
             const listDiv = document.getElementById('rankingList');
