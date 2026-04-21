@@ -293,6 +293,63 @@ def calculate_shadbala_metrics(p_name, p_data, all_positions, asc_abs_deg, sun_d
         log.append(f"Naisargika: {round(nais_v, 1)}V")
 
     return max(0, round(total_v, 1)), log
+    
+    
+    # -----------------------------------------------------------------------------------------
+# TRUE BPHS ASHTAKAVARGA BINDU MATRIX (Positions from which a planet gives 1 Bindu)
+# -----------------------------------------------------------------------------------------
+BAV_TABLES = {
+    'Surya': {
+        'Surya': [1,2,4,7,8,9,10,11], 'Chandra': [3,6,10,11], 'Mangal': [1,2,4,7,8,9,10,11],
+        'Budh': [3,5,6,9,10,11,12], 'Guru': [5,6,9,11], 'Shukra': [6,7,12], 'Shani': [1,2,4,7,8,9,10,11], 'Asc': [3,4,6,10,11,12]
+    },
+    'Chandra': {
+        'Surya': [3,6,7,8,10,11], 'Chandra': [1,3,6,7,10,11], 'Mangal': [2,3,5,6,9,10,11],
+        'Budh': [1,3,4,5,7,8,10,11], 'Guru': [1,4,7,8,10,11,12], 'Shukra': [3,4,5,7,9,10,11], 'Shani': [3,5,6,11], 'Asc': [3,6,10,11]
+    },
+    'Mangal': {
+        'Surya': [3,5,6,10,11], 'Chandra': [3,6,11], 'Mangal': [1,2,4,7,8,10,11],
+        'Budh': [3,5,6,11], 'Guru': [6,10,11,12], 'Shukra': [6,8,11,12], 'Shani': [1,4,7,8,9,10,11], 'Asc': [1,3,6,10,11]
+    },
+    'Budh': {
+        'Surya': [5,6,9,11,12], 'Chandra': [2,4,6,8,10,11], 'Mangal': [1,2,4,7,8,9,10,11],
+        'Budh': [1,3,5,6,9,10,11,12], 'Guru': [6,8,11,12], 'Shukra': [1,2,3,4,5,8,9,11], 'Shani': [1,2,4,7,8,9,10,11], 'Asc': [1,2,4,6,8,10,11]
+    },
+    'Guru': {
+        'Surya': [1,2,3,4,7,8,9,10,11], 'Chandra': [2,5,7,9,11], 'Mangal': [1,2,4,7,8,10,11],
+        'Budh': [1,2,4,5,6,9,10,11], 'Guru': [1,2,3,4,7,8,10,11], 'Shukra': [2,5,6,9,10,11], 'Shani': [3,5,6,12], 'Asc': [1,2,4,5,6,7,9,10,11]
+    },
+    'Shukra': {
+        'Surya': [8,11,12], 'Chandra': [1,2,3,4,5,8,9,11,12], 'Mangal': [3,5,6,9,11,12],
+        'Budh': [3,5,6,9,11], 'Guru': [5,8,9,10,11], 'Shukra': [1,2,3,4,5,8,9,10,11], 'Shani': [3,4,5,8,9,10,11], 'Asc': [1,2,3,4,5,8,9,11]
+    },
+    'Shani': {
+        'Surya': [1,2,4,7,8,10,11], 'Chandra': [3,6,11], 'Mangal': [3,5,6,10,11],
+        'Budh': [6,8,9,10,11,12], 'Guru': [5,6,11,12], 'Shukra': [6,11,12], 'Shani': [3,5,6,11], 'Asc': [1,3,4,6,10,11]
+    }
+}
+
+def calculate_sarvashtakavarga(all_positions, asc_sign_index):
+    """Calculates the exact 337 points of Parashari SAV."""
+    sav = [0] * 12
+    # Add Ascendant to positions for BAV calc
+    pos_data = {k: v['sign'] for k, v in all_positions.items() if k in BAV_TABLES.keys()}
+    pos_data['Asc'] = asc_sign_index
+    
+    for target_planet, contributors in BAV_TABLES.items():
+        for contributor, houses in contributors.items():
+            if contributor in pos_data:
+                contributor_sign = pos_data[contributor]
+                for h in houses:
+                    target_sign = (contributor_sign + h - 1) % 12
+                    sav[target_sign] += 1
+    
+    # We must shift the array so index 0 = Lagna (1st House)
+    shifted_sav = []
+    for i in range(12):
+        shifted_sav.append(sav[(asc_sign_index + i) % 12])
+        
+    return shifted_sav
 
 @app.route('/calculate', methods=['POST'])
 def calculate_chart():
@@ -365,13 +422,88 @@ def calculate_chart():
         for g in grahas: 
             houses_array[g['house'] - 1].append(g)
 
+        # Pass 3: True Ashtakavarga
+        sav_array = calculate_sarvashtakavarga(all_positions, asc_sign_index)
+           
+        # --- PASS 4: RESTORE UPAGRAHAS (Aprakasha & Kala Velas) ---
+        # 1. Aprakasha Grahas based on Sun's Longitude
+        aprakasha = {}
+        aprakasha['Dhuma'] = (sun_deg + 133.333333) % 360
+        aprakasha['Vyatipata'] = (360 - aprakasha['Dhuma']) % 360
+        aprakasha['Parivesha'] = (aprakasha['Vyatipata'] + 180) % 360
+        aprakasha['Indrachap'] = (360 - aprakasha['Parivesha']) % 360
+        aprakasha['Upaketu'] = (aprakasha['Indrachap'] + 16.666667) % 360
+
+        for name, u_deg in aprakasha.items():
+            u_sign_idx = int(u_deg / 30)
+            u_house_idx = (u_sign_idx - asc_sign_index + 12) % 12
+            houses_array[u_house_idx].append({
+                'name': name, 'type': 'upagraha', 'abs_deg': u_deg, 'deg': u_deg % 30, 'house': u_house_idx + 1
+            })
+
+        # 2. Kala Velas based on Sunrise/Sunset segments
+        geopos = (lon, lat, 0.0) 
+        rise_flags = swe.CALC_RISE | swe.BIT_DISC_CENTER | swe.BIT_NO_REFRACTION
+        set_flags = swe.CALC_SET | swe.BIT_DISC_CENTER | swe.BIT_NO_REFRACTION
+        
+        res_rise1 = swe.rise_trans(jd_ut - 1.0, swe.SUN, rise_flags, geopos)
+        sunrise1 = res_rise1[1][0]
+        
+        res_set1 = swe.rise_trans(sunrise1, swe.SUN, set_flags, geopos)
+        sunset1 = res_set1[1][0]
+        
+        res_rise2 = swe.rise_trans(sunset1, swe.SUN, rise_flags, geopos)
+        sunrise2 = res_rise2[1][0]
+
+        is_daytime = sunrise1 <= jd_ut < sunset1
+
+        if is_daytime:
+            start_jd = sunrise1
+            end_jd = sunset1
+            wk_day = swe.day_of_week(start_jd + 0.5) 
+        else:
+            if jd_ut >= sunset1:
+                start_jd = sunset1
+                end_jd = sunrise2
+                wk_day = swe.day_of_week(sunrise1 + 0.5) 
+            else:
+                res_set_prev = swe.rise_trans(sunrise1 - 1.0, swe.SUN, set_flags, geopos)
+                start_jd = res_set_prev[1][0]
+                end_jd = sunrise1
+                wk_day = swe.day_of_week(start_jd - 0.5)
+
+        lord_index = (wk_day + 1) % 7 
+        if not is_daytime:
+            lord_index = (lord_index + 4) % 7
+            
+        segment_len = (end_jd - start_jd) / 8.0
+        owners = [(lord_index + i) % 7 for i in range(7)]
+        
+        upagraha_segments = {
+            'Kaal': owners.index(0), 'Mrityu': owners.index(2),
+            'Ardhaprahar': owners.index(3), 'Yaamgandak': owners.index(4),
+            'Gulika': owners.index(6)
+        }
+        
+        for name, seg_idx in upagraha_segments.items():
+            u_start_jd = start_jd + (seg_idx * segment_len)
+            houses_u, ascmc_u = swe.houses_ex(u_start_jd, lat, lon, b'E', flags)
+            u_deg = ascmc_u[0]
+            u_sign_idx = int(u_deg / 30)
+            u_house_idx = (u_sign_idx - asc_sign_index + 12) % 12
+            houses_array[u_house_idx].append({
+                'name': name, 'type': 'upagraha', 'abs_deg': u_deg, 'deg': u_deg % 30, 'house': u_house_idx + 1
+            })
+
         return jsonify({
             'status': 'success', 
             'asc_sign': asc_sign_index + 1, 
             'asc_degree': asc_deg, 
             'houses': houses_array, 
-            'grahas_data': grahas
+            'grahas_data': grahas,
+            'sav_data': sav_array # <--- ADD THIS LINE
         })
+        
 
     except Exception as e: 
         return jsonify({'status': 'error', 'message': str(e)}), 500
