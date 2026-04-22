@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sanjeevani - Holistic AI Vaidya</title>
+    <style>
+        :root {
+            --primary: #1e3a8a; /* Deep Blue/Scientific */
+            --secondary: #b45309; /* Saffron/Ayurvedic */
+            --accent: #16a34a; /* Green/Nature */
+            --bg: #fdfbf7; /* Off-white/Papyrus */
+            --text: #333;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg); color: var(--text);
+            max-width: 800px; margin: 0 auto; padding: 20px;
+        }
+        h1, h2, h3 { text-align: center; color: var(--primary); }
+        
+        /* Language Selector */
+        .lang-container { text-align: right; margin-bottom: 15px; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .lang-container select { font-size: 16px; padding: 5px; border-radius: 4px; border: 1px solid #ccc; font-weight: bold; color: var(--primary);}
+
+        /* Layout Toggles */
+        #profileSetup { display: none; }
+        #mainApp { display: none; }
+
+        /* Form Styles */
+        .form-group { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; border-top: 4px solid var(--secondary); }
+        label { font-weight: bold; display: block; margin-top: 10px; color: var(--secondary); }
+        input[type="text"], input[type="number"], select, textarea {
+            width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px;
+        }
+        .btn-submit { width: 100%; background-color: var(--secondary); color: white; padding: 15px; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 20px; }
+
+        /* App Styles */
+        .user-badge { background: #e0f2fe; padding: 10px; border-radius: 8px; text-align: center; margin-bottom: 20px; font-size: 0.9em; border: 1px solid #bae6fd; }
+        .api-config { display: flex; gap: 10px; margin-bottom: 20px; }
+        .btn-upload { position: relative; overflow: hidden; background-color: var(--accent); color: white; padding: 16px 32px; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; border: none; width: 100%; display: block; text-align: center;}
+        .btn-upload input[type=file] { position: absolute; left: 0; top: 0; right: 0; bottom: 0; opacity: 0; cursor: pointer; }
+
+        .vision-container { position: relative; display: inline-block; max-width: 100%; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 16px rgba(0,0,0,0.1); margin: 0 auto 20px auto; }
+        #scannedImage { display: block; max-width: 100%; height: auto; }
+        .vision-badge { position: absolute; background-color: var(--primary); color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid white; transform: translate(-50%, -50%); z-index: 10; }
+
+        /* Holistic Feedback Cards */
+        .feedback-section { margin-top: 30px; }
+        .card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.05); }
+        
+        .card-summary { background: var(--primary); color: white; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+        .card-summary h3 { color: #f1c40f; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 10px; margin-top: 0; }
+        .summary-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 1.1em; }
+        
+        .card-science { border-left: 5px solid var(--primary); }
+        .card-ayurveda { border-left: 5px solid var(--secondary); background: #fffbeb; }
+        .card-vedic { border-left: 5px solid #8b5cf6; background: #faf5ff; }
+        .card-action { border-left: 5px solid var(--accent); background: #f0fdf4; border-width: 5px 2px 2px 2px; border-style: solid; border-color: var(--accent) #ddd #ddd #ddd;}
+
+        .loading-state { display: none; text-align: center; padding: 30px; font-style: italic; color: #666; font-size: 1.1em; }
+        .error-msg { color: white; background-color: #e74c3c; padding: 10px; border-radius: 6px; text-align: center; font-weight: bold; display: none; margin-bottom: 10px; }
+        .disclaimer { font-size: 0.8em; color: #666; text-align: center; margin-top: 40px; border-top: 1px solid #ccc; padding-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="lang-container">
+        <label for="appLang">🌐 भाषा / Language: </label>
+        <select id="appLang">
+            <option value="Marathi" selected>मराठी (Marathi)</option>
+            <option value="Hindi">हिंदी (Hindi)</option>
+            <option value="English">English</option>
+        </select>
+    </div>
+
+    <div id="profileSetup">
+        <h1>🌿 Sanjeevani Profile</h1>
+        <p>To provide accurate Ayurvedic and Scientific feedback, tell us about your physical vessel.</p>
+        
+        <div class="form-group">
+            <label>Name</label><input type="text" id="p_name" placeholder="E.g., Arjun">
+            <label>Age</label><input type="number" id="p_age">
+            <label>Sex</label>
+            <select id="p_sex">
+                <option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option>
+            </select>
+            <label>Height (cm)</label><input type="number" id="p_height">
+            <label>Weight (kg)</label><input type="number" id="p_weight">
+        </div>
+
+        <div class="form-group">
+            <label>Chronic Diseases (Long-term)</label>
+            <textarea id="p_chronic" rows="2" placeholder="E.g., Type 2 Diabetes, Hypertension, Kidney Stones..."></textarea>
+            
+            <label>Current Acute Issues (Short-term)</label>
+            <textarea id="p_acute" rows="2" placeholder="E.g., Cough, Cold, Fever, Acidity today..."></textarea>
+            
+            <label>Current Medications</label>
+            <textarea id="p_meds" rows="2" placeholder="E.g., Metformin, Antacids..."></textarea>
+        </div>
+
+        <div class="form-group">
+            <label>Primary Goal</label>
+            <select id="p_goal">
+                <option value="Control Blood Sugar">Control Blood Sugar</option>
+                <option value="Weight Loss">Weight Loss</option>
+                <option value="Muscle Gain / Strength">Muscle Gain / Strength</option>
+                <option value="Balance Doshas / General Health">Balance Doshas / General Health</option>
+            </select>
+        </div>
+
+        <button class="btn-submit" onclick="saveProfile()">Save My Health Profile</button>
+    </div>
+
+    <div id="mainApp">
+        <h2>Sanjeevani AI Vaidya</h2>
+        <div id="userInfo" class="user-badge"></div>
+
+        <div class="api-config">
+            <input type="password" id="apiKey" placeholder="Enter Groq API Key (gsk_...)" style="flex:1; padding:10px; border-radius:6px; border:1px solid #ccc;">
+        </div>
+
+        <button class="btn-upload">
+            📸 Snap Meal for Holistic Analysis
+            <input type="file" id="imageInput" accept="image/*" capture="environment" onchange="processImage(event)" />
+        </button>
+
+        <div id="errorMsg" class="error-msg"></div>
+
+        <div id="loading" class="loading-state">
+            🧘‍♂️ Meditating on your meal... Consulting ancient texts and modern science...<br>
+            <span style="font-size: 0.8em; color: var(--secondary);">कृपया प्रतीक्षा करा... (Please wait)</span>
+        </div>
+
+        <div style="text-align: center; margin-top: 20px;">
+            <div id="visionWrapper" class="vision-container">
+                <img id="scannedImage" alt="Analyzed Meal" />
+                <div id="badgeLayer"></div>
+            </div>
+        </div>
+
+        <div id="resultsPanel" class="feedback-section" style="display:none;">
+            </div>
+
+        <p class="disclaimer">Disclaimer: This tool fuses AI with modern and ancient texts. It is NOT a substitute for professional medical advice. Always consult a qualified Vaidya or Doctor.</p>
+    </div>
+
+    <script>
+        // --- 1. STATE MANAGEMENT ---
+        let userProfile = null;
+        let userContext = { location: "Unknown", time: "Unknown" };
+
+        window.onload = () => {
+            const savedProfile = localStorage.getItem('sanjeevaniProfile');
+            if (savedProfile) {
+                userProfile = JSON.parse(savedProfile);
+                showApp();
+                requestContext();
+            } else {
+                document.getElementById('profileSetup').style.display = 'block';
+            }
+        };
+
+        function saveProfile() {
+            userProfile = {
+                name: document.getElementById('p_name').value || "User",
+                age: document.getElementById('p_age').value || "Unknown",
+                sex: document.getElementById('p_sex').value,
+                height: document.getElementById('p_height').value,
+                weight: document.getElementById('p_weight').value,
+                chronic: document.getElementById('p_chronic').value || "None",
+                acute: document.getElementById('p_acute').value || "None",
+                meds: document.getElementById('p_meds').value || "None",
+                goal: document.getElementById('p_goal').value
+            };
+            localStorage.setItem('sanjeevaniProfile', JSON.stringify(userProfile));
+            document.getElementById('profileSetup').style.display = 'none';
+            showApp();
+            requestContext();
+        }
+
+        function showApp() {
+            document.getElementById('mainApp').style.display = 'block';
+            document.getElementById('userInfo').innerHTML = `<strong>${userProfile.name}</strong> | Goal: ${userProfile.goal} | Conditions: ${userProfile.chronic}`;
+        }
+
+        function requestContext() {
+            const now = new Date();
+            userContext.time = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) + " (" + now.getHours() + "00 hours)";
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => { userContext.location = `Lat: ${position.coords.latitude.toFixed(2)}, Lon: ${position.coords.longitude.toFixed(2)}`; },
+                    (error) => { console.log("Location access denied."); }
+                );
+            }
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]); 
+                reader.onerror = error => reject(error);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // --- 3. AI INTEGRATION ---
+        async function processImage(event) {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            if (!apiKey) return alert("Please enter Groq API Key.");
+
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Get selected language dynamically
+            const selectedLang = document.getElementById('appLang').value;
+
+            document.getElementById('scannedImage').src = URL.createObjectURL(file);
+            
+            const imgElement = document.getElementById('scannedImage');
+            imgElement.onload = async function() {
+                document.getElementById('visionWrapper').style.display = 'inline-block';
+                document.getElementById('badgeLayer').innerHTML = ''; 
+                document.getElementById('resultsPanel').style.display = 'none';
+                document.getElementById('loading').style.display = 'block';
+
+                try {
+                    const base64Image = await fileToBase64(file);
+                    
+                    // The Multilingual Maha-Prompt
+                    const systemPrompt = `You are an elite Clinical Nutritionist, an expert Ayurvedic Vaidya, and a scholar of the Bhagavad Gita and Charaka Samhita.
+                    Analyze the image of this meal. 
+                    
+                    PATIENT CONTEXT:
+                    - Profile: ${userProfile.age}yo ${userProfile.sex}, Weight: ${userProfile.weight}kg.
+                    - Goal: ${userProfile.goal}
+                    - Chronic Diseases: ${userProfile.chronic}
+                    - Current Issues: ${userProfile.acute}
+                    - Medications: ${userProfile.meds}
+                    - Context: Eating at ${userContext.time}, Location GPS: ${userContext.location}
+
+                    CRITICAL LANGUAGE RULE: You MUST translate all text responses (food names, analysis, wisdom, verdict) into ${selectedLang}. Do NOT use English for the values unless ${selectedLang} is English. However, keep the exact JSON keys in English so the code doesn't break. Provide deeply elaborated answers.
+
+                    Output ONLY a raw JSON object with this exact structure:
+                    {
+                        "components": [
+                            { 
+                                "id": 1, 
+                                "name": "Name in ${selectedLang}", 
+                                "cals": integer, 
+                                "pro_g": integer, 
+                                "fat_g": integer, 
+                                "carb_g": integer,
+                                "centerPoint": [x_%, y_%] 
+                            }
+                        ],
+                        "scientific_analysis": "Strict modern medical advice based on their specific diseases in ${selectedLang}. Elaborate on glycemic index, specific contraindications, etc.",
+                        "ayurvedic_analysis": "Deep Vaidya's feedback based on time of day, climate, and balancing doshas according to Charaka Samhita in ${selectedLang}. Mention Agni and ingredients.",
+                        "vedic_wisdom": "Philosophical take based on Bhagavad Gita (Sattvic, Rajasic, Tamasic) in ${selectedLang}.",
+                        "actionable_verdict": "Clear, direct instruction in ${selectedLang}. E.g., 'Do NOT eat the Gulab Jamun because of your diabetes', or 'Eat only half'."
+                    }`;
+
+                    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                        body: JSON.stringify({
+                            model: "meta-llama/llama-4-scout-17b-16e-instruct", 
+                            response_format: { type: "json_object" }, 
+                            messages: [
+                                { role: "system", content: systemPrompt },
+                                { role: "user", content: [{ type: "image_url", image_url: { url: `data:${file.type};base64,${base64Image}` } }] }
+                            ]
+                        })
+                    });
+
+                    const data = await response.json();
+                    if (data.error) throw new Error(data.error.message);
+
+                    const aiResponse = JSON.parse(data.choices[0].message.content);
+                    renderResults(aiResponse);
+
+                } catch (error) {
+                    console.error(error);
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('errorMsg').innerText = "API Error: " + error.message;
+                    document.getElementById('errorMsg').style.display = 'block';
+                }
+            };
+        }
+
+        // --- 4. RENDER UI ---
+        function renderResults(data) {
+            document.getElementById('loading').style.display = 'none';
+            const panel = document.getElementById('resultsPanel');
+            const badgeLayer = document.getElementById('badgeLayer');
+            panel.innerHTML = '';
+            panel.style.display = 'block';
+
+            let totalCals = 0, totalPro = 0, totalFat = 0, totalCarb = 0;
+
+            // 1. Calculate Totals & Build Badges/List
+            let componentsHtml = `<div class="card"><h3>🍽️ Detected Plate Elements</h3><ul style="list-style:none; padding:0;">`;
+            
+            data.components.forEach(item => {
+                totalCals += item.cals || 0;
+                totalPro += item.pro_g || 0;
+                totalFat += item.fat_g || 0;
+                totalCarb += item.carb_g || 0;
+
+                const badge = document.createElement('div');
+                badge.className = 'vision-badge';
+                badge.style.left = `${item.centerPoint[0]}%`;
+                badge.style.top = `${item.centerPoint[1]}%`;
+                badge.innerText = item.id;
+                badgeLayer.appendChild(badge);
+                
+                componentsHtml += `<li style="margin-bottom:10px; font-size: 1.1em; border-bottom: 1px solid #eee; padding-bottom: 5px;">
+                    <strong><span style="background:var(--primary); color:white; border-radius:50%; padding:2px 8px; font-size:0.8em; margin-right:8px;">${item.id}</span>${item.name}</strong> 
+                    <br><span style="color:#666; font-size:0.9em; padding-left: 30px;">Cals: ${item.cals} | Pro: ${item.pro_g}g | Fat: ${item.fat_g}g | Carbs: ${item.carb_g}g</span>
+                </li>`;
+            });
+            componentsHtml += `</ul></div>`;
+
+            // 2. Build the Grand Total Card (Placed directly above Action Card)
+            let summaryHtml = `
+                <div class="card-summary">
+                    <h3>📊 Total Meal Macros</h3>
+                    <div class="summary-row"><span>Proteins</span><strong>${totalPro} g</strong></div>
+                    <div class="summary-row"><span>Fats</span><strong>${totalFat} g</strong></div>
+                    <div class="summary-row"><span>Carbohydrates</span><strong>${totalCarb} g</strong></div>
+                    <div class="summary-row" style="border-top: 2px solid rgba(255,255,255,0.3); padding-top: 10px; margin-top: 5px; color: #f1c40f; font-weight: bold; font-size: 1.3em;">
+                        <span>Total Calories</span>
+                        <strong>${totalCals} kcal</strong>
+                    </div>
+                </div>
+            `;
+
+            // 3. Assemble the final Holistic Output
+            panel.innerHTML = `
+                ${componentsHtml}
+                
+                ${summaryHtml}
+
+                <div class="card card-action">
+                    <h3 style="color: var(--accent); margin-top:0;">🛑 Direct Action / Verdict</h3>
+                    <p style="font-size: 1.2em; font-weight:bold; line-height: 1.5;">${data.actionable_verdict}</p>
+                </div>
+
+                <div class="card card-science">
+                    <h3 style="color: var(--primary); margin-top:0;">🔬 Scientific & Clinical Analysis</h3>
+                    <p style="line-height: 1.6; font-size: 1.05em;">${data.scientific_analysis}</p>
+                </div>
+
+                <div class="card card-ayurveda">
+                    <h3 style="color: var(--secondary); margin-top:0;">🌿 Ayurvedic Perspective (Charaka Samhita)</h3>
+                    <p style="line-height: 1.6; font-size: 1.05em;">${data.ayurvedic_analysis}</p>
+                </div>
+
+                <div class="card card-vedic">
+                    <h3 style="color: #8b5cf6; margin-top:0;">🕉️ Vedic Wisdom (Bhagavad Gita)</h3>
+                    <p style="line-height: 1.6; font-size: 1.05em;">${data.vedic_wisdom}</p>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
