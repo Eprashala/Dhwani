@@ -22,9 +22,9 @@
         /* Top Navigation Bar */
         .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #eee; }
         
-        /* Click-to-Edit Profile Button (User Name) */
+        /* Click-to-Edit Profile Button (User Name) & History */
         .header-name {
-            font-size: 18px; font-weight: bold; color: var(--primary); padding: 8px 15px;
+            font-size: 16px; font-weight: bold; color: var(--primary); padding: 8px 12px;
             border: 2px dashed transparent; border-radius: 8px; cursor: pointer; transition: all 0.3s;
             background: rgba(30, 58, 138, 0.05); display: flex; align-items: center; gap: 8px;
         }
@@ -36,6 +36,7 @@
         /* Layout Toggles */
         #profileSetup { display: none; }
         #mainApp { display: none; }
+        #historyView { display: none; }
 
         /* Form Styles */
         .form-group { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; border-top: 4px solid var(--secondary); }
@@ -82,12 +83,23 @@
         .loading-state { display: none; text-align: center; padding: 30px; font-style: italic; color: #666; font-size: 1.1em; }
         .error-msg { color: white; background-color: #e74c3c; padding: 10px; border-radius: 6px; text-align: center; font-weight: bold; display: none; margin-bottom: 10px; }
         .disclaimer { font-size: 0.8em; color: #666; text-align: center; margin-top: 40px; border-top: 1px solid #ccc; padding-top: 10px; }
+
+        /* History View Styles */
+        .history-card { display: flex; gap: 15px; background: white; padding: 15px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border-left: 4px solid var(--accent); align-items: flex-start; }
+        .history-img { width: 100px; height: 100px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
+        .history-details { flex-grow: 1; }
+        .history-date { font-size: 0.85em; color: #888; margin-bottom: 5px; display: block; }
+        .history-notes { background: #f8fafc; padding: 8px; border-radius: 6px; font-size: 0.9em; margin-top: 8px; border: 1px dashed #cbd5e1; }
+        .btn-delete { background: #fee2e2; color: #dc2626; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8em; margin-top: 10px;}
     </style>
 </head>
 <body>
 
     <div class="top-nav">
-        <div id="headerName" class="header-name" onclick="editProfile()" title="Click to view or edit your profile">👤 Guest</div>
+        <div style="display: flex; gap: 10px;">
+            <div id="headerName" class="header-name" onclick="editProfile()" title="Click to view or edit your profile">👤 Guest</div>
+            <div class="header-name" onclick="showHistoryView()" title="View your meal history" style="color: var(--accent); border-color: rgba(22, 163, 74, 0.2);">📜 History</div>
+        </div>
         
         <div class="lang-container">
             <select id="appLang">
@@ -193,7 +205,7 @@
     </div>
 
     <div id="mainApp">
-        <h2>Sanjeevani AI Scanner</h2>
+        <h2>Sanjeevani AI Food Scanner</h2>
 
         <button class="btn-upload">
             📸 Snap Meal for Holistic Analysis
@@ -208,22 +220,34 @@
         </div>
 
         <div style="text-align: center; margin-top: 20px;">
-            <div id="visionWrapper" class="vision-container">
+            <div id="visionWrapper" class="vision-container" style="display:none;">
                 <img id="scannedImage" alt="Analyzed Meal" />
                 <div id="badgeLayer"></div>
             </div>
         </div>
 
         <div id="resultsPanel" class="feedback-section" style="display:none;">
-            </div>
+        </div>
 
         <p class="disclaimer">Disclaimer: This tool fuses AI with modern clinical nutrition and ancient texts (Charaka Samhita). It is NOT a substitute for professional medical advice. Always consult a qualified Vaidya or Doctor.</p>
+    </div>
+
+    <div id="historyView">
+        <h2 style="color: var(--accent);">📜 My Clinical Meal History</h2>
+        <p style="text-align: center; color: #666; font-size: 0.9em; margin-bottom: 20px;">Use this log to correlate your food intake with medical tests (like post-lunch blood sugar).</p>
+        
+        <button class="btn-submit" onclick="showApp()" style="margin-top: 0; margin-bottom: 20px; background-color: var(--primary);">🔙 Back to Scanner</button>
+        
+        <div id="historyList">
+            </div>
     </div>
 
     <script>
         // --- 1. STATE & DATA MANAGEMENT ---
         let userProfile = null;
         let userContext = { location: "Unknown", time: "Unknown" };
+        let currentMealData = null; 
+        let currentImageBase64Raw = null; // Store raw image briefly for history
 
         window.onload = () => {
             const savedProfile = localStorage.getItem('sanjeevaniProfile');
@@ -235,96 +259,48 @@
             } else {
                 document.getElementById('profileSetup').style.display = 'block';
                 document.getElementById('mainApp').style.display = 'none';
+                document.getElementById('historyView').style.display = 'none';
             }
         };
 
-        // Helper to get checked boxes
-        function getCheckedValues(name) {
-            return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map(cb => cb.value);
-        }
-
-        // Helper to set checked boxes
-        function setCheckedValues(name, valuesArray) {
-            document.querySelectorAll(`input[name="${name}"]`).forEach(cb => {
-                cb.checked = valuesArray.includes(cb.value);
-            });
-        }
-
-        function toggleCustomGoal() {
-            const goalSelect = document.getElementById('p_goal').value;
-            const customGoal = document.getElementById('p_goal_custom');
-            customGoal.style.display = (goalSelect === 'Custom') ? 'block' : 'none';
-        }
-
+        // ... [Helper functions getCheckedValues, setCheckedValues, toggleCustomGoal, saveProfile, editProfile remain unchanged] ...
+        function getCheckedValues(name) { return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map(cb => cb.value); }
+        function setCheckedValues(name, valuesArray) { document.querySelectorAll(`input[name="${name}"]`).forEach(cb => { cb.checked = valuesArray.includes(cb.value); }); }
+        function toggleCustomGoal() { const goalSelect = document.getElementById('p_goal').value; const customGoal = document.getElementById('p_goal_custom'); customGoal.style.display = (goalSelect === 'Custom') ? 'block' : 'none'; }
+        
         function saveProfile() {
-            // Combine Checkboxes + Text Input for Diseases
-            let chronicArr = getCheckedValues('chronic');
-            if (document.getElementById('p_chronic_other').value) chronicArr.push(document.getElementById('p_chronic_other').value);
-            
-            let acuteArr = getCheckedValues('acute');
-            if (document.getElementById('p_acute_other').value) acuteArr.push(document.getElementById('p_acute_other').value);
-
-            // Determine Goal
-            let finalGoal = document.getElementById('p_goal').value;
-            if (finalGoal === 'Custom') finalGoal = document.getElementById('p_goal_custom').value;
+            let chronicArr = getCheckedValues('chronic'); if (document.getElementById('p_chronic_other').value) chronicArr.push(document.getElementById('p_chronic_other').value);
+            let acuteArr = getCheckedValues('acute'); if (document.getElementById('p_acute_other').value) acuteArr.push(document.getElementById('p_acute_other').value);
+            let finalGoal = document.getElementById('p_goal').value; if (finalGoal === 'Custom') finalGoal = document.getElementById('p_goal_custom').value;
 
             userProfile = {
-                apiKey: document.getElementById('p_api_key').value,
-                name: document.getElementById('p_name').value || "Guest",
-                age: document.getElementById('p_age').value || "Unknown",
-                sex: document.getElementById('p_sex').value,
-                height: document.getElementById('p_height').value,
-                weight: document.getElementById('p_weight').value,
-                chronic: chronicArr.join(', ') || "None",
-                acute: acuteArr.join(', ') || "None",
-                meds: document.getElementById('p_meds').value || "None",
-                goal: finalGoal,
-                
-                // Saving raw arrays/states so Edit Profile populates correctly later
-                rawChronic: getCheckedValues('chronic'),
-                rawAcute: getCheckedValues('acute'),
-                rawChronicOther: document.getElementById('p_chronic_other').value,
-                rawAcuteOther: document.getElementById('p_acute_other').value,
-                rawGoalSelect: document.getElementById('p_goal').value,
-                rawGoalCustom: document.getElementById('p_goal_custom').value
+                apiKey: document.getElementById('p_api_key').value, name: document.getElementById('p_name').value || "Guest", age: document.getElementById('p_age').value || "Unknown",
+                sex: document.getElementById('p_sex').value, height: document.getElementById('p_height').value, weight: document.getElementById('p_weight').value,
+                chronic: chronicArr.join(', ') || "None", acute: acuteArr.join(', ') || "None", meds: document.getElementById('p_meds').value || "None", goal: finalGoal,
+                rawChronic: getCheckedValues('chronic'), rawAcute: getCheckedValues('acute'), rawChronicOther: document.getElementById('p_chronic_other').value,
+                rawAcuteOther: document.getElementById('p_acute_other').value, rawGoalSelect: document.getElementById('p_goal').value, rawGoalCustom: document.getElementById('p_goal_custom').value
             };
-
             localStorage.setItem('sanjeevaniProfile', JSON.stringify(userProfile));
             document.getElementById('headerName').innerText = '👤 ' + userProfile.name;
-            
-            document.getElementById('profileSetup').style.display = 'none';
-            showApp();
-            requestContext();
+            showApp(); requestContext();
         }
 
         function editProfile() {
-            document.getElementById('mainApp').style.display = 'none';
-            document.getElementById('profileSetup').style.display = 'block';
-
-            // Populate Fields from Memory
+            document.getElementById('mainApp').style.display = 'none'; document.getElementById('historyView').style.display = 'none'; document.getElementById('profileSetup').style.display = 'block';
             if (userProfile) {
-                document.getElementById('p_api_key').value = userProfile.apiKey || '';
-                document.getElementById('p_name').value = userProfile.name !== "Guest" ? userProfile.name : "";
-                document.getElementById('p_age').value = userProfile.age !== "Unknown" ? userProfile.age : "";
-                document.getElementById('p_sex').value = userProfile.sex;
-                document.getElementById('p_height').value = userProfile.height;
-                document.getElementById('p_weight').value = userProfile.weight;
-                document.getElementById('p_meds').value = userProfile.meds !== "None" ? userProfile.meds : "";
-                
-                setCheckedValues('chronic', userProfile.rawChronic || []);
-                document.getElementById('p_chronic_other').value = userProfile.rawChronicOther || '';
-                
-                setCheckedValues('acute', userProfile.rawAcute || []);
-                document.getElementById('p_acute_other').value = userProfile.rawAcuteOther || '';
-
-                document.getElementById('p_goal').value = userProfile.rawGoalSelect || 'Control Blood Sugar';
-                document.getElementById('p_goal_custom').value = userProfile.rawGoalCustom || '';
-                toggleCustomGoal();
+                document.getElementById('p_api_key').value = userProfile.apiKey || ''; document.getElementById('p_name').value = userProfile.name !== "Guest" ? userProfile.name : "";
+                document.getElementById('p_age').value = userProfile.age !== "Unknown" ? userProfile.age : ""; document.getElementById('p_sex').value = userProfile.sex;
+                document.getElementById('p_height').value = userProfile.height; document.getElementById('p_weight').value = userProfile.weight; document.getElementById('p_meds').value = userProfile.meds !== "None" ? userProfile.meds : "";
+                setCheckedValues('chronic', userProfile.rawChronic || []); document.getElementById('p_chronic_other').value = userProfile.rawChronicOther || '';
+                setCheckedValues('acute', userProfile.rawAcute || []); document.getElementById('p_acute_other').value = userProfile.rawAcuteOther || '';
+                document.getElementById('p_goal').value = userProfile.rawGoalSelect || 'Control Blood Sugar'; document.getElementById('p_goal_custom').value = userProfile.rawGoalCustom || ''; toggleCustomGoal();
             }
-            window.scrollTo(0,0); // Scroll to top for UX
+            window.scrollTo(0,0); 
         }
 
         function showApp() {
+            document.getElementById('profileSetup').style.display = 'none';
+            document.getElementById('historyView').style.display = 'none';
             document.getElementById('mainApp').style.display = 'block';
         }
 
@@ -348,7 +324,7 @@
             });
         }
 
-        // --- 2. AI INTEGRATION (THE MAHA-PROMPT) ---
+        // --- 2. AI INTEGRATION ---
         async function processImage(event) {
             if (!userProfile || !userProfile.apiKey) {
                 alert("Please click your Name (Profile) and enter your Groq API Key.");
@@ -372,6 +348,7 @@
 
                 try {
                     const base64Image = await fileToBase64(file);
+                    currentImageBase64Raw = `data:${file.type};base64,${base64Image}`; // Save raw for logging
                     
                     const systemPrompt = `You are an elite Clinical Nutritionist, an expert Ayurvedic Vaidya, and a scholar of the Bhagavad Gita and Charaka Samhita.
                     Analyze the image of this meal deeply. Deduce the exact ingredients and cooking methods (e.g., deep-fried, ghee used, maida used).
@@ -413,7 +390,7 @@
                             response_format: { type: "json_object" }, 
                             messages: [
                                 { role: "system", content: systemPrompt },
-                                { role: "user", content: [{ type: "image_url", image_url: { url: `data:${file.type};base64,${base64Image}` } }] }
+                                { role: "user", content: [{ type: "image_url", image_url: { url: currentImageBase64Raw } }] }
                             ]
                         })
                     });
@@ -422,7 +399,8 @@
                     if (data.error) throw new Error(data.error.message);
 
                     const aiResponse = JSON.parse(data.choices[0].message.content);
-                    renderResults(aiResponse);
+                    currentMealData = aiResponse; 
+                    renderResults(currentMealData);
 
                 } catch (error) {
                     console.error(error);
@@ -431,6 +409,79 @@
                     document.getElementById('errorMsg').style.display = 'block';
                 }
             };
+        }
+
+        async function recalculateMeal() {
+            // ... [Recalculate code remains entirely the same as the previous iteration] ...
+            if (!currentMealData || !currentMealData.components) return;
+
+            currentMealData.components.forEach((item, index) => {
+                item.name = document.getElementById(`comp_name_${index}`).value;
+                item.cals = parseInt(document.getElementById(`comp_cals_${index}`).value) || 0;
+                item.pro_g = parseInt(document.getElementById(`comp_pro_${index}`).value) || 0;
+                item.fat_g = parseInt(document.getElementById(`comp_fat_${index}`).value) || 0;
+                item.carb_g = parseInt(document.getElementById(`comp_carb_${index}`).value) || 0;
+            });
+
+            const selectedLang = document.getElementById('appLang').value;
+            document.getElementById('resultsPanel').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('loading').innerHTML = `🧘‍♂️ Re-evaluating your meal based on updated ingredients...<br><span style="font-size: 0.85em; color: var(--secondary);">कृपया प्रतीक्षा करा... (Please wait)</span>`;
+
+            try {
+                const systemPrompt = `You are an elite Clinical Nutritionist, an expert Ayurvedic Vaidya, and a scholar of the Bhagavad Gita and Charaka Samhita.
+                The user has manually verified and corrected their meal ingredients. Analyze the health impact of this specific meal based ONLY on the provided JSON data.
+
+                VERIFIED MEAL COMPONENTS:
+                ${JSON.stringify(currentMealData.components, null, 2)}
+
+                PATIENT CONTEXT:
+                - Profile: ${userProfile.age}yo ${userProfile.sex}, Weight: ${userProfile.weight}kg.
+                - Primary Goal: ${userProfile.goal}
+                - Chronic Diseases: ${userProfile.chronic}
+                - Current Acute Issues: ${userProfile.acute}
+                - Medications/Notes: ${userProfile.meds}
+
+                CRITICAL LANGUAGE RULE: You MUST translate all text responses into ${selectedLang}. KEEP JSON KEYS IN ENGLISH.
+
+                Output ONLY a raw JSON object:
+                {
+                    "scientific_analysis": "Modern medical advice based on their specific diseases in ${selectedLang}. Note glycemic index or contraindications.",
+                    "ayurvedic_analysis": "Deep Vaidya's feedback based on balancing doshas according to Charaka Samhita in ${selectedLang}.",
+                    "vedic_wisdom": "Philosophical take based on Bhagavad Gita in ${selectedLang}.",
+                    "actionable_verdict": "Clear, direct instruction in ${selectedLang}."
+                }`;
+
+                const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${userProfile.apiKey}` },
+                    body: JSON.stringify({
+                        model: "llama-3.1-70b-versatile", // Fast text model for recalculation
+                        response_format: { type: "json_object" }, 
+                        messages: [
+                            { role: "system", content: systemPrompt },
+                            { role: "user", content: "Generate the holistic analysis JSON based strictly on my corrected meal data." }
+                        ]
+                    })
+                });
+
+                const data = await response.json();
+                if (data.error) throw new Error(data.error.message);
+
+                const newAnalysis = JSON.parse(data.choices[0].message.content);
+                currentMealData.scientific_analysis = newAnalysis.scientific_analysis;
+                currentMealData.ayurvedic_analysis = newAnalysis.ayurvedic_analysis;
+                currentMealData.vedic_wisdom = newAnalysis.vedic_wisdom;
+                currentMealData.actionable_verdict = newAnalysis.actionable_verdict;
+
+                renderResults(currentMealData);
+
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('errorMsg').innerText = "Update Error: " + error.message;
+                document.getElementById('errorMsg').style.display = 'block';
+                document.getElementById('resultsPanel').style.display = 'block'; 
+            }
         }
 
         // --- 3. RENDER UI ---
@@ -443,9 +494,9 @@
 
             let totalCals = 0, totalPro = 0, totalFat = 0, totalCarb = 0;
 
-            let componentsHtml = `<div class="card"><h3 style="margin-top:0;">🍽️ Detected Plate Elements</h3><ul style="list-style:none; padding:0;">`;
+            let componentsHtml = `<div class="card"><h3 style="margin-top:0;">🍽️ Detected Plate Elements (Edit if incorrect)</h3><div style="display:flex; flex-direction:column; gap:10px;">`;
             
-            data.components.forEach(item => {
+            data.components.forEach((item, index) => {
                 totalCals += item.cals || 0;
                 totalPro += item.pro_g || 0;
                 totalFat += item.fat_g || 0;
@@ -458,15 +509,23 @@
                 badge.innerText = item.id;
                 badgeLayer.appendChild(badge);
                 
-                componentsHtml += `<li style="margin-bottom:12px; font-size: 1.1em; border-bottom: 1px solid #eee; padding-bottom: 8px;">
-                    <strong><span style="background:var(--primary); color:white; border-radius:50%; padding:2px 8px; font-size:0.8em; margin-right:8px;">${item.id}</span>${item.name}</strong> 
-                    <br><span style="color:#666; font-size:0.9em; padding-left: 30px; display:inline-block; margin-top:4px;">Cals: <strong>${item.cals}</strong> | Pro: ${item.pro_g}g | Fat: ${item.fat_g}g | Carbs: ${item.carb_g}g</span>
-                </li>`;
+                componentsHtml += `
+                <div style="background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+                    <strong><span style="background:var(--primary); color:white; border-radius:50%; padding:2px 8px; font-size:0.8em;">${item.id}</span></strong>
+                    <input type="text" id="comp_name_${index}" value="${item.name}" style="flex: 1; min-width: 150px; padding: 6px; font-size: 1em; margin:0;" title="Food Name"/>
+                    <label style="font-size: 0.85em; margin: 0; color: #666;">Cals: <input type="number" id="comp_cals_${index}" value="${item.cals}" style="width: 60px; padding: 4px; margin:0;" /></label>
+                    <label style="font-size: 0.85em; margin: 0; color: #666;">Pro: <input type="number" id="comp_pro_${index}" value="${item.pro_g}" style="width: 50px; padding: 4px; margin:0;" /></label>
+                    <label style="font-size: 0.85em; margin: 0; color: #666;">Fat: <input type="number" id="comp_fat_${index}" value="${item.fat_g}" style="width: 50px; padding: 4px; margin:0;" /></label>
+                    <label style="font-size: 0.85em; margin: 0; color: #666;">Carb: <input type="number" id="comp_carb_${index}" value="${item.carb_g}" style="width: 50px; padding: 4px; margin:0;" /></label>
+                </div>`;
             });
-            componentsHtml += `</ul></div>`;
+            
+            componentsHtml += `</div>
+            <button onclick="recalculateMeal()" style="background-color: var(--primary); color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; width: 100%; font-size: 1em; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">🔄 Update Details & Recalculate</button>
+            </div>`;
 
             let summaryHtml = `
-                <div class="card-summary">
+                <div class="card-summary" id="macroSummaryBox" data-cals="${totalCals}">
                     <h3>📊 Total Meal Macros</h3>
                     <div class="summary-row"><span>Proteins (प्रथिने)</span><strong>${totalPro} g</strong></div>
                     <div class="summary-row"><span>Fats (स्निग्ध पदार्थ)</span><strong>${totalFat} g</strong></div>
@@ -475,6 +534,24 @@
                         <span>Total Calories (एकूण कॅलरीज)</span>
                         <strong>${totalCals} kcal</strong>
                     </div>
+                </div>
+            `;
+
+            // NEW: The Consumption Logger UI
+            let consumptionLoggerHtml = `
+                <div class="card" style="border-left: 5px solid #0284c7; background: #f0f9ff;">
+                    <h3 style="color: #0369a1; margin-top:0;">📋 Log Consumption for Medical Records</h3>
+                    <p style="font-size: 0.9em; color: #334155; margin-bottom: 15px;">It is vital to record what you <strong>actually ate</strong> versus what was served on the plate to accurately track glycemic load.</p>
+                    
+                    <label style="display:flex; align-items:center; gap:10px; font-weight:bold; cursor:pointer; font-size: 1.1em; color: #0f172a; margin-bottom: 15px;">
+                        <input type="checkbox" id="consumedCheck" style="width:24px; height:24px; cursor:pointer;">
+                        I have consumed this meal
+                    </label>
+
+                    <input type="text" id="consumptionNotes" placeholder="Optional notes (e.g., 'I only ate half the rice', 'Skipped the sweets')" style="border-color: #bae6fd;">
+                    
+                    <button onclick="logMealToHistory()" style="background-color: #0284c7; color: white; border: none; padding: 15px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; width: 100%; font-size: 1.1em; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">💾 Save to My Clinical History</button>
+                    <div id="logSuccessMsg" style="display:none; color: #15803d; font-weight: bold; text-align: center; margin-top: 10px;">✅ Meal successfully saved to History!</div>
                 </div>
             `;
 
@@ -496,12 +573,124 @@
                     <h3 style="color: var(--secondary); margin-top:0;">🌿 Ayurvedic Perspective (Charaka Samhita)</h3>
                     <p style="line-height: 1.7; font-size: 1.1em;">${data.ayurvedic_analysis}</p>
                 </div>
-
-                <div class="card card-vedic">
-                    <h3 style="color: #8b5cf6; margin-top:0;">🕉️ Vedic Wisdom (Bhagavad Gita)</h3>
-                    <p style="line-height: 1.7; font-size: 1.1em;">${data.vedic_wisdom}</p>
-                </div>
+                
+                ${consumptionLoggerHtml}
             `;
+        }
+
+        // --- 4. CLINICAL HISTORY MANAGEMENT ---
+
+        // Helper: Resize image to thumbnail to prevent LocalStorage 5MB Crash
+        function compressImageForStorage(base64Str, maxWidth = 300) {
+            return new Promise((resolve) => {
+                let img = new Image();
+                img.src = base64Str;
+                img.onload = () => {
+                    let canvas = document.createElement('canvas');
+                    let scaleSize = maxWidth / img.width;
+                    if (scaleSize >= 1) { resolve(base64Str); return; } // No need to compress if already small
+                    
+                    canvas.width = maxWidth;
+                    canvas.height = img.height * scaleSize;
+                    let ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    resolve(canvas.toDataURL('image/jpeg', 0.7)); // Compress to 70% quality JPEG
+                };
+            });
+        }
+
+        async function logMealToHistory() {
+            const isConsumed = document.getElementById('consumedCheck').checked;
+            if (!isConsumed) {
+                alert("Please check 'I have consumed this meal' to save it to your history.");
+                return;
+            }
+
+            const notes = document.getElementById('consumptionNotes').value;
+            const totalCals = document.getElementById('macroSummaryBox').getAttribute('data-cals');
+            
+            // Generate smaller image for storage
+            const compressedImg = await compressImageForStorage(currentImageBase64Raw);
+
+            // Create record
+            const record = {
+                id: Date.now(),
+                date: new Date().toLocaleString(),
+                image: compressedImg,
+                calories: totalCals,
+                notes: notes || "No manual notes provided.",
+                items: currentMealData.components.map(c => c.name).join(", ")
+            };
+
+            // Get existing history or start new array
+            let history = JSON.parse(localStorage.getItem('sanjeevaniHistory') || '[]');
+            
+            // Add new record to beginning of array
+            history.unshift(record);
+
+            // Keep only the last 20 meals so we don't crash the browser storage
+            if (history.length > 20) history.pop(); 
+
+            localStorage.setItem('sanjeevaniHistory', JSON.stringify(history));
+
+            // Show success animation
+            const btn = document.querySelector('button[onclick="logMealToHistory()"]');
+            const msg = document.getElementById('logSuccessMsg');
+            btn.style.display = 'none';
+            msg.style.display = 'block';
+            
+            // Reset after 3 seconds
+            setTimeout(() => {
+                btn.style.display = 'block';
+                msg.style.display = 'none';
+                document.getElementById('consumedCheck').checked = false;
+                document.getElementById('consumptionNotes').value = '';
+            }, 3000);
+        }
+
+        function showHistoryView() {
+            document.getElementById('mainApp').style.display = 'none';
+            document.getElementById('profileSetup').style.display = 'none';
+            document.getElementById('historyView').style.display = 'block';
+            
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const historyList = document.getElementById('historyList');
+            let history = JSON.parse(localStorage.getItem('sanjeevaniHistory') || '[]');
+
+            if (history.length === 0) {
+                historyList.innerHTML = `<p style="text-align:center; color:#888; font-style:italic;">No meals logged yet. Snap a meal and log it to see it here!</p>`;
+                return;
+            }
+
+            let html = '';
+            history.forEach(record => {
+                html += `
+                    <div class="history-card" id="hist_${record.id}">
+                        <img src="${record.image}" class="history-img" alt="Meal thumbnail" />
+                        <div class="history-details">
+                            <span class="history-date">📅 ${record.date}</span>
+                            <strong style="color: var(--primary); font-size: 1.1em;">${record.calories} kcal Estimated</strong>
+                            <p style="margin: 5px 0; font-size: 0.9em; color: #444;"><strong>Items:</strong> ${record.items}</p>
+                            <div class="history-notes"><strong>My Notes:</strong> ${record.notes}</div>
+                            <button class="btn-delete" onclick="deleteHistoryItem(${record.id})">🗑️ Remove Entry</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            historyList.innerHTML = html;
+        }
+
+        function deleteHistoryItem(id) {
+            if(confirm("Are you sure you want to delete this clinical record?")) {
+                let history = JSON.parse(localStorage.getItem('sanjeevaniHistory') || '[]');
+                history = history.filter(record => record.id !== id);
+                localStorage.setItem('sanjeevaniHistory', JSON.stringify(history));
+                renderHistory(); // Refresh list
+            }
         }
     </script>
 </body>
