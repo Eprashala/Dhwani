@@ -1,1095 +1,303 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Eprashala Nutrition Calculator — AI Meal Analyzer</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg: #0e0f0c;
-    --surface: #161810;
-    --card: #1c1e18;
-    --border: #2a2d24;
-    --accent: #c8f060;
-    --accent2: #f0a830;
-    --accent3: #60d4f0;
-    --muted: #5a5f4e;
-    --text: #e8ead8;
-    --text2: #9aa08a;
-  }
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'DM Sans', sans-serif;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  /* Noise texture overlay */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-    pointer-events: none;
-    z-index: 0;
-    opacity: 0.4;
-  }
-
-  .container {
-    position: relative;
-    z-index: 1;
-    max-width: 860px;
-    margin: 0 auto;
-    padding: 48px 24px 80px;
-  }
-
-  /* Header */
-  header {
-    display: flex;
-    align-items: baseline;
-    gap: 16px;
-    margin-bottom: 56px;
-  }
-
-  .logo {
-    font-family: 'Playfair Display', serif;
-    font-size: 2rem;
-    font-weight: 900;
-    letter-spacing: -0.5px;
-    color: var(--text);
-  }
-
-  .logo span {
-    color: var(--accent);
-  }
-
-  .tagline {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.7rem;
-    color: var(--muted);
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    border-left: 1px solid var(--border);
-    padding-left: 16px;
-  }
-
-  /* Upload Zone */
-  .upload-zone {
-    border: 1.5px dashed var(--border);
-    border-radius: 20px;
-    padding: 56px 32px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    background: var(--surface);
-    position: relative;
-    overflow: hidden;
-  }
-
-  .upload-zone::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(ellipse at 50% 0%, rgba(200, 240, 96, 0.05) 0%, transparent 70%);
-    pointer-events: none;
-  }
-
-  .upload-zone:hover, .upload-zone.dragover {
-    border-color: var(--accent);
-    background: #1a1c16;
-  }
-
-  .upload-zone:hover::before {
-    background: radial-gradient(ellipse at 50% 0%, rgba(200, 240, 96, 0.1) 0%, transparent 70%);
-  }
-
-  .upload-icon {
-    width: 64px;
-    height: 64px;
-    margin: 0 auto 20px;
-    background: var(--card);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--border);
-    transition: all 0.3s ease;
-  }
-
-  .upload-zone:hover .upload-icon {
-    border-color: var(--accent);
-    background: rgba(200, 240, 96, 0.08);
-  }
-
-  .upload-icon svg {
-    width: 28px;
-    height: 28px;
-    stroke: var(--accent);
-    fill: none;
-    stroke-width: 1.5;
-    transition: transform 0.3s ease;
-  }
-
-  .upload-zone:hover .upload-icon svg {
-    transform: translateY(-3px);
-  }
-
-  .upload-title {
-    font-family: 'Playfair Display', serif;
-    font-size: 1.4rem;
-    margin-bottom: 8px;
-    color: var(--text);
-  }
-
-  .upload-sub {
-    font-size: 0.85rem;
-    color: var(--text2);
-    font-weight: 300;
-  }
-
-  .upload-btn {
-    margin-top: 24px;
-    display: inline-block;
-    background: var(--accent);
-    color: #0e0f0c;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.75rem;
-    font-weight: 500;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    padding: 12px 28px;
-    border-radius: 100px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: none;
-  }
-
-  .upload-btn:hover {
-    background: #d4f570;
-    transform: translateY(-1px);
-  }
-
-  #fileInput { display: none; }
-
-  /* Preview */
-  .preview-wrap {
-    display: none;
-    position: relative;
-    border-radius: 20px;
-    overflow: hidden;
-    background: var(--card);
-    border: 1px solid var(--border);
-    margin-bottom: 24px;
-  }
-
-  .preview-wrap.visible { display: block; }
-
-  .preview-wrap img {
-    width: 100%;
-    max-height: 420px;
-    object-fit: cover;
-    display: block;
-  }
-
-  .preview-overlay {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    padding: 20px 24px;
-    background: linear-gradient(transparent, rgba(0,0,0,0.85));
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .preview-filename {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.75rem;
-    color: rgba(255,255,255,0.6);
-  }
-
-  .change-btn {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.7rem;
-    color: var(--accent);
-    background: none;
-    border: 1px solid rgba(200,240,96,0.3);
-    padding: 6px 14px;
-    border-radius: 100px;
-    cursor: pointer;
-    letter-spacing: 0.06em;
-    transition: all 0.2s;
-  }
-
-  .change-btn:hover { background: rgba(200,240,96,0.1); }
-
-  /* Analyze Button */
-  .analyze-btn {
-    width: 100%;
-    padding: 18px;
-    background: var(--accent);
-    color: #0e0f0c;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.85rem;
-    font-weight: 500;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    border: none;
-    border-radius: 14px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: none;
-    margin-bottom: 40px;
-  }
-
-  .analyze-btn.visible { display: block; }
-  .analyze-btn:hover { background: #d4f570; transform: translateY(-1px); }
-  .analyze-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-
-  /* Loading */
-  .loading {
-    display: none;
-    text-align: center;
-    padding: 48px;
-  }
-
-  .loading.visible { display: block; }
-
-  .loading-ring {
-    width: 56px;
-    height: 56px;
-    border: 2px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin: 0 auto 20px;
-  }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  .loading-text {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.78rem;
-    color: var(--text2);
-    letter-spacing: 0.08em;
-    animation: pulse 1.8s ease-in-out infinite;
-  }
-
-  @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
-
-  /* Results */
-  .results { display: none; }
-  .results.visible { display: block; }
-
-  .meal-header {
-    margin-bottom: 32px;
-    padding-bottom: 24px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .meal-label {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.68rem;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--accent);
-    margin-bottom: 8px;
-  }
-
-  .meal-name {
-    font-family: 'Playfair Display', serif;
-    font-size: 2rem;
-    font-weight: 700;
-    line-height: 1.2;
-    margin-bottom: 8px;
-  }
-
-  .meal-desc {
-    font-size: 0.9rem;
-    color: var(--text2);
-    line-height: 1.6;
-    font-weight: 300;
-    max-width: 620px;
-  }
-
-  /* Calorie Hero */
-  .calorie-hero {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 24px;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .calorie-hero::before {
-    content: '';
-    position: absolute;
-    right: -40px;
-    top: -40px;
-    width: 200px;
-    height: 200px;
-    background: radial-gradient(circle, rgba(200,240,96,0.08) 0%, transparent 70%);
-    pointer-events: none;
-  }
-
-  .calorie-info { flex: 1; }
-
-  .calorie-label {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.65rem;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 6px;
-  }
-
-  .calorie-value {
-    font-family: 'Playfair Display', serif;
-    font-size: 4rem;
-    font-weight: 900;
-    color: var(--accent);
-    line-height: 1;
-    letter-spacing: -2px;
-  }
-
-  .calorie-unit {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.75rem;
-    color: var(--text2);
-    letter-spacing: 0.06em;
-    margin-top: 4px;
-  }
-
-  .calorie-breakdown {
-    display: flex;
-    gap: 20px;
-  }
-
-  .cal-badge {
-    text-align: center;
-    padding: 14px 20px;
-    background: var(--surface);
-    border-radius: 12px;
-    border: 1px solid var(--border);
-  }
-
-  .cal-badge-val {
-    font-family: 'DM Mono', monospace;
-    font-size: 1.1rem;
-    font-weight: 500;
-    margin-bottom: 2px;
-  }
-
-  .cal-badge-lbl {
-    font-size: 0.68rem;
-    color: var(--muted);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    font-family: 'DM Mono', monospace;
-  }
-
-  /* Macro Grid */
-  .section-title {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.68rem;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 16px;
-    margin-top: 32px;
-  }
-
-  .macro-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    margin-bottom: 24px;
-  }
-
-  .macro-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 20px;
-    position: relative;
-    overflow: hidden;
-    transition: transform 0.2s ease, border-color 0.2s;
-  }
-
-  .macro-card:hover {
-    transform: translateY(-2px);
-    border-color: var(--accent2);
-  }
-
-  .macro-card .accent-line {
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 3px;
-    border-radius: 16px 16px 0 0;
-  }
-
-  .macro-card.protein .accent-line { background: #60d4f0; }
-  .macro-card.fat .accent-line { background: #f0a830; }
-  .macro-card.carbs .accent-line { background: #c8f060; }
-
-  .macro-icon {
-    font-size: 1.4rem;
-    margin-bottom: 10px;
-  }
-
-  .macro-name {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.68rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 4px;
-  }
-
-  .macro-val {
-    font-family: 'Playfair Display', serif;
-    font-size: 1.8rem;
-    font-weight: 700;
-    line-height: 1;
-    margin-bottom: 4px;
-  }
-
-  .macro-card.protein .macro-val { color: #60d4f0; }
-  .macro-card.fat .macro-val { color: #f0a830; }
-  .macro-card.carbs .macro-val { color: #c8f060; }
-
-  .macro-sub {
-    font-size: 0.75rem;
-    color: var(--text2);
-    font-weight: 300;
-    line-height: 1.5;
-    margin-top: 8px;
-    padding-top: 8px;
-    border-top: 1px solid var(--border);
-  }
-
-  /* Bar for macro */
-  .macro-bar-wrap {
-    margin-top: 8px;
-    height: 4px;
-    background: var(--border);
-    border-radius: 100px;
-    overflow: hidden;
-  }
-
-  .macro-bar {
-    height: 100%;
-    border-radius: 100px;
-    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  .macro-card.protein .macro-bar { background: #60d4f0; }
-  .macro-card.fat .macro-bar { background: #f0a830; }
-  .macro-card.carbs .macro-bar { background: #c8f060; }
-
-  /* Micros Grid */
-  .micros-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 14px;
-  }
-
-  .micro-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 18px 20px;
-    transition: border-color 0.2s;
-  }
-
-  .micro-card:hover { border-color: var(--border); }
-
-  .micro-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-  }
-
-  .micro-title {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.7rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--text2);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .micro-dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-  }
-
-  .micro-items {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .micro-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-size: 0.82rem;
-  }
-
-  .micro-item-name {
-    color: var(--text2);
-    font-weight: 300;
-  }
-
-  .micro-item-val {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.75rem;
-    color: var(--text);
-    font-weight: 500;
-  }
-
-  .micro-item-bar {
-    flex: 1;
-    height: 2px;
-    background: var(--border);
-    border-radius: 100px;
-    margin: 0 12px;
-    overflow: hidden;
-  }
-
-  .micro-item-fill {
-    height: 100%;
-    border-radius: 100px;
-  }
-
-  /* Ingredients */
-  .ingredients-list {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    overflow: hidden;
-  }
-
-  .ingredient-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 20px;
-    border-bottom: 1px solid var(--border);
-    transition: background 0.15s;
-  }
-
-  .ingredient-row:last-child { border-bottom: none; }
-  .ingredient-row:hover { background: var(--surface); }
-
-  .ing-name {
-    font-size: 0.88rem;
-    color: var(--text);
-    font-weight: 400;
-  }
-
-  .ing-amount {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.72rem;
-    color: var(--muted);
-  }
-
-  .ing-cal {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.75rem;
-    color: var(--accent);
-    font-weight: 500;
-    background: rgba(200,240,96,0.08);
-    padding: 3px 10px;
-    border-radius: 100px;
-  }
-
-  /* Health Notes */
-  .health-notes {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 24px;
-  }
-
-  .health-note {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 14px;
-    font-size: 0.85rem;
-    color: var(--text2);
-    line-height: 1.6;
-    font-weight: 300;
-  }
-
-  .health-note:last-child { margin-bottom: 0; }
-
-  .note-dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: var(--accent);
-    flex-shrink: 0;
-    margin-top: 7px;
-  }
-
-  /* Disclaimer */
-  .disclaimer {
-    margin-top: 40px;
-    padding: 16px 20px;
-    background: rgba(240,168,48,0.06);
-    border: 1px solid rgba(240,168,48,0.2);
-    border-radius: 12px;
-    font-size: 0.78rem;
-    color: var(--text2);
-    line-height: 1.6;
-    font-weight: 300;
-  }
-
-  .disclaimer strong {
-    color: var(--accent2);
-    font-weight: 500;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.68rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    display: block;
-    margin-bottom: 4px;
-  }
-
-  /* Error */
-  .error-box {
-    display: none;
-    background: rgba(240,96,96,0.06);
-    border: 1px solid rgba(240,96,96,0.25);
-    border-radius: 14px;
-    padding: 20px 24px;
-    font-size: 0.85rem;
-    color: #f07060;
-    font-weight: 300;
-    margin-bottom: 24px;
-  }
-
-  .error-box.visible { display: block; }
-
-  /* Scan Again */
-  .scan-again-btn {
-    margin-top: 32px;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--text2);
-    font-family: 'DM Mono', monospace;
-    font-size: 0.72rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    padding: 12px 24px;
-    border-radius: 100px;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .scan-again-btn:hover {
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-
-  @media (max-width: 600px) {
-    .macro-grid { grid-template-columns: 1fr; }
-    .micros-grid { grid-template-columns: 1fr; }
-    .calorie-hero { flex-direction: column; gap: 24px; align-items: flex-start; }
-    .calorie-breakdown { flex-wrap: wrap; }
-    .meal-name { font-size: 1.5rem; }
-    .calorie-value { font-size: 3rem; }
-    header { flex-direction: column; gap: 8px; }
-    .tagline { border-left: none; padding-left: 0; }
-  }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Precision AI Meal Analyzer</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #f39c12; 
+            --accent: #e74c3c;
+            --bg: #f8f9fa;
+        }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h2, p { text-align: center; }
+        
+        .api-config {
+            background: #fff; padding: 15px; border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; display: flex; gap: 10px;
+        }
+        .api-config input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+
+        .upload-section { display: flex; justify-content: center; margin: 20px 0; }
+        .btn-upload {
+            position: relative; overflow: hidden; background-color: var(--secondary);
+            color: white; padding: 16px 32px; border-radius: 8px; font-size: 18px;
+            font-weight: 600; cursor: pointer; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        .btn-upload:hover { transform: translateY(-2px); }
+        .btn-upload input[type=file] {
+            position: absolute; left: 0; top: 0; right: 0; bottom: 0; opacity: 0; cursor: pointer;
+        }
+
+        .image-wrapper-center { text-align: center; width: 100%; }
+        .vision-container {
+            position: relative; display: inline-block; max-width: 100%; 
+            border-radius: 12px; overflow: hidden; box-shadow: 0 8px 16px rgba(0,0,0,0.1); 
+            display: none; margin: 0 auto 20px auto; 
+        }
+        #scannedImage { display: block; max-width: 100%; height: auto; }
+        
+        .vision-badge {
+            position: absolute; background-color: var(--accent); color: white;
+            width: 32px; height: 32px; border-radius: 50%; display: flex;
+            align-items: center; justify-content: center; font-weight: bold; font-size: 16px;
+            border: 3px solid white; box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+            transform: translate(-50%, -50%); z-index: 10;
+        }
+
+        .loading-state { display: none; text-align: center; padding: 30px; font-size: 1.1em; color: #666; font-style: italic; }
+        .data-panel { display: none; margin-top: 10px; }
+        
+        .component-row {
+            background: white; border-radius: 8px; padding: 20px; margin-bottom: 15px;
+            border-left: 5px solid var(--secondary); display: grid; grid-template-columns: auto 1fr; gap: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .row-id {
+            background: var(--accent); color: white; width: 35px; height: 35px; font-size: 1.2em;
+            display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: bold;
+        }
+        
+        .form-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+        input[type="text"], input[type="number"], select {
+            padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 15px; width: 100%; box-sizing: border-box;
+        }
+        
+        .nutrition-deep-dive { background: #f1f2f6; padding: 12px; border-radius: 6px; font-size: 0.9em; line-height: 1.5; color: #2f3640; }
+        .nutrition-deep-dive strong { color: var(--primary); }
+        
+        /* New Styles for the Grand Total Summary Card */
+        .summary-card {
+            background: var(--primary); color: white; padding: 25px; border-radius: 12px;
+            margin-top: 30px; box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+        .summary-title { text-align: center; margin-top: 0; color: #f1c40f; border-bottom: 1px solid #7f8c8d; padding-bottom: 10px; }
+        .summary-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 1.1em; }
+        .summary-row:last-child { border-bottom: none; font-size: 1.2em; color: #f1c40f; }
+
+        .error-msg { color: white; background-color: #e74c3c; padding: 10px; border-radius: 6px; text-align: center; font-weight: bold; display: none; margin-top: 10px; }
+    </style>
 </head>
 <body>
 
-<div class="container">
-  <header>
-    <div class="logo">Eprashala <span>Nutrition Calculator</span></div>
-    <div class="tagline">AI-Powered Meal Analysis</div>
-  </header>
-
-  <!-- Upload Zone -->
-  <div class="upload-zone" id="uploadZone">
-    <div class="upload-icon">
-      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-    </div>
-    <div class="upload-title">Drop your meal photo here</div>
-    <div class="upload-sub">Snap a photo or upload from your gallery — we'll do the rest</div>
-    <label class="upload-btn" for="fileInput">Choose Photo</label>
-    <input type="file" id="fileInput" accept="image/*" capture="environment">
-  </div>
-
-  <!-- Preview -->
-  <div class="preview-wrap" id="previewWrap">
-    <img id="previewImg" src="" alt="Meal preview">
-    <div class="preview-overlay">
-      <span class="preview-filename" id="previewName"></span>
-      <button class="change-btn" onclick="resetUpload()">Change Photo</button>
-    </div>
-  </div>
-
-  <!-- Analyze Button -->
-  <button class="analyze-btn" id="analyzeBtn" onclick="analyzeMeal()">
-    ⚡ Analyze Nutrition
-  </button>
-
-  <!-- Error -->
-  <div class="error-box" id="errorBox"></div>
-
-  <!-- Loading -->
-  <div class="loading" id="loading">
-    <div class="loading-ring"></div>
-    <div class="loading-text" id="loadingText">Identifying meal components...</div>
-  </div>
-
-  <!-- Results -->
-  <div class="results" id="results"></div>
-</div>
-
-<script>
-let currentFile = null;
-let currentBase64 = null;
-
-const uploadZone = document.getElementById('uploadZone');
-const fileInput = document.getElementById('fileInput');
-const previewWrap = document.getElementById('previewWrap');
-const previewImg = document.getElementById('previewImg');
-const previewName = document.getElementById('previewName');
-const analyzeBtn = document.getElementById('analyzeBtn');
-const loading = document.getElementById('loading');
-const loadingText = document.getElementById('loadingText');
-const results = document.getElementById('results');
-const errorBox = document.getElementById('errorBox');
-
-// Drag & drop
-uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
-uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
-uploadZone.addEventListener('drop', e => {
-  e.preventDefault();
-  uploadZone.classList.remove('dragover');
-  const file = e.dataTransfer.files[0];
-  if (file && file.type.startsWith('image/')) handleFile(file);
-});
-
-fileInput.addEventListener('change', e => {
-  if (e.target.files[0]) handleFile(e.target.files[0]);
-});
-
-function handleFile(file) {
-  currentFile = file;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const dataUrl = e.target.result;
-    currentBase64 = dataUrl.split(',')[1];
-    previewImg.src = dataUrl;
-    previewName.textContent = file.name;
-    uploadZone.style.display = 'none';
-    previewWrap.classList.add('visible');
-    analyzeBtn.classList.add('visible');
-    errorBox.classList.remove('visible');
-    results.classList.remove('visible');
-    results.innerHTML = '';
-  };
-  reader.readAsDataURL(file);
-}
-
-function resetUpload() {
-  currentFile = null;
-  currentBase64 = null;
-  fileInput.value = '';
-  uploadZone.style.display = 'block';
-  previewWrap.classList.remove('visible');
-  analyzeBtn.classList.remove('visible');
-  loading.classList.remove('visible');
-  results.classList.remove('visible');
-  results.innerHTML = '';
-  errorBox.classList.remove('visible');
-}
-
-const loadingMessages = [
-  'Identifying meal components...',
-  'Estimating portion sizes...',
-  'Calculating macronutrients...',
-  'Analyzing vitamins & minerals...',
-  'Compiling nutrition report...'
-];
-let msgIdx = 0;
-let msgInterval = null;
-
-function startLoadingMessages() {
-  msgIdx = 0;
-  loadingText.textContent = loadingMessages[0];
-  msgInterval = setInterval(() => {
-    msgIdx = (msgIdx + 1) % loadingMessages.length;
-    loadingText.textContent = loadingMessages[msgIdx];
-  }, 1800);
-}
-
-function stopLoadingMessages() {
-  if (msgInterval) { clearInterval(msgInterval); msgInterval = null; }
-}
-
-async function analyzeMeal() {
-  if (!currentBase64) return;
-
-  analyzeBtn.disabled = true;
-  loading.classList.add('visible');
-  results.classList.remove('visible');
-  errorBox.classList.remove('visible');
-  startLoadingMessages();
-
-  const prompt = `You are a professional nutritionist and dietitian. Analyze this meal photo with high accuracy.
-
-Respond ONLY with a valid JSON object (no markdown, no backticks, no explanation outside JSON).
-
-JSON format:
-{
-  "meal_name": "Name of the meal",
-  "description": "Brief description of what you see",
-  "total_calories": 520,
-  "serving_note": "Estimated portion size",
-  "macronutrients": {
-    "protein": { "grams": 28, "calories": 112, "notes": "Sources and details" },
-    "fat": { "grams": 18, "calories": 162, "saturated": 5, "unsaturated": 11, "trans": 0.2, "notes": "Sources and details" },
-    "carbohydrates": { "grams": 55, "calories": 220, "fiber": 6, "sugar": 8, "starch": 41, "notes": "Sources and details" }
-  },
-  "vitamins": [
-    { "name": "Vitamin A", "amount": "320 mcg", "dv_percent": 36, "note": "Brief note" },
-    { "name": "Vitamin C", "amount": "18 mg", "dv_percent": 20, "note": "" },
-    { "name": "Vitamin D", "amount": "1.2 mcg", "dv_percent": 6, "note": "" },
-    { "name": "Vitamin E", "amount": "2.1 mg", "dv_percent": 14, "note": "" },
-    { "name": "Vitamin K", "amount": "55 mcg", "dv_percent": 46, "note": "" },
-    { "name": "Thiamin (B1)", "amount": "0.4 mg", "dv_percent": 33, "note": "" },
-    { "name": "Riboflavin (B2)", "amount": "0.3 mg", "dv_percent": 23, "note": "" },
-    { "name": "Niacin (B3)", "amount": "5 mg", "dv_percent": 31, "note": "" },
-    { "name": "B6", "amount": "0.5 mg", "dv_percent": 29, "note": "" },
-    { "name": "Folate (B9)", "amount": "60 mcg", "dv_percent": 15, "note": "" },
-    { "name": "B12", "amount": "0.8 mcg", "dv_percent": 33, "note": "" }
-  ],
-  "minerals": [
-    { "name": "Calcium", "amount": "180 mg", "dv_percent": 14, "note": "" },
-    { "name": "Iron", "amount": "3.2 mg", "dv_percent": 18, "note": "" },
-    { "name": "Magnesium", "amount": "55 mg", "dv_percent": 13, "note": "" },
-    { "name": "Phosphorus", "amount": "280 mg", "dv_percent": 22, "note": "" },
-    { "name": "Potassium", "amount": "620 mg", "dv_percent": 13, "note": "" },
-    { "name": "Sodium", "amount": "480 mg", "dv_percent": 21, "note": "" },
-    { "name": "Zinc", "amount": "3.1 mg", "dv_percent": 28, "note": "" },
-    { "name": "Selenium", "amount": "18 mcg", "dv_percent": 33, "note": "" }
-  ],
-  "ingredients": [
-    { "name": "Ingredient name", "amount": "Estimated amount", "calories": 120 }
-  ],
-  "health_notes": [
-    "Health insight 1 about this meal",
-    "Health insight 2",
-    "Health insight 3"
-  ]
-}
-
-Be as accurate as possible. Base values on standard nutritional databases (USDA). Adjust for visible portion size.`;
-
-  try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 2000,
-        messages: [{
-          role: "user",
-          content: [
-            { type: "image", source: { type: "base64", media_type: currentFile.type || "image/jpeg", data: currentBase64 } },
-            { type: "text", text: prompt }
-          ]
-        }]
-      })
-    });
-
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error?.message || 'API error');
-    }
-
-    const data = await response.json();
-    const raw = data.content.map(b => b.text || '').join('');
-    const clean = raw.replace(/```json|```/g, '').trim();
-    const nutrition = JSON.parse(clean);
-    renderResults(nutrition);
-  } catch (err) {
-    errorBox.textContent = '⚠ ' + (err.message || 'Failed to analyze. Please try again.');
-    errorBox.classList.add('visible');
-  } finally {
-    stopLoadingMessages();
-    loading.classList.remove('visible');
-    analyzeBtn.disabled = false;
-  }
-}
-
-function pct(value, total) {
-  return Math.min(100, Math.round((value / total) * 100));
-}
-
-function dvColor(pct) {
-  if (pct >= 40) return '#c8f060';
-  if (pct >= 20) return '#f0a830';
-  return '#60d4f0';
-}
-
-function renderResults(n) {
-  const macro = n.macronutrients;
-  const totalMacroG = macro.protein.grams + macro.fat.grams + macro.carbohydrates.grams;
-
-  const vitHtml = n.vitamins.map(v => `
-    <div class="micro-item">
-      <span class="micro-item-name">${v.name}</span>
-      <div class="micro-item-bar"><div class="micro-item-fill" style="width:${v.dv_percent}%;background:${dvColor(v.dv_percent)}"></div></div>
-      <span class="micro-item-val">${v.amount} <span style="color:var(--muted);font-size:0.65rem">${v.dv_percent}%DV</span></span>
-    </div>
-  `).join('');
-
-  const minHtml = n.minerals.map(m => `
-    <div class="micro-item">
-      <span class="micro-item-name">${m.name}</span>
-      <div class="micro-item-bar"><div class="micro-item-fill" style="width:${m.dv_percent}%;background:${dvColor(m.dv_percent)}"></div></div>
-      <span class="micro-item-val">${m.amount} <span style="color:var(--muted);font-size:0.65rem">${m.dv_percent}%DV</span></span>
-    </div>
-  `).join('');
-
-  const ingHtml = n.ingredients.map(i => `
-    <div class="ingredient-row">
-      <span class="ing-name">${i.name}</span>
-      <span class="ing-amount">${i.amount}</span>
-      <span class="ing-cal">${i.calories} kcal</span>
-    </div>
-  `).join('');
-
-  const notesHtml = n.health_notes.map(note => `
-    <div class="health-note"><div class="note-dot"></div><span>${note}</span></div>
-  `).join('');
-
-  results.innerHTML = `
-    <div class="meal-header">
-      <div class="meal-label">✦ Identified Meal</div>
-      <div class="meal-name">${n.meal_name}</div>
-      <div class="meal-desc">${n.description}</div>
+    <h2>⚡ Precision AI Meal Analyzer</h2>
+    <p>Powered by Groq & Llama 4 Scout Vision</p>
+    
+    <div class="api-config">
+        <input type="password" id="apiKey" placeholder="Enter your free Groq API Key (gsk_...) here..." />
     </div>
 
-    <div class="calorie-hero">
-      <div class="calorie-info">
-        <div class="calorie-label">Total Energy</div>
-        <div class="calorie-value">${n.total_calories}</div>
-        <div class="calorie-unit">kcal · ${n.serving_note}</div>
-      </div>
-      <div class="calorie-breakdown">
-        <div class="cal-badge">
-          <div class="cal-badge-val" style="color:#60d4f0">${macro.protein.calories}</div>
-          <div class="cal-badge-lbl">Protein kcal</div>
+    <div class="upload-section">
+        <button class="btn-upload">
+            📸 Snap a Meal
+            <input type="file" id="imageInput" accept="image/*" capture="environment" onchange="processImage(event)" />
+        </button>
+    </div>
+
+    <div id="errorMsg" class="error-msg"></div>
+
+    <div class="image-wrapper-center">
+        <div id="visionWrapper" class="vision-container">
+            <img id="scannedImage" alt="Analyzed Meal" />
+            <div id="badgeLayer"></div>
         </div>
-        <div class="cal-badge">
-          <div class="cal-badge-val" style="color:#f0a830">${macro.fat.calories}</div>
-          <div class="cal-badge-lbl">Fat kcal</div>
-        </div>
-        <div class="cal-badge">
-          <div class="cal-badge-val" style="color:#c8f060">${macro.carbohydrates.calories}</div>
-          <div class="cal-badge-lbl">Carb kcal</div>
-        </div>
-      </div>
     </div>
 
-    <div class="section-title">Macronutrients</div>
-    <div class="macro-grid">
-      <div class="macro-card protein">
-        <div class="accent-line"></div>
-        <div class="macro-icon">🥩</div>
-        <div class="macro-name">Protein</div>
-        <div class="macro-val">${macro.protein.grams}g</div>
-        <div class="macro-bar-wrap"><div class="macro-bar" style="width:${pct(macro.protein.grams, totalMacroG)}%"></div></div>
-        <div class="macro-sub">${macro.protein.notes}</div>
-      </div>
-      <div class="macro-card fat">
-        <div class="accent-line"></div>
-        <div class="macro-icon">🧈</div>
-        <div class="macro-name">Total Fat</div>
-        <div class="macro-val">${macro.fat.grams}g</div>
-        <div class="macro-bar-wrap"><div class="macro-bar" style="width:${pct(macro.fat.grams, totalMacroG)}%"></div></div>
-        <div class="macro-sub">Saturated: ${macro.fat.saturated}g · Unsaturated: ${macro.fat.unsaturated}g · Trans: ${macro.fat.trans}g<br>${macro.fat.notes}</div>
-      </div>
-      <div class="macro-card carbs">
-        <div class="accent-line"></div>
-        <div class="macro-icon">🌾</div>
-        <div class="macro-name">Carbohydrates</div>
-        <div class="macro-val">${macro.carbohydrates.grams}g</div>
-        <div class="macro-bar-wrap"><div class="macro-bar" style="width:${pct(macro.carbohydrates.grams, totalMacroG)}%"></div></div>
-        <div class="macro-sub">Fiber: ${macro.carbohydrates.fiber}g · Sugar: ${macro.carbohydrates.sugar}g · Starch: ${macro.carbohydrates.starch}g<br>${macro.carbohydrates.notes}</div>
-      </div>
+    <div id="loading" class="loading-state">
+        🔍 Scanning meal components & calculating total macros...
     </div>
 
-    <div class="section-title">Micronutrients — Vitamins & Minerals</div>
-    <div class="micros-grid">
-      <div class="micro-card">
-        <div class="micro-header">
-          <div class="micro-title"><div class="micro-dot" style="background:#f0a830"></div>Vitamins</div>
-        </div>
-        <div class="micro-items">${vitHtml}</div>
-      </div>
-      <div class="micro-card">
-        <div class="micro-header">
-          <div class="micro-title"><div class="micro-dot" style="background:#60d4f0"></div>Minerals</div>
-        </div>
-        <div class="micro-items">${minHtml}</div>
-      </div>
+    <div id="dataPanel" class="data-panel">
+        <h3 style="border-bottom: 2px solid #ddd; padding-bottom: 10px; color: var(--primary);">Identified Components</h3>
+        <div id="componentsList"></div>
+        <div id="summaryContainer"></div>
     </div>
 
-    <div class="section-title">Ingredients Breakdown</div>
-    <div class="ingredients-list">${ingHtml}</div>
+    <script>
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]); 
+                reader.onerror = error => reject(error);
+                reader.readAsDataURL(file);
+            });
+        }
 
-    <div class="section-title">Health Insights</div>
-    <div class="health-notes">${notesHtml}</div>
+        async function processImage(event) {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const errorMsg = document.getElementById('errorMsg');
+            
+            if (!apiKey || !apiKey.startsWith('gsk_')) {
+                errorMsg.innerText = "Please enter a valid Groq API Key starting with 'gsk_'";
+                errorMsg.style.display = 'block';
+                return;
+            }
+            errorMsg.style.display = 'none';
 
-    <div class="disclaimer">
-      <strong>⚠ Accuracy Note</strong>
-      Values are AI estimates based on visual analysis and USDA nutritional data. Actual nutrition may vary by ±15–25% depending on exact ingredients, cooking methods, and portion sizes. For medical or dietary planning, consult a registered dietitian.
-    </div>
+            const file = event.target.files[0];
+            if (!file) return;
 
-    <button class="scan-again-btn" onclick="resetUpload()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>
-      Scan Another Meal
-    </button>
-  `;
+            const imgElement = document.getElementById('scannedImage');
+            imgElement.src = URL.createObjectURL(file);
+            
+            imgElement.onload = async function() {
+                document.getElementById('visionWrapper').style.display = 'inline-block';
+                document.getElementById('badgeLayer').innerHTML = ''; 
+                document.getElementById('dataPanel').style.display = 'none';
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('summaryContainer').innerHTML = '';
 
-  results.classList.add('visible');
+                try {
+                    const base64Image = await fileToBase64(file);
+                    const mimeType = file.type;
 
-  // Animate bars after render
-  setTimeout(() => {
-    results.querySelectorAll('.macro-bar').forEach(bar => {
-      const w = bar.style.width;
-      bar.style.width = '0';
-      requestAnimationFrame(() => { bar.style.width = w; });
-    });
-  }, 100);
-}
-</script>
+                    // UPGRADED PROMPT: We now ask for cals, pro_g, fat_g, and carb_g as pure integers.
+                    const systemPrompt = `You are an expert Clinical Nutritionist and Computer Vision Engineer. Analyze this meal. Identify EVERY item on the plate. 
+                    Return a JSON object with a single key called "components" containing an array of objects. 
+                    Each object must have:
+                    "id" (integer starting at 1),
+                    "name" (string),
+                    "qty" (integer),
+                    "unit" (string like "grams", "pieces", "tbsp", "bowl"),
+                    "cals" (integer, estimated calories),
+                    "pro_g" (integer, protein in grams),
+                    "fat_g" (integer, fat in grams),
+                    "carb_g" (integer, carbs in grams),
+                    "vitamins" (string, list key vitamins/minerals like "High in Vitamin C, Iron"),
+                    "inferred" (string detailing hidden fats/ingredients or cooking methods),
+                    "centerPoint" (array of 2 numbers: [x_percentage, y_percentage]. Estimate the exact center bullseye of the item. x is left-to-right 0-100, y is top-to-bottom 0-100. e.g., [50, 50] is dead center).
+                    Output ONLY valid JSON.`;
+
+                    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`
+                        },
+                        body: JSON.stringify({
+                            model: "meta-llama/llama-4-scout-17b-16e-instruct", 
+                            response_format: { type: "json_object" }, 
+                            messages: [
+                                { role: "system", content: systemPrompt },
+                                { role: "user", content: [
+                                    { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Image}` } }
+                                ]}
+                            ]
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.error) {
+                        throw new Error(data.error.message);
+                    }
+
+                    const rawText = data.choices[0].message.content;
+                    const parsedData = JSON.parse(rawText);
+                    const apiResponse = parsedData.components; 
+
+                    renderResults(apiResponse);
+
+                } catch (error) {
+                    console.error(error);
+                    document.getElementById('loading').style.display = 'none';
+                    errorMsg.innerText = "API Error: " + error.message;
+                    errorMsg.style.display = 'block';
+                }
+            };
+        }
+
+        function renderResults(apiResponse) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('dataPanel').style.display = 'block';
+
+            const badgeLayer = document.getElementById('badgeLayer');
+            const componentsList = document.getElementById('componentsList');
+            const summaryContainer = document.getElementById('summaryContainer');
+            componentsList.innerHTML = '';
+
+            // Initialize Total Variables
+            let totalCals = 0;
+            let totalPro = 0;
+            let totalFat = 0;
+            let totalCarb = 0;
+            let allVitamins = [];
+
+            apiResponse.forEach(item => {
+                // Add to Grand Totals
+                totalCals += item.cals || 0;
+                totalPro += item.pro_g || 0;
+                totalFat += item.fat_g || 0;
+                totalCarb += item.carb_g || 0;
+                if(item.vitamins) allVitamins.push(`${item.name}: ${item.vitamins}`);
+
+                // Place the Badge
+                const centerX = item.centerPoint[0];
+                const centerY = item.centerPoint[1];
+
+                const badge = document.createElement('div');
+                badge.className = 'vision-badge';
+                badge.style.left = `${centerX}%`;
+                badge.style.top = `${centerY}%`;
+                badge.innerText = item.id;
+                badgeLayer.appendChild(badge);
+
+                // Build Individual Row
+                const row = document.createElement('div');
+                row.className = 'component-row';
+                row.innerHTML = `
+                    <div class="row-id">${item.id}</div>
+                    <div style="width: 100%;">
+                        <div class="form-grid">
+                            <input type="text" value="${item.name}" aria-label="Food Name">
+                            <input type="number" value="${item.qty}" aria-label="Quantity">
+                            <select aria-label="Unit">
+                                <option value="grams" ${item.unit === 'grams' ? 'selected' : ''}>grams</option>
+                                <option value="pieces" ${item.unit === 'pieces' ? 'selected' : ''}>pieces</option>
+                                <option value="tbsp" ${item.unit === 'tbsp' ? 'selected' : ''}>tbsp</option>
+                                <option value="bowl" ${item.unit === 'bowl' ? 'selected' : ''}>bowl</option>
+                                <option value="ml" ${item.unit === 'ml' ? 'selected' : ''}>ml</option>
+                            </select>
+                        </div>
+                        <div class="nutrition-deep-dive">
+                            <strong>Estimated Macros:</strong> <span style="color: #e74c3c; font-weight:bold;">Cals: ${item.cals} | Pro: ${item.pro_g}g | Fat: ${item.fat_g}g | Carb: ${item.carb_g}g</span><br>
+                            <strong>Vitamins/Minerals:</strong> ${item.vitamins}<br>
+                            <strong>Nutritionist Inference:</strong> ${item.inferred}
+                        </div>
+                    </div>
+                `;
+                componentsList.appendChild(row);
+            });
+
+            // Build and Append the Grand Total Summary Card
+            const summaryHtml = `
+                <div class="summary-card">
+                    <h3 class="summary-title">Total Plate Summary</h3>
+                    <div class="summary-row"><span>Total Protein</span><strong>${totalPro} g</strong></div>
+                    <div class="summary-row"><span>Total Fats</span><strong>${totalFat} g</strong></div>
+                    <div class="summary-row"><span>Total Carbohydrates</span><strong>${totalCarb} g</strong></div>
+                    <div class="summary-row" style="border-top: 1px solid rgba(255,255,255,0.3); padding-top: 15px; margin-top: 5px;">
+                        <span><strong>Total Calories</strong></span>
+                        <strong>${totalCals} kcal</strong>
+                    </div>
+                    <div style="margin-top: 15px; font-size: 0.9em; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px;">
+                        <strong style="color: #f1c40f;">Micronutrient Summary:</strong><br>
+                        ${allVitamins.join('<br>')}
+                    </div>
+                </div>
+            `;
+            summaryContainer.innerHTML = summaryHtml;
+        }
+    </script>
 </body>
 </html>
