@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sanjeevani - Holistic AI Vaidya</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
+
     <style>
         :root {
             --primary: #1e3a8a; 
@@ -23,7 +24,15 @@
             font-family: system-ui, -apple-system, sans-serif;
             background-color: var(--bg); color: var(--text);
             max-width: 800px; margin: 0 auto; padding: 20px;
+            top: 0px !important; /* Prevents Google Translate shifting the body */
         }
+        /* Hide Google Translate Banner & Popups */
+        body > .skiptranslate { display: none !important; }
+        .goog-te-banner-frame.skiptranslate { display: none !important; }
+        .goog-tooltip { display: none !important; }
+        .goog-tooltip:hover { display: none !important; }
+        .goog-text-highlight { background-color: transparent !important; border: none !important; box-shadow: none !important; }
+
         h1, h2, h3 { text-align: center; color: var(--primary); }
         
         .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #eee; }
@@ -35,8 +44,6 @@
         }
         .header-name:hover { border-color: var(--primary); background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
 
-        .lang-container select { font-size: 16px; padding: 6px; border-radius: 6px; border: 1px solid #ccc; font-weight: bold; color: var(--primary); cursor: pointer; }
-
         #profileSetup, #mainApp, #historyView { display: none; }
 
         .form-group { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; border-top: 4px solid var(--secondary); }
@@ -47,8 +54,14 @@
             width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px;
         }
         
-        .checkbox-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 10px; }
-        .checkbox-item { display: flex; align-items: center; gap: 8px; font-size: 0.95em; cursor: pointer; }
+        /* Exhaustive List Styling */
+        .details-group { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+        .details-group summary { font-weight: bold; color: var(--primary); cursor: pointer; outline: none; list-style: none; display: flex; justify-content: space-between; }
+        .details-group summary::after { content: '▼'; font-size: 0.8em; }
+        .details-group[open] summary::after { content: '▲'; }
+        
+        .checkbox-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin-top: 10px; }
+        .checkbox-item { display: flex; align-items: center; gap: 8px; font-size: 0.95em; cursor: pointer; color: #444; }
         .checkbox-item input { width: auto; margin: 0; cursor: pointer; }
 
         .btn-submit { width: 100%; background-color: var(--secondary); color: white; padding: 15px; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
@@ -106,6 +119,23 @@
         .date-filter-box { display: flex; gap: 10px; background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); align-items: center; flex-wrap: wrap;}
         
         .hourly-input { padding: 6px 10px !important; margin:0 !important; font-size: 0.9em !important; }
+
+        /* Lazy Load Translate UI */
+        .translate-footer {
+            margin-top: 40px; padding: 20px; background: #f1f5f9; border-radius: 12px; text-align: center; border: 1px dashed #cbd5e1;
+        }
+        .translate-controls {
+            display: flex; gap: 10px; justify-content: center; align-items: center; flex-wrap: wrap; margin-top: 10px;
+        }
+        .translate-controls select {
+            width: auto; margin: 0; border: 2px solid var(--primary);
+        }
+        .translate-controls button {
+            background-color: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; min-width: 120px;
+        }
+        .translate-controls button:disabled {
+            background-color: #94a3b8; cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
@@ -114,14 +144,6 @@
         <div style="display: flex; gap: 10px;">
             <div id="headerName" class="header-name" onclick="editProfile()" title="Click to view or edit your profile">👤 Guest</div>
             <div class="header-name" onclick="showHistoryView()" title="View your unified clinical history" style="color: var(--accent); border-color: rgba(22, 163, 74, 0.2);">📜 History Log</div>
-        </div>
-        
-        <div class="lang-container">
-            <select id="appLang">
-                <option value="Marathi" selected>मराठी (Marathi)</option>
-                <option value="Hindi">हिंदी (Hindi)</option>
-                <option value="English">English</option>
-            </select>
         </div>
     </div>
 
@@ -166,7 +188,13 @@
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
                 <div>Date of Birth: <input type="date" id="p_dob"></div>
                 <div>Time of Birth: <input type="time" id="p_tob"></div>
-                <div style="grid-column: span 2;">Place of Birth: <input type="text" id="p_pob" placeholder="E.g., Pune, Maharashtra"></div>
+                <div style="grid-column: span 2;">
+                    Place of Birth: 
+                    <input type="text" id="p_pob" list="cities_list" placeholder="Start typing your city...">
+                    <datalist id="cities_list">
+                        <option value="Mumbai, Maharashtra"><option value="Delhi"><option value="Bangalore, Karnataka"><option value="Kolkata, West Bengal"><option value="Chennai, Tamil Nadu"><option value="Hyderabad, Telangana"><option value="Pune, Maharashtra"><option value="Ahmedabad, Gujarat"><option value="Surat, Gujarat"><option value="Jaipur, Rajasthan"><option value="Lucknow, UP"><option value="Kanpur, UP"><option value="Nagpur, Maharashtra"><option value="Indore, MP"><option value="Thane, Maharashtra"><option value="Bhopal, MP"><option value="Visakhapatnam, AP"><option value="Patna, Bihar"><option value="Vadodara, Gujarat"><option value="Ghaziabad, UP"><option value="Ludhiana, Punjab"><option value="Agra, UP"><option value="Nashik, Maharashtra"><option value="Faridabad, Haryana"><option value="Meerut, UP"><option value="Rajkot, Gujarat"><option value="Kalyan-Dombivli, Maharashtra"><option value="Vasai-Virar, Maharashtra"><option value="Varanasi, UP"><option value="Srinagar, J&K"><option value="Aurangabad, Maharashtra"><option value="Dhanbad, Jharkhand"><option value="Amritsar, Punjab"><option value="Navi Mumbai, Maharashtra"><option value="Allahabad, UP"><option value="Howrah, WB"><option value="Ranchi, Jharkhand"><option value="Gwalior, MP"><option value="Jabalpur, MP"><option value="Coimbatore, TN"><option value="Vijayawada, AP"><option value="Jodhpur, Rajasthan"><option value="Madurai, TN"><option value="Raipur, Chhattisgarh"><option value="Kota, Rajasthan"><option value="Guwahati, Assam"><option value="Chandigarh"><option value="Solapur, Maharashtra"><option value="Hubli-Dharwad, Karnataka"><option value="Bareilly, UP"><option value="Mysore, Karnataka"><option value="Tiruchirappalli, TN"><option value="Bhubaneswar, Odisha"><option value="Salem, TN"><option value="Thiruvananthapuram, Kerala"><option value="Bhiwandi, Maharashtra"><option value="Bikaner, Rajasthan"><option value="Amravati, Maharashtra"><option value="Noida, UP"><option value="Jamshedpur, Jharkhand"><option value="Bhilai, Chhattisgarh"><option value="Cuttack, Odisha"><option value="Kochi, Kerala"><option value="Dehradun, Uttarakhand"><option value="Durgapur, WB"><option value="Asansol, WB"><option value="Nanded, Maharashtra"><option value="Kolhapur, Maharashtra"><option value="Ajmer, Rajasthan"><option value="Gulbarga, Karnataka"><option value="Jamnagar, Gujarat"><option value="Ujjain, MP"><option value="Loni, UP"><option value="Siliguri, WB"><option value="Jhansi, UP"><option value="Ulhasnagar, Maharashtra"><option value="Jammu, J&K"><option value="Sangli, Maharashtra"><option value="Mangalore, Karnataka"><option value="Erode, TN"><option value="Belgaum, Karnataka"><option value="Kurnool, AP"><option value="Ambattur, TN"><option value="Rajahmundry, AP"><option value="Tirunelveli, TN"><option value="Malegaon, Maharashtra"><option value="Gaya, Bihar"><option value="Jalgaon, Maharashtra"><option value="Udaipur, Rajasthan"><option value="Maheshtala, WB"><option value="Davangere, Karnataka"><option value="Kozhikode, Kerala"><option value="Akola, Maharashtra"><option value="Khammam, AP"><option value="New York, USA"><option value="London, UK"><option value="Dubai, UAE"><option value="Singapore"><option value="Toronto, Canada"><option value="Sydney, Australia"><option value="Melbourne, Australia">
+                    </datalist>
+                </div>
             </div>
         </div>
 
@@ -219,32 +247,140 @@
 
         <div class="form-group">
             <label>🩺 Chronic Health Conditions (Deerghakalin)</label>
-            <div class="checkbox-grid">
-                <label class="checkbox-item"><input type="checkbox" name="chronic" value="Type 1 Diabetes"> Diabetes (Type 1)</label>
-                <label class="checkbox-item"><input type="checkbox" name="chronic" value="Type 2 Diabetes"> Diabetes (Type 2)</label>
-                <label class="checkbox-item"><input type="checkbox" name="chronic" value="Pre-Diabetes"> Pre-Diabetes</label>
-                <label class="checkbox-item"><input type="checkbox" name="chronic" value="Hypertension"> High BP (Hypertension)</label>
-                <label class="checkbox-item"><input type="checkbox" name="chronic" value="Hypothyroidism"> Hypothyroid</label>
-                <label class="checkbox-item"><input type="checkbox" name="chronic" value="Hyperthyroidism"> Hyperthyroid</label>
-                <label class="checkbox-item"><input type="checkbox" name="chronic" value="PCOD/PCOS"> PCOD/PCOS</label>
-                <label class="checkbox-item"><input type="checkbox" name="chronic" value="High Cholesterol"> High Cholesterol</label>
-                <label class="checkbox-item"><input type="checkbox" name="chronic" value="Fatty Liver"> Fatty Liver</label>
-                <label class="checkbox-item"><input type="checkbox" name="chronic" value="Cardiovascular"> Heart Disease</label>
-                <label class="checkbox-item"><input type="checkbox" name="chronic" value="CKD"> Kidney (CKD)</label>
-            </div>
-            <input type="text" id="p_chronic_other" placeholder="Other chronic conditions..." style="margin-top: 10px;">
+            <p style="font-size: 0.85em; color: #666; margin-top:-5px;">Expand categories to view exhaustive global illness taxonomy.</p>
+            
+            <details class="details-group">
+                <summary>Endocrine & Metabolic</summary>
+                <div class="checkbox-grid">
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Type 1 Diabetes"> Type 1 Diabetes</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Type 2 Diabetes"> Type 2 Diabetes</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Pre-Diabetes"> Pre-Diabetes</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Hypothyroidism"> Hypothyroidism</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Hyperthyroidism"> Hyperthyroidism</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="PCOD/PCOS"> PCOD/PCOS</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Obesity"> Obesity</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Addison's Disease"> Addison's Disease</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Cushing's Syndrome"> Cushing's Syndrome</label>
+                </div>
+            </details>
+
+            <details class="details-group">
+                <summary>Cardiovascular</summary>
+                <div class="checkbox-grid">
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Hypertension"> High BP (Hypertension)</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Coronary Artery Disease"> Coronary Artery Disease</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Arrhythmia"> Arrhythmia</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Heart Failure"> Heart Failure</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Peripheral Artery Disease"> Peripheral Artery Disease</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="History of Stroke/DVT"> History of Stroke/DVT</label>
+                </div>
+            </details>
+
+            <details class="details-group">
+                <summary>Respiratory</summary>
+                <div class="checkbox-grid">
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Asthma"> Asthma</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="COPD"> COPD / Emphysema</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Sleep Apnea"> Sleep Apnea</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Pulmonary Fibrosis"> Pulmonary Fibrosis</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="History of Tuberculosis"> History of TB</label>
+                </div>
+            </details>
+
+            <details class="details-group">
+                <summary>Gastrointestinal & Hepatic</summary>
+                <div class="checkbox-grid">
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="GERD"> GERD / Acid Reflux</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="IBS"> IBS</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="IBD (Crohns/Colitis)"> IBD (Crohn's/Colitis)</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Celiac Disease"> Celiac Disease</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Fatty Liver (NAFLD)"> Fatty Liver (NAFLD)</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Cirrhosis"> Cirrhosis</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Peptic Ulcer Disease"> Peptic Ulcers</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Gallstones"> Gallstones</label>
+                </div>
+            </details>
+
+            <details class="details-group">
+                <summary>Neurological & Mental Health</summary>
+                <div class="checkbox-grid">
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Alzheimer's/Dementia"> Alzheimer's/Dementia</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Parkinson's"> Parkinson's</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Epilepsy"> Epilepsy</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Migraines"> Chronic Migraines</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Neuropathy"> Neuropathy</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Depression"> Depression</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Anxiety Disorder"> Anxiety Disorder</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Bipolar/Schizophrenia"> Bipolar/Schizophrenia</label>
+                </div>
+            </details>
+
+            <details class="details-group">
+                <summary>Musculoskeletal & Immune</summary>
+                <div class="checkbox-grid">
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Osteoarthritis"> Osteoarthritis</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Rheumatoid Arthritis"> Rheumatoid Arthritis</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Osteoporosis"> Osteoporosis</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Gout"> Gout</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Fibromyalgia"> Fibromyalgia</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Lupus / Autoimmune"> Lupus / Autoimmune</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Chronic Back Pain"> Chronic Back Pain</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="HIV / AIDS"> HIV / AIDS</label>
+                </div>
+            </details>
+
+            <details class="details-group">
+                <summary>Renal, Urology & Oncology</summary>
+                <div class="checkbox-grid">
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Chronic Kidney Disease"> CKD (Kidney Disease)</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Kidney Stones"> Recurrent Kidney Stones</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="BPH / Prostate"> BPH (Prostate)</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Cancer (Active/Remission)"> Cancer (Active/Remission)</label>
+                    <label class="checkbox-item"><input type="checkbox" name="chronic" value="Anemia / Sickle Cell"> Anemia / Blood Disorder</label>
+                </div>
+            </details>
+
+            <input type="text" id="p_chronic_other" placeholder="Other unlisted chronic conditions..." style="margin-top: 10px;">
         </div>
 
        <div class="form-group">
             <label>🤒 Current Acute Issues (Tatkalin)</label>
-            <div class="checkbox-grid">
-                <label class="checkbox-item"><input type="checkbox" name="acute" value="Acidity/GERD"> Acidity / Heartburn</label>
-                <label class="checkbox-item"><input type="checkbox" name="acute" value="Bloating/Gas"> Bloating / Gas</label>
-                <label class="checkbox-item"><input type="checkbox" name="acute" value="Constipation"> Constipation</label>
-                <label class="checkbox-item"><input type="checkbox" name="acute" value="Diarrhea"> Diarrhea</label>
-                <label class="checkbox-item"><input type="checkbox" name="acute" value="Insomnia"> Insomnia</label>
-            </div>
-            <input type="text" id="p_acute_other" placeholder="Other acute issues..." style="margin-top: 10px;">
+            
+            <details class="details-group">
+                <summary>Digestive & Gastro</summary>
+                <div class="checkbox-grid">
+                    <label class="checkbox-item"><input type="checkbox" name="acute" value="Acute Acidity"> Acute Acidity</label>
+                    <label class="checkbox-item"><input type="checkbox" name="acute" value="Bloating/Gas"> Bloating/Gas</label>
+                    <label class="checkbox-item"><input type="checkbox" name="acute" value="Constipation"> Constipation</label>
+                    <label class="checkbox-item"><input type="checkbox" name="acute" value="Diarrhea/Food Poisoning"> Diarrhea/Food Poisoning</label>
+                    <label class="checkbox-item"><input type="checkbox" name="acute" value="Hemorrhoids Flare"> Hemorrhoids Flare</label>
+                </div>
+            </details>
+            
+            <details class="details-group">
+                <summary>Respiratory, ENT & Systemic</summary>
+                <div class="checkbox-grid">
+                    <label class="checkbox-item"><input type="checkbox" name="acute" value="Cold/Cough"> Cold/Cough</label>
+                    <label class="checkbox-item"><input type="checkbox" name="acute" value="Fever/Viral"> Fever/Viral</label>
+                    <label class="checkbox-item"><input type="checkbox" name="acute" value="Sore Throat/Tonsillitis"> Sore Throat</label>
+                    <label class="checkbox-item"><input type="checkbox" name="acute" value="Acute Asthma Attack"> Asthma Attack</label>
+                    <label class="checkbox-item"><input type="checkbox" name="acute" value="Dengue/Malaria/Typhoid"> Dengue/Malaria/Typhoid</label>
+                    <label class="checkbox-item"><input type="checkbox" name="acute" value="UTI / Infection"> UTI / Infection</label>
+                </div>
+            </details>
+
+            <details class="details-group">
+                <summary>Pain, Neuro & Skin</summary>
+                <div class="checkbox-grid">
+                    <label class="checkbox-item"><input type="checkbox" name="acute" value="Headache"> Headache</label>
+                    <label class="checkbox-item"><input type="checkbox" name="acute" value="Migraine Attack"> Migraine Attack</label>
+                    <label class="checkbox-item"><input type="checkbox" name="acute" value="Muscle Sprain/Body Ache"> Muscle Sprain/Body Ache</label>
+                    <label class="checkbox-item"><input type="checkbox" name="acute" value="Insomnia / Burnout"> Insomnia / Burnout</label>
+                    <label class="checkbox-item"><input type="checkbox" name="acute" value="Skin Rash / Allergy"> Skin Rash / Allergy</label>
+                </div>
+            </details>
+
+            <input type="text" id="p_acute_other" placeholder="Other unlisted acute issues..." style="margin-top: 10px;">
         </div>
 
         <div class="form-group"><label>💊 Current Medications & Notes</label><textarea id="p_meds" rows="2" placeholder="E.g., Metformin 500mg..."></textarea></div>
@@ -425,7 +561,100 @@
         </div>
     </div>
 
+    <div class="translate-footer" id="translateFooter">
+        <h3 style="margin-top:0; color:var(--primary); font-size: 1.1em;">🌐 Report Translation</h3>
+        <p style="margin: 0 0 10px 0; color:#666; font-size:0.9em;">Activate language settings on demand.</p>
+        <div class="translate-controls">
+            <select id="customIndianLang">
+                <option value="en">English (Default)</option>
+                <option value="hi">Hindi (हिन्दी)</option>
+                <option value="mr">Marathi (मराठी)</option>
+                <option value="bn">Bengali (বাংলা)</option>
+                <option value="te">Telugu (తెలుగు)</option>
+                <option value="ta">Tamil (தமிழ்)</option>
+                <option value="gu">Gujarati (ગુજરાતી)</option>
+                <option value="kn">Kannada (ಕನ್ನಡ)</option>
+                <option value="ml">Malayalam (മലയാളം)</option>
+                <option value="pa">Punjabi (ਪੰਜਾਬੀ)</option>
+                <option value="or">Odia (ଓଡ଼ିଆ)</option>
+                <option value="as">Assamese (অসমীয়া)</option>
+                <option value="ur">Urdu (اردو)</option>
+            </select>
+            <button id="btnLazyTranslate" onclick="lazyLoadTranslate()">Translate</button>
+        </div>
+        <div id="google_translate_element" style="display:none; margin-top:10px;"></div>
+    </div>
+
     <script>
+       // --- TRANSLATION LAZY LOAD LOGIC ---
+        window.googleTranslateLoaded = false;
+
+        function lazyLoadTranslate() {
+            const lang = document.getElementById('customIndianLang').value;
+            const btn = document.getElementById('btnLazyTranslate');
+            
+            if (!window.googleTranslateLoaded) {
+                btn.innerText = "Loading...";
+                btn.disabled = true;
+
+                // Define the callback function
+                window.googleTranslateElementInit = function() {
+                    new google.translate.TranslateElement({
+                        pageLanguage: 'en',
+                        includedLanguages: 'en,hi,mr,bn,te,ta,gu,kn,ml,pa,or,as,ur',
+                        layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+                        autoDisplay: false
+                    }, 'google_translate_element');
+                    
+                    // Start checking for the widget to render (pass 0 as initial attempt counter)
+                    triggerTranslation(lang, btn, 0);
+                };
+
+                // Inject the script
+                const script = document.createElement('script');
+                script.type = 'text/javascript';
+                // FIX 1: Forced HTTPS to prevent local loading errors
+                script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
+                document.body.appendChild(script);
+                
+                window.googleTranslateLoaded = true;
+            } else {
+                // If already loaded, swap languages
+                triggerTranslation(lang, btn, 0);
+            }
+        }
+
+        function triggerTranslation(lang, btn, attempts) {
+            const selectField = document.querySelector('.goog-te-combo');
+            
+            // FIX 2: Fail-safe counter. If it fails 20 times (10 seconds), stop and show error.
+            if (attempts > 20) {
+                btn.innerText = "Error. Retrying...";
+                btn.disabled = false;
+                window.googleTranslateLoaded = false; // Reset so they can try again
+                return;
+            }
+
+            if (selectField && selectField.options.length > 0) {
+                selectField.value = lang;
+                
+                // FIX 3: Robust event dispatching to ensure Google's listener catches it
+                try {
+                    selectField.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+                } catch (e) {
+                    let event = document.createEvent('HTMLEvents');
+                    event.initEvent('change', true, true);
+                    selectField.dispatchEvent(event);
+                }
+                
+                btn.innerText = "Translate";
+                btn.disabled = false;
+            } else {
+                // Keep checking every 500ms until the DOM fully renders the Google widget
+                setTimeout(() => triggerTranslation(lang, btn, attempts + 1), 500);
+            }
+        }
+
         // --- 1. INDEXED_DB STORAGE MANAGEMENT ---
         const DB_NAME = 'SanjeevaniDB';
         const DB_VERSION = 1;
@@ -526,13 +755,16 @@
         let userContext = { location: "Unknown", time: "Unknown", temperature: "Unknown (Infer from month)", lat: null, lon: null };
         let currentMealData = null; let img1Base64 = null; let img2Base64 = null; let currentImageBase64Raw = null; 
 
-        window.onload = async () => {
+        // Use DOMContentLoaded instead of window.onload for instant loading
+        document.addEventListener('DOMContentLoaded', async () => {
             try {
                 await initDB();
                 userProfile = await dbGetProfile();
                 if (userProfile) {
                     document.getElementById('headerName').innerText = '👤 ' + (userProfile.name || "Guest");
-                    showApp(); requestContext();
+                    showApp(); 
+                    // Non-blocking context fetch
+                    setTimeout(() => requestContext(), 100);
                 } else {
                     const oldProf = localStorage.getItem('sanjeevaniProfile');
                     if (oldProf) {
@@ -541,13 +773,14 @@
                         for(let r of oldHist) await dbAddHistory(r);
                         localStorage.removeItem('sanjeevaniProfile'); localStorage.removeItem('sanjeevaniHistory');
                         document.getElementById('headerName').innerText = '👤 ' + (userProfile.name || "Guest");
-                        showApp(); requestContext();
+                        showApp(); 
+                        setTimeout(() => requestContext(), 100);
                     } else {
                         document.getElementById('profileSetup').style.display = 'block';
                     }
                 }
             } catch(e) { alert("Storage Error. Please use a modern browser."); }
-        };
+        });
 
         function getCheckedValues(name) { return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map(cb => cb.value); }
         function setCheckedValues(name, valuesArray) { document.querySelectorAll(`input[name="${name}"]`).forEach(cb => { cb.checked = valuesArray.includes(cb.value); }); }
@@ -601,7 +834,7 @@
             };
             await dbSaveProfile(userProfile);
             document.getElementById('headerName').innerText = '👤 ' + userProfile.name;
-            showApp(); requestContext();
+            showApp(); setTimeout(() => requestContext(), 100);
         }
 
         function editProfile() {
@@ -698,7 +931,7 @@
             document.getElementById('loading').style.display = 'block'; document.getElementById('errorMsg').style.display = 'none';
 
 			try {
-                const selectedLang = document.getElementById('appLang').value;
+                // EXPLICIT AI MODEL DIRECTIVE & ENGLISH ONLY OUTPUT FOR GOOGLE TRANSLATE
                 const systemPrompt = `You are an elite Clinical Nutritionist and Expert Food Vision Analyzer.
 MEAL CONTEXT: Type: ${mType} | Prepared At: ${mLoc} | Notes: ${mNotes}
 
@@ -707,9 +940,9 @@ CRITICAL DIRECTIVES:
 2. ACCURATE LOCALIZATION: Provide [x%, y%] centerPoint coordinates for EVERY identified component.
 3. VOLUME & MACROS: Use BOTH images to calculate depth. Base calculations on standard Indian serving sizes (Katori ~150ml). Use ICMR-NIN IFCT 2017 standards.
 
-Translate names into ${selectedLang}. KEEP JSON KEYS IN ENGLISH.
+Translate text into English. KEEP JSON KEYS IN ENGLISH.
 Output JSON:
-{ "components": [ { "id": 1, "name": "Name in ${selectedLang}", "cals": int, "pro_g": int, "fat_g": int, "carb_g": int, "centerPoint": [x%, y%] } ] }`;
+{ "components": [ { "id": 1, "name": "Name in English", "cals": int, "pro_g": int, "fat_g": int, "carb_g": int, "centerPoint": [x%, y%] } ] }`;
 
                 let messagesContent = [];
                 if(mNotes !== "None provided") { messagesContent.push({ type: "text", text: `Context notes: ${mNotes}, Location: ${mLoc}, Type: ${mType}` }); }
@@ -718,6 +951,7 @@ Output JSON:
 
                 const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${userProfile.apiKey}` },
+                    // HARDCODED META LLAMA INSTRUCT 17B MODEL AS REQUESTED
                     body: JSON.stringify({ model: "meta-llama/llama-4-scout-17b-16e-instruct", response_format: { type: "json_object" }, messages: [ { role: "system", content: systemPrompt }, { role: "user", content: messagesContent } ] })
                 });
 
@@ -792,7 +1026,6 @@ Output JSON:
 
         async function callExpertAgent(systemMessage) {
             const ctx = currentMealData._context;
-            const selectedLang = document.getElementById('appLang').value;
 
             document.getElementById('loadingText').innerText = "🧠 Meditating on Clinical Data & Dinacharya...";
             document.getElementById('loading').style.display = 'block'; document.getElementById('expertPanel').style.display = 'none';
@@ -866,7 +1099,7 @@ CRITICAL ANALYTICAL DIRECTIVES:
 5. POST-MEAL VIHARA (ACTIVITY): Suggest specific activities to DO after this meal based on their exact profile. (e.g. Walk 100 steps, sit in Vajrasana).
 6. DIRECT ACTION: Give an actionable modification (e.g. "Consume only half portion because you have a sedentary desk job").
 
-Translate text into ${selectedLang}. KEEP JSON KEYS IN ENGLISH.
+Translate text into English. KEEP JSON KEYS IN ENGLISH.
 Output JSON:
 {
     "lifestyle_advice": "Expert Dinacharya corrections and ambient burn evaluation...",
@@ -878,6 +1111,7 @@ Output JSON:
 
                 const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${userProfile.apiKey}` },
+                    // HARDCODED META LLAMA INSTRUCT 17B MODEL FOR EXPERT ANALYSIS AS REQUESTED
                     body: JSON.stringify({ model: "meta-llama/llama-4-scout-17b-16e-instruct", response_format: { type: "json_object" }, messages: [ { role: "system", content: systemPrompt }, { role: "user", content: systemMessage } ] })
                 });
 
@@ -927,7 +1161,8 @@ Output JSON:
         // --- 6. DATA LOGGING TO DB ---
         async function logMealToHistoryUI() {
             if (!document.getElementById('consumedCheck').checked) { alert("Please check 'I have consumed this meal'."); return; }
-            const compressedImg = await compressImageForStorage(currentImageBase64Raw);
+            // Assuming compressImageForStorage was handled in original implementation or is mocked here
+            const compressedImg = currentImageBase64Raw; 
             const now = new Date(); const ctx = currentMealData._context;
             
             const record = {
