@@ -76,10 +76,12 @@
         .btn-vitals { background-color: var(--danger); }
         .btn-medicine { background-color: var(--medicine); }
         .btn-activity { background-color: var(--activity); }
+        .btn-report { background-color: #f59e0b; }
         .btn-outline { background-color: #f1f5f9; color: #333; border: 1px solid #cbd5e1; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; }
 
-        .action-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; margin-top: 20px; }
-        .action-grid > button { flex: 1 1 calc(33% - 10px); min-width: 120px; padding: 12px 10px; font-size: 14px; margin: 0; flex-direction: row; gap: 5px; }
+        /* Updated Action Grid for 2x2 Mobile / 4-in-a-row PC */
+        .action-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 15px; margin-top: 20px; }
+        .action-grid > button { width: 100%; padding: 12px 10px; font-size: 14px; margin: 0; }
 
         .vision-container { position: relative; display: inline-block; max-width: 100%; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 16px rgba(0,0,0,0.1); margin: 0 auto 20px auto; }
         #scannedImage { display: block; max-width: 100%; height: auto; }
@@ -106,6 +108,7 @@
         .history-card.vital { border-left: 5px solid var(--danger); }
         .history-card.medicine { border-left: 5px solid var(--medicine); }
         .history-card.activity { border-left: 5px solid var(--activity); }
+        .history-card.report { border-left: 5px solid #f59e0b; }
         
         .history-img { width: 100px; height: 100px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
         .history-icon-box { width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; font-size: 3em; border-radius: 8px; flex-shrink: 0; }
@@ -121,21 +124,11 @@
         .hourly-input { padding: 6px 10px !important; margin:0 !important; font-size: 0.9em !important; }
 
         /* Lazy Load Translate UI */
-        .translate-footer {
-            margin-top: 40px; padding: 20px; background: #f1f5f9; border-radius: 12px; text-align: center; border: 1px dashed #cbd5e1;
-        }
-        .translate-controls {
-            display: flex; gap: 10px; justify-content: center; align-items: center; flex-wrap: wrap; margin-top: 10px;
-        }
-        .translate-controls select {
-            width: auto; margin: 0; border: 2px solid var(--primary);
-        }
-        .translate-controls button {
-            background-color: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; min-width: 120px;
-        }
-        .translate-controls button:disabled {
-            background-color: #94a3b8; cursor: not-allowed;
-        }
+        .translate-footer { margin-top: 40px; padding: 20px; background: #f1f5f9; border-radius: 12px; text-align: center; border: 1px dashed #cbd5e1; }
+        .translate-controls { display: flex; gap: 10px; justify-content: center; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+        .translate-controls select { width: auto; margin: 0; border: 2px solid var(--primary); }
+        .translate-controls button { background-color: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 16px; min-width: 120px; }
+        .translate-controls button:disabled { background-color: #94a3b8; cursor: not-allowed; }
     </style>
 </head>
 <body>
@@ -455,9 +448,10 @@
         </div>
 
         <div class="action-grid">
-            <button class="btn-upload btn-vitals" onclick="toggleForm('vitalsFormSection')">🩺 Vitals</button>
-            <button class="btn-upload btn-medicine" onclick="toggleForm('medicineFormSection')">💊 Medicine</button>
-            <button class="btn-upload btn-activity" onclick="toggleForm('activityFormSection')">🏃 Activity</button>
+            <button class="btn-upload btn-vitals" onclick="toggleForm('vitalsFormSection')"><span style="font-size: 1.2em;">🩺</span> Vitals</button>
+            <button class="btn-upload btn-medicine" onclick="toggleForm('medicineFormSection')"><span style="font-size: 1.2em;">💊</span> Medicine</button>
+            <button class="btn-upload btn-activity" onclick="toggleForm('activityFormSection')"><span style="font-size: 1.2em;">🏃</span> Activity</button>
+            <button class="btn-upload btn-report" onclick="toggleForm('reportFormSection')"><span style="font-size: 1.2em;">📄</span> Reports</button>
         </div>
 
         <div id="activityFormSection" class="card" style="display:none; border-top: 4px solid var(--activity);">
@@ -476,6 +470,18 @@
             <label>Duration (in minutes):</label>
             <input type="number" id="a_duration" placeholder="E.g. 30, 45, 120">
             <button onclick="saveActivityRecord()" style="background-color: var(--activity); color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; width: 100%; font-size: 1.1em;">💾 Save Activity to History</button>
+        </div>
+
+        <div id="reportFormSection" class="card" style="display:none; border-top: 4px solid #f59e0b;">
+            <h3 style="color: #d97706; margin-top: 0;">Upload Medical Report</h3>
+            <p style="font-size: 0.85em; color: #666; margin-top:-10px;">Max file size: 1 MB (PDF only). Saved securely to local database.</p>
+            <label>Report Title / Type:</label>
+            <input type="text" id="r_title" placeholder="E.g. Blood Test, HbA1c, X-Ray...">
+            <label>Select PDF File:</label>
+            <input type="file" id="r_file" accept=".pdf" style="margin-top: 5px; padding: 10px; border: 1px dashed #d97706; background: #fffbeb; width: 100%; box-sizing: border-box; cursor: pointer;">
+            <label>Context / Notes (Optional):</label>
+            <textarea id="r_notes" rows="2" placeholder="Any context regarding this report..."></textarea>
+            <button onclick="saveReportRecord()" style="background-color: #f59e0b; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; width: 100%; font-size: 1.1em;">💾 Save Report to History</button>
         </div>
 
         <div id="vitalsFormSection" class="card" style="display:none; border-top: 4px solid var(--danger);">
@@ -582,22 +588,23 @@
             </select>
             <button id="btnLazyTranslate" onclick="lazyLoadTranslate()">Translate</button>
         </div>
-        <div id="google_translate_element" style="display:none; margin-top:10px;"></div>
+        <div id="google_translate_element" style="position: fixed; top: -10000px; left: -10000px; z-index: -9999;"></div>
     </div>
-
-    <script>
-        // --- TRANSLATION LAZY LOAD LOGIC ---
+	
+	
+	
+	<script>
+        // --- TRANSLATION LAZY LOAD LOGIC (BULLETPROOF) ---
         window.googleTranslateLoaded = false;
 
         function lazyLoadTranslate() {
-            const lang = document.getElementById('customIndianLang').value;
-            const btn = document.getElementById('btnLazyTranslate');
+            var lang = document.getElementById('customIndianLang').value;
+            var btn = document.getElementById('btnLazyTranslate');
             
             if (!window.googleTranslateLoaded) {
-                btn.innerText = "Loading...";
+                btn.innerText = "Connecting...";
                 btn.disabled = true;
 
-                // Define the callback function that Google's script will look for
                 window.googleTranslateElementInit = function() {
                     new google.translate.TranslateElement({
                         pageLanguage: 'en',
@@ -606,34 +613,51 @@
                         autoDisplay: false
                     }, 'google_translate_element');
                     
-                    // Allow time for the widget DOM to build before triggering our translation
-                    setTimeout(() => triggerTranslation(lang, btn), 1000);
+                    triggerTranslation(lang, btn, 0);
                 };
 
-                // Inject the Google Translate script natively into the DOM
-                const script = document.createElement('script');
+                var script = document.createElement('script');
                 script.type = 'text/javascript';
-                script.src = '//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
+                script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
                 document.body.appendChild(script);
                 
                 window.googleTranslateLoaded = true;
             } else {
-                // If already loaded, just swap languages
-                triggerTranslation(lang, btn);
+                triggerTranslation(lang, btn, 0);
             }
         }
 
-        function triggerTranslation(lang, btn) {
-            // Target the hidden select dropdown that Google Translate generates
-            const selectField = document.querySelector('.goog-te-combo');
-            if (selectField) {
+        function triggerTranslation(lang, btn, attempts) {
+            var selectField = document.querySelector('.goog-te-combo');
+            
+            // Fail-safe: If it takes longer than 15 seconds, alert the user about the file:/// block
+            if (attempts > 30) {
+                btn.innerText = "Translate";
+                btn.disabled = false;
+                window.googleTranslateLoaded = false; 
+                alert("Google Translate is blocking the connection. If you are opening this file directly from your computer (file:///), Google will reject the translation. Please use a local web server (like VS Code Live Server).");
+                return;
+            }
+
+            // Verify the DOM has completely finished rendering Google's options
+            if (selectField && selectField.options && selectField.options.length > 0) {
                 selectField.value = lang;
-                selectField.dispatchEvent(new Event('change'));
+                
+                // Cross-browser forced event dispatch (Guarantees Google hears the command)
+                var event;
+                if (typeof Event === 'function') {
+                    event = new Event('change', { bubbles: true, cancelable: true });
+                } else {
+                    event = document.createEvent('HTMLEvents');
+                    event.initEvent('change', true, true);
+                }
+                selectField.dispatchEvent(event);
+                
                 btn.innerText = "Translate";
                 btn.disabled = false;
             } else {
-                // If it hasn't injected into the DOM yet, wait 500ms and try again
-                setTimeout(() => triggerTranslation(lang, btn), 500);
+                // Widget is still building, check again in 500ms
+                setTimeout(function() { triggerTranslation(lang, btn, attempts + 1); }, 500);
             }
         }
 
@@ -737,7 +761,6 @@
         let userContext = { location: "Unknown", time: "Unknown", temperature: "Unknown (Infer from month)", lat: null, lon: null };
         let currentMealData = null; let img1Base64 = null; let img2Base64 = null; let currentImageBase64Raw = null; 
 
-        // Use DOMContentLoaded instead of window.onload for instant loading
         document.addEventListener('DOMContentLoaded', async () => {
             try {
                 await initDB();
@@ -745,7 +768,6 @@
                 if (userProfile) {
                     document.getElementById('headerName').innerText = '👤 ' + (userProfile.name || "Guest");
                     showApp(); 
-                    // Non-blocking context fetch
                     setTimeout(() => requestContext(), 100);
                 } else {
                     const oldProf = localStorage.getItem('sanjeevaniProfile');
@@ -799,10 +821,8 @@
                 age: document.getElementById('p_age').value || "Unknown", sex: document.getElementById('p_sex').value, 
                 height: document.getElementById('p_height').value, weight: document.getElementById('p_weight').value,
                 
-                // Birth Details
                 dob: document.getElementById('p_dob').value, tob: document.getElementById('p_tob').value, pob: document.getElementById('p_pob').value,
                 
-                // Routine
                 job: document.getElementById('p_job').value === 'Custom' ? document.getElementById('p_job_custom').value : document.getElementById('p_job').value,
                 rawJob: document.getElementById('p_job').value, customJob: document.getElementById('p_job_custom').value,
                 workDays: document.getElementById('p_work_days').value, onLeave: document.getElementById('p_on_leave').checked,
@@ -870,8 +890,9 @@
 
         // --- 3. UI TOGGLES ---
         function toggleCustom(selectId, inputId) { document.getElementById(inputId).style.display = document.getElementById(selectId).value === 'Custom' ? 'block' : 'none'; }
+        
         function toggleForm(formId) {
-            const forms = ['vitalsFormSection', 'medicineFormSection', 'activityFormSection'];
+            const forms = ['vitalsFormSection', 'medicineFormSection', 'activityFormSection', 'reportFormSection'];
             forms.forEach(id => { document.getElementById(id).style.display = (id === formId && document.getElementById(id).style.display === 'none') ? 'block' : 'none'; });
         }
 
@@ -913,7 +934,6 @@
             document.getElementById('loading').style.display = 'block'; document.getElementById('errorMsg').style.display = 'none';
 
 			try {
-                // EXPLICIT AI MODEL DIRECTIVE & ENGLISH ONLY OUTPUT FOR GOOGLE TRANSLATE
                 const systemPrompt = `You are an elite Clinical Nutritionist and Expert Food Vision Analyzer.
 MEAL CONTEXT: Type: ${mType} | Prepared At: ${mLoc} | Notes: ${mNotes}
 
@@ -933,7 +953,6 @@ Output JSON:
 
                 const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${userProfile.apiKey}` },
-                    // HARDCODED META LLAMA INSTRUCT 17B MODEL AS REQUESTED
                     body: JSON.stringify({ model: "meta-llama/llama-4-scout-17b-16e-instruct", response_format: { type: "json_object" }, messages: [ { role: "system", content: systemPrompt }, { role: "user", content: messagesContent } ] })
                 });
 
@@ -1093,7 +1112,6 @@ Output JSON:
 
                 const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${userProfile.apiKey}` },
-                    // HARDCODED META LLAMA INSTRUCT 17B MODEL FOR EXPERT ANALYSIS AS REQUESTED
                     body: JSON.stringify({ model: "meta-llama/llama-4-scout-17b-16e-instruct", response_format: { type: "json_object" }, messages: [ { role: "system", content: systemPrompt }, { role: "user", content: systemMessage } ] })
                 });
 
@@ -1143,7 +1161,6 @@ Output JSON:
         // --- 6. DATA LOGGING TO DB ---
         async function logMealToHistoryUI() {
             if (!document.getElementById('consumedCheck').checked) { alert("Please check 'I have consumed this meal'."); return; }
-            // Assuming compressImageForStorage was handled in original implementation or is mocked here
             const compressedImg = currentImageBase64Raw; 
             const now = new Date(); const ctx = currentMealData._context;
             
@@ -1181,6 +1198,46 @@ Output JSON:
             document.getElementById('a_duration').value = ''; toggleForm('none'); alert("Activity Saved to Clinical Log!");
         }
 
+        // PDF Report Logging
+        async function saveReportRecord() {
+            const title = document.getElementById('r_title').value;
+            const fileInput = document.getElementById('r_file');
+            
+            if (!title) { alert("Please enter a report title."); return; }
+            if (fileInput.files.length === 0) { alert("Please select a PDF file."); return; }
+            
+            const file = fileInput.files[0];
+            
+            // 1 MB limit (1048576 bytes)
+            if (file.size > 1048576) {
+                alert("File exceeds 1MB limit. Please compress your PDF before uploading.");
+                return;
+            }
+            
+            // Convert to Base64 for IndexedDB storage
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const base64Data = e.target.result;
+                
+                await dbAddHistory({ 
+                    id: Date.now(), 
+                    timestamp: new Date().getTime(), 
+                    type: 'report', 
+                    date: new Date().toLocaleString(), 
+                    reportTitle: title, 
+                    pdfData: base64Data, 
+                    notes: document.getElementById('r_notes').value 
+                });
+                
+                document.getElementById('r_title').value = ''; 
+                document.getElementById('r_file').value = ''; 
+                document.getElementById('r_notes').value = ''; 
+                toggleForm('none'); 
+                alert("Report Saved to Clinical Log!");
+            };
+            reader.readAsDataURL(file);
+        }
+
         // --- 7. HISTORY VIEW & EXPORT ---
         async function showHistoryView() {
             document.getElementById('mainApp').style.display = 'none'; document.getElementById('profileSetup').style.display = 'none'; document.getElementById('historyView').style.display = 'block'; 
@@ -1214,6 +1271,8 @@ Output JSON:
                     html += `<div class="history-card medicine" id="hist_${record.id}"><div class="history-icon-box" style="background: #ede9fe; color: var(--medicine);">💊</div><div class="history-details"><span class="history-date">${record.date}</span><strong style="color: var(--medicine); font-size: 1.1em;">${record.medName}</strong><p style="margin: 5px 0; font-size: 1.1em; color: #000; font-weight: bold;">Dosage/Qty: ${record.dosage}</p>${record.notes ? `<div class="history-notes"><strong>Anupana/Notes:</strong> ${record.notes}</div>` : ''}<button class="btn-delete pdf-hide" onclick="deleteHistoryItemUI(${record.id})">🗑️ Delete</button></div></div>`;
                 } else if (record.type === 'activity') {
                     html += `<div class="history-card activity" id="hist_${record.id}"><div class="history-icon-box" style="background: #e0f2fe; color: var(--activity);">🏃</div><div class="history-details"><span class="history-date">${record.date}</span><strong style="color: var(--activity); font-size: 1.1em;">${record.activityName}</strong><p style="margin: 5px 0; font-size: 1.1em; color: #000; font-weight: bold;">Duration: ${record.duration} minutes</p><button class="btn-delete pdf-hide" onclick="deleteHistoryItemUI(${record.id})">🗑️ Delete</button></div></div>`;
+                } else if (record.type === 'report') {
+                    html += `<div class="history-card report" id="hist_${record.id}"><div class="history-icon-box" style="background: #fef3c7; color: #d97706;">📄</div><div class="history-details"><span class="history-date">${record.date}</span><strong style="color: #d97706; font-size: 1.1em;">${record.reportTitle}</strong>${record.notes ? `<p style="margin: 5px 0; font-size: 0.9em; color: #444;">${record.notes}</p>` : ''}<div style="margin-top: 10px;"><a href="${record.pdfData}" download="${record.reportTitle.replace(/\s+/g, '_')}_Report.pdf" style="background-color: #d97706; color: white; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 0.9em; font-weight: bold; display: inline-block;">📥 Download PDF</a></div><button class="btn-delete pdf-hide" onclick="deleteHistoryItemUI(${record.id})">🗑️ Delete</button></div></div>`;
                 }
             });
             historyList.innerHTML = html;
