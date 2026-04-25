@@ -15,6 +15,7 @@
             --medicine: #8b5cf6; 
             --activity: #0284c7;
             --vihara: #0891b2; 
+            --routine: #d97706; 
             --bg: #fdfbf7; 
             --text: #333;
         }
@@ -42,7 +43,7 @@
         label { font-weight: bold; display: block; margin-top: 15px; color: var(--primary); border-bottom: 1px solid #eee; padding-bottom: 5px; }
         .sub-label { font-size: 0.85em; color: #666; font-weight: normal; margin-bottom: 10px; display: block; }
         
-        input[type="text"], input[type="number"], input[type="password"], select, textarea {
+        input[type="text"], input[type="number"], input[type="password"], input[type="time"], input[type="date"], select, textarea {
             width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 16px;
         }
         
@@ -81,6 +82,7 @@
         .card-science { border-left: 5px solid var(--primary); }
         .card-ayurveda { border-left: 5px solid var(--secondary); background: #fffbeb; }
         .card-vihara { border-left: 5px solid var(--vihara); background: #ecfeff; }
+        .card-routine { border-left: 5px solid var(--routine); background: #fff7ed; }
         .card-action { border-left: 5px solid var(--accent); background: #f0fdf4; border-width: 5px 2px 2px 2px; border-style: solid; border-color: var(--accent) #ddd #ddd #ddd;}
 
         .loading-state { display: none; text-align: center; padding: 30px; font-style: italic; color: #666; font-size: 1.1em; }
@@ -100,6 +102,10 @@
         .btn-delete { background: #fee2e2; color: #dc2626; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8em; margin-top: 10px;}
         
         .pdf-header { display: none; text-align: center; margin-bottom: 20px; }
+        
+        .date-filter-box { display: flex; gap: 10px; background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); align-items: center; flex-wrap: wrap;}
+        
+        .hourly-input { padding: 6px 10px !important; margin:0 !important; font-size: 0.9em !important; }
     </style>
 </head>
 <body>
@@ -121,16 +127,29 @@
 
     <div id="profileSetup">
         <h1>🌿 Sanjeevani Health Profile</h1>
-        <p>Configure your digital Vaidya. This data stays on your device.</p>
+        <p>Configure your digital Vaidya. All data is securely encrypted in your phone's native database.</p>
         
+        <div class="form-group" style="border-top-color: #64748b; background: #f8fafc;">
+            <label style="color: #475569;">💾 Data Backup & Restore</label>
+            <p style="font-size: 0.85em; color: #666; margin-top:-5px;">Export your data securely before changing phones, or import a previous backup.</p>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button onclick="exportDatabase()" style="flex:1; background-color: #475569; color: white; border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer;">📤 Export Backup</button>
+                <button onclick="document.getElementById('importDBFile').click()" style="flex:1; background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer;">📥 Import Backup</button>
+                <input type="file" id="importDBFile" style="display:none;" accept=".json" onchange="importDatabase(event)">
+            </div>
+        </div>
+
         <div class="form-group" style="border-top-color: var(--primary);">
             <label>🔑 System Setup</label>
             <span class="sub-label">Your Groq API key is required to power the AI.</span>
             <input type="password" id="p_api_key" placeholder="Enter Groq API Key here...">
+            <a href="https://console.groq.com/keys" target="_blank" style="display: block; margin-top: 8px; font-size: 0.85em; color: var(--primary); font-weight: bold; text-decoration: underline;">
+                🔗 Get your free Groq API Key here
+            </a>
         </div>
 
         <div class="form-group">
-            <label>🧍 Physical Vessel (Deha)</label>
+            <label>🧍 Physical Vessel (Deha) & Prakriti</label>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                 <div>Name: <input type="text" id="p_name" placeholder="E.g., Arjun"></div>
                 <div>Age: <input type="number" id="p_age"></div>
@@ -141,6 +160,60 @@
                 </div>
                 <div>Height (cm): <input type="number" id="p_height"></div>
                 <div style="grid-column: span 2;">Weight (kg): <input type="number" id="p_weight"></div>
+            </div>
+            
+            <label class="sub-label" style="margin-top:15px; border-bottom: 1px dashed #ccc; padding-bottom:5px;">Birth Details (Crucial for Jyotish & Prakriti Evaluation):</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                <div>Date of Birth: <input type="date" id="p_dob"></div>
+                <div>Time of Birth: <input type="time" id="p_tob"></div>
+                <div style="grid-column: span 2;">Place of Birth: <input type="text" id="p_pob" placeholder="E.g., Pune, Maharashtra"></div>
+            </div>
+        </div>
+
+        <div class="form-group" style="border-top-color: var(--routine);">
+            <label>🗓️ Lifestyle & Daily Routine (Dinacharya)</label>
+            
+            <label class="sub-label" style="margin-top:10px;">Primary Occupation / Job Profile:</label>
+            <select id="p_job" onchange="document.getElementById('p_job_custom').style.display = this.value === 'Custom' ? 'block' : 'none';">
+                <option value="Sedentary Desk Job (IT, Bank, Office)">Sedentary Desk Job (IT, Bank, Office)</option>
+                <option value="Light Active (Teacher, Retail, Healthcare)">Light Active (Teacher, Retail, Healthcare)</option>
+                <option value="Heavy Labor / Field Work / Machine Job">Heavy Labor / Field Work / Machine Job</option>
+                <option value="Athlete / High Performance">Athlete / High Performance</option>
+                <option value="Custom">✏️ Custom...</option>
+            </select>
+            <input type="text" id="p_job_custom" placeholder="Specify your exact job..." style="display:none; margin-top:5px; border-color: var(--routine);">
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px;">
+                <div>Working Days: 
+                    <select id="p_work_days">
+                        <option value="5">5 Days a week</option>
+                        <option value="6">6 Days a week</option>
+                        <option value="7">7 Days a week</option>
+                    </select>
+                </div>
+                <div style="display:flex; align-items:center;">
+                    <label class="checkbox-item" style="margin:0; font-weight:bold; color:var(--danger);"><input type="checkbox" id="p_on_leave"> 🏝️ Currently on Leave</label>
+                </div>
+                <div>Wake Up Time: <input type="time" id="p_wake_time" value="07:00"></div>
+                <div>Sleep Time: <input type="time" id="p_sleep_time" value="23:00"></div>
+            </div>
+
+            <label class="sub-label" style="margin-top:15px;">Daily Commute (One Way):</label>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <select id="p_commute_type">
+                    <option value="Work from Home (No Commute)">Work from Home (No Commute)</option>
+                    <option value="Drive / Car / Bike">Drive / Car / Bike</option>
+                    <option value="Train / Bus (Standing/Sitting)">Train / Bus (Standing/Sitting)</option>
+                    <option value="Walking / Cycling">Walking / Cycling</option>
+                </select>
+                <input type="number" id="p_commute_mins" placeholder="Minutes (e.g. 45)">
+            </div>
+
+            <div style="margin-top: 25px; border-top: 1px dashed #ccc; padding-top: 15px;">
+                <label style="color: var(--routine); margin-top:0; border:none;">⏳ Granular Hourly Routine</label>
+                <p style="font-size: 0.85em; color: #666; margin-top:-5px;">Fill in your typical hourly tasks so the AI can track your precise metabolic burn throughout the day.</p>
+                <button type="button" class="btn-outline" onclick="generateHourlyGrid()" style="width: 100%; border-color: var(--routine); color: var(--routine);">🔄 Generate Hourly Grid</button>
+                <div id="hourly_grid" style="display:flex; flex-direction:column; gap:8px; margin-top:15px;"></div>
             </div>
         </div>
 
@@ -189,7 +262,7 @@
             <input type="text" id="p_goal_custom" placeholder="Type your specific health goal here..." style="display:none; margin-top: 10px; border-color: var(--accent);">
         </div>
 
-        <button class="btn-submit" onclick="saveProfile()">💾 Save & Activate Sanjeevani</button>
+        <button class="btn-submit" onclick="saveProfileDataUI()">💾 Save & Activate Sanjeevani</button>
     </div>
 
     <div id="mainApp">
@@ -252,11 +325,10 @@
         </div>
 
         <div id="activityFormSection" class="card" style="display:none; border-top: 4px solid var(--activity);">
-            <h3 style="color: var(--activity); margin-top: 0;">Record Activity (Vyayama)</h3>
+            <h3 style="color: var(--activity); margin-top: 0;">Record EXTRA Activity</h3>
+            <p style="font-size: 0.85em; color: #666; margin-top:-10px;">Log activities outside your normal daily routine.</p>
             <label>Select Activity Pattern:</label>
             <select id="a_type" onchange="toggleCustom('a_type', 'a_custom_name')">
-                <option value="Sedentary / Office Work">🪑 Sedentary (Sitting / Office Work)</option>
-                <option value="Light Walking / Household Chores">🚶 Light Walking / Chores</option>
                 <option value="Brisk Walking / Jogging">🏃 Brisk Walking / Jogging</option>
                 <option value="Cycling">🚴 Cycling</option>
                 <option value="Heavy Labor / Trekking">⛰️ Heavy Labor / Trekking</option>
@@ -324,7 +396,6 @@
         </div>
 
         <div id="componentsPanel" class="feedback-section" style="display:none;"></div>
-
         <div id="expertPanel" class="feedback-section" style="display:none;"></div>
 
     </div>
@@ -334,10 +405,19 @@
             <button class="btn-submit" onclick="showApp()" style="margin-top: 0; background-color: var(--primary); width: auto; padding: 10px 20px;">🔙 Back</button>
             <button onclick="exportHistoryPDF()" style="background-color: var(--accent); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">📥 Export PDF</button>
         </div>
+        
+        <div class="date-filter-box">
+            <strong style="color: var(--primary);">🗓️ Filter Records:</strong>
+            <div style="display:flex; align-items:center; gap:5px;">From: <input type="date" id="filterStartDate" onchange="renderHistory()"></div>
+            <div style="display:flex; align-items:center; gap:5px;">To: <input type="date" id="filterEndDate" onchange="renderHistory()"></div>
+            <button onclick="document.getElementById('filterStartDate').value=''; document.getElementById('filterEndDate').value=''; renderHistory();" style="padding:8px 12px; border:none; background:#e2e8f0; border-radius:6px; cursor:pointer; font-weight:bold;">Clear</button>
+        </div>
+
         <div id="pdfPrintArea" style="background: var(--bg); padding: 10px;">
             <div class="pdf-header" id="pdfHeader">
                 <h1 style="color: var(--primary); margin-bottom: 5px;">Sanjeevani Clinical Log</h1>
                 <p id="pdfPatientInfo" style="color: #666; font-size: 0.9em;"></p>
+                <p id="pdfDateRange" style="color: var(--danger); font-size: 0.9em; font-weight: bold; margin-top: 5px;"></p>
                 <hr style="border: 1px solid #eee; margin-bottom: 20px;">
             </div>
             <h2 style="color: var(--accent); margin-top:0;">📜 Unified Timeline</h2>
@@ -346,40 +426,180 @@
     </div>
 
     <script>
-        // --- 1. STATE & DATA MANAGEMENT ---
+        // --- 1. INDEXED_DB STORAGE MANAGEMENT ---
+        const DB_NAME = 'SanjeevaniDB';
+        const DB_VERSION = 1;
+        let db;
+
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onupgradeneeded = (event) => {
+                    db = event.target.result;
+                    if (!db.objectStoreNames.contains('profile')) { db.createObjectStore('profile', { keyPath: 'id' }); }
+                    if (!db.objectStoreNames.contains('history')) {
+                        const historyStore = db.createObjectStore('history', { keyPath: 'id' });
+                        historyStore.createIndex('timestamp', 'timestamp', { unique: false });
+                    }
+                };
+                request.onsuccess = (event) => { db = event.target.result; resolve(db); };
+                request.onerror = (event) => reject(event.target.error);
+            });
+        }
+
+        function dbGetProfile() {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['profile'], 'readonly');
+                const request = transaction.objectStore('profile').get('main');
+                request.onsuccess = () => resolve(request.result ? request.result.data : null);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        function dbSaveProfile(data) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['profile'], 'readwrite');
+                const request = transaction.objectStore('profile').put({ id: 'main', data: data });
+                request.onsuccess = () => resolve(); request.onerror = () => reject(request.error);
+            });
+        }
+
+        function dbGetHistory() {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['history'], 'readonly');
+                const request = transaction.objectStore('history').getAll();
+                request.onsuccess = () => {
+                    let history = request.result || [];
+                    history.sort((a, b) => b.timestamp - a.timestamp); 
+                    resolve(history);
+                };
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        function dbAddHistory(record) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['history'], 'readwrite');
+                const request = transaction.objectStore('history').put(record);
+                request.onsuccess = () => resolve(); request.onerror = () => reject(request.error);
+            });
+        }
+
+        function dbDeleteHistory(id) {
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(['history'], 'readwrite');
+                const request = transaction.objectStore('history').delete(id);
+                request.onsuccess = () => resolve(); request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function exportDatabase() {
+            try {
+                const profile = await dbGetProfile(); const history = await dbGetHistory();
+                const backup = { profile, history, exportDate: new Date().toISOString() };
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backup));
+                const downloadAnchorNode = document.createElement('a'); downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", "sanjeevani_backup_" + new Date().getTime() + ".json");
+                document.body.appendChild(downloadAnchorNode); downloadAnchorNode.click(); downloadAnchorNode.remove();
+            } catch (err) { alert("Error exporting database."); }
+        }
+
+        async function importDatabase(event) {
+            const file = event.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const backup = JSON.parse(e.target.result);
+                    if (backup.profile) await dbSaveProfile(backup.profile);
+                    if (backup.history && Array.isArray(backup.history)) {
+                        for (let record of backup.history) await dbAddHistory(record);
+                    }
+                    alert("Database imported successfully! Sanjeevani will now reload.");
+                    window.location.reload();
+                } catch (err) { alert("Invalid backup file."); }
+            };
+            reader.readAsText(file);
+        }
+
+        // --- 2. STATE & INITIALIZATION ---
         let userProfile = null;
         let userContext = { location: "Unknown", time: "Unknown", temperature: "Unknown (Infer from month)", lat: null, lon: null };
-        let currentMealData = null; 
-        let img1Base64 = null;
-        let img2Base64 = null;
-        let currentImageBase64Raw = null; 
+        let currentMealData = null; let img1Base64 = null; let img2Base64 = null; let currentImageBase64Raw = null; 
 
-        window.onload = () => {
-            const savedProfile = localStorage.getItem('sanjeevaniProfile');
-            if (savedProfile) {
-                userProfile = JSON.parse(savedProfile);
-                document.getElementById('headerName').innerText = '👤 ' + (userProfile.name || "Guest");
-                showApp(); requestContext();
-            } else {
-                document.getElementById('profileSetup').style.display = 'block';
-            }
+        window.onload = async () => {
+            try {
+                await initDB();
+                userProfile = await dbGetProfile();
+                if (userProfile) {
+                    document.getElementById('headerName').innerText = '👤 ' + (userProfile.name || "Guest");
+                    showApp(); requestContext();
+                } else {
+                    const oldProf = localStorage.getItem('sanjeevaniProfile');
+                    if (oldProf) {
+                        userProfile = JSON.parse(oldProf); await dbSaveProfile(userProfile);
+                        let oldHist = JSON.parse(localStorage.getItem('sanjeevaniHistory') || '[]');
+                        for(let r of oldHist) await dbAddHistory(r);
+                        localStorage.removeItem('sanjeevaniProfile'); localStorage.removeItem('sanjeevaniHistory');
+                        document.getElementById('headerName').innerText = '👤 ' + (userProfile.name || "Guest");
+                        showApp(); requestContext();
+                    } else {
+                        document.getElementById('profileSetup').style.display = 'block';
+                    }
+                }
+            } catch(e) { alert("Storage Error. Please use a modern browser."); }
         };
 
         function getCheckedValues(name) { return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map(cb => cb.value); }
         function setCheckedValues(name, valuesArray) { document.querySelectorAll(`input[name="${name}"]`).forEach(cb => { cb.checked = valuesArray.includes(cb.value); }); }
         
-        function saveProfile() {
+        function generateHourlyGrid() {
+            const wake = document.getElementById('p_wake_time').value;
+            const sleep = document.getElementById('p_sleep_time').value;
+            if(!wake || !sleep) { alert("Set Wake and Sleep times first."); return; }
+
+            let wakeH = parseInt(wake.split(':')[0]); let sleepH = parseInt(sleep.split(':')[0]);
+            let html = ''; let currentH = wakeH;
+
+            while(currentH !== sleepH) {
+                let nextH = (currentH + 1) % 24;
+                let timeLabel = `${currentH.toString().padStart(2, '0')}:00 - ${nextH.toString().padStart(2, '0')}:00`;
+                html += `<div style="display:flex; gap:10px; align-items:center;">
+                            <span style="width:105px; font-size:0.85em; font-weight:bold; color:#475569;">${timeLabel}</span>
+                            <input type="text" class="hourly-input" data-time="${timeLabel}" placeholder="Task/Activity..." style="flex:1;">
+                         </div>`;
+                currentH = nextH;
+            }
+            document.getElementById('hourly_grid').innerHTML = html;
+        }
+
+        async function saveProfileDataUI() {
             let chronicArr = getCheckedValues('chronic'); if (document.getElementById('p_chronic_other').value) chronicArr.push(document.getElementById('p_chronic_other').value);
             let acuteArr = getCheckedValues('acute'); if (document.getElementById('p_acute_other').value) acuteArr.push(document.getElementById('p_acute_other').value);
 
+            let hrRoutine = {};
+            document.querySelectorAll('.hourly-input').forEach(inp => { if(inp.value.trim() !== '') hrRoutine[inp.getAttribute('data-time')] = inp.value; });
+
             userProfile = {
-                apiKey: document.getElementById('p_api_key').value, name: document.getElementById('p_name').value || "Guest", age: document.getElementById('p_age').value || "Unknown",
-                sex: document.getElementById('p_sex').value, height: document.getElementById('p_height').value, weight: document.getElementById('p_weight').value,
+                apiKey: document.getElementById('p_api_key').value, name: document.getElementById('p_name').value || "Guest", 
+                age: document.getElementById('p_age').value || "Unknown", sex: document.getElementById('p_sex').value, 
+                height: document.getElementById('p_height').value, weight: document.getElementById('p_weight').value,
+                
+                // Birth Details
+                dob: document.getElementById('p_dob').value, tob: document.getElementById('p_tob').value, pob: document.getElementById('p_pob').value,
+                
+                // Routine
+                job: document.getElementById('p_job').value === 'Custom' ? document.getElementById('p_job_custom').value : document.getElementById('p_job').value,
+                rawJob: document.getElementById('p_job').value, customJob: document.getElementById('p_job_custom').value,
+                workDays: document.getElementById('p_work_days').value, onLeave: document.getElementById('p_on_leave').checked,
+                wakeTime: document.getElementById('p_wake_time').value, sleepTime: document.getElementById('p_sleep_time').value,
+                commuteType: document.getElementById('p_commute_type').value, commuteMins: document.getElementById('p_commute_mins').value,
+                hourlyRoutine: hrRoutine,
+
                 chronic: chronicArr.join(', ') || "None", acute: acuteArr.join(', ') || "None", meds: document.getElementById('p_meds').value || "None", goal: document.getElementById('p_goal').value === 'Custom' ? document.getElementById('p_goal_custom').value : document.getElementById('p_goal').value,
                 rawChronic: getCheckedValues('chronic'), rawAcute: getCheckedValues('acute'), rawChronicOther: document.getElementById('p_chronic_other').value,
 				rawAcuteOther: document.getElementById('p_acute_other').value, rawGoal: document.getElementById('p_goal').value, customGoal: document.getElementById('p_goal_custom').value
             };
-            localStorage.setItem('sanjeevaniProfile', JSON.stringify(userProfile));
+            await dbSaveProfile(userProfile);
             document.getElementById('headerName').innerText = '👤 ' + userProfile.name;
             showApp(); requestContext();
         }
@@ -389,7 +609,24 @@
             if (userProfile) {
                 document.getElementById('p_api_key').value = userProfile.apiKey || ''; document.getElementById('p_name').value = userProfile.name !== "Guest" ? userProfile.name : "";
                 document.getElementById('p_age').value = userProfile.age !== "Unknown" ? userProfile.age : ""; document.getElementById('p_sex').value = userProfile.sex;
-                document.getElementById('p_height').value = userProfile.height; document.getElementById('p_weight').value = userProfile.weight; document.getElementById('p_meds').value = userProfile.meds !== "None" ? userProfile.meds : "";
+                document.getElementById('p_height').value = userProfile.height; document.getElementById('p_weight').value = userProfile.weight; 
+                
+                document.getElementById('p_dob').value = userProfile.dob || ''; document.getElementById('p_tob').value = userProfile.tob || ''; document.getElementById('p_pob').value = userProfile.pob || '';
+
+                document.getElementById('p_job').value = userProfile.rawJob || 'Sedentary Desk Job (IT, Bank, Office)';
+                document.getElementById('p_job_custom').value = userProfile.customJob || ''; document.getElementById('p_job_custom').style.display = userProfile.rawJob === 'Custom' ? 'block' : 'none';
+                document.getElementById('p_work_days').value = userProfile.workDays || '5'; document.getElementById('p_on_leave').checked = userProfile.onLeave || false;
+                document.getElementById('p_wake_time').value = userProfile.wakeTime || '07:00'; document.getElementById('p_sleep_time').value = userProfile.sleepTime || '23:00';
+                document.getElementById('p_commute_type').value = userProfile.commuteType || 'Work from Home (No Commute)'; document.getElementById('p_commute_mins').value = userProfile.commuteMins || '';
+
+                generateHourlyGrid(); 
+                if(userProfile.hourlyRoutine) {
+                    document.querySelectorAll('.hourly-input').forEach(inp => {
+                        let t = inp.getAttribute('data-time'); if(userProfile.hourlyRoutine[t]) inp.value = userProfile.hourlyRoutine[t];
+                    });
+                }
+
+                document.getElementById('p_meds').value = userProfile.meds !== "None" ? userProfile.meds : "";
                 setCheckedValues('chronic', userProfile.rawChronic || []); document.getElementById('p_chronic_other').value = userProfile.rawChronicOther || '';
                 setCheckedValues('acute', userProfile.rawAcute || []); document.getElementById('p_acute_other').value = userProfile.rawAcuteOther || '';
               	document.getElementById('p_goal').value = userProfile.rawGoal || 'Control Blood Sugar';
@@ -397,9 +634,7 @@
             } window.scrollTo(0,0); 
         }
 
-        function showApp() {
-            document.getElementById('profileSetup').style.display = 'none'; document.getElementById('historyView').style.display = 'none'; document.getElementById('mainApp').style.display = 'block';
-        }
+        function showApp() { document.getElementById('profileSetup').style.display = 'none'; document.getElementById('historyView').style.display = 'none'; document.getElementById('mainApp').style.display = 'block'; }
 
         function requestContext() {
             const now = new Date(); userContext.time = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
@@ -411,19 +646,14 @@
                             const wRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${userContext.lat}&longitude=${userContext.lon}&current_weather=true`);
                             const wData = await wRes.json(); userContext.temperature = `${wData.current_weather.temperature}°C`;
                         } catch(e) { console.log("Weather fetch failed."); }
-                    },
-                    (error) => { console.log("Location access denied."); }
+                    }, (error) => { console.log("Location access denied."); }
                 );
             }
         }
 
-        function fileToBase64(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader(); reader.onload = () => resolve(reader.result.split(',')[1]); reader.onerror = error => reject(error); reader.readAsDataURL(file);
-            });
-        }
+        function fileToBase64(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result.split(',')[1]); reader.onerror = error => reject(error); reader.readAsDataURL(file); }); }
 
-        // --- 2. UI TOGGLES ---
+        // --- 3. UI TOGGLES ---
         function toggleCustom(selectId, inputId) { document.getElementById(inputId).style.display = document.getElementById(selectId).value === 'Custom' ? 'block' : 'none'; }
         function toggleForm(formId) {
             const forms = ['vitalsFormSection', 'medicineFormSection', 'activityFormSection'];
@@ -431,21 +661,18 @@
         }
 
         async function previewImage(event, num) {
-            if (!userProfile || !userProfile.apiKey) { alert("Please click your Name and enter your Groq API Key."); return editProfile(); }
+            if (!userProfile || !userProfile.apiKey) { alert("Please enter your Groq API Key in Profile Setup."); return editProfile(); }
             const file = event.target.files[0]; if (!file) return;
             toggleForm('none'); 
 
-            const preview = document.getElementById('preview' + num);
-            preview.src = URL.createObjectURL(file); preview.style.display = 'block';
-            
+            const preview = document.getElementById('preview' + num); preview.src = URL.createObjectURL(file); preview.style.display = 'block';
             const base64 = await fileToBase64(file); const fullBase64 = `data:${file.type};base64,${base64}`;
+            
             if(num === 1) { img1Base64 = fullBase64; currentImageBase64Raw = fullBase64; }
             if(num === 2) { img2Base64 = fullBase64; }
 
-            document.getElementById('mealContextForm').style.display = 'block';
-            document.getElementById('visionWrapper').style.display = 'none';
-            document.getElementById('componentsPanel').style.display = 'none';
-            document.getElementById('expertPanel').style.display = 'none';
+            document.getElementById('mealContextForm').style.display = 'block'; document.getElementById('visionWrapper').style.display = 'none';
+            document.getElementById('componentsPanel').style.display = 'none'; document.getElementById('expertPanel').style.display = 'none';
         }
 
         function resetPhotos() {
@@ -456,7 +683,7 @@
             document.getElementById('componentsPanel').style.display = 'none'; document.getElementById('expertPanel').style.display = 'none'; document.getElementById('errorMsg').style.display = 'none';
         }
 
-        // --- 3. STEP 1: VISION AGENT (NUTRITION RECOGNITION) ---
+        // --- 4. STEP 1: VISION AGENT ---
         async function step1_ScanNutrition() {
             if (!img1Base64) { alert("Please upload at least the Top View photo."); return; }
 
@@ -465,29 +692,24 @@
             let mNotes = document.getElementById('mealNotes').value || "None provided";
 
             document.getElementById('mealContextForm').style.display = 'none'; document.getElementById('imageUploadSection').style.display = 'none';
-            document.getElementById('scannedImage').src = img1Base64; 
-            document.getElementById('visionWrapper').style.display = 'inline-block'; document.getElementById('badgeLayer').innerHTML = ''; 
+            document.getElementById('scannedImage').src = img1Base64; document.getElementById('visionWrapper').style.display = 'inline-block'; document.getElementById('badgeLayer').innerHTML = ''; 
             document.getElementById('componentsPanel').style.display = 'none'; document.getElementById('expertPanel').style.display = 'none'; 
             document.getElementById('loadingText').innerText = "👁️ Scanning Plate Components (Step 1/2)...";
             document.getElementById('loading').style.display = 'block'; document.getElementById('errorMsg').style.display = 'none';
 
 			try {
                 const selectedLang = document.getElementById('appLang').value;
-                
-                // STEP 1 PROMPT: PURE VISION AND COMPONENT BREAKDOWN
                 const systemPrompt = `You are an elite Clinical Nutritionist and Expert Food Vision Analyzer.
 MEAL CONTEXT: Type: ${mType} | Prepared At: ${mLoc} | Notes: ${mNotes}
 
 CRITICAL DIRECTIVES:
-1. EXHAUSTIVE IMAGE SEGMENTATION: Scan the images grid-by-grid. Identify EVERY DISTINCT food item. DO NOT group items as "Thali" or "Meal". Break down into fundamental components (e.g. Roti, Rice, Dal Tadka, Mango Pickle).
-2. ACCURATE LOCALIZATION: Provide [x%, y%] centerPoint coordinates for EVERY identified component so UI markers place correctly over the food.
-3. VOLUME & MACROS: If receiving two images, use BOTH to calculate depth. Base calculations strictly on standard Indian serving sizes (Katori/bowl ~150ml, roti ~6-8 inches). Estimate grams and provide macros based strictly on ICMR-NIN IFCT 2017 standards.
+1. EXHAUSTIVE IMAGE SEGMENTATION: Scan the images grid-by-grid. Identify EVERY DISTINCT food item. DO NOT group items as "Thali". Break down into fundamental components (e.g. Roti, Rice, Dal Tadka, Mango Pickle).
+2. ACCURATE LOCALIZATION: Provide [x%, y%] centerPoint coordinates for EVERY identified component.
+3. VOLUME & MACROS: Use BOTH images to calculate depth. Base calculations on standard Indian serving sizes (Katori ~150ml). Use ICMR-NIN IFCT 2017 standards.
 
 Translate names into ${selectedLang}. KEEP JSON KEYS IN ENGLISH.
 Output JSON:
-{
-    "components": [ { "id": 1, "name": "Name in ${selectedLang}", "cals": int, "pro_g": int, "fat_g": int, "carb_g": int, "centerPoint": [x%, y%] } ]
-}`;
+{ "components": [ { "id": 1, "name": "Name in ${selectedLang}", "cals": int, "pro_g": int, "fat_g": int, "carb_g": int, "centerPoint": [x%, y%] } ] }`;
 
                 let messagesContent = [];
                 if(mNotes !== "None provided") { messagesContent.push({ type: "text", text: `Context notes: ${mNotes}, Location: ${mLoc}, Type: ${mType}` }); }
@@ -500,10 +722,8 @@ Output JSON:
                 });
 
                 const data = await response.json(); if (data.error) throw new Error(data.error.message);
-
                 currentMealData = JSON.parse(data.choices[0].message.content);
                 currentMealData._context = { mType, mLoc, mNotes };
-                
                 renderStage1_Components(currentMealData);
 
             } catch (error) {
@@ -518,7 +738,7 @@ Output JSON:
             panel.innerHTML = ''; panel.style.display = 'block'; document.getElementById('expertPanel').style.display = 'none';
 
             let totalCals = 0, totalPro = 0, totalFat = 0, totalCarb = 0;
-            let componentsHtml = `<div class="card"><h3 style="margin-top:0;">🍽️ Step 1: Verify Plate Elements</h3><p style="font-size:0.85em; color:#666;">Check the AI's vision. Edit names or calories manually if incorrect before getting the expert opinion.</p><div style="display:flex; flex-direction:column; gap:10px;">`;
+            let componentsHtml = `<div class="card"><h3 style="margin-top:0;">🍽️ Step 1: Verify Plate Elements</h3><p style="font-size:0.85em; color:#666;">Check the AI's vision. Edit manually if incorrect before getting the expert opinion.</p><div style="display:flex; flex-direction:column; gap:10px;">`;
             
             data.components.forEach((item, index) => {
                 totalCals += item.cals || 0; totalPro += item.pro_g || 0; totalFat += item.fat_g || 0; totalCarb += item.carb_g || 0;
@@ -531,7 +751,6 @@ Output JSON:
                 </div>`;
             });
             
-            // Pass 'true' to show the alert if the user manually clicks "Update Totals"
             componentsHtml += `</div><div style="display:flex; gap:10px;"><button onclick="updateUIMacros(true)" style="background-color: #f1f5f9; color: #333; border: 1px solid #cbd5e1; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 15px; flex:1;">🔄 Update Totals</button><button onclick="resetPhotos()" style="background-color: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 15px; flex:1;">📸 Retake</button></div></div>`;
 
             let summaryHtml = `
@@ -549,36 +768,37 @@ Output JSON:
             `;
         }
 
-        // Updated Function: Accepts showPopup boolean to allow silent updates
         function updateUIMacros(showPopup = false) {
             if (!currentMealData || !currentMealData.components) return;
             let tc = 0;
             currentMealData.components.forEach((item, index) => {
                 item.name = document.getElementById(`comp_name_${index}`).value; 
-                let cal = parseInt(document.getElementById(`comp_cals_${index}`).value) || 0;
-                item.cals = cal; tc += cal;
+                let cal = parseInt(document.getElementById(`comp_cals_${index}`).value) || 0; item.cals = cal; tc += cal;
             });
-            document.getElementById('totCal').innerText = tc;
-            document.getElementById('macroSummaryBox').setAttribute('data-cals', tc);
-            
-            if (showPopup) {
-                alert("Totals Updated. You can now get your Expert Opinion.");
-            }
+            document.getElementById('totCal').innerText = tc; document.getElementById('macroSummaryBox').setAttribute('data-cals', tc);
+            if (showPopup) alert("Totals Updated. You can now get your Expert Opinion.");
         }
 
-        // --- 4. STEP 2: MASTER VAIDYA AGENT (DEEP REASONING) ---
+        // --- 5. STEP 2: MASTER VAIDYA AGENT ---
         async function step2_FetchExpertOpinion() {
-            // Re-read inputs silently before sending to the expert API
-            updateUIMacros(false);
+            updateUIMacros(false); // Silent update
+            await callExpertAgent("Analyze patient data and verified meal components.");
+        }
+
+        async function recalculateMeal() {
+            updateUIMacros(false); 
+            await callExpertAgent("Re-evaluate. The user has corrected their meal ingredients.");
+        }
+
+        async function callExpertAgent(systemMessage) {
             const ctx = currentMealData._context;
             const selectedLang = document.getElementById('appLang').value;
 
-            document.getElementById('loadingText').innerText = "🧠 Meditating on Clinical Data... Generating Deep Reasoning...";
+            document.getElementById('loadingText').innerText = "🧠 Meditating on Clinical Data & Dinacharya...";
             document.getElementById('loading').style.display = 'block'; document.getElementById('expertPanel').style.display = 'none';
-            document.querySelector('.btn-expert').style.display = 'none'; // hide button while loading
+            if(document.querySelector('.btn-expert')) document.querySelector('.btn-expert').style.display = 'none';
 
             try {
-                // GATHER 360 CLINICAL CONTEXT
                 let bmiStr = "Unknown";
                 if (userProfile.height && userProfile.weight) {
                     let h = parseFloat(userProfile.height) / 100; let w = parseFloat(userProfile.weight);
@@ -589,9 +809,21 @@ Output JSON:
                     }
                 }
 
-                const now = new Date(); let history = JSON.parse(localStorage.getItem('sanjeevaniHistory') || '[]');
+                const now = new Date(); let history = await dbGetHistory();
                 const twentyFourHoursAgo = now.getTime() - (24 * 60 * 60 * 1000);
                 
+                const dayOfWeek = now.getDay(); let isWorkDay = true;
+                if (userProfile.onLeave) { isWorkDay = false; } 
+                else if (userProfile.workDays === "5" && (dayOfWeek === 0 || dayOfWeek === 6)) { isWorkDay = false; } 
+                else if (userProfile.workDays === "6" && dayOfWeek === 0) { isWorkDay = false; }
+
+                let hrRoutineStr = userProfile.hourlyRoutine ? Object.entries(userProfile.hourlyRoutine).map(([time, task]) => `[${time}] ${task}`).join(" | ") : "No hourly routine mapped.";
+
+                let routineContext = `Job: ${userProfile.job} | Wake: ${userProfile.wakeTime} | Sleep: ${userProfile.sleepTime}`;
+                if (isWorkDay) routineContext += ` | WORKING DAY. Commute: ${userProfile.commuteMins || 0} mins via ${userProfile.commuteType}.`;
+                else routineContext += ` | HOLIDAY/LEAVE. Ambient caloric burn is at baseline.`;
+                routineContext += `\nHOURLY ROUTINE: ${hrRoutineStr}`;
+
                 let lastMeal = history.filter(h => h.type === 'meal').sort((a,b) => b.timestamp - a.timestamp)[0];
                 let mealGapText = "No previous meals logged recently.";
                 if (lastMeal) {
@@ -601,7 +833,7 @@ Output JSON:
                 }
 
                 let recentActivities = history.filter(h => h.type === 'activity' && h.timestamp > twentyFourHoursAgo);
-                let activityContext = recentActivities.length > 0 ? recentActivities.map(a => `[${a.date.split(',')[1].trim()}] ${a.activityName} for ${a.duration} mins`).join(" | ") : "Sedentary / No activity logged.";
+                let activityContext = recentActivities.length > 0 ? recentActivities.map(a => `[${a.date.split(',')[1].trim()}] ${a.activityName} for ${a.duration} mins`).join(" | ") : "Sedentary / No extra activity logged.";
 
                 let recentVitals = history.filter(h => h.type === 'vital' && h.timestamp > twentyFourHoursAgo);
                 let vitalContext = recentVitals.length > 0 ? recentVitals.map(v => `[${v.date.split(',')[1].trim()}] ${v.vitalName}: ${v.vitalValue}`).join(" | ") : "No vitals logged.";
@@ -612,100 +844,88 @@ Output JSON:
                 const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
                 const currentMonth = months[now.getMonth()];
 
-                // STEP 2 PROMPT: PURE TEXT CLINICAL REASONING (No Image Passed!)
-                const systemPrompt = `You are an elite Clinical Nutritionist and Ayurvedic Vaidya. Analyze this verified meal data against the patient's entire clinical timeline.
+                const systemPrompt = `You are an elite Clinical Nutritionist and Ayurvedic Vaidya. Analyze this verified meal data against the patient's entire clinical timeline and daily routine.
 
 FOOD TO ANALYZE: ${JSON.stringify(currentMealData.components)}
 MEAL CONTEXT: Type: ${ctx.mType} | Prepared At: ${ctx.mLoc} | Notes: ${ctx.mNotes}
 
-PATIENT DEHA & VIKRITI: Age/Sex: ${userProfile.age}yo ${userProfile.sex} | BMI: ${bmiStr} | Chronic: ${userProfile.chronic} | Acute: ${userProfile.acute} | Goal: ${userProfile.goal}
+PATIENT DEHA & PRAKRITI: Age/Sex: ${userProfile.age}yo ${userProfile.sex} | BMI: ${bmiStr} | Chronic: ${userProfile.chronic} | Acute: ${userProfile.acute} | Goal: ${userProfile.goal}
+BIRTH DETAILS (For Jyotish/Prakriti context): DOB: ${userProfile.dob}, Time: ${userProfile.tob}, Place: ${userProfile.pob}.
 ENVIRONMENT: Time: ${userContext.time}, Month: ${currentMonth}, Temp: ${userContext.temperature}
 CLINICAL (Last 24h): Vitals: ${vitalContext} | Medicine: ${medContext}
-AGNI & VYAYAMA (Last 24h): Meals: ${mealGapText} | Activity: ${activityContext}
+AGNI & VYAYAMA (Last 24h): Meals: ${mealGapText} | Extra Activity: ${activityContext}
 
-CRITICAL ANALYTICAL DIRECTIVES FOR DEEP REASONING:
-1. SCIENTIFIC ANALYSIS: Perform step-by-step logic. Mathematically weigh the calories of the previous 'AGNI/LAST MEAL' against the physical exertion in 'VYAYAMA'. Check 'CLINICAL METRICS & MEDICATIONS' for exact drug-food interactions (e.g., if they logged high BP today, flag sodium; if they took insulin, map to this meal's carbs).
-2. AYURVEDIC ANALYSIS: Assess Agni dynamically. Physical exertion ignites Agni and burns Ama. If exertion was high, heavy food is permissible. Provide deep, sutra-level reasoning factoring in specific diseases, medications, BMI, and weather/Virya.
-3. POST-MEAL VIHARA (ACTIVITY): As an expert, suggest specific activities the user MUST DO after this heavy/light meal. (e.g. Avoid drinking lot of water immediately, do Vajrasana for 10 mins, consume Tambul leaf, or walk 100 steps/Shatapavali). Give PERFECT clinical reasoning for these suggestions based on their specific profile.
-4. DIRECT ACTION: Give a deeply nuanced verdict based on the above logic. Give an actionable modification (e.g. "Consume only half portion because you have been sedentary and your fasting sugar was 140").
+LIFESTYLE & DINACHARYA (ROUTINE): 
+${routineContext}
 
-Translate text responses into ${selectedLang}. KEEP JSON KEYS IN ENGLISH.
+CRITICAL ANALYTICAL DIRECTIVES:
+1. LIFESTYLE & DINACHARYA: Evaluate their 'HOURLY ROUTINE'. Estimate ambient calorie burn based on their specific tasks leading up to this meal. If sedentary, mandate micro-breaks. Cross-reference wake/sleep times with specific diseases to correct circadian rhythm.
+2. PRAKRITI EVALUATION: Use their Birth Details, chronic diseases, and climate to infer their likely Dosha imbalance (e.g. late sleepers have Pitta/Vata issues). 
+3. SCIENTIFIC ANALYSIS: Mathematically weigh previous 'LAST MEAL' against ambient hourly burn and 'Extra Activity'. Check 'CLINICAL METRICS' for exact drug-food interactions.
+4. AYURVEDIC ANALYSIS: Assess Agni dynamically based on routine exertion. Provide sutra-level reasoning factoring in inferred Prakriti, medications, BMI, and Virya.
+5. POST-MEAL VIHARA (ACTIVITY): Suggest specific activities to DO after this meal based on their exact profile. (e.g. Walk 100 steps, sit in Vajrasana).
+6. DIRECT ACTION: Give an actionable modification (e.g. "Consume only half portion because you have a sedentary desk job").
+
+Translate text into ${selectedLang}. KEEP JSON KEYS IN ENGLISH.
 Output JSON:
 {
+    "lifestyle_advice": "Expert Dinacharya corrections and ambient burn evaluation...",
     "scientific_analysis": "Step-by-step medical logic...",
-    "ayurvedic_analysis": "Deep Vaidya reasoning...",
+    "ayurvedic_analysis": "Deep Vaidya reasoning linking Dosha/Prakriti...",
     "post_meal_vihara": "Expert post-meal activity suggestions...",
     "actionable_verdict": "A definitive, highly conditional instruction..."
 }`;
 
                 const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${userProfile.apiKey}` },
-                    body: JSON.stringify({ model: "meta-llama/llama-4-scout-17b-16e-instruct", response_format: { type: "json_object" }, messages: [ { role: "system", content: systemPrompt }, { role: "user", content: "Analyze patient data." } ] })
+                    body: JSON.stringify({ model: "meta-llama/llama-4-scout-17b-16e-instruct", response_format: { type: "json_object" }, messages: [ { role: "system", content: systemPrompt }, { role: "user", content: systemMessage } ] })
                 });
 
-                const data = await response.json();
-                if (data.error) throw new Error(data.error.message);
+                const data = await response.json(); if (data.error) throw new Error(data.error.message);
 
                 const expertData = JSON.parse(data.choices[0].message.content);
-                currentMealData.scientific_analysis = expertData.scientific_analysis;
-                currentMealData.ayurvedic_analysis = expertData.ayurvedic_analysis;
-                currentMealData.post_meal_vihara = expertData.post_meal_vihara;
+                currentMealData.lifestyle_advice = expertData.lifestyle_advice; currentMealData.scientific_analysis = expertData.scientific_analysis;
+                currentMealData.ayurvedic_analysis = expertData.ayurvedic_analysis; currentMealData.post_meal_vihara = expertData.post_meal_vihara;
                 currentMealData.actionable_verdict = expertData.actionable_verdict;
                 
                 renderStage2_ExpertOpinion();
 
             } catch (error) {
                 document.getElementById('loading').style.display = 'none'; document.getElementById('errorMsg').innerText = "API Error: " + error.message;
-                document.getElementById('errorMsg').style.display = 'block'; document.querySelector('.btn-expert').style.display = 'block';
+                document.getElementById('errorMsg').style.display = 'block'; if(document.querySelector('.btn-expert')) document.querySelector('.btn-expert').style.display = 'block';
             }
         }
 
         function renderStage2_ExpertOpinion() {
             document.getElementById('loading').style.display = 'none';
-            const expertPanel = document.getElementById('expertPanel');
-            expertPanel.style.display = 'block';
+            const expertPanel = document.getElementById('expertPanel'); expertPanel.style.display = 'block';
 
             let consumptionLoggerHtml = `
-                <div class="card" style="border-left: 5px solid #0284c7; background: #f0f9ff;">
+                <div class="card" style="border-left: 5px solid #0284c7; background: #f0f9ff; margin-top:20px;">
                     <h3 style="color: #0369a1; margin-top:0;">📋 Log Verified Meal to Timeline</h3>
                     <label style="display:flex; align-items:center; gap:10px; font-weight:bold; cursor:pointer; font-size: 1.1em; color: #0f172a; margin-bottom: 15px;">
                         <input type="checkbox" id="consumedCheck" style="width:24px; height:24px; cursor:pointer;"> I have consumed this meal
                     </label>
                     <input type="text" id="consumptionNotes" placeholder="Notes (e.g., 'I followed Vaidya advice and ate half')" style="border-color: #bae6fd;">
-                    <button onclick="logMealToHistory()" style="background-color: #0284c7; color: white; border: none; padding: 15px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; width: 100%; font-size: 1.1em;">💾 Save Meal to Clinical Log</button>
+                    <button onclick="logMealToHistoryUI()" style="background-color: #0284c7; color: white; border: none; padding: 15px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; width: 100%; font-size: 1.1em;">💾 Save Meal to Clinical Log</button>
                     <div id="logMealSuccessMsg" style="display:none; color: #15803d; font-weight: bold; text-align: center; margin-top: 10px;">✅ Meal saved to Log!</div>
                 </div>
             `;
 
             expertPanel.innerHTML = `
                 <div class="card card-action"><h3 style="color: var(--accent); margin-top:0;">🛑 Direct Action Strategy</h3><p style="font-size: 1.25em; font-weight:bold;">${currentMealData.actionable_verdict}</p></div>
+                <div class="card card-routine"><h3 style="color: var(--routine); margin-top:0;">🌅 Dinacharya (Lifestyle & Routine)</h3><p>${currentMealData.lifestyle_advice}</p></div>
                 <div class="card card-vihara"><h3 style="color: var(--vihara); margin-top:0;">🏃 Post-Meal Vihara (Activity Guide)</h3><p>${currentMealData.post_meal_vihara}</p></div>
                 <div class="card card-science"><h3 style="color: var(--primary); margin-top:0;">🔬 Deep Clinical Analysis</h3><p>${currentMealData.scientific_analysis}</p></div>
-                <div class="card card-ayurveda"><h3 style="color: var(--secondary); margin-top:0;">🌿 Advanced Ayurveda</h3><p>${currentMealData.ayurvedic_analysis}</p></div>
+                <div class="card card-ayurveda"><h3 style="color: var(--secondary); margin-top:0;">🌿 Advanced Ayurveda & Prakriti</h3><p>${currentMealData.ayurvedic_analysis}</p></div>
+                <button onclick="recalculateMeal()" style="background-color: var(--primary); color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 15px; width: 100%;">🔄 Re-Evaluate Data</button>
                 ${consumptionLoggerHtml}
             `;
-            
-            // Scroll down to the expert panel
             expertPanel.scrollIntoView({ behavior: 'smooth' });
         }
 
-
-        // --- 5. DATA LOGGING & EXPORT LOGIC ---
-
-        function compressImageForStorage(base64Str, maxWidth = 300) {
-            return new Promise((resolve) => {
-                let img = new Image(); img.src = base64Str;
-                img.onload = () => {
-                    let canvas = document.createElement('canvas'); let scaleSize = maxWidth / img.width;
-                    if (scaleSize >= 1) { resolve(base64Str); return; } 
-                    canvas.width = maxWidth; canvas.height = img.height * scaleSize;
-                    let ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    resolve(canvas.toDataURL('image/jpeg', 0.7)); 
-                };
-            });
-        }
-
-        async function logMealToHistory() {
+        // --- 6. DATA LOGGING TO DB ---
+        async function logMealToHistoryUI() {
             if (!document.getElementById('consumedCheck').checked) { alert("Please check 'I have consumed this meal'."); return; }
             const compressedImg = await compressImageForStorage(currentImageBase64Raw);
             const now = new Date(); const ctx = currentMealData._context;
@@ -717,67 +937,76 @@ Output JSON:
                 items: currentMealData.components.map(c => c.name).join(", ")
             };
 
-            saveRecordToStorage(record);
-            const btn = document.querySelector('button[onclick="logMealToHistory()"]'); const msg = document.getElementById('logMealSuccessMsg');
+            await dbAddHistory(record);
+            const btn = document.querySelector('button[onclick="logMealToHistoryUI()"]'); const msg = document.getElementById('logMealSuccessMsg');
             btn.style.display = 'none'; msg.style.display = 'block';
             setTimeout(() => { btn.style.display = 'block'; msg.style.display = 'none'; document.getElementById('consumedCheck').checked = false; resetPhotos(); document.getElementById('imageUploadSection').style.display='block';}, 3000);
         }
 
-        function saveVitalRecord() {
+        async function saveVitalRecord() {
             const val = document.getElementById('v_value').value; if(!val) { alert("Please enter the reading/value."); return; }
             let name = document.getElementById('v_type').value; if(name === 'Custom') name = document.getElementById('v_custom_name').value || "Custom Vital";
-            saveRecordToStorage({ id: Date.now(), timestamp: new Date().getTime(), type: 'vital', date: new Date().toLocaleString(), vitalName: name, vitalValue: val, notes: document.getElementById('v_notes').value });
+            await dbAddHistory({ id: Date.now(), timestamp: new Date().getTime(), type: 'vital', date: new Date().toLocaleString(), vitalName: name, vitalValue: val, notes: document.getElementById('v_notes').value });
             document.getElementById('v_value').value = ''; document.getElementById('v_notes').value = ''; toggleForm('none'); alert("Saved to Clinical Log!");
         }
 
-        function saveMedicineRecord() {
+        async function saveMedicineRecord() {
             const val = document.getElementById('m_dosage').value; if(!val) { alert("Please enter the dosage."); return; }
             let name = document.getElementById('m_type').value; if(name === 'Custom') name = document.getElementById('m_custom_name').value || "Custom Medicine";
-            saveRecordToStorage({ id: Date.now(), timestamp: new Date().getTime(), type: 'medicine', date: new Date().toLocaleString(), medName: name, dosage: val, notes: document.getElementById('m_notes').value });
+            await dbAddHistory({ id: Date.now(), timestamp: new Date().getTime(), type: 'medicine', date: new Date().toLocaleString(), medName: name, dosage: val, notes: document.getElementById('m_notes').value });
             document.getElementById('m_dosage').value = ''; document.getElementById('m_notes').value = ''; toggleForm('none'); alert("Saved to Clinical Log!");
         }
 
-        function saveActivityRecord() {
+        async function saveActivityRecord() {
             const duration = document.getElementById('a_duration').value; if(!duration) { alert("Please enter duration in minutes."); return; }
             let name = document.getElementById('a_type').value; if(name === 'Custom') name = document.getElementById('a_custom_name').value || "Custom Activity";
-            saveRecordToStorage({ id: Date.now(), timestamp: new Date().getTime(), type: 'activity', date: new Date().toLocaleString(), activityName: name, duration: duration });
+            await dbAddHistory({ id: Date.now(), timestamp: new Date().getTime(), type: 'activity', date: new Date().toLocaleString(), activityName: name, duration: duration });
             document.getElementById('a_duration').value = ''; toggleForm('none'); alert("Activity Saved to Clinical Log!");
         }
 
-        function saveRecordToStorage(record) {
-            let history = JSON.parse(localStorage.getItem('sanjeevaniHistory') || '[]'); history.push(record); history.sort((a, b) => b.timestamp - a.timestamp);
-            if (history.length > 100) history.pop(); localStorage.setItem('sanjeevaniHistory', JSON.stringify(history));
+        // --- 7. HISTORY VIEW & EXPORT ---
+        async function showHistoryView() {
+            document.getElementById('mainApp').style.display = 'none'; document.getElementById('profileSetup').style.display = 'none'; document.getElementById('historyView').style.display = 'block'; 
+            await renderHistory();
         }
 
-        function showHistoryView() {
-            document.getElementById('mainApp').style.display = 'none'; document.getElementById('profileSetup').style.display = 'none'; document.getElementById('historyView').style.display = 'block'; renderHistory();
-        }
+        async function renderHistory() {
+            const historyList = document.getElementById('historyList'); 
+            let history = await dbGetHistory();
+            
+            const startVal = document.getElementById('filterStartDate').value; const endVal = document.getElementById('filterEndDate').value;
+            let rangeText = "All Time";
+            if (startVal || endVal) {
+                rangeText = "Filtered: ";
+                const sDate = startVal ? new Date(startVal).getTime() : 0;
+                const eDate = endVal ? new Date(endVal).getTime() + 86400000 : Infinity; 
+                history = history.filter(h => h.timestamp >= sDate && h.timestamp <= eDate);
+                rangeText += (startVal ? startVal : "Beginning") + " to " + (endVal ? endVal : "Now");
+            }
+            document.getElementById('pdfDateRange').innerText = rangeText;
 
-        function renderHistory() {
-            const historyList = document.getElementById('historyList'); let history = JSON.parse(localStorage.getItem('sanjeevaniHistory') || '[]');
-            if (history.length === 0) { historyList.innerHTML = `<p style="text-align:center; color:#888; font-style:italic;">No records found. Log a meal, activity, vital reading, or medication to build your timeline.</p>`; return; }
+            if (history.length === 0) { historyList.innerHTML = `<p style="text-align:center; color:#888; font-style:italic;">No records found for this period.</p>`; return; }
 
             let html = '';
             history.forEach(record => {
                 if (record.type === 'meal') {
-                    html += `<div class="history-card meal" id="hist_${record.id}"><img src="${record.image}" class="history-img" alt="Meal" /><div class="history-details"><span class="history-date">${record.date}</span><strong style="color: var(--primary); font-size: 1.1em;">🍽️ ${record.calories} kcal</strong><p style="margin: 5px 0; font-size: 0.9em; color: #444;"><strong>Items:</strong> ${record.items}</p><div class="history-notes"><strong>Notes:</strong> ${record.notes}</div><button class="btn-delete pdf-hide" onclick="deleteHistoryItem(${record.id})">🗑️ Delete</button></div></div>`;
+                    html += `<div class="history-card meal" id="hist_${record.id}"><img src="${record.image}" class="history-img" alt="Meal" /><div class="history-details"><span class="history-date">${record.date}</span><strong style="color: var(--primary); font-size: 1.1em;">🍽️ ${record.calories} kcal</strong><p style="margin: 5px 0; font-size: 0.9em; color: #444;"><strong>Items:</strong> ${record.items}</p><div class="history-notes"><strong>Notes:</strong> ${record.notes}</div><button class="btn-delete pdf-hide" onclick="deleteHistoryItemUI(${record.id})">🗑️ Delete</button></div></div>`;
                 } else if (record.type === 'vital') {
-                    html += `<div class="history-card vital" id="hist_${record.id}"><div class="history-icon-box" style="background: #fee2e2; color: var(--danger);">🩺</div><div class="history-details"><span class="history-date">${record.date}</span><strong style="color: var(--danger); font-size: 1.1em;">${record.vitalName}</strong><p style="margin: 5px 0; font-size: 1.3em; color: #000; font-weight: bold;">Reading: ${record.vitalValue}</p>${record.notes ? `<div class="history-notes"><strong>Notes:</strong> ${record.notes}</div>` : ''}<button class="btn-delete pdf-hide" onclick="deleteHistoryItem(${record.id})">🗑️ Delete</button></div></div>`;
+                    html += `<div class="history-card vital" id="hist_${record.id}"><div class="history-icon-box" style="background: #fee2e2; color: var(--danger);">🩺</div><div class="history-details"><span class="history-date">${record.date}</span><strong style="color: var(--danger); font-size: 1.1em;">${record.vitalName}</strong><p style="margin: 5px 0; font-size: 1.3em; color: #000; font-weight: bold;">Reading: ${record.vitalValue}</p>${record.notes ? `<div class="history-notes"><strong>Notes:</strong> ${record.notes}</div>` : ''}<button class="btn-delete pdf-hide" onclick="deleteHistoryItemUI(${record.id})">🗑️ Delete</button></div></div>`;
                 } else if (record.type === 'medicine') {
-                    html += `<div class="history-card medicine" id="hist_${record.id}"><div class="history-icon-box" style="background: #ede9fe; color: var(--medicine);">💊</div><div class="history-details"><span class="history-date">${record.date}</span><strong style="color: var(--medicine); font-size: 1.1em;">${record.medName}</strong><p style="margin: 5px 0; font-size: 1.1em; color: #000; font-weight: bold;">Dosage/Qty: ${record.dosage}</p>${record.notes ? `<div class="history-notes"><strong>Anupana/Notes:</strong> ${record.notes}</div>` : ''}<button class="btn-delete pdf-hide" onclick="deleteHistoryItem(${record.id})">🗑️ Delete</button></div></div>`;
+                    html += `<div class="history-card medicine" id="hist_${record.id}"><div class="history-icon-box" style="background: #ede9fe; color: var(--medicine);">💊</div><div class="history-details"><span class="history-date">${record.date}</span><strong style="color: var(--medicine); font-size: 1.1em;">${record.medName}</strong><p style="margin: 5px 0; font-size: 1.1em; color: #000; font-weight: bold;">Dosage/Qty: ${record.dosage}</p>${record.notes ? `<div class="history-notes"><strong>Anupana/Notes:</strong> ${record.notes}</div>` : ''}<button class="btn-delete pdf-hide" onclick="deleteHistoryItemUI(${record.id})">🗑️ Delete</button></div></div>`;
                 } else if (record.type === 'activity') {
-                    html += `<div class="history-card activity" id="hist_${record.id}"><div class="history-icon-box" style="background: #e0f2fe; color: var(--activity);">🏃</div><div class="history-details"><span class="history-date">${record.date}</span><strong style="color: var(--activity); font-size: 1.1em;">${record.activityName}</strong><p style="margin: 5px 0; font-size: 1.1em; color: #000; font-weight: bold;">Duration: ${record.duration} minutes</p><button class="btn-delete pdf-hide" onclick="deleteHistoryItem(${record.id})">🗑️ Delete</button></div></div>`;
+                    html += `<div class="history-card activity" id="hist_${record.id}"><div class="history-icon-box" style="background: #e0f2fe; color: var(--activity);">🏃</div><div class="history-details"><span class="history-date">${record.date}</span><strong style="color: var(--activity); font-size: 1.1em;">${record.activityName}</strong><p style="margin: 5px 0; font-size: 1.1em; color: #000; font-weight: bold;">Duration: ${record.duration} minutes</p><button class="btn-delete pdf-hide" onclick="deleteHistoryItemUI(${record.id})">🗑️ Delete</button></div></div>`;
                 }
             });
             historyList.innerHTML = html;
         }
 
-        function deleteHistoryItem(id) {
-            if(confirm("Delete this record from your timeline?")) { let history = JSON.parse(localStorage.getItem('sanjeevaniHistory') || '[]'); history = history.filter(record => record.id !== id); localStorage.setItem('sanjeevaniHistory', JSON.stringify(history)); renderHistory(); }
-        }
+        async function deleteHistoryItemUI(id) { if(confirm("Delete this record from your timeline?")) { await dbDeleteHistory(id); await renderHistory(); } }
 
         function exportHistoryPDF() {
-            const profile = JSON.parse(localStorage.getItem('sanjeevaniProfile') || '{}'); document.getElementById('pdfPatientInfo').innerHTML = `<strong>Patient:</strong> ${profile.name || 'Guest'} | <strong>Age:</strong> ${profile.age || 'N/A'} | <strong>Goal:</strong> ${profile.rawGoal || 'N/A'}<br><strong>Chronic:</strong> ${profile.chronic || 'None'}`; document.getElementById('pdfHeader').style.display = 'block'; document.querySelectorAll('.pdf-hide').forEach(el => el.style.display = 'none');
+            document.getElementById('pdfPatientInfo').innerHTML = `<strong>Patient:</strong> ${userProfile.name || 'Guest'} | <strong>Age:</strong> ${userProfile.age || 'N/A'} | <strong>Goal:</strong> ${userProfile.rawGoal || 'N/A'}<br><strong>Chronic:</strong> ${userProfile.chronic || 'None'}`; 
+            document.getElementById('pdfHeader').style.display = 'block'; document.querySelectorAll('.pdf-hide').forEach(el => el.style.display = 'none');
             const opt = { margin: 10, filename: 'Sanjeevani_Clinical_Log.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
             html2pdf().set(opt).from(document.getElementById('pdfPrintArea')).save().then(() => { document.getElementById('pdfHeader').style.display = 'none'; document.querySelectorAll('.pdf-hide').forEach(el => el.style.display = 'inline-block'); });
         }
