@@ -561,7 +561,9 @@
         </div>
     </div>
 
-    <div class="translate-footer" id="translateFooter">
+ 
+    <script>
+       <div class="translate-footer" id="translateFooter">
         <h3 style="margin-top:0; color:var(--primary); font-size: 1.1em;">🌐 Report Translation</h3>
         <p style="margin: 0 0 10px 0; color:#666; font-size:0.9em;">Activate language settings on demand.</p>
         <div class="translate-controls">
@@ -582,22 +584,21 @@
             </select>
             <button id="btnLazyTranslate" onclick="lazyLoadTranslate()">Translate</button>
         </div>
-        <div id="google_translate_element" style="display:none; margin-top:10px;"></div>
+        <div id="google_translate_element" style="position: fixed; top: -10000px; left: -10000px; z-index: -9999;"></div>
     </div>
 
     <script>
-       // --- TRANSLATION LAZY LOAD LOGIC ---
+        // --- BULLETPROOF TRANSLATION LAZY LOAD LOGIC ---
         window.googleTranslateLoaded = false;
 
         function lazyLoadTranslate() {
-            const lang = document.getElementById('customIndianLang').value;
-            const btn = document.getElementById('btnLazyTranslate');
+            var lang = document.getElementById('customIndianLang').value;
+            var btn = document.getElementById('btnLazyTranslate');
             
             if (!window.googleTranslateLoaded) {
-                btn.innerText = "Loading...";
+                btn.innerText = "Connecting...";
                 btn.disabled = true;
 
-                // Define the callback function
                 window.googleTranslateElementInit = function() {
                     new google.translate.TranslateElement({
                         pageLanguage: 'en',
@@ -606,54 +607,54 @@
                         autoDisplay: false
                     }, 'google_translate_element');
                     
-                    // Start checking for the widget to render (pass 0 as initial attempt counter)
                     triggerTranslation(lang, btn, 0);
                 };
 
-                // Inject the script
-                const script = document.createElement('script');
+                var script = document.createElement('script');
                 script.type = 'text/javascript';
-                // FIX 1: Forced HTTPS to prevent local loading errors
                 script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
                 document.body.appendChild(script);
                 
                 window.googleTranslateLoaded = true;
             } else {
-                // If already loaded, swap languages
                 triggerTranslation(lang, btn, 0);
             }
         }
 
         function triggerTranslation(lang, btn, attempts) {
-            const selectField = document.querySelector('.goog-te-combo');
+            var selectField = document.querySelector('.goog-te-combo');
             
-            // FIX 2: Fail-safe counter. If it fails 20 times (10 seconds), stop and show error.
-            if (attempts > 20) {
-                btn.innerText = "Error. Retrying...";
+            // Fail-safe: If it takes longer than 15 seconds, alert the user about the file:/// block
+            if (attempts > 30) {
+                btn.innerText = "Translate";
                 btn.disabled = false;
-                window.googleTranslateLoaded = false; // Reset so they can try again
+                window.googleTranslateLoaded = false; 
+                alert("Google Translate is blocking the connection. If you are opening this file directly from your computer (file:///), Google will reject the translation. Please use a local web server (like VS Code Live Server).");
                 return;
             }
 
-            if (selectField && selectField.options.length > 0) {
+            // Verify the DOM has completely finished rendering Google's options
+            if (selectField && selectField.options && selectField.options.length > 0) {
                 selectField.value = lang;
                 
-                // FIX 3: Robust event dispatching to ensure Google's listener catches it
-                try {
-                    selectField.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
-                } catch (e) {
-                    let event = document.createEvent('HTMLEvents');
+                // Cross-browser forced event dispatch (Guarantees Google hears the command)
+                var event;
+                if (typeof Event === 'function') {
+                    event = new Event('change', { bubbles: true, cancelable: true });
+                } else {
+                    event = document.createEvent('HTMLEvents');
                     event.initEvent('change', true, true);
-                    selectField.dispatchEvent(event);
                 }
+                selectField.dispatchEvent(event);
                 
                 btn.innerText = "Translate";
                 btn.disabled = false;
             } else {
-                // Keep checking every 500ms until the DOM fully renders the Google widget
-                setTimeout(() => triggerTranslation(lang, btn, attempts + 1), 500);
+                // Widget is still building, check again in 500ms
+                setTimeout(function() { triggerTranslation(lang, btn, attempts + 1); }, 500);
             }
         }
+    </script>
 
         // --- 1. INDEXED_DB STORAGE MANAGEMENT ---
         const DB_NAME = 'SanjeevaniDB';
