@@ -570,7 +570,7 @@
         </div>
     </div>
 
-    <div class="translate-footer" id="translateFooter">
+	<div class="translate-footer" id="translateFooter">
         <h3 style="margin-top:0; color:var(--primary); font-size: 1.1em;">🌐 Report Translation</h3>
         <p style="margin: 0 0 10px 0; color:#666; font-size:0.9em;">Activate language settings on demand.</p>
         <div class="translate-controls">
@@ -589,79 +589,47 @@
                 <option value="as">Assamese (অসমীয়া)</option>
                 <option value="ur">Urdu (اردو)</option>
             </select>
-            <button id="btnLazyTranslate" onclick="lazyLoadTranslate()">Translate</button>
+            <button id="btnLazyTranslate" onclick="applyTranslation()">Translate</button>
         </div>
-        <div id="google_translate_element" style="position: fixed; top: -10000px; left: -10000px; z-index: -9999;"></div>
+        
+        <div id="google_translate_element" style="width: 0; height: 0; overflow: hidden; position: absolute;"></div>
     </div>
+    
+    <script type="text/javascript">
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({
+                pageLanguage: 'en',
+                includedLanguages: 'hi,mr,bn,te,ta,gu,kn,ml,pa,or,as,ur',
+                autoDisplay: false
+            }, 'google_translate_element');
+        }
+    </script>
+    <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 	
 	
 	
 	<script>
     
-        // --- TRANSLATION LAZY LOAD LOGIC (FIXED) ---
-        window.googleTranslateLoaded = false;
-
-        function lazyLoadTranslate() {
+       // --- TRANSLATION LOGIC (NATIVE) ---
+        function applyTranslation() {
             var lang = document.getElementById('customIndianLang').value;
-            var btn = document.getElementById('btnLazyTranslate');
-            
-            if (!window.googleTranslateLoaded) {
-                btn.innerText = "Connecting...";
-                btn.disabled = true;
-
-                window.googleTranslateElementInit = function() {
-                    new google.translate.TranslateElement({
-                        pageLanguage: 'en',
-                        // Note: Removed 'en' from includedLanguages, as it's the base language
-                        includedLanguages: 'hi,mr,bn,te,ta,gu,kn,ml,pa,or,as,ur',
-                        layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
-                        autoDisplay: false
-                    }, 'google_translate_element');
-                    
-                    triggerTranslation(lang, btn, 0);
-                };
-
-                var script = document.createElement('script');
-                script.type = 'text/javascript';
-                script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
-                document.body.appendChild(script);
-                
-                window.googleTranslateLoaded = true;
-            } else {
-                triggerTranslation(lang, btn, 0);
-            }
-        }
-
-        function triggerTranslation(lang, btn, attempts) {
             var selectField = document.querySelector('.goog-te-combo');
             
-            if (attempts > 30) {
-                btn.innerText = "Translate";
-                btn.disabled = false;
-                alert("Translation connection timed out. Please ensure you are not blocking Google scripts.");
+            // If the element doesn't exist, an Adblocker or Privacy Shield is killing the script.
+            if (!selectField) {
+                alert("Google Translate is being blocked. If you are using Brave browser, an Adblocker (like uBlock Origin), or Strict Privacy Settings, please disable it for this local web server.");
                 return;
             }
 
-            // Wait until Google has fully populated the options
-            if (selectField && selectField.options && selectField.options.length > 0) {
-                
-                // CRITICAL FIX: Google Translate doesn't have an "en" option if the page is already "en".
-                // To revert to English, we must set the combo box value to an empty string.
-                if (lang === 'en') {
-                    selectField.value = '';
-                } else {
-                    selectField.value = lang;
-                }
-                
-                // Fire native change event so Google's hidden listeners catch it
-                selectField.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
-                
-                btn.innerText = "Translate";
-                btn.disabled = false;
+            // Apply the language. Empty string reverts to English.
+            if (lang === 'en') {
+                selectField.value = '';
             } else {
-                // Widget is still building in the background, poll again in 500ms
-                setTimeout(function() { triggerTranslation(lang, btn, attempts + 1); }, 500);
+                selectField.value = lang;
             }
+            
+            // Force Google to recognize the change
+            selectField.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
         }
 
         // --- 1. INDEXED_DB STORAGE MANAGEMENT ---
