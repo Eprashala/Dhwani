@@ -58,10 +58,12 @@
                         <span class="text-xs text-gray-500 group-open:rotate-180 transition-transform">▼</span>
                     </summary>
                     <div class="p-3 border-t border-gray-700 space-y-3 bg-gray-800/50">
+                        
                         <div>
                             <label class="text-xs text-gray-400 mb-1 block">🔑 Groq API Key</label>
                             <input type="password" id="api-key-input" class="w-full bg-black border border-gray-600 rounded px-3 py-2 text-base md:text-sm outline-none focus:border-amber-500 text-white placeholder-gray-500" placeholder="Paste Groq API Key (gsk_...)">
                         </div>
+                        
                         <div>
                             <label class="text-xs text-gray-400 mb-1 block">🌐 Preferred Language</label>
                             <select id="language-select" class="w-full bg-black border border-gray-600 rounded px-3 py-2 text-base md:text-sm outline-none focus:border-amber-500 text-white">
@@ -73,6 +75,7 @@
                                 <option value="ta-IN">Tamil (தமிழ்)</option>
                             </select>
                         </div>
+
                         <div class="flex gap-2 border-t border-gray-700 pt-3">
                             <div class="w-2/3">
                                 <label class="text-xs text-gray-400 mb-1 block">Your Name</label>
@@ -83,6 +86,7 @@
                                 <input type="number" id="user-age" class="w-full bg-black border border-gray-600 rounded px-3 py-2 text-base md:text-sm outline-none focus:border-amber-500" placeholder="Age">
                             </div>
                         </div>
+
                         <div class="flex justify-end pt-1">
                             <span id="key-saved-msg" class="text-xs text-green-400 hidden font-semibold">Settings Saved!</span>
                         </div>
@@ -108,14 +112,13 @@
                 <div id="active-book-display" class="hidden shrink-0 bg-amber-900/20 border-b border-amber-700/50 p-3 md:p-4 relative overflow-hidden shadow-md z-0">
                     <div class="absolute right-0 top-0 opacity-10 text-5xl md:text-6xl pt-2 pr-2">📖</div>
                     <h3 id="active-book-title" class="text-amber-400 font-bold text-sm md:text-base pr-8"></h3>
-                    <p id="active-book-author" class="text-amber-200/70 text-xs font-semibold mt-0.5"></p>
                     <p id="active-book-desc" class="text-gray-300 text-xs md:text-sm mt-1 leading-relaxed pr-8"></p>
                 </div>
 
                 <div id="conversation-log" class="flex-grow overflow-y-auto p-3 md:p-4 space-y-4 custom-scrollbar pb-4">
                     <div class="text-gray-500 text-center mt-10 text-sm px-4">
-                        धर्मसंस्थापनार्थाय - Select a Shastra and begin your journey.<br>
-                        <span class="text-amber-600/70 block mt-2 font-semibold">"I am Dhwani. Let us explore the exact sciences of the ancients."</span>
+                        Configure your settings, select a Shastra, and begin the dialogue.<br>
+                        <span class="text-amber-600/70 block mt-2 font-semibold">"I am Dhwani. Let us explore the sciences of the ancients."</span>
                     </div>
                 </div>
 
@@ -169,13 +172,40 @@
             "sa-IN": "Sanskrit", "gu-IN": "Gujarati", "ta-IN": "Tamil"
         };
 
-        // EXHAUSTIVE LIBRARY DATA (RESTRUCTURED VEDAS & UPANISHADS)
+        const bookDescriptions = {
+            "Rigveda Samhita": "The Book of Mantra. The oldest known Vedic Sanskrit text containing foundational hymns to cosmic principles.",
+            "Shukla Yajurveda Samhita": "The White Yajurveda. Contains pure mantras and precise instructions for worship and cosmic ceremonies.",
+            "Krishna Yajurveda Samhita": "The Black Yajurveda. Integrates mantras with prose explanations of sacrificial rituals.",
+            "Samaveda Samhita": "The Book of Song. The musical and chanting adaptation of the Rigveda, focusing on frequency and vibration.",
+            "Atharvaveda Samhita": "Deals with the practicalities of daily life, medicine, architecture, and protective sciences.",
+            "Isha Upanishad": "Explores the concept of the absolute (Brahman) and the inner self (Atman), embedded in the Shukla Yajurveda.",
+            "Katha Upanishad": "The famous dialogue between the young boy Nachiketa and Yama (Death) exploring the nature of the soul.",
+            "Mandukya Upanishad": "Analyzes the states of consciousness: waking, dreaming, deep sleep, and the transcendent state (Turiya) via the syllable AUM.",
+            "Patanjali Yoga Sutras": "The foundational text of Yoga philosophy, detailing the 8 limbs (Ashtanga) of mental and spiritual discipline.",
+            "Nyaya Sutras": "The ancient Indian text on logic, epistemology, and the rules of debate and reasoning.",
+            "Vaisheshika Sutras": "An ancient physics and metaphysics text proposing an atomic theory of the universe.",
+            "Valmiki Ramayana": "The original epic journey of Rama, exploring Dharma (duty), morality, and human values.",
+            "Mahabharata": "The longest epic poem known, exploring the complex dynamics of politics, ethics, and cosmic law (Itihasa).",
+            "Bhagavad Gita": "The ultimate synthesis of Hindu philosophy, focusing on duty, knowledge, and action without attachment.",
+            "Charaka Samhita": "The definitive, ancient text on Ayurveda, internal medicine, and holistic lifestyle management.",
+            "Sushruta Samhita": "The foundational ancient text of surgery, anatomy, and advanced medical procedures.",
+            "Ashtanga Hridayam": "A comprehensive summary of Ayurvedic medicine compiled by Vagbhata.",
+            "Surya Siddhanta": "The monumental ancient treatise on archaeo-astronomy, planetary motions, and timekeeping.",
+            "Brihat Samhita": "An encyclopedic work by Varahamihira covering astronomy, astrology, architecture, meteorology, and planetary phenomena.",
+            "Brihat Parashara Hora Shastra": "The most comprehensive and foundational text of Vedic Astrology (Jyotish).",
+            "Bhagavata Purana": "Renowned text intertwining deep cosmic philosophy with Bhakti (devotion) towards Krishna.",
+            "Shiva Purana": "Focuses on the cosmic dance of creation and destruction, physics of the universe, and the worship of Shiva.",
+            "Arthashastra": "Chanakya's ancient Indian treatise on statecraft, economic policy, and military strategy."
+        };
+
+        const getDesc = (name) => bookDescriptions[name] || `Authentic ancient Indian text containing deep philosophies, traditions, and scientific observations regarding ${name}.`;
+
         const libraryData = {
             "📖 Epics & Neeti (Moral/Statecraft)": [
                 { name: "Maharishi Valmiki Ramayan", author: "Maharishi Valmiki", desc: "रामायण कथा" },
                 { name: "Mahabharat", author: "Maharishi Ved Vyas", desc: "महर्षी वेद व्यास लिखित महाभारताचे महाकाव्यं" },
-				{ name: "Bhagavad Gita", author: "Maharishi Ved Vyas (Lord Krishna)", desc: "श्रीकृष्णाने अर्जुनाला रणांगणावर सांगितलेले जीवन, कर्म आणि मोक्षाचे अंतिम तत्त्वज्ञान." }
-                            ],
+                { name: "Bhagavad Gita", author: "Maharishi Ved Vyas (Lord Krishna)", desc: "श्रीकृष्णाने अर्जुनाला रणांगणावर सांगितलेले जीवन, कर्म आणि मोक्षाचे अंतिम तत्त्वज्ञान." }
+            ],
             "🕉️ The Four Vedas": [
                 { name: "RigVeda", author: "Traditional / Not specified", desc: "निसर्गातील विविध शक्तींची पूजा आणि मूळ मंत्र" },
                 { name: "YajurVeda", author: "Traditional / Not specified", desc: "यज्ञ आणि विविध धार्मिक विधीं (शुक्ल आणि कृष्ण)" },
@@ -256,7 +286,7 @@
                 { name: "Ayurveda", author: "Traditional", desc: "आयुर्वेद: निसर्गाची देणगी, निरोगी जीवनाची हमी!" },
                 { name: "DharmaShastra", author: "Traditional", desc: "धर्मशास्त्र जीवनाला शिस्त, करुणा आणि सत्याचा मार्ग दाखवते" },
                 { name: "Artha Shastra", author: "Chanakya (Kautilya)", desc: "न्याय, शिस्त आणि लोककल्याण" },
-				{ name: "Acharya Chanakya Niti", author: "Acharya Chanakya", desc: "धर्म अर्थ काम शास्त्र - आचार्य चाणक्य" }
+                { name: "Acharya Chanakya Niti", author: "Acharya Chanakya", desc: "धर्म अर्थ काम शास्त्र - आचार्य चाणक्य" }
             ],
             "🇮🇳 Freedom Fighters of India (Authentic Biographies)": [
                 { name: "The Indian War of Independence 1857", author: "Vinayak Damodar Savarkar", desc: "१८५७ च्या स्वातंत्र्यसमराचा ज्वलंत इतिहास." },
@@ -269,15 +299,6 @@
             ]
         };
 
-        function getBookInfo(bookName) {
-            for (const category in libraryData) {
-                const book = libraryData[category].find(b => b.name === bookName);
-                if (book) return book;
-            }
-            return null;
-        }
-
-        // Render Collapsible Library UI
         const libraryContainer = document.getElementById('library-container');
         for (const [category, books] of Object.entries(libraryData)) {
             let html = `
@@ -289,10 +310,16 @@
                     <div class="p-2 space-y-1 bg-gray-800 border-t border-gray-700">
             `;
             books.forEach(book => {
+                // Populate existing description logic so the UI functions perfectly
+                bookDescriptions[book.name] = book.desc;
+                
                 html += `
-                    <label class="flex items-start md:items-center gap-3 cursor-pointer hover:text-white p-2 md:p-1.5 rounded hover:bg-gray-700 transition">
-                        <input type="radio" name="selected_book" value="${book.name}" class="book-radio mt-0.5 md:mt-0">
-                        <span class="text-sm leading-tight">${book.name}</span>
+                    <label class="flex items-center gap-3 cursor-pointer hover:text-white p-2 md:p-1.5 rounded hover:bg-gray-700 transition">
+                        <input type="radio" name="selected_book" value="${book.name}" class="book-radio">
+                        <div class="flex flex-col">
+                            <span class="text-sm leading-tight">${book.name}</span>
+                            <span class="text-[10px] text-gray-500">${book.author}</span>
+                        </div>
                     </label>
                 `;
             });
@@ -330,7 +357,6 @@
             
             bookDisplay: document.getElementById('active-book-display'),
             bookTitle: document.getElementById('active-book-title'),
-            bookAuthor: document.getElementById('active-book-author'),
             bookDesc: document.getElementById('active-book-desc')
         };
 
@@ -405,10 +431,8 @@
                 ui.bookDisplay.classList.add('hidden');
                 return;
             }
-            const info = getBookInfo(bookName);
-            ui.bookTitle.innerText = `📖 ${info.name}`;
-            ui.bookAuthor.innerText = `✍️ Author/Source: ${info.author}`;
-            ui.bookDesc.innerText = info.desc;
+            ui.bookTitle.innerText = `Active Reference: ${bookName}`;
+            ui.bookDesc.innerText = getDesc(bookName);
             ui.bookDisplay.classList.remove('hidden');
         }
 
@@ -449,10 +473,11 @@
             }
         });
 
+        // Deep Text Extraction for Sharing
         function getChatLogAsText() {
             const messages = [];
             const messageNodes = ui.log.children;
-            for (let i = 1; i < messageNodes.length; i++) { 
+            for (let i = 1; i < messageNodes.length; i++) { // skip intro text
                 const node = messageNodes[i];
                 const senderSpan = node.querySelector('span');
                 const textDiv = node.querySelector('div > div');
@@ -530,29 +555,26 @@
             const userName = ui.name.value.trim() || "Seeker";
             const userAge = parseInt(ui.age.value) || 25;
             const selectedLanguageName = languageMap[ui.language.value] || "English";
-            const selectedBookName = document.querySelector('input[name="selected_book"]:checked').value;
+            const selectedBook = document.querySelector('input[name="selected_book"]:checked').value;
             
             let ageDirectives = "";
             if (userAge <= 12) {
-                ageDirectives = `The user is a child (${userAge} years old). Explain concepts using extremely simple analogies. Keep sentences short.`;
+                ageDirectives = `The user is a child (${userAge} years old). Explain concepts using extremely simple analogies, nature, and storytelling. Keep sentences short.`;
             } else if (userAge <= 18) {
                 ageDirectives = `The user is a teenager (${userAge} years old). Bridge ancient wisdom with basic physics, biology, or psychology.`;
             } else {
-                ageDirectives = `The user is an adult (${userAge} years old). Provide in-depth scientific reasoning, exploring physics, logic, and deep metaphysical theories.`;
+                ageDirectives = `The user is an adult (${userAge} years old). Provide in-depth scientific reasoning, exploring advanced physics, quantum correlations, and deep metaphysical theories.`;
             }
 
             let bookDirectives = "You may draw upon general ancient Indian wisdom. Do not limit yourself to one text.";
-            
-            if (selectedBookName) {
-                const info = getBookInfo(selectedBookName);
+            if (selectedBook) {
                 bookDirectives = `
-                ABSOLUTE DIRECTIVE: You are RESTRICTED to using ONLY information from the text: "${info.name}".
-                
-                1. HALLUCINATION CHECK: You MUST NOT invent verses, and you MUST NOT bring in concepts from other books unless explicitly part of the ${info.name}.
-                2. FORMAT REQUIREMENT: Every single answer MUST begin exactly like this: "${info.author} says... in verse [Insert exact Verse/Shloka/Quote number]:"
-                3. STRICT DENIAL: If you cannot retrieve the exact verse/quote from ${info.name} from your memory, you MUST reply: "I apologize, but I cannot find a specific verse in the ${info.name} to answer this." Do NOT provide a generic answer.
+                ABSOLUTE DIRECTIVE: You are RESTRICTED to using ONLY information from the text: "${selectedBook}".
+                1. HALLUCINATION CHECK: You MUST NOT invent verses, and you MUST NOT bring in concepts from other books unless explicitly part of the ${selectedBook}.
+                2. FORMAT REQUIREMENT: Every single answer MUST begin with the EXACT original Sanskrit verse (in Devanagari or precise transliteration) from the ${selectedBook} that answers the query.
+                3. STRICT DENIAL: If you cannot retrieve the exact verse from the ${selectedBook} from your memory, you MUST reply: "I apologize, but I cannot find a specific verse in the ${selectedBook} to answer this." Do NOT provide a generic answer.
                 4. After the exact verse, provide the literal translation.
-                5. Finally, provide the deeper scientific reasoning linked to the verse to uplift human civilization (Dharma sansthapanarthaya).`;
+                5. Finally, provide the deeper scientific reasoning linked to the verse.`;
             }
 
             systemInstruction = `
@@ -568,8 +590,6 @@
                 FORMATTING RULES:
                 1. Acknowledge the user by name.
                 2. Do NOT use markdown brackets like [ ] or < >.
-				3. Your only reference book is the book selected by the user.
-				4. Answer the user with reference to exact phrases mentioned in the selected book giving reference to the author of the book. 
             `;
         }
 
