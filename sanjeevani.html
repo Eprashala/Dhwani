@@ -430,7 +430,10 @@
             <label>Prepared At / Location:</label>
             <select id="mealLocation" onchange="toggleCustom('mealLocation', 'customMealLocation')">
                 <option value="Home">🏠 Home</option>
-                <option value="Office Canteen">🏢 Office Canteen</option>
+                <option value="In-laws place">🏡 In-laws place ( Relatives) </option>
+                <option value="Mess">🍛 Mess</option>
+                <option value="Dhaba">🛣️ Dhaba</option>
+                <option value="Canteen">🏫 Canteen</option>
                 <option value="Fine Dining Hotel">🍽️ Fine Dining Hotel</option>
                 <option value="Local Hotel / Udupi">🏨 Local Hotel / Udupi</option>
                 <option value="Street Vendor / Thela">🛒 Street Vendor / Thela</option>
@@ -567,7 +570,7 @@
         </div>
     </div>
 
-    <div class="translate-footer" id="translateFooter">
+	<div class="translate-footer" id="translateFooter">
         <h3 style="margin-top:0; color:var(--primary); font-size: 1.1em;">🌐 Report Translation</h3>
         <p style="margin: 0 0 10px 0; color:#666; font-size:0.9em;">Activate language settings on demand.</p>
         <div class="translate-controls">
@@ -586,79 +589,47 @@
                 <option value="as">Assamese (অসমীয়া)</option>
                 <option value="ur">Urdu (اردو)</option>
             </select>
-            <button id="btnLazyTranslate" onclick="lazyLoadTranslate()">Translate</button>
+            <button id="btnLazyTranslate" onclick="applyTranslation()">Translate</button>
         </div>
-        <div id="google_translate_element" style="position: fixed; top: -10000px; left: -10000px; z-index: -9999;"></div>
+        
+        <div id="google_translate_element" style="width: 0; height: 0; overflow: hidden; position: absolute;"></div>
     </div>
+    
+    <script type="text/javascript">
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({
+                pageLanguage: 'en',
+                includedLanguages: 'hi,mr,bn,te,ta,gu,kn,ml,pa,or,as,ur',
+                autoDisplay: false
+            }, 'google_translate_element');
+        }
+    </script>
+    <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 	
 	
 	
 	<script>
-        // --- TRANSLATION LAZY LOAD LOGIC (BULLETPROOF) ---
-        window.googleTranslateLoaded = false;
-
-        function lazyLoadTranslate() {
+    
+       // --- TRANSLATION LOGIC (NATIVE) ---
+        function applyTranslation() {
             var lang = document.getElementById('customIndianLang').value;
-            var btn = document.getElementById('btnLazyTranslate');
-            
-            if (!window.googleTranslateLoaded) {
-                btn.innerText = "Connecting...";
-                btn.disabled = true;
-
-                window.googleTranslateElementInit = function() {
-                    new google.translate.TranslateElement({
-                        pageLanguage: 'en',
-                        includedLanguages: 'en,hi,mr,bn,te,ta,gu,kn,ml,pa,or,as,ur',
-                        layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
-                        autoDisplay: false
-                    }, 'google_translate_element');
-                    
-                    triggerTranslation(lang, btn, 0);
-                };
-
-                var script = document.createElement('script');
-                script.type = 'text/javascript';
-                script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
-                document.body.appendChild(script);
-                
-                window.googleTranslateLoaded = true;
-            } else {
-                triggerTranslation(lang, btn, 0);
-            }
-        }
-
-        function triggerTranslation(lang, btn, attempts) {
             var selectField = document.querySelector('.goog-te-combo');
             
-            // Fail-safe: If it takes longer than 15 seconds, alert the user about the file:/// block
-            if (attempts > 30) {
-                btn.innerText = "Translate";
-                btn.disabled = false;
-                window.googleTranslateLoaded = false; 
-                alert("Google Translate is blocking the connection. If you are opening this file directly from your computer (file:///), Google will reject the translation. Please use a local web server (like VS Code Live Server).");
+            // If the element doesn't exist, an Adblocker or Privacy Shield is killing the script.
+            if (!selectField) {
+                alert("Google Translate is being blocked. If you are using Brave browser, an Adblocker (like uBlock Origin), or Strict Privacy Settings, please disable it for this local web server.");
                 return;
             }
 
-            // Verify the DOM has completely finished rendering Google's options
-            if (selectField && selectField.options && selectField.options.length > 0) {
-                selectField.value = lang;
-                
-                // Cross-browser forced event dispatch (Guarantees Google hears the command)
-                var event;
-                if (typeof Event === 'function') {
-                    event = new Event('change', { bubbles: true, cancelable: true });
-                } else {
-                    event = document.createEvent('HTMLEvents');
-                    event.initEvent('change', true, true);
-                }
-                selectField.dispatchEvent(event);
-                
-                btn.innerText = "Translate";
-                btn.disabled = false;
+            // Apply the language. Empty string reverts to English.
+            if (lang === 'en') {
+                selectField.value = '';
             } else {
-                // Widget is still building, check again in 500ms
-                setTimeout(function() { triggerTranslation(lang, btn, attempts + 1); }, 500);
+                selectField.value = lang;
             }
+            
+            // Force Google to recognize the change
+            selectField.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
         }
 
         // --- 1. INDEXED_DB STORAGE MANAGEMENT ---
@@ -780,7 +751,11 @@
                         showApp(); 
                         setTimeout(() => requestContext(), 100);
                     } else {
-                        document.getElementById('profileSetup').style.display = 'block';
+                        // NEW GUEST LOGIC: Setup basic guest profile and show app immediately
+                        userProfile = { name: "Guest" };
+                        document.getElementById('headerName').innerText = '👤 Guest';
+                        showApp();
+                        setTimeout(() => requestContext(), 100);
                     }
                 }
             } catch(e) { alert("Storage Error. Please use a modern browser."); }
@@ -842,9 +817,12 @@
         function editProfile() {
             document.getElementById('mainApp').style.display = 'none'; document.getElementById('historyView').style.display = 'none'; document.getElementById('profileSetup').style.display = 'block';
             if (userProfile) {
-                document.getElementById('p_api_key').value = userProfile.apiKey || ''; document.getElementById('p_name').value = userProfile.name !== "Guest" ? userProfile.name : "";
-                document.getElementById('p_age').value = userProfile.age !== "Unknown" ? userProfile.age : ""; document.getElementById('p_sex').value = userProfile.sex;
-                document.getElementById('p_height').value = userProfile.height; document.getElementById('p_weight').value = userProfile.weight; 
+                document.getElementById('p_api_key').value = userProfile.apiKey || ''; 
+                document.getElementById('p_name').value = userProfile.name !== "Guest" ? userProfile.name : "";
+                document.getElementById('p_age').value = (userProfile.age && userProfile.age !== "Unknown") ? userProfile.age : ""; 
+                document.getElementById('p_sex').value = userProfile.sex || "Male";
+                document.getElementById('p_height').value = userProfile.height || ""; 
+                document.getElementById('p_weight').value = userProfile.weight || ""; 
                 
                 document.getElementById('p_dob').value = userProfile.dob || ''; document.getElementById('p_tob').value = userProfile.tob || ''; document.getElementById('p_pob').value = userProfile.pob || '';
 
@@ -861,7 +839,7 @@
                     });
                 }
 
-                document.getElementById('p_meds').value = userProfile.meds !== "None" ? userProfile.meds : "";
+                document.getElementById('p_meds').value = (userProfile.meds && userProfile.meds !== "None") ? userProfile.meds : "";
                 setCheckedValues('chronic', userProfile.rawChronic || []); document.getElementById('p_chronic_other').value = userProfile.rawChronicOther || '';
                 setCheckedValues('acute', userProfile.rawAcute || []); document.getElementById('p_acute_other').value = userProfile.rawAcuteOther || '';
               	document.getElementById('p_goal').value = userProfile.rawGoal || 'Control Blood Sugar';
@@ -897,7 +875,6 @@
         }
 
         async function previewImage(event, num) {
-            if (!userProfile || !userProfile.apiKey) { alert("Please enter your Groq API Key in Profile Setup."); return editProfile(); }
             const file = event.target.files[0]; if (!file) return;
             toggleForm('none'); 
 
@@ -911,17 +888,35 @@
             document.getElementById('componentsPanel').style.display = 'none'; document.getElementById('expertPanel').style.display = 'none';
         }
 
-        function resetPhotos() {
+		function resetPhotos() {
+            // 1. Clear the stored image data
             img1Base64 = null; img2Base64 = null; currentImageBase64Raw = null;
             document.getElementById('image1').value = ''; document.getElementById('image2').value = '';
+            
+            // 2. Hide all the preview images and downstream AI panels
             document.getElementById('preview1').style.display = 'none'; document.getElementById('preview2').style.display = 'none';
             document.getElementById('mealContextForm').style.display = 'none'; document.getElementById('visionWrapper').style.display = 'none';
             document.getElementById('componentsPanel').style.display = 'none'; document.getElementById('expertPanel').style.display = 'none'; document.getElementById('errorMsg').style.display = 'none';
+            
+            // 3. THE FIX: Bring back the main camera/upload buttons!
+            document.getElementById('imageUploadSection').style.display = 'block';
+            
+            // 4. Smoothly scroll back to the top of the app
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         // --- 4. STEP 1: VISION AGENT ---
         async function step1_ScanNutrition() {
             if (!img1Base64) { alert("Please upload at least the Top View photo."); return; }
+
+            // Dynamic API Key Prompt for Guests
+            if (!userProfile) userProfile = { name: "Guest" };
+            if (!userProfile.apiKey) {
+                const key = prompt("To scan the plate using AI, please enter your free Groq API Key:\n(Get it from console.groq.com)");
+                if (!key) return; // Exit if user cancels
+                userProfile.apiKey = key;
+                await dbSaveProfile(userProfile); // Save temporarily to DB so they don't have to keep re-entering during this session
+            }
 
             let mType = document.getElementById('mealType').value; if(mType === 'Custom') mType = document.getElementById('customMealType').value || "Unknown";
             let mLoc = document.getElementById('mealLocation').value; if(mLoc === 'Custom') mLoc = document.getElementById('customMealLocation').value || "Unknown";
@@ -1016,6 +1011,13 @@ Output JSON:
 
         // --- 5. STEP 2: MASTER VAIDYA AGENT ---
         async function step2_FetchExpertOpinion() {
+            // Profile Check Intercept for Guests
+            if (!userProfile.age || userProfile.age === "Unknown" || userProfile.name === "Guest") {
+                alert("Please create your profile for an accurate and expert opinion!\n\nThis helps the AI Vaidya analyze your Prakriti, Dinacharya, and medical history.\n\nDon't worry, the app is completely free and will always be! All data stays securely on your device.");
+                editProfile();
+                return;
+            }
+
             updateUIMacros(false); // Silent update
             await callExpertAgent("Analyze patient data and verified meal components.");
         }
