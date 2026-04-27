@@ -597,7 +597,8 @@
 	
 	
 	<script>
-        // --- TRANSLATION LAZY LOAD LOGIC (BULLETPROOF) ---
+    
+        // --- TRANSLATION LAZY LOAD LOGIC (FIXED) ---
         window.googleTranslateLoaded = false;
 
         function lazyLoadTranslate() {
@@ -611,7 +612,8 @@
                 window.googleTranslateElementInit = function() {
                     new google.translate.TranslateElement({
                         pageLanguage: 'en',
-                        includedLanguages: 'en,hi,mr,bn,te,ta,gu,kn,ml,pa,or,as,ur',
+                        // Note: Removed 'en' from includedLanguages, as it's the base language
+                        includedLanguages: 'hi,mr,bn,te,ta,gu,kn,ml,pa,or,as,ur',
                         layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
                         autoDisplay: false
                     }, 'google_translate_element');
@@ -633,33 +635,31 @@
         function triggerTranslation(lang, btn, attempts) {
             var selectField = document.querySelector('.goog-te-combo');
             
-            // Fail-safe: If it takes longer than 15 seconds, alert the user about the file:/// block
             if (attempts > 30) {
                 btn.innerText = "Translate";
                 btn.disabled = false;
-                window.googleTranslateLoaded = false; 
-                alert("Google Translate is blocking the connection. If you are opening this file directly from your computer (file:///), Google will reject the translation. Please use a local web server (like VS Code Live Server).");
+                alert("Translation connection timed out. Please ensure you are not blocking Google scripts.");
                 return;
             }
 
-            // Verify the DOM has completely finished rendering Google's options
+            // Wait until Google has fully populated the options
             if (selectField && selectField.options && selectField.options.length > 0) {
-                selectField.value = lang;
                 
-                // Cross-browser forced event dispatch (Guarantees Google hears the command)
-                var event;
-                if (typeof Event === 'function') {
-                    event = new Event('change', { bubbles: true, cancelable: true });
+                // CRITICAL FIX: Google Translate doesn't have an "en" option if the page is already "en".
+                // To revert to English, we must set the combo box value to an empty string.
+                if (lang === 'en') {
+                    selectField.value = '';
                 } else {
-                    event = document.createEvent('HTMLEvents');
-                    event.initEvent('change', true, true);
+                    selectField.value = lang;
                 }
-                selectField.dispatchEvent(event);
+                
+                // Fire native change event so Google's hidden listeners catch it
+                selectField.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
                 
                 btn.innerText = "Translate";
                 btn.disabled = false;
             } else {
-                // Widget is still building, check again in 500ms
+                // Widget is still building in the background, poll again in 500ms
                 setTimeout(function() { triggerTranslation(lang, btn, attempts + 1); }, 500);
             }
         }
