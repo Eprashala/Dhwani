@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dhwani AI - Eprashala Local Assessment</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; display: flex; justify-content: center; height: 100dvh; box-sizing: border-box; }
+        .container { background: white; max-width: 800px; width: 100%; box-shadow: 0 4px 20px rgba(0,0,0,0.05); display: flex; flex-direction: column; overflow: hidden; }
+        
+        button { background: #2980b9; color: white; border: none; padding: 14px 20px; font-size: 16px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; transition: 0.2s; }
+        button:hover { background: #1c5980; }
+        button:disabled { background: #bdc3c7; cursor: not-allowed; }
+        input[type="text"], input[type="number"], input[type="password"] { width: 100%; padding: 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; box-sizing: border-box; margin-bottom: 10px; }
+        
+        #setup-screen, #api-key-screen { padding: 40px 20px; text-align: center; overflow-y: auto; height: 100%; }
+        #api-key-screen { display: none; } /* Hidden initially */
+        
+        #test-screen { display: none; flex-direction: column; height: 100%; }
+        .header { background: #2c3e50; color: white; padding: 15px; text-align: center; font-size: 15px; }
+        #stage-indicator { background: #e67e22; padding: 4px 10px; border-radius: 12px; font-size: 13px; font-weight: bold; display: inline-block; margin-top: 5px; }
+        
+        #chat-history { flex: 1; padding: 20px; overflow-y: auto; background: #fafafa; }
+        .message { margin-bottom: 15px; max-width: 90%; padding: 14px; border-radius: 10px; font-size: 15px; line-height: 1.5; white-space: pre-wrap; }
+        .bot-msg { background: #e3f2fd; color: #0b3c7c; align-self: flex-start; border-bottom-left-radius: 0; border: 1px solid #bbdefb; }
+        .user-msg { background: #27ae60; color: white; align-self: flex-end; margin-left: auto; border-bottom-right-radius: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        
+        .controls-area { padding: 15px; background: white; border-top: 1px solid #eee; padding-bottom: max(15px, env(safe-area-inset-bottom)); }
+        .input-row { display: flex; gap: 10px; align-items: center; }
+        
+        #micBtn { 
+            background: #e67e22; width: 50px; height: 50px; border-radius: 50%; font-size: 20px; flex-shrink: 0; border: none; padding: 0; transition: 0.2s;
+            -webkit-user-select: none; -webkit-touch-callout: none; user-select: none; touch-action: none;
+        }
+        #micBtn.listening { background: #e74c3c; box-shadow: 0 0 15px rgba(231, 76, 60, 0.6); transform: scale(1.08); }
+        
+        #full-loader { display: none; position: absolute; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.9); z-index: 100; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px; box-sizing: border-box;}
+        
+        #report-screen { display: none; flex-direction: column; height: 100%; }
+        #report-content { flex: 1; overflow-y: auto; padding: 20px; background: white; }
+        .report-card { background: #f8f9fa; border-left: 4px solid #2980b9; padding: 15px; margin-bottom: 20px; border-radius: 0 8px 8px 0; }
+        #consult-area { background: #eef2f5; padding: 20px; border-top: 2px solid #ddd; }
+        #consult-history { max-height: 250px; overflow-y: auto; margin-bottom: 10px; background: white; padding: 10px; border-radius: 8px; border: 1px solid #ddd;}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="setup-screen">
+        <h2>Dhwani AI - Offline Evaluator</h2>
+        <p style="color: #666; font-size: 14px;">Eprashala Hybrid Architecture</p>
+        <input type="text" id="childName" placeholder="Student's Name" required>
+        <input type="number" id="childAge" placeholder="Age (e.g., 14)" required>
+        <input type="text" id="childCity" placeholder="City/Town (e.g., Pune)" required>
+        <button onclick="startTest()">Begin Assessment (Offline)</button>
+    </div>
+
+    <div id="test-screen">
+        <div class="header">
+            <div id="test-header">Dhwani Session</div>
+            <div id="stage-indicator">Stage 0: Basics</div>
+        </div>
+        <div id="chat-history"></div>
+        <div class="controls-area">
+            <p id="mic-status" style="font-size: 11px; color: #7f8c8d; margin: 0 0 5px 0; text-align: center;">Hold mic to speak. Auto-sends on release.</p>
+            <div class="input-row">
+                <button id="micBtn">🎤</button>
+                <input type="text" id="userInput" placeholder="Type or hold mic..." onkeypress="handleEnter(event)">
+                <button id="sendBtn" onclick="submitAnswer()" style="display: none;">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="api-key-screen">
+        <h2>Assessment Complete!</h2>
+        <p style="color: #666; font-size: 14px;">Please enter the Gemini API Key to submit the offline transcript for cloud psychological analysis.</p>
+        <input type="password" id="apiKey" placeholder="Enter Gemini API Key" required>
+        <button onclick="generateFinalReport()">Generate Report</button>
+    </div>
+
+    <div id="report-screen">
+        <div id="report-content"></div>
+        
+        <div style="padding: 0 20px;">
+            <button onclick="downloadInitialReport()" style="background: #e67e22; margin-bottom: 20px;">⬇️ Download Report & Q&A</button>
+        </div>
+
+        <div id="consult-area">
+            <h3 style="margin-top:0; color:#2c3e50;">Consult Dhwani AI</h3>
+            <div id="consult-history"></div>
+            <div class="input-row">
+                <input type="text" id="consultInput" placeholder="Ask about colleges, streams..." onkeypress="if(event.key === 'Enter') sendConsult()">
+                <button onclick="sendConsult()" style="width: auto; margin:0;">Ask</button>
+            </div>
+            <button onclick="downloadFullSession()" style="background: #27ae60;">⬇️ Export Entire Session (Q&A + Summary + AI Chat)</button>
+        </div>
+    </div>
+
+    <div id="full-loader">
+        <h2 id="loader-text">Dhwani is analyzing...</h2>
+    </div>
+</div>
+
+<script>
+    let childData = { name: "", age: 0, city: "" };
+    let apiKey = "";
+    
+    let currentStage = 0;
+    let questionCount = 0;
+    const questionsPerStage = 5; 
+    let fullTranscript = ""; 
+    let generatedReportHtml = ""; // Store for downloads
+    let lastBotQuestion = ""; 
+    let consultHistory = [];
+    let isProcessing = false;
+    
+    // OFFLINE QUESTION BANK (You can expand this to 5000+ questions easily)
+    const RAW_QUESTION_BANK = {
+        0: [
+            "Do you prefer solving math puzzles, writing stories, playing sports, or drawing?",
+            "If you had a free hour, would you rather read a book, build something, or talk to friends?",
+            "Which subject do you score the highest marks in: Science, English, or History?",
+            "Do you like working on computers, or do you prefer being outdoors?",
+            "Do you enjoy fixing broken things around the house?",
+            "Are you more interested in how plants grow or how engines work?"
+        ],
+        1: [
+            "Are you comfortable speaking in front of a large group of people? Answer yes or no.",
+            "Do you easily get bored when doing repetitive tasks? Yes or no.",
+            "Do you prefer working alone rather than in a team? Yes or no.",
+            "Are you good at keeping a strict daily timetable? Yes or no.",
+            "Do you get anxious before exams even if you studied? Yes or no."
+        ],
+        2: [
+            "Describe a time when you helped a friend solve a difficult problem.",
+            "What is the most interesting project you have made for a school exhibition?",
+            "If you could invent one thing to help people in your city, what would it be?",
+            "Tell me about a hobby you have that takes a lot of patience.",
+            "What is the best compliment a teacher has ever given you?"
+        ],
+        3: [
+            "You mentioned you like your favorite subject. Why does studying it interest you so much?",
+            "What kind of career do you see yourself having 10 years from now, and why?",
+            "If you had to start a small business tomorrow, what product or service would you sell?",
+            "How do you usually handle a situation where you completely disagree with your teacher or parents?",
+            "If you had unlimited money to study anywhere, what exact course would you take?"
+        ],
+        4: [
+            "Imagine you are given a massive project but your team abandons you on the final day. How exactly do you handle the stress and complete it?",
+            "AI is rapidly replacing many traditional jobs. What is your backup plan if your dream career becomes fully automated?",
+            "If you fail your most important entrance exam next year, what is your immediate next step?",
+            "Some people say pursuing your passion doesn't pay the bills. How would you balance making money with doing what you love?"
+        ]
+    };
+
+    const STAGE_NAMES = ["Stage 0: Basics", "Stage 1: Quick Fire", "Stage 2: Short Thoughts", "Stage 3: Exploration", "Stage 4: Stress Test"];
+
+    // SHUFFLE & ANTI-REPETITION LOGIC
+    let activeQuestionQueues = {};
+
+    function initializeQuestionQueues() {
+        for (let stage in RAW_QUESTION_BANK) {
+            // Clone the array and shuffle it
+            activeQuestionQueues[stage] = [...RAW_QUESTION_BANK[stage]].sort(() => 0.5 - Math.random());
+        }
+    }
+
+    // --- PUSH-TO-TALK LOGIC ---
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition;
+    let isButtonHeld = false; 
+    let committedText = ""; 
+
+    if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.continuous = false; 
+        recognition.interimResults = true; 
+        recognition.lang = 'en-IN'; 
+        
+        recognition.onstart = () => { 
+            document.getElementById('micBtn').classList.add('listening'); 
+            document.getElementById('mic-status').innerText = "Listening... Release to send.";
+            document.getElementById('userInput').placeholder = "Listening...";
+        };
+        
+        recognition.onresult = (e) => { 
+            let interimTranscript = '';
+            let finalTranscript = '';
+            
+            for (let i = e.resultIndex; i < e.results.length; ++i) {
+                if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript;
+                else interimTranscript += e.results[i][0].transcript;
+            }
+            
+            if (finalTranscript) {
+                if (committedText.length > 0 && !committedText.endsWith(' ') && !finalTranscript.startsWith(' ')) committedText += ' ';
+                committedText += finalTranscript;
+            }
+            document.getElementById('userInput').value = committedText + interimTranscript;
+        };
+
+        recognition.onend = () => { 
+            if (isButtonHeld) {
+                try { recognition.start(); } catch(err) {}
+            } else {
+                stopListeningUI();
+                setTimeout(() => {
+                    const inputVal = document.getElementById('userInput').value.trim();
+                    if (inputVal.length > 0) submitAnswer();
+                }, 500);
+            }
+        };
+
+        recognition.onerror = (e) => { if (e.error !== 'no-speech') stopListeningUI(); };
+    }
+
+    const micBtn = document.getElementById('micBtn');
+
+    function startListening(e) {
+        if (e) e.preventDefault();
+        if (isProcessing || isButtonHeld || !recognition) return;
+        isButtonHeld = true;
+        committedText = document.getElementById('userInput').value;
+        if (committedText.length > 0 && !committedText.endsWith(' ')) committedText += ' ';
+        try { recognition.start(); } catch(err) {}
+    }
+
+    function stopListening(e) {
+        if (e) e.preventDefault();
+        if (!isButtonHeld) return;
+        isButtonHeld = false; 
+        try { recognition.stop(); } catch(err) {} 
+    }
+
+    micBtn.addEventListener('touchstart', startListening, { passive: false });
+    micBtn.addEventListener('touchend', stopListening);
+    micBtn.addEventListener('touchcancel', stopListening);
+    micBtn.addEventListener('mousedown', startListening);
+    micBtn.addEventListener('mouseup', stopListening);
+    micBtn.addEventListener('mouseleave', stopListening);
+
+    function stopListeningUI() {
+        document.getElementById('micBtn').classList.remove('listening'); 
+        document.getElementById('mic-status').innerText = "Hold mic to speak. Auto-sends on release.";
+        document.getElementById('userInput').placeholder = "Type or hold mic...";
+    }
+
+    // --- TTS SETUP ---
+    function unlockAndroidAudio() {
+        const silentUtterance = new SpeechSynthesisUtterance('');
+        silentUtterance.volume = 0;
+        window.speechSynthesis.speak(silentUtterance);
+    }
+
+    function speakDhwaniResponse(text) {
+        if (!('speechSynthesis' in window)) return;
+        window.speechSynthesis.cancel(); 
+        const utterance = new SpeechSynthesisUtterance(text);
+        
+        let voices = window.speechSynthesis.getVoices();
+        let targetVoice = voices.find(v => 
+            (v.lang.includes('en-IN') || v.lang.includes('hi-IN') || v.lang.includes('mr-IN')) && 
+            (v.name.toLowerCase().includes('female') || v.name.includes('Google'))
+        ) || voices.find(v => v.lang === 'en-IN');
+        
+        if (targetVoice) utterance.voice = targetVoice;
+        utterance.rate = 0.90; 
+        utterance.pitch = 1.1; 
+        window.speechSynthesis.speak(utterance);
+    }
+
+    // --- CORE LOCAL LOGIC ---
+    function startTest() {
+        childData.name = document.getElementById('childName').value.trim();
+        childData.age = parseInt(document.getElementById('childAge').value);
+        childData.city = document.getElementById('childCity').value.trim();
+
+        if(!childData.name || !childData.age || !childData.city) { alert("Fill all fields."); return; }
+
+        unlockAndroidAudio(); 
+        initializeQuestionQueues(); // Shuffle questions on start
+        
+        document.getElementById('setup-screen').style.display = 'none';
+        document.getElementById('test-screen').style.display = 'flex';
+        
+        askNextLocalQuestion(true);
+    }
+
+    function askNextLocalQuestion(isFirst = false) {
+        document.getElementById('stage-indicator').innerText = STAGE_NAMES[currentStage];
+        
+        // Pop the last item off the shuffled array to ensure no repetition
+        let nextQuestion = activeQuestionQueues[currentStage].pop();
+        
+        // Safety net: if array is somehow empty, grab a generic fallback
+        if (!nextQuestion) nextQuestion = "Please tell me a bit more about your career interests.";
+
+        if (isFirst) {
+            nextQuestion = `Namaste ${childData.name}. Let's begin. ` + nextQuestion;
+        }
+
+        lastBotQuestion = nextQuestion;
+        addMessage(nextQuestion, 'bot', 'chat-history');
+        speakDhwaniResponse(nextQuestion);
+    }
+
+    function submitAnswer() {
+        if (isProcessing) return;
+        if (isButtonHeld) { isButtonHeld = false; try { recognition.stop(); } catch(e){} }
+
+        const input = document.getElementById('userInput');
+        const answerTxt = input.value.trim();
+        if (!answerTxt) return;
+        
+        isProcessing = true; // Lock
+        
+        addMessage(answerTxt, 'user', 'chat-history');
+        fullTranscript += `Stage ${currentStage} - Q: ${lastBotQuestion}\nUser (${childData.name}): ${answerTxt}\n\n`;
+
+        input.value = '';
+        committedText = ''; 
+        questionCount++;
+        
+        if (questionCount >= questionsPerStage) {
+            currentStage++;
+            questionCount = 0;
+            
+            const chat = document.getElementById('chat-history');
+            const divider = document.createElement('div');
+            divider.innerHTML = `<hr style="border:0; border-top:1px dashed #ccc; margin: 20px 0;">`;
+            chat.appendChild(divider);
+        }
+
+        if (currentStage > 4) {
+            // Test Done -> Show API Gateway
+            document.getElementById('test-screen').style.display = 'none';
+            document.getElementById('api-key-screen').style.display = 'block';
+            speakDhwaniResponse("The offline assessment is complete. Please provide the key for analysis.");
+        } else {
+            // Next offline question
+            setTimeout(() => {
+                isProcessing = false;
+                askNextLocalQuestion();
+            }, 500);
+        }
+    }
+
+    function handleEnter(e) { if (e.key === 'Enter') submitAnswer(); }
+
+    function cleanText(text) { return text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*/g, ''); }
+
+    // --- GEMINI API: REPORT GENERATION ---
+    async function generateFinalReport() {
+        apiKey = document.getElementById('apiKey').value.trim();
+        if (!apiKey) { alert("Please enter the API key to generate the report."); return; }
+
+        setLoading(true, "Sending transcript to Dhwani Cloud for deep analysis...");
+        
+        const reportPrompt = `You are Dhwani, the career consultant AI. The user (${childData.name}, Age ${childData.age}, from ${childData.city}) just completed an offline aptitude test.
+        Here is the full flat-text transcript of their answers:
+        
+        ${fullTranscript}
+        
+        Analyze this holistically. Output ONLY raw HTML. DO NOT use markdown like \`\`\`html.
+        Format strictly:
+        <h2 style='color:#2980b9'>Dhwani AI Executive Summary</h2>
+        <div class='report-card'><b>Personality Traits:</b> Honest assessment based on text.</div>
+        <div class='report-card'><b>Strengths & Areas of Improvement:</b> Highlight specific answers.</div>
+        <div class='report-card'><b>Recommended Indian Career Streams:</b> Top 3 paths suitable for them.</div>`;
+
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    contents: [{ role: "user", parts: [{ text: reportPrompt }] }],
+                    safetySettings: [
+                        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
+                        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" }
+                    ]
+                })
+            });
+
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error?.message || "Report Generation Failed");
+
+            let rawHtml = data.candidates[0].content.parts[0].text;
+            rawHtml = rawHtml.replace(/^```html\n|```\n?$/gm, '').trim();
+            generatedReportHtml = rawHtml; // Save for the download button
+
+            document.getElementById('api-key-screen').style.display = 'none';
+            document.getElementById('report-screen').style.display = 'flex';
+            document.getElementById('report-content').innerHTML = rawHtml;
+            
+            speakDhwaniResponse("Assessment complete. Your final report is ready. You can now consult me below.");
+        } catch (e) { 
+            console.error("Report Error:", e);
+            alert(`Error generating report: ${e.message}`); 
+        } finally {
+            setLoading(false);
+            isProcessing = false;
+        }
+    }
+
+    // --- GEMINI API: CONSULTATION (FIXED TURN SEQUENCE) ---
+    async function sendConsult() {
+        const input = document.getElementById('consultInput');
+        const text = input.value.trim();
+        if (!text) return;
+        addMessage(text, 'user', 'consult-history');
+        
+        // Push actual user question to history
+        consultHistory.push({ role: "user", parts: [{ text: text }] });
+        input.value = '';
+        
+        // FIX: Inject the massive transcript safely into the System Instruction 
+        // to prevent API turn-sequence crashes.
+        const systemPrompt = `You are Dhwani, an Indian career consultant. 
+        The user (${childData.name}) just took an aptitude test. Here is their offline test transcript:
+        ---
+        ${fullTranscript}
+        ---
+        Based on their results, give advice on Indian colleges, coaching, Udemy, and entrance exams. 
+        Reply in plain text. DO NOT USE MARKDOWN (no asterisks or bolding).`;
+
+        try {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    system_instruction: { parts: [{ text: systemPrompt }] },
+                    contents: consultHistory
+                })
+            });
+            const data = await response.json();
+            
+            if (!response.ok) throw new Error(data.error?.message || "API Error");
+            
+            const reply = cleanText(data.candidates[0].content.parts[0].text);
+            
+            consultHistory.push({ role: "model", parts: [{ text: reply }] });
+            addMessage(reply, 'bot', 'consult-history');
+            speakDhwaniResponse(reply); 
+        } catch(e) { 
+            console.error(e);
+            alert(`Error connecting to Dhwani: ${e.message}`); 
+            consultHistory.pop(); // Remove user message on fail to allow retry
+        }
+    }
+
+    // --- DOWNLOAD MANAGERS ---
+    
+    // 1. Download just Q&A + Report Summary
+    function downloadInitialReport() {
+        // Strip HTML tags for clean text reading
+        let cleanSummary = generatedReportHtml.replace(/<[^>]*>?/gm, ''); 
+        
+        let textToSave = `--- EPRASHALA APTITUDE REPORT: ${childData.name} ---\n\n`;
+        textToSave += `--- OFFLINE TEST TRANSCRIPT ---\n${fullTranscript}\n\n`;
+        textToSave += `--- AI EXECUTIVE SUMMARY ---\n${cleanSummary}\n`;
+        
+        triggerDownload(textToSave, `Dhwani_Report_${childData.name}.txt`);
+    }
+
+    // 2. Download Everything (Q&A + Summary + Consultation)
+    function downloadFullSession() {
+        let cleanSummary = generatedReportHtml.replace(/<[^>]*>?/gm, ''); 
+        
+        let textToSave = `--- EPRASHALA FULL SESSION: ${childData.name} ---\n\n`;
+        textToSave += `--- OFFLINE TEST TRANSCRIPT ---\n${fullTranscript}\n\n`;
+        textToSave += `--- AI EXECUTIVE SUMMARY ---\n${cleanSummary}\n\n`;
+        textToSave += `--- POST-TEST AI CONSULTATION ---\n`;
+        
+        consultHistory.forEach(msg => { 
+            let roleName = msg.role === 'user' ? childData.name : 'Dhwani';
+            textToSave += `${roleName}: ${msg.parts[0].text}\n\n`; 
+        });
+        
+        triggerDownload(textToSave, `Dhwani_Full_Session_${childData.name}.txt`);
+    }
+
+    function triggerDownload(content, filename) {
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(new Blob([content], { type: "text/plain" }));
+        link.download = filename;
+        link.click();
+    }
+
+    function addMessage(text, sender, containerId) {
+        const chat = document.getElementById(containerId);
+        const div = document.createElement('div');
+        div.className = `message ${sender}-msg`;
+        div.innerText = text;
+        chat.appendChild(div);
+        chat.scrollTop = chat.scrollHeight;
+    }
+
+    function setLoading(show, text="") {
+        document.getElementById('full-loader').style.display = show ? 'flex' : 'none';
+        document.getElementById('loader-text').innerText = text;
+    }
+</script>
+</body>
+</html>

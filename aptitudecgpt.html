@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Advanced Career Profiling Engine</title>
+<style>
+body{
+    font-family:Arial;
+    background:#0f172a;
+    color:white;
+    text-align:center;
+    padding:20px;
+}
+#box{
+    max-width:800px;
+    margin:auto;
+    background:#1e293b;
+    padding:25px;
+    border-radius:10px;
+}
+button{
+    margin:8px;
+    padding:10px 20px;
+    border:none;
+    border-radius:5px;
+    cursor:pointer;
+}
+.option{background:#334155;color:white;}
+#progress{
+    margin-bottom:15px;
+}
+#result{
+    margin-top:20px;
+    font-size:18px;
+}
+.timer{
+    color:#f87171;
+}
+</style>
+</head>
+<body>
+
+<h2>🎓 Deep Career Intelligence Assessment</h2>
+
+<div id="box">
+<div id="progress"></div>
+<div id="timer" class="timer"></div>
+<div id="question"></div>
+<div id="options"></div>
+<div id="result"></div>
+</div>
+
+<script>
+
+const questions = [
+
+/* PHASE 1 – Forced Trade-offs */
+{type:"choice", text:"Would you rather solve a complex math problem OR lead a group discussion?", a:"Solve math", b:"Lead discussion", mapA:"analytical", mapB:"leadership"},
+
+{type:"choice", text:"Design a futuristic building OR build a working robot?", a:"Design building", b:"Build robot", mapA:"creative", mapB:"technical"},
+
+{type:"choice", text:"Teach a child patiently OR win a competitive debate?", a:"Teach patiently", b:"Win debate", mapA:"social", mapB:"leadership"},
+
+{type:"choice", text:"Work alone deeply OR manage 10 people?", a:"Work alone", b:"Manage team", mapA:"analytical", mapB:"leadership"},
+
+/* PHASE 2 – Logical */
+{type:"logic", text:"2, 6, 12, 20, ?", answer:"30", map:"analytical"},
+
+{type:"logic", text:"If all roses are flowers and some flowers fade quickly, can we say all roses fade quickly? (yes/no)", answer:"no", map:"analytical"},
+
+/* PHASE 3 – Frustration */
+{type:"stress", text:"Solve: 99 x 97 = ?", answer:"9603", map:"persistence"},
+
+{type:"stress", text:"Find next: A, C, F, J, O, ?", answer:"U", map:"analytical"},
+
+/* PHASE 4 – Situational */
+{type:"choice", text:"Your team fails because of one weak member. Do you: Replace OR Train?", a:"Replace", b:"Train", mapA:"leadership", mapB:"social"},
+
+/* Reverse consistency */
+{type:"choice", text:"You dislike solving difficult puzzles.", a:"Agree", b:"Disagree", mapA:"lowAnalytical", mapB:"analytical"}
+
+];
+
+let scores = {
+analytical:0,
+technical:0,
+creative:0,
+leadership:0,
+social:0,
+persistence:0,
+lowAnalytical:0
+};
+
+let current = 0;
+let timerInterval;
+let timeLeft = 30;
+
+function startTimer(){
+    timerInterval = setInterval(()=>{
+        timeLeft--;
+        document.getElementById("timer").innerText = "Time Remaining: "+timeLeft+" seconds";
+        if(timeLeft <= 0){
+            clearInterval(timerInterval);
+            next();
+        }
+    },1000);
+}
+
+function showQuestion(){
+    if(current >= questions.length){
+        showResult();
+        return;
+    }
+
+    document.getElementById("progress").innerText =
+        "Question "+(current+1)+" of "+questions.length;
+
+    let q = questions[current];
+    document.getElementById("question").innerText = q.text;
+
+    document.getElementById("options").innerHTML="";
+    document.getElementById("timer").innerText="";
+    clearInterval(timerInterval);
+
+    if(q.type === "choice"){
+        document.getElementById("options").innerHTML = `
+        <button class="option" onclick="answerChoice('${q.mapA}')">${q.a}</button>
+        <button class="option" onclick="answerChoice('${q.mapB}')">${q.b}</button>
+        `;
+    }
+
+    if(q.type === "logic" || q.type === "stress"){
+        document.getElementById("options").innerHTML = `
+        <input id="inputAns" placeholder="Type answer"/>
+        <button onclick="answerInput()">Submit</button>
+        `;
+        timeLeft = 30;
+        startTimer();
+    }
+}
+
+function answerChoice(category){
+    scores[category] += 2;
+    next();
+}
+
+function answerInput(){
+    let q = questions[current];
+    let val = document.getElementById("inputAns").value.toLowerCase().trim();
+    if(val === q.answer){
+        scores[q.map] += 3;
+    }
+    next();
+}
+
+function next(){
+    current++;
+    showQuestion();
+}
+
+function showResult(){
+    document.getElementById("options").innerHTML="";
+    document.getElementById("timer").innerText="";
+    document.getElementById("question").innerText="Assessment Completed";
+
+    if(scores.lowAnalytical > scores.analytical){
+        scores.analytical -= 2;
+    }
+
+    let sorted = Object.keys(scores)
+        .sort((a,b)=>scores[b]-scores[a]);
+
+    let primary = sorted[0];
+    let secondary = sorted[1];
+
+    let career="";
+
+    if(primary==="analytical"){
+        career="Engineering, Data Science, AI, Finance";
+    }
+    if(primary==="technical"){
+        career="Mechanical, Robotics, Electronics";
+    }
+    if(primary==="creative"){
+        career="Architecture, Design, Media, Animation";
+    }
+    if(primary==="leadership"){
+        career="Management, Law, Civil Services, Business";
+    }
+    if(primary==="social"){
+        career="Teaching, Psychology, Medicine, Social Work";
+    }
+
+    document.getElementById("result").innerHTML =
+    "Primary Strength: "+primary.toUpperCase()+"<br>"+
+    "Secondary Strength: "+secondary.toUpperCase()+"<br><br>"+
+    "Suggested Career Paths:<br>"+career;
+}
+
+showQuestion();
+
+</script>
+</body>
+</html>
