@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Biometric Scanner</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f4f8;
+            color: #333;
+            text-align: center;
+            padding: 20px;
+            margin: 0; 
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            position: relative;
+        }
+        h1 { color: #2c3e50; transition: color 0.2s; }
+        .form-group {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+            color: #7f8c8d; 
+        }
+        input:focus, select:focus { color: #333; }
+        
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            margin-top: 10px;
+            transition: background 0.3s;
+        }
+        button:hover { background-color: #2980b9; }
+        button:disabled { background-color: #95a5a6; cursor: not-allowed; }
+        
+        #dashboard, #brain-results, #heart-results { display: none; }
+        
+        .measure-box {
+            border: 2px dashed #bdc3c7;
+            padding: 20px;
+            margin-top: 20px;
+            border-radius: 8px;
+        }
+        .countdown {
+            font-size: 48px;
+            font-weight: bold;
+            color: #e74c3c;
+            margin: 15px 0;
+        }
+        .result-text {
+            font-size: 18px;
+            color: #27ae60;
+            font-weight: bold;
+            margin-top: 15px;
+            padding: 15px;
+            background: #eafaf1;
+            border-radius: 6px;
+            display: none;
+        }
+
+        #secret-button {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 50px;
+            height: 50px;
+            font-size: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: transparent;
+            z-index: 9999;
+            cursor: pointer;
+            color: yellow;
+        }
+    </style>
+</head>
+<body>
+
+<div id="secret-button" onclick="handleSecretTap()">☀️</div>
+
+<div class="container" id="profile-setup">
+    <h1>Biometric Profiler</h1>
+    <p>Please enter patient details to calibrate the scanner.</p>
+    <div class="form-group">
+        <label>Username (Patient Name):</label>
+        <input type="text" id="username" value="Pramod" oninput="this.style.color='#333'">
+    </div>
+    <div class="form-group">
+        <label>Age:</label>
+        <input type="number" id="age" value="44" oninput="this.style.color='#333'">
+    </div>
+    <div class="form-group">
+        <label>Sex:</label>
+        <select id="sex" onchange="this.style.color='#333'">
+            <option>Male</option>
+            <option>Female</option>
+            <option>Other</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label>Date of Birth:</label>
+        <input type="date" id="dob" value="1982-02-11" oninput="this.style.color='#333'">
+    </div>
+    <div class="form-group">
+        <label>Time of Birth:</label>
+        <input type="time" id="tob" value="11:51" oninput="this.style.color='#333'">
+    </div>
+    <button onclick="startApp()">Create Profile & Initialize Scanner</button>
+</div>
+
+<div class="container" id="dashboard">
+    <h1 id="welcome-msg">Scanner Ready</h1>
+    <p>Please place the device on the required body part before clicking measure.</p>
+    
+    <div class="measure-box">
+        <h3>Brain Wave Analysis</h3>
+        <button id="btn-measure-brain" onclick="measure('brain')">Measure Brain Waves</button>
+        <div id="brain-timer" class="countdown"></div>
+        <div id="brain-results">
+            <button onclick="playHiss()">Play Brain Waves</button>
+            <button onclick="decodeBrain()" style="background-color: #e67e22;">Decode Brain Wave</button>
+        </div>
+    </div>
+
+    <div class="measure-box">
+        <h3>Heart Wave Analysis</h3>
+        <button id="btn-measure-heart" onclick="measure('heart')">Measure Heart Waves</button>
+        <div id="heart-timer" class="countdown"></div>
+        <div id="heart-results">
+            <button onclick="playHeartbeat()">Play Heart Waves</button>
+            <button onclick="decodeHeart()" style="background-color: #e67e22;">Decode Heart Wave</button>
+            <div id="heart-text-output" class="result-text"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentUser = "";
+    let audioCtx;
+
+    let tapCount = 0;
+    let tapTimer;
+
+    function handleSecretTap() {
+        tapCount++;
+        
+        const title = document.getElementById('welcome-msg');
+        title.style.color = "#e74c3c"; 
+        setTimeout(() => { title.style.color = "#2c3e50"; }, 150);
+
+        clearTimeout(tapTimer);
+        tapTimer = setTimeout(() => {
+            if (tapCount === 1) {
+                currentUser = "rajashree";
+            } else if (tapCount === 2) {
+                currentUser = "marlesh";
+            } else if (tapCount === 3) {
+                currentUser = "random1";
+            } else if (tapCount >= 4) {
+                currentUser = "random2";
+            }
+            tapCount = 0; 
+        }, 1000); 
+    }
+
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+    }
+
+    function startApp() {
+        const nameInput = document.getElementById('username').value.trim();
+        currentUser = nameInput.toLowerCase();
+        
+        document.getElementById('profile-setup').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'block';
+        initAudio(); 
+    }
+
+    function measure(type) {
+        initAudio();
+        const btn = document.getElementById('btn-measure-' + type);
+        const timerDiv = document.getElementById(type + '-timer');
+        const resultsDiv = document.getElementById(type + '-results');
+        
+        btn.disabled = true;
+        resultsDiv.style.display = 'none';
+        
+        let timeLeft = 30; 
+        timerDiv.innerText = timeLeft + "s";
+
+        const interval = setInterval(() => {
+            timeLeft--;
+            timerDiv.innerText = timeLeft + "s";
+            if (timeLeft <= 0) {
+                clearInterval(interval);
+                timerDiv.innerText = "Scan Complete!";
+                playDing();
+                resultsDiv.style.display = 'block';
+                btn.disabled = false;
+            }
+        }, 1000);
+    }
+
+    function playDing() {
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+        gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+        gainNode.gain.linearRampToValueAtTime(1, audioCtx.currentTime + 0.05);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1);
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 1);
+    }
+
+    function playHiss() {
+        const bufferSize = audioCtx.sampleRate * 2; 
+        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+        }
+        const noiseSource = audioCtx.createBufferSource();
+        noiseSource.buffer = buffer;
+        const gainNode = audioCtx.createGain();
+        gainNode.gain.value = 0.1; 
+        noiseSource.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        noiseSource.start();
+    }
+
+    function playHeartbeat() {
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        for (let i = 0; i < 5; i++) {
+            let startTime = audioCtx.currentTime + (i * 0.9); 
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            osc.type = 'triangle'; 
+            osc.frequency.setValueAtTime(65, startTime); 
+
+            gainNode.gain.setValueAtTime(0, startTime);
+            gainNode.gain.linearRampToValueAtTime(1, startTime + 0.05);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + 0.2);
+            gainNode.gain.setValueAtTime(0, startTime + 0.25);
+            gainNode.gain.linearRampToValueAtTime(1, startTime + 0.3);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + 0.5);
+
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            osc.start(startTime);
+            osc.stop(startTime + 0.6);
+        }
+    }
+
+    function playBadEngine() {
+        const osc = audioCtx.createOscillator();
+        const lfo = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(60, audioCtx.currentTime);
+        
+        lfo.type = 'square';
+        lfo.frequency.setValueAtTime(8, audioCtx.currentTime); 
+        
+        lfo.connect(gainNode.gain);
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        osc.start();
+        lfo.start();
+        osc.stop(audioCtx.currentTime + 2);
+        lfo.stop(audioCtx.currentTime + 2);
+    }
+
+    function playSportsCar(isSuperFast) {
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        
+        osc.type = 'sawtooth';
+        let startFreq = isSuperFast ? 150 : 100;
+        let peakFreq = isSuperFast ? 600 : 400;
+
+        osc.frequency.setValueAtTime(startFreq, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(peakFreq, audioCtx.currentTime + 1.5);
+        osc.frequency.exponentialRampToValueAtTime(startFreq, audioCtx.currentTime + 2.5);
+
+        gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 0.2);
+        gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 2.5);
+
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 2.5);
+    }
+
+    function decodeBrain() {
+        if (currentUser === "rajashree") {
+            playBadEngine();
+        } else if (currentUser === "marlesh" || currentUser === "random1" || currentUser === "random2") {
+            playSportsCar(false); 
+        } else if (currentUser === "pramod") {
+            playSportsCar(true);  
+        } else {
+            playDing(); 
+        }
+    }
+
+    function decodeHeart() {
+        const outputDiv = document.getElementById('heart-text-output');
+        let text = "";
+
+        if (currentUser === "rajashree") {
+            text = "Your heart is thinking about: headache, mother, father, brother, sister, son, house works, sister's children, brothers children, cooking.";
+        } else if (currentUser === "marlesh") {
+            text = "Your heart is thinking about: Cricket, AI, coding, software, bat, gloves, cricket, ground, android.";
+        } else if (currentUser === "pramod") {
+            text = "Your heart is thinking about: Dev, desh, dharma, moksha, sewa, son, mother, mankind, divine.";
+        } else if (currentUser === "random1") {
+            text = "Your heart is thinking about: Kagad, Vakil, Batmya, paper, mobile, sleeping.";
+        } else if (currentUser === "random2") {
+            text = "Your heart is thinking about: Ghar, work, Son, son, sons wife, grandchildren, younger brother, elder sister, brothers son.";
+        } else {
+            text = "Your heart is thinking about: Nothing but empty space.";
+        }
+
+        outputDiv.innerText = text;
+        outputDiv.style.display = "block";
+    }
+</script>
+
+</body>
+</html>
