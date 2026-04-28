@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Converse with the Gods</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        .listening-pulse { animation: pulse 1.5s infinite ease-in-out; }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.7); } 
+            70% { box-shadow: 0 0 0 15px rgba(250, 204, 21, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(250, 204, 21, 0); }
+        }
+
+        .icon-btn {
+            @apply p-3 rounded-full text-white transition-all duration-200
+                   bg-slate-700 hover:bg-yellow-600 shadow-lg
+                   focus:outline-none focus:ring-2 focus:ring-yellow-500
+                   disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none;
+        }
+        
+        .utility-btn {
+            @apply w-full py-3 px-2 rounded-lg text-sm font-semibold transition-colors
+                   bg-slate-700 text-white hover:bg-cyan-700
+                   disabled:bg-slate-800 disabled:text-gray-600 disabled:cursor-not-allowed;
+        }
+
+        .custom-checkbox {
+            @apply w-4 h-4 text-yellow-500 bg-slate-700 border-slate-600 rounded focus:ring-yellow-500;
+        }
+        
+        .custom-input {
+            @apply block w-full text-center border border-slate-500 rounded-lg p-3 outline-none transition-all;
+            background-color: #0f172a !important; 
+            color: #facc15 !important;             
+        }
+    </style>
+</head>
+
+<body class="bg-slate-950 text-white flex flex-col items-center justify-start min-h-screen p-4 overflow-x-hidden">
+
+    <div class="bg-slate-900 rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-2xl flex flex-col border-t-4 border-yellow-500 z-10">
+        
+        <div class="flex items-center justify-between mb-4 shrink-0 flex-wrap gap-2">
+            <h1 class="text-2xl md:text-3xl font-bold text-white tracking-wide">
+                <span class="text-cyan-400">Eप्रशाला</span> <span class="text-yellow-400">Darshan</span>
+            </h1>
+            <div class="flex items-center gap-3">
+                <select id="language-selector" class="bg-slate-800 border border-slate-600 text-yellow-300 text-sm rounded-lg p-2 outline-none cursor-pointer">
+                    <option value="en-IN">English</option>
+                    <option value="hi-IN">हिन्दी (Hindi)</option>
+                    <option value="mr-IN">मराठी (Marathi)</option>
+                </select>
+                <div id="status-indicator" class="w-4 h-4 rounded-full bg-gray-500 transition-colors" title="Offline"></div>
+            </div>
+        </div>
+
+        <div class="mb-4 shrink-0 bg-slate-800/60 p-3 rounded-xl border border-slate-700">
+            <label class="text-xs text-gray-400 mb-1 block text-center uppercase tracking-widest">Select the Divine Presence</label>
+            <select id="deity-selector" class="custom-input text-lg font-bold !text-cyan-300 cursor-pointer text-center">
+                </select>
+        </div>
+
+        <div id="conversation-log" class="flex-grow overflow-y-auto bg-slate-950 rounded-lg p-4 mb-4 border border-slate-800 space-y-4 shadow-inner min-h-[200px] max-h-[40vh] whitespace-pre-wrap">
+            <div class="text-gray-400 text-center mt-6">
+                Select your Deity and Language.<br>
+                Press "Seek Wisdom" to begin.<br>
+                <span class="text-sm opacity-70 text-yellow-200 block mt-2">Dharma • Truth • Karma</span>
+            </div>
+        </div>
+
+        <div class="flex justify-center gap-8 mb-4 shrink-0 bg-slate-800/50 p-2 rounded-xl">
+            <button id="pause-resume-button" class="icon-btn bg-blue-900/30 hover:bg-blue-800" disabled>⏸️</button>
+            <button id="stop-speech-button" class="icon-btn bg-red-900/30 hover:bg-red-800" disabled>⏹️</button>
+            <button id="replay-button" class="icon-btn bg-green-900/30 hover:bg-green-800" disabled>🔄</button>
+        </div>
+
+        <div class="flex gap-4 mb-4 shrink-0 w-full text-center">
+            <div class="w-1/2">
+                <label class="text-xs text-gray-400 mb-1 block">Name</label>
+                <input type="text" id="manual-name" class="custom-input" placeholder="Your Name">
+            </div>
+            <div class="w-1/2">
+                <label class="text-xs text-gray-400 mb-1 block">Age</label>
+                <input type="number" id="manual-age" class="custom-input" placeholder="25">
+            </div>
+        </div>
+
+        <div class="w-full flex flex-col items-center justify-center mb-4 shrink-0">
+            <button id="advance-toggle-btn" class="text-xs text-cyan-400 hover:text-cyan-300 underline mb-2 focus:outline-none">▼ Advance Settings (API Key)</button>
+            <div id="advance-container" class="hidden w-full bg-slate-800/80 border border-slate-700 rounded-lg p-4 flex flex-col gap-3 transition-all">
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="use-custom-key-checkbox" class="custom-checkbox">
+                    <label for="use-custom-key-checkbox" class="text-sm text-gray-300 cursor-pointer select-none">Use your own API Key</label>
+                </div>
+                <input type="password" id="custom-api-key-input" class="custom-input text-xs w-full !w-full" placeholder="Paste your Gemini API Key here" disabled>
+            </div>
+        </div>
+
+        <button id="talk-button" class="w-full py-4 px-6 rounded-lg text-lg font-semibold transition-all duration-300 bg-cyan-700 text-white hover:bg-cyan-600 focus:outline-none disabled:bg-slate-700">
+            Seek Wisdom (Start)
+        </button>
+
+        <div class="mt-4 grid grid-cols-2 gap-3 shrink-0">
+            <button id="restart-chat-button" class="utility-btn" disabled>Restart</button>
+            <button id="end-chat-button" class="utility-btn text-red-200 hover:bg-red-900/40" disabled>End Darshan</button>
+        </div>
+    </div>
+
+    <button id="debug-toggle-btn" class="mt-4 text-xs text-gray-500 hover:text-gray-300 underline">Show Developer Console</button>
+    
+    <div id="debug-console" class="hidden w-full max-w-2xl mt-2 bg-black border border-gray-700 rounded p-3 text-[10px] text-green-400 font-mono overflow-y-auto h-48 text-left break-words">
+        <div>[SYSTEM] Debug Console Initialized.</div>
+    </div>
+
+    <script>
+        // --- DEITY DATABASE ---
+        const DEITY_CONFIG = {
+            "Vishnu": { texts: "Vishnu Purana, Bhagavata Purana, Garuda Purana, Bhagavad Gita", greeting: "Om Namo Bhagavate Vasudevaya" },
+            "Shiv": { texts: "Shiva Purana, Linga Purana, Skanda Purana, Shiva Samhita, Shivananda Lahari, Kaivalya Upanishad", greeting: "Om Namah Shivaya" },
+            "Brahma": { texts: "Brahma Purana, Brahma-samhita, Brahma Vaivarta Purana, Maitrayaniya Upanishad", greeting: "Aham Brahmasmi" },
+            "Ganesh": { texts: "Ganesha Purana, Mudgala Purana, Ganesha Gita, Shiva Purana", greeting: "Om Gam Ganapataye Namaha" },
+            "Rama": { texts: "Valmiki Ramayana", greeting: "Jai Shri Ram" }
+        };
+
+        const PROXY_URL = "https://eprashala.pythonanywhere.com/api/chat"; 
+
+        // --- DOM ELEMENTS ---
+        const deitySelector = document.getElementById('deity-selector');
+        const languageSelector = document.getElementById('language-selector');
+        const talkButton = document.getElementById('talk-button');
+        const statusIndicator = document.getElementById('status-indicator');
+        const conversationLog = document.getElementById('conversation-log');
+        const manualNameInput = document.getElementById('manual-name');
+        const manualAgeInput = document.getElementById('manual-age');
+        
+        const advanceToggleBtn = document.getElementById('advance-toggle-btn');
+        const advanceContainer = document.getElementById('advance-container');
+        const useCustomKeyCheckbox = document.getElementById('use-custom-key-checkbox');
+        const customApiKeyInput = document.getElementById('custom-api-key-input');
+
+        const debugToggleBtn = document.getElementById('debug-toggle-btn');
+        const debugConsole = document.getElementById('debug-console');
+
+        let appState = 'IDLE'; 
+        let userName = '';
+        let userAge = 25; 
+        let chatHistory = [];
+        let systemInstruction = '';
+        let recognition;
+        
+        // --- AUDIO/TTS VARIABLES ---
+        const synth = window.speechSynthesis;
+        let voices = [];
+        let audioUnlocked = false; 
+
+        // --- DEBUG LOGGER ---
+        function dbg(msg) {
+            console.log(msg);
+            const line = document.createElement('div');
+            const time = new Date().toLocaleTimeString();
+            line.innerHTML = `<span class="text-gray-500">[${time}]</span> ${msg}`;
+            debugConsole.appendChild(line);
+            debugConsole.scrollTop = debugConsole.scrollHeight;
+        }
+
+        // --- INITIALIZATION ---
+        window.onload = () => {
+            dbg("Window Loaded. Populating deities...");
+            for (const god in DEITY_CONFIG) {
+                let opt = document.createElement('option');
+                opt.value = god; opt.innerHTML = `Lord ${god}`;
+                deitySelector.appendChild(opt);
+            }
+            if (synth.speaking) synth.cancel();
+            
+            // Load voices immediately
+            voices = synth.getVoices();
+            if (synth.onvoiceschanged !== undefined) {
+                synth.onvoiceschanged = () => { voices = synth.getVoices(); };
+            }
+            
+            // Advance UI Listeners
+            advanceToggleBtn.addEventListener('click', () => {
+                advanceContainer.classList.toggle('hidden'); advanceContainer.classList.toggle('flex');
+            });
+            useCustomKeyCheckbox.addEventListener('change', () => {
+                customApiKeyInput.disabled = !useCustomKeyCheckbox.checked;
+            });
+            debugToggleBtn.addEventListener('click', () => {
+                debugConsole.classList.toggle('hidden');
+                debugToggleBtn.innerText = debugConsole.classList.contains('hidden') ? "Show Developer Console" : "Hide Developer Console";
+            });
+
+            initSpeechRecognition();
+        };
+
+        // --- THE AUDIO UNLOCKER (CRITICAL FIX) ---
+        // Browsers block TTS unless the user directly clicks a button. 
+        function unlockAudio() {
+            if (!audioUnlocked) {
+                const silentUtterance = new SpeechSynthesisUtterance('');
+                silentUtterance.volume = 0; // Silent
+                synth.speak(silentUtterance);
+                audioUnlocked = true;
+                dbg("AUDIO: System Audio Unlocked by user click.");
+            }
+        }
+
+        // --- API COMMUNICATION ---
+        function getEffectiveApiKey() {
+            if (useCustomKeyCheckbox.checked && customApiKeyInput.value.trim().length > 10) return customApiKeyInput.value.trim();
+            return null;
+        }
+
+        async function sendToProxy(payloadData) {
+            const customKey = getEffectiveApiKey();
+            const headers = { 'Content-Type': 'application/json' };
+            if (customKey) headers['X-Custom-Api-Key'] = customKey;
+            
+            dbg("NETWORK: Request sent.");
+            const response = await fetch(PROXY_URL, { method: 'POST', headers: headers, body: JSON.stringify(payloadData) });
+            
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const data = await response.json();
+            dbg("NETWORK: Response received.");
+            return data;
+        }
+
+        // --- SPEECH RECOGNITION SETUP ---
+        function initSpeechRecognition() {
+            const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRec) {
+                talkButton.disabled = true;
+                alert('Speech Recognition not supported. Use Chrome for Android/Desktop.');
+                return;
+            }
+            recognition = new SpeechRec();
+            recognition.continuous = false; recognition.interimResults = false;
+            
+            recognition.onresult = handleSpeechResult;
+            recognition.onend = () => {
+                if (appState === 'CONVERSATION') startRecognitionSafe();
+                else if (appState === 'IDLE') setState('IDLE');
+            };
+            recognition.onerror = (e) => {
+                dbg("MIC ERROR: " + e.error);
+                if (e.error === 'no-speech' && appState === 'CONVERSATION') startRecognitionSafe();
+            };
+        }
+
+        function startRecognitionSafe() {
+            if (!recognition) return;
+            recognition.lang = languageSelector.value;
+            try { 
+                recognition.start(); 
+                dbg(`MIC: Listening... (${recognition.lang})`);
+            } catch (e) {}
+        }
+
+        // --- MAIN CHAT LOGIC ---
+        talkButton.addEventListener('click', toggleListening);
+        document.getElementById('end-chat-button').addEventListener('click', endChat);
+        document.getElementById('restart-chat-button').addEventListener('click', () => { endChat(); setTimeout(toggleListening, 500); });
+
+        async function toggleListening() {
+            if (appState === 'IDLE') {
+                unlockAudio(); // CRITICAL FIX: Unlock audio on the very first click
+
+                userName = manualNameInput.value.trim() || "Bhakt";
+                userAge = parseInt(manualAgeInput.value.trim()) || 25;
+                
+                buildSystemPrompt(); 
+
+                const selectedGod = deitySelector.value;
+                const greetingBase = DEITY_CONFIG[selectedGod].greeting;
+                
+                let welcomeText = `${greetingBase}. Welcome, Child. What weighs upon your soul today?`;
+                if (languageSelector.value === 'hi-IN') welcomeText = `${greetingBase}. स्वागत है वत्स। आज तुम्हारे मन में क्या दुविधा है?`;
+                if (languageSelector.value === 'mr-IN') welcomeText = `${greetingBase}. स्वागत आहे बाळा. आज तुझ्या मनात कोणती चिंता आहे?`;
+
+                logMessage(selectedGod, welcomeText);
+                chatHistory.push({ role: 'user', parts: [{ text: "Start session." }] });
+                chatHistory.push({ role: 'model', parts: [{ text: welcomeText }] });
+                
+                setState('BUSY'); 
+                await speakText(welcomeText, languageSelector.value);
+                setState('CONVERSATION');
+                startRecognitionSafe();
+
+            } else {
+                setState('IDLE');
+                recognition.stop();
+                if (synth.speaking) synth.cancel();
+            }
+        }
+
+        function setState(newState) {
+            appState = newState;
+            switch (newState) {
+                case 'IDLE':
+                    talkButton.textContent = 'Seek Wisdom (Start)';
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-gray-500';
+                    talkButton.className = "w-full py-4 px-6 rounded-lg text-lg font-semibold transition-all bg-cyan-700 text-white hover:bg-cyan-600 focus:outline-none";
+                    document.getElementById('end-chat-button').disabled = true;
+                    document.getElementById('restart-chat-button').disabled = true;
+                    break;
+                case 'BUSY':
+                    talkButton.textContent = 'Seeking Divine Wisdom...';
+                    talkButton.disabled = true;
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-400';
+                    document.getElementById('end-chat-button').disabled = false;
+                    break;
+                case 'CONVERSATION':
+                    talkButton.textContent = 'Stop Listening';
+                    talkButton.disabled = false;
+                    statusIndicator.className = 'w-4 h-4 rounded-full bg-yellow-400 listening-pulse';
+                    talkButton.className = "w-full py-4 px-6 rounded-lg text-lg font-semibold transition-all bg-red-600 text-white hover:bg-red-700 focus:outline-none";
+                    document.getElementById('end-chat-button').disabled = false;
+                    document.getElementById('restart-chat-button').disabled = false;
+                    break;
+            }
+        }
+        
+        async function handleSpeechResult(event) {
+            const transcript = event.results[event.results.length - 1][0].transcript.trim();
+            if (!transcript) return;
+            
+            dbg(`USER SAID: "${transcript}"`);
+            const currentState = appState; 
+            recognition.stop();
+            setState('BUSY');
+
+            try {
+                if (currentState === 'CONVERSATION') {
+                    logMessage(userName, transcript);
+                    chatHistory.push({ role: 'user', parts: [{ text: transcript }] });
+
+                    const aiResponseText = await getAIResponse(chatHistory);
+                    
+                    // CRITICAL FIX: Clean text thoroughly for the TTS engine to prevent crashing
+                    const cleanedResponseText = aiResponseText.replace(/[*#`_\[\]()]/g, '').trim();
+
+                    chatHistory.push({ role: 'model', parts: [{ text: cleanedResponseText }] });
+                    logMessage(deitySelector.value, cleanedResponseText);
+                    
+                    await speakText(cleanedResponseText, languageSelector.value);
+                    
+                    setState('CONVERSATION');
+                    startRecognitionSafe();
+                }
+            } catch (error) {
+                dbg("ERROR in processing: " + error.message);
+                setState('CONVERSATION'); 
+                startRecognitionSafe();
+            }
+        }
+
+        // --- SYSTEM PROMPT ---
+        function buildSystemPrompt() {
+            const god = deitySelector.value;
+            const texts = DEITY_CONFIG[god].texts;
+            
+            let langText = "English";
+            if(languageSelector.value === 'hi-IN') langText = "Hindi (Devanagari script)";
+            if(languageSelector.value === 'mr-IN') langText = "Marathi (Devanagari script)";
+
+            systemInstruction = `
+                You are the Supreme Divine Entity, Lord ${god}. 
+                User Context: Name: ${userName}, Age: ${userAge}.
+                
+                YOUR KNOWLEDGE BASE:
+                Draw wisdom EXCLUSIVELY from: ${texts}.
+
+                CRITICAL RULES:
+                1. PRIMARY LANGUAGE: Speak entirely in ${langText}. 
+                2. SANSKRIT VERSES: If quoting a verse, quote it in SANSKRIT (Devanagari) first, then explain in ${langText}.
+                3. TONE: Address the user neutrally as "Child", "Bhakt", "Vatsa", or ${userName}. Be highly encouraging, compassionate, divine, and profound.
+                4. CORE PHILOSOPHY: Guide the user towards Dharma, Truth, and the Law of Karma.
+                5. FORMATTING: NO Markdown. Plain text only. Keep answers concise, deep, and conversational. Do NOT use special characters or emojis.
+            `;
+        }
+
+        async function getAIResponse(historyData) {
+            try {
+                const limitedHistory = historyData.slice(-15);
+                const payload = { contents: limitedHistory, systemInstruction: { parts: [{ text: systemInstruction }] } };
+                const result = await sendToProxy(payload);
+                if (result.candidates && result.candidates[0]) {
+                    return result.candidates[0].content.parts[0].text.trim();
+                } else {
+                    throw new Error("Invalid AI Response format.");
+                }
+            } catch (error) { 
+                return (languageSelector.value === 'en-IN') ? "⚠️ Network Error. The cosmic connection is weak." : "⚠️ नेटवर्क त्रुटी. कृपया पुन्हा प्रयत्न करा."; 
+            }
+        }
+
+        // --- TTS ENGINE (CRITICAL FIX) ---
+        async function speakText(text, langCode) {
+            if (synth.speaking) synth.cancel();
+            if (voices.length === 0) voices = synth.getVoices();
+            
+            return new Promise((resolve) => {
+                const utterance = new SpeechSynthesisUtterance(text);
+                
+                // Resolve the promise when speech ends OR if it crashes
+                utterance.onend = () => { dbg("AUDIO: Speech finished."); resolve(); };
+                utterance.onerror = (e) => { dbg("AUDIO ERROR: " + e.error); resolve(); }; 
+                
+                utterance.lang = langCode;
+                utterance.rate = 0.85; 
+                utterance.pitch = 0.9;
+                
+                // Aggressive Voice Fallback Logic
+                let selectedVoice = voices.find(v => v.lang === langCode || v.lang.replace('_', '-') === langCode);
+                
+                if (!selectedVoice) {
+                    dbg("AUDIO: Exact voice not found, trying fallback...");
+                    if (langCode.includes('mr')) selectedVoice = voices.find(v => v.lang.includes('hi')); // Fallback Marathi to Hindi
+                    if (!selectedVoice && langCode.includes('hi')) selectedVoice = voices.find(v => v.lang.includes('hi')); 
+                    if (!selectedVoice && langCode.includes('en')) selectedVoice = voices.find(v => v.lang.includes('en'));
+                }
+                
+                if (selectedVoice) {
+                    utterance.voice = selectedVoice;
+                    dbg(`AUDIO: Using voice -> ${selectedVoice.name}`);
+                } else {
+                    dbg("AUDIO: No suitable voice found, using system default.");
+                }
+
+                dbg("AUDIO: Speaking...");
+                synth.speak(utterance);
+            });
+        }
+
+        function logMessage(sender, message) {
+            const div = document.createElement('div');
+            let senderClass = 'text-cyan-300 font-semibold';
+            let messageClass = 'text-white';
+
+            if (message.includes('⚠️')) messageClass = 'text-red-400 font-medium';
+            if (sender in DEITY_CONFIG) senderClass = 'text-yellow-400 font-semibold tracking-wider';
+
+            div.innerHTML = `<strong class="${senderClass}">${sender}:</strong> <span class="${messageClass}">${message}</span>`;
+            conversationLog.appendChild(div);
+            conversationLog.scrollTop = conversationLog.scrollHeight;
+        }
+
+        function endChat() {
+            setState('IDLE');
+            if (synth.speaking) synth.cancel();
+            if (recognition) try { recognition.stop(); } catch (e) {}
+            chatHistory = [];
+            conversationLog.innerHTML = '<div class="text-gray-400 text-center">Darshan Ended. Press Start to seek wisdom again.</div>';
+        }
+    </script>
+</body>
+</html>
