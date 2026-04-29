@@ -144,7 +144,7 @@
             </div>
         </header>
 
-        <main id="conversation-log" class="flex-1 overflow-y-auto p-4 space-y-5 pb-40">
+        <main id="conversation-log" class="flex-1 overflow-y-auto p-4 space-y-5 pb-40 scroll-smooth">
             <div class="text-gray-400 text-center mt-12 cinzel" id="welcome-msg">
                 <p class="text-yellow-500 text-2xl mb-3">🙏 Welcome 🙏</p>
                 Tap the glowing microphone once to speak.<br>It will automatically send when you pause.
@@ -206,13 +206,54 @@
     </div>
 
     <script>
-        // --- 1. SECURITY & KIOSK MODE CONTROLS ---
+        // --- 1. SECURITY, KIOSK MODE & WAKE LOCK ---
         document.addEventListener('contextmenu', event => event.preventDefault());
         document.addEventListener('keydown', (e) => {
             if (e.key === 'F12' || 
                (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J')) || 
                (e.ctrlKey && e.key === 'U')) {
                 e.preventDefault();
+            }
+        });
+
+        let wakeLock = null;
+        async function acquireWakeLock() {
+            if ('wakeLock' in navigator) {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                } catch (err) {
+                    console.log(`Wake Lock Error: ${err.message}`);
+                }
+            }
+        }
+        async function releaseWakeLock() {
+            if (wakeLock !== null) {
+                await wakeLock.release();
+                wakeLock = null;
+            }
+        }
+
+        // --- GLOBAL FULLSCREEN ENFORCER ---
+        document.addEventListener('click', () => {
+            if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            }
+        });
+
+        // --- VISIBILITY (INTERRUPT) HANDLER ---
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                // App went to background (call, swapped app)
+                if (synth.speaking && !synth.paused) {
+                    synth.pause();
+                    togglePlayIcon(true); // User must click play to resume
+                }
+                if (recognition && isListening) {
+                    recognition.stop();
+                }
+            } else {
+                // App came back
+                acquireWakeLock();
             }
         });
 
@@ -291,8 +332,9 @@
 
         UI.overlay.addEventListener('click', () => {
             if (document.documentElement.requestFullscreen) {
-                document.documentElement.requestFullscreen().catch((e) => console.log("Fullscreen denied", e));
+                document.documentElement.requestFullscreen().catch(() => {});
             }
+            acquireWakeLock();
             const silent = new SpeechSynthesisUtterance('');
             silent.volume = 0; synth.speak(silent);
             UI.overlay.style.display = 'none';
@@ -341,49 +383,60 @@
 
         function setupEventListeners() {
             // Settings Modal Controls
-            const openSettings = () => {
+            const openSettings = (e) => {
+                e.stopPropagation();
                 UI.settingsModal.classList.remove('hidden');
                 UI.name.value = localStorage.getItem('darshan_name') || UI.name.value;
                 UI.age.value = localStorage.getItem('darshan_age') || UI.age.value;
             };
-            const closeSettings = () => UI.settingsModal.classList.add('hidden');
+            const closeSettings = (e) => {
+                e.stopPropagation();
+                UI.settingsModal.classList.add('hidden');
+            };
             
             UI.advToggle.onclick = openSettings;
             UI.btnCloseSet.onclick = closeSettings;
-            UI.btnSaveSet.onclick = () => {
+            UI.btnSaveSet.onclick = (e) => {
+                e.stopPropagation();
                 saveData();
-                closeSettings();
+                closeSettings(e);
             };
+            
+            // Stop propagation on inputs so clicking them doesn't re-trigger fullscreen arbitrarily if it fails
+            UI.settingsModal.addEventListener('click', e => e.stopPropagation());
 
             // Audio Player Controls
-            UI.btnPlayPause.onclick = () => {
+            UI.btnPlayPause.onclick = (e) => {
+                e.stopPropagation();
                 if(synth.paused) { synth.resume(); togglePlayIcon(false); }
                 else if(synth.speaking) { synth.pause(); togglePlayIcon(true); }
             };
-            UI.btnStop.onclick = () => { synth.cancel(); togglePlayIcon(true); };
-            UI.btnRepeat.onclick = () => { if(state.lastAIMessage) speakText(state.lastAIMessage, UI.lang.value); };
-            UI.btnMute.onclick = () => {
+            UI.btnStop.onclick = (e) => { e.stopPropagation(); synth.cancel(); togglePlayIcon(true); };
+            UI.btnRepeat.onclick = (e) => { e.stopPropagation(); if(state.lastAIMessage) speakText(state.lastAIMessage, UI.lang.value); };
+            UI.btnMute.onclick = (e) => {
+                e.stopPropagation();
                 state.isMuted = !state.isMuted;
                 if(state.isMuted) { synth.cancel(); UI.iconVol.classList.add('hidden'); UI.iconMute.classList.remove('hidden'); }
                 else { UI.iconVol.classList.remove('hidden'); UI.iconMute.classList.add('hidden'); }
             };
 
             // Actions
-            UI.btnRestart.onclick = clearData;
-            UI.btnEnd.onclick = () => { clearData(); UI.log.innerHTML = `<div class="text-gray-500 text-center mt-12 cinzel text-lg">Darshan Ended.<br>May peace be with you.</div>`; };
-            UI.btnShare.onclick = async () => {
+            UI.btnRestart.onclick = (e) => { e.stopPropagation(); clearData(); };
+            UI.btnEnd.onclick = (e) => { e.stopPropagation(); clearData(); UI.log.innerHTML = `<div class="text-gray-500 text-center mt-12 cinzel text-lg">Darshan Ended.<br>May peace be with you.</div>`; };
+            UI.btnShare.onclick = async (e) => {
+                e.stopPropagation();
                 if(chatHistory.length === 0) return;
                 let text = chatHistory.map(m => `${m.role === 'user' ? 'User' : UI.deity.value}: ${m.parts[0].text}`).join("\n\n");
-                try { await navigator.share({ title: 'Darshan', text: text }); } catch(e) {}
+                try { await navigator.share({ title: 'Darshan', text: text }); } catch(err) {}
             };
 
             // Sending text
-            UI.btnSend.onclick = () => processInput(UI.textIn.value);
-            UI.textIn.onkeypress = (e) => { if(e.key === 'Enter') processInput(UI.textIn.value); };
+            UI.btnSend.onclick = (e) => { e.stopPropagation(); processInput(UI.textIn.value); };
+            UI.textIn.onkeypress = (e) => { e.stopPropagation(); if(e.key === 'Enter') processInput(UI.textIn.value); };
 
             // EXACT KRISHNA.HTML LOGIC ADAPTATION: Click to Start, Auto-Stop on Silence
             UI.btnMic.addEventListener('click', (e) => {
-                e.preventDefault();
+                e.stopPropagation();
                 if (state.isProcessing || !recognition) return;
 
                 if (isListening) {
@@ -402,7 +455,6 @@
             recognition = new SpeechRec();
             
             // THE SECRET SAUCE FROM KRISHNA.HTML: One-shot mode.
-            // This prevents Android's erratic double-typing and stuck microphones.
             recognition.continuous = false; 
             recognition.interimResults = false; 
             
@@ -537,7 +589,10 @@
             div.innerHTML = `<div class="text-[10px] uppercase font-bold tracking-wider ${isModel ? 'text-yellow-500 cinzel' : 'text-cyan-400'} mb-1">${sender}</div>
                              <div class="text-sm leading-relaxed text-gray-100">${text}</div>`;
             UI.log.appendChild(div);
-            UI.log.scrollTop = UI.log.scrollHeight;
+            // Ensure scroll is forced to the bottom so text is ALWAYS visible
+            setTimeout(() => {
+                UI.log.scrollTop = UI.log.scrollHeight;
+            }, 50);
         }
 
         function speakText(text, langCode) {
