@@ -407,44 +407,42 @@
             UI.btnMic.addEventListener('pointerdown', startMic);
             UI.btnMic.addEventListener('pointerup', stopMic);
             UI.btnMic.addEventListener('pointerleave', stopMic);
+			UI.btnMic.addEventListener('pointercancel', stopMic);
         }
 
-        function initSpeechRecognition() {
+		function initSpeechRecognition() {
             const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRec) return;
             recognition = new SpeechRec();
             recognition.continuous = true; 
             recognition.interimResults = true; 
             
-            // Reset transcripts when a new recording starts
             recognition.onstart = () => {
-                finalTranscript = '';
+                // Clear text box explicitly on a fresh press
                 UI.textIn.value = '';
             };
 
             recognition.onresult = (e) => {
-                let interimTranscript = '';
-                for (let i = e.resultIndex; i < e.results.length; ++i) {
-                    if (e.results[i].isFinal) {
-                        finalTranscript += e.results[i][0].transcript;
-                    } else {
-                        interimTranscript += e.results[i][0].transcript;
-                    }
+                // FIX: The Android Chrome duplication bug.
+                // We completely ignore e.resultIndex and isFinal logic.
+                // We rebuild the entire sentence from index 0 every single time it fires.
+                let fullTranscript = '';
+                for (let i = 0; i < e.results.length; ++i) {
+                    fullTranscript += e.results[i][0].transcript;
                 }
-                // Correctly display both finalized words and current interim words
-                UI.textIn.value = finalTranscript + interimTranscript; 
+                
+                // Overwrite the input box, never append
+                UI.textIn.value = fullTranscript; 
             };
 
-            // Trigger the send ONLY when the speech engine has fully stopped and resolved text
             recognition.onend = () => {
-                // Reset system colors back to idle
+                // Reset UI strictly
                 UI.btnMic.classList.remove('mic-pulse');
                 UI.status.style.backgroundColor = '#4b5563'; 
                 UI.status.style.boxShadow = 'none';
                 isRecording = false;
 
                 const finalText = UI.textIn.value.trim();
-                // Fire the AI process automatically if we have text
                 if (finalText.length > 0 && !state.isProcessing) {
                     processInput(finalText);
                 }
