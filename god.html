@@ -270,6 +270,8 @@
         let chatHistory = [];
         let recognition = null;
         let synth = window.speechSynthesis;
+        let isRecording = false; 
+        let finalTranscript = ''; 
         
         let state = {
             isProcessing: false,
@@ -339,7 +341,6 @@
             // Settings Modal Controls
             const openSettings = () => {
                 UI.settingsModal.classList.remove('hidden');
-                // load inputs so they reflect currently typed data if it wasn't saved yet
                 UI.name.value = localStorage.getItem('darshan_name') || UI.name.value;
                 UI.age.value = localStorage.getItem('darshan_age') || UI.age.value;
             };
@@ -381,28 +382,26 @@
             // PTT (Press To Talk) & Auto-Send
             const startMic = (e) => { 
                 e.preventDefault(); 
-                if(!state.isProcessing && recognition) { 
-                    recognition.lang = UI.lang.value;
-                    try{ recognition.start(); } catch(err){} 
-                    UI.btnMic.classList.add('mic-pulse'); 
-                    UI.status.style.backgroundColor = '#ef4444'; // Red
-                    UI.status.style.boxShadow = '0 0 10px rgba(239,68,68,0.8)';
-                } 
+                if(state.isProcessing || !recognition) return; 
+                
+                isRecording = true;
+                recognition.lang = UI.lang.value;
+                try { recognition.start(); } catch(err){} 
+                
+                UI.btnMic.classList.add('mic-pulse'); 
+                UI.status.style.backgroundColor = '#ef4444'; // Red
+                UI.status.style.boxShadow = '0 0 10px rgba(239,68,68,0.8)';
             };
+
             const stopMic = (e) => { 
                 e.preventDefault(); 
+                if(!isRecording) return; // Prevent double-triggering from touch events
+                
+                // Command the engine to stop. This will process the last word, then fire recognition.onend
                 if(recognition) recognition.stop(); 
+                
+                // Remove pulse immediately for snappy UX, onend handles the rest
                 UI.btnMic.classList.remove('mic-pulse'); 
-                UI.status.style.backgroundColor = '#4b5563'; // Gray
-                UI.status.style.boxShadow = 'none';
-
-                // Delay slightly to ensure recognition.onresult catches the final word
-                setTimeout(() => {
-                    const finalInput = UI.textIn.value.trim();
-                    if (finalInput.length > 0 && !state.isProcessing) {
-                        processInput(finalInput);
-                    }
-                }, 600);
             };
             
             UI.btnMic.addEventListener('pointerdown', startMic);
@@ -417,13 +416,38 @@
             recognition.continuous = true; 
             recognition.interimResults = true; 
             
+            // Reset transcripts when a new recording starts
+            recognition.onstart = () => {
+                finalTranscript = '';
+                UI.textIn.value = '';
+            };
+
             recognition.onresult = (e) => {
-                let finalTranscript = '';
+                let interimTranscript = '';
                 for (let i = e.resultIndex; i < e.results.length; ++i) {
-                    if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript;
-                    else UI.textIn.value = e.results[i][0].transcript; 
+                    if (e.results[i].isFinal) {
+                        finalTranscript += e.results[i][0].transcript;
+                    } else {
+                        interimTranscript += e.results[i][0].transcript;
+                    }
                 }
-                if (finalTranscript) UI.textIn.value = finalTranscript.trim(); 
+                // Correctly display both finalized words and current interim words
+                UI.textIn.value = finalTranscript + interimTranscript; 
+            };
+
+            // Trigger the send ONLY when the speech engine has fully stopped and resolved text
+            recognition.onend = () => {
+                // Reset system colors back to idle
+                UI.btnMic.classList.remove('mic-pulse');
+                UI.status.style.backgroundColor = '#4b5563'; 
+                UI.status.style.boxShadow = 'none';
+                isRecording = false;
+
+                const finalText = UI.textIn.value.trim();
+                // Fire the AI process automatically if we have text
+                if (finalText.length > 0 && !state.isProcessing) {
+                    processInput(finalText);
+                }
             };
         }
 
