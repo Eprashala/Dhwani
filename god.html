@@ -21,13 +21,16 @@
             background: linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%);
             box-shadow: 0 10px 25px rgba(185, 28, 28, 0.5), inset 0 2px 5px rgba(255,255,255,0.2);
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
         }
-        .big-mic:active, .mic-active {
+        .big-mic:active {
             transform: scale(0.92);
-            box-shadow: 0 0 30px rgba(239, 68, 68, 0.8), inset 0 5px 10px rgba(0,0,0,0.4);
         }
         
-        .mic-pulse { animation: ripple 1.5s infinite; }
+        .mic-pulse { 
+            animation: ripple 1.5s infinite; 
+            background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%) !important;
+        }
         
         /* Thinking State for Mic */
         .mic-thinking {
@@ -144,7 +147,7 @@
         <main id="conversation-log" class="flex-1 overflow-y-auto p-4 space-y-5 pb-40">
             <div class="text-gray-400 text-center mt-12 cinzel" id="welcome-msg">
                 <p class="text-yellow-500 text-2xl mb-3">🙏 Welcome 🙏</p>
-                Press and hold the glowing microphone to speak, or type your thoughts.
+                Tap the glowing microphone once to speak.<br>It will automatically send when you pause.
             </div>
         </main>
 
@@ -174,7 +177,7 @@
                         <svg class="w-6 h-6 hidden" id="icon-play" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                     </button>
 
-                    <button id="btn-mic" class="big-mic w-14 h-14 rounded-full flex items-center justify-center mx-1 outline-none select-none touch-none transition-all">
+                    <button id="btn-mic" class="big-mic w-14 h-14 rounded-full flex items-center justify-center mx-1 outline-none select-none transition-all">
                         <svg id="icon-mic-default" class="w-6 h-6 text-white drop-shadow-md" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z"/></svg>
                         <svg id="icon-mic-thinking" class="w-6 h-6 text-white drop-shadow-md hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                     </button>
@@ -270,8 +273,7 @@
         let chatHistory = [];
         let recognition = null;
         let synth = window.speechSynthesis;
-        let isRecording = false; 
-        let finalTranscript = ''; 
+        let isListening = false; 
         
         let state = {
             isProcessing: false,
@@ -379,74 +381,74 @@
             UI.btnSend.onclick = () => processInput(UI.textIn.value);
             UI.textIn.onkeypress = (e) => { if(e.key === 'Enter') processInput(UI.textIn.value); };
 
-            // PTT (Press To Talk) & Auto-Send
-            const startMic = (e) => { 
-                e.preventDefault(); 
-                if(state.isProcessing || !recognition) return; 
-                
-                isRecording = true;
-                recognition.lang = UI.lang.value;
-                try { recognition.start(); } catch(err){} 
-                
-                UI.btnMic.classList.add('mic-pulse'); 
-                UI.status.style.backgroundColor = '#ef4444'; // Red
-                UI.status.style.boxShadow = '0 0 10px rgba(239,68,68,0.8)';
-            };
+            // EXACT KRISHNA.HTML LOGIC ADAPTATION: Click to Start, Auto-Stop on Silence
+            UI.btnMic.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (state.isProcessing || !recognition) return;
 
-            const stopMic = (e) => { 
-                e.preventDefault(); 
-                if(!isRecording) return; // Prevent double-triggering from touch events
-                
-                // Command the engine to stop. This will process the last word, then fire recognition.onend
-                if(recognition) recognition.stop(); 
-                
-                // Remove pulse immediately for snappy UX, onend handles the rest
-                UI.btnMic.classList.remove('mic-pulse'); 
-            };
-            
-            UI.btnMic.addEventListener('pointerdown', startMic);
-            UI.btnMic.addEventListener('pointerup', stopMic);
-            UI.btnMic.addEventListener('pointerleave', stopMic);
-			UI.btnMic.addEventListener('pointercancel', stopMic);
+                if (isListening) {
+                    recognition.stop();
+                } else {
+                    recognition.lang = UI.lang.value;
+                    try { recognition.start(); } catch(err) {}
+                }
+            });
         }
 
-		function initSpeechRecognition() {
+        function initSpeechRecognition() {
             const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRec) return;
+            
             recognition = new SpeechRec();
-            recognition.continuous = true; 
-            recognition.interimResults = true; 
+            
+            // THE SECRET SAUCE FROM KRISHNA.HTML: One-shot mode.
+            // This prevents Android's erratic double-typing and stuck microphones.
+            recognition.continuous = false; 
+            recognition.interimResults = false; 
             
             recognition.onstart = () => {
-                // Clear text box explicitly on a fresh press
+                isListening = true;
+                UI.btnMic.classList.add('mic-pulse');
+                UI.status.style.backgroundColor = '#ef4444'; // Red
+                UI.status.style.boxShadow = '0 0 10px rgba(239,68,68,0.8)';
                 UI.textIn.value = '';
+                UI.textIn.placeholder = "Listening... Speak now.";
             };
 
             recognition.onresult = (e) => {
-                // FIX: The Android Chrome duplication bug.
-                // We completely ignore e.resultIndex and isFinal logic.
-                // We rebuild the entire sentence from index 0 every single time it fires.
-                let fullTranscript = '';
-                for (let i = 0; i < e.results.length; ++i) {
-                    fullTranscript += e.results[i][0].transcript;
-                }
+                // Because continuous/interim are false, this only fires once when the user pauses
+                const transcript = e.results[e.results.length - 1][0].transcript.trim();
                 
-                // Overwrite the input box, never append
-                UI.textIn.value = fullTranscript; 
+                if (transcript) {
+                    UI.textIn.value = transcript;
+                    // Immediately trigger processing
+                    processInput(transcript);
+                }
             };
 
             recognition.onend = () => {
-                // Reset UI strictly
-                UI.btnMic.classList.remove('mic-pulse');
-                UI.status.style.backgroundColor = '#4b5563'; 
-                UI.status.style.boxShadow = 'none';
-                isRecording = false;
-
-                const finalText = UI.textIn.value.trim();
-                if (finalText.length > 0 && !state.isProcessing) {
-                    processInput(finalText);
+                isListening = false;
+                
+                // If we aren't processing (e.g. user stayed completely silent or canceled), reset UI
+                if (!state.isProcessing) {
+                    resetMicUI();
                 }
             };
+
+            recognition.onerror = (e) => {
+                if (e.error === 'no-speech' || e.error === 'not-allowed') {
+                    isListening = false;
+                    resetMicUI();
+                }
+            };
+        }
+
+        function resetMicUI() {
+            UI.btnMic.classList.remove('mic-pulse');
+            UI.status.style.backgroundColor = '#4b5563'; // Gray
+            UI.status.style.boxShadow = 'none';
+            UI.textIn.placeholder = "Type your message...";
+            setMicThinkingState(false);
         }
 
         function togglePlayIcon(isPaused) {
@@ -457,6 +459,7 @@
         function setMicThinkingState(isThinking) {
             if (isThinking) {
                 UI.btnMic.classList.add('mic-thinking');
+                UI.btnMic.classList.remove('mic-pulse');
                 UI.iconMicDefault.classList.add('hidden');
                 UI.iconMicThinking.classList.remove('hidden');
             } else {
@@ -471,13 +474,13 @@
             if (!userText || state.isProcessing) return;
 
             UI.textIn.value = '';
+            UI.textIn.placeholder = "Divine thinking...";
             if (UI.welcome) UI.welcome.style.display = 'none';
             
             state.isProcessing = true;
             UI.status.style.backgroundColor = '#facc15'; 
             UI.status.style.boxShadow = '0 0 10px rgba(250,204,21,0.8)';
             
-            // Switch Mic to Thinking state
             setMicThinkingState(true);
             
             if (chatHistory.length === 0) {
@@ -506,9 +509,7 @@
 
             // Revert state
             state.isProcessing = false;
-            UI.status.style.backgroundColor = '#4b5563';
-            UI.status.style.boxShadow = 'none';
-            setMicThinkingState(false);
+            resetMicUI();
         }
 
         async function getAIResponse(history) {
