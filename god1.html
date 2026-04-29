@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Darshan - Converse with the Divine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@300;400;600&display=swap');
+        
+        body { 
+            font-family: 'Inter', sans-serif; 
+            touch-action: manipulation; 
+            user-select: none;
+        }
+        
+        h1, .cinzel { font-family: 'Cinzel', serif; }
+
+        /* The glowing central mic */
+        .big-mic {
+            background: linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%);
+            box-shadow: 0 10px 25px rgba(185, 28, 28, 0.5), inset 0 2px 5px rgba(255,255,255,0.2);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+        .big-mic:active {
+            transform: scale(0.92);
+        }
+        
+        .mic-pulse { 
+            animation: ripple 1.5s infinite; 
+            background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%) !important;
+        }
+        
+        /* Thinking State for Mic */
+        .mic-thinking {
+            background: linear-gradient(135deg, #ca8a04 0%, #854d0e 100%) !important;
+            box-shadow: 0 0 20px rgba(234, 179, 8, 0.6), inset 0 2px 5px rgba(255,255,255,0.2) !important;
+            animation: pulse-think 1.5s infinite;
+            pointer-events: none;
+        }
+
+        @keyframes ripple {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+            70% { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        
+        @keyframes pulse-think {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(0.95); }
+        }
+
+        /* Glassmorphism containers */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .custom-input {
+            @apply block w-full border border-slate-600 rounded-xl p-3 outline-none transition-all shadow-inner;
+            background-color: rgba(2, 6, 23, 0.8) !important; 
+            color: #fde047 !important;             
+        }
+        .custom-input:focus { border-color: #eab308; box-shadow: 0 0 10px rgba(234, 179, 8, 0.2); }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+
+        /* Sleek Audio Buttons */
+        .audio-btn {
+            @apply p-2 rounded-full text-gray-400 hover:text-white hover:bg-slate-700/50 transition-all focus:outline-none;
+        }
+    </style>
+</head>
+
+<body class="bg-[#020617] text-white flex flex-col items-center h-screen overflow-hidden">
+
+    <div id="start-overlay" class="cursor-pointer text-center px-4 absolute inset-0 z-[100] bg-[radial-gradient(circle_at_center,#1e293b_0%,#020617_100%)] flex flex-col items-center justify-center">
+        <svg class="w-20 h-20 text-yellow-500 mb-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 2v20m-7-7l7 7 7-7"/></svg>
+        <h1 class="text-4xl cinzel text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-600 mb-4">Tap to Enter Darshan</h1>
+        <p class="text-slate-400 text-sm">Experience the divine in full screen.</p>
+    </div>
+
+    <div id="settings-modal" class="hidden fixed inset-0 bg-black/80 z-[150] flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-sm shadow-2xl relative">
+            <button id="btn-close-settings" class="absolute top-4 right-4 text-slate-400 hover:text-white text-xl">✕</button>
+            <h2 class="text-xl font-bold text-cyan-400 mb-5 cinzel">Devotee Settings</h2>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1 ml-1 uppercase tracking-wider">Your Name</label>
+                    <input type="text" id="manual-name" class="custom-input !p-2 text-sm" placeholder="e.g. Arjun">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1 ml-1 uppercase tracking-wider">Your Age</label>
+                    <input type="number" id="manual-age" class="custom-input !p-2 text-sm" placeholder="e.g. 25">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1 ml-1 uppercase tracking-wider">Custom API Key (Optional)</label>
+                    <input type="password" id="custom-api-key-input" class="custom-input !p-2 text-sm" placeholder="Paste Gemini API Key here">
+                </div>
+                <div class="flex items-center gap-3 pt-2 pl-1">
+                    <input type="checkbox" id="remember-checkbox" class="w-5 h-5 accent-cyan-500 rounded cursor-pointer">
+                    <label for="remember-checkbox" class="text-sm text-gray-300 cursor-pointer">Remember Chat & Settings</label>
+                </div>
+            </div>
+            
+            <button id="btn-save-settings" class="w-full mt-6 bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-2.5 rounded-xl transition-colors shadow-lg">Save & Close</button>
+        </div>
+    </div>
+
+    <div class="flex flex-col w-full h-full max-w-2xl relative shadow-2xl bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]">
+        
+        <header class="flex-shrink-0 pt-6 pb-4 px-4 glass-panel z-20 rounded-b-3xl">
+            <button id="adv-toggle" class="absolute top-5 right-5 z-50 text-slate-400 hover:text-white transition-colors" title="Settings">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            </button>
+
+            <div class="flex flex-col items-center justify-center mb-5 relative">
+                <div id="status-indicator" class="absolute left-2 top-2 w-2.5 h-2.5 rounded-full bg-gray-600 shadow-[0_0_8px_rgba(75,85,99,0.8)]" title="Idle"></div>
+                <h1 class="text-2xl md:text-3xl font-bold tracking-widest text-center">
+                    <span class="text-cyan-400">Eप्रशाला</span> <span class="text-yellow-500">DARSHAN</span>
+                </h1>
+            </div>
+
+            <div class="flex gap-3">
+                <select id="deity-selector" class="custom-input flex-1 text-sm font-bold !text-cyan-300 cursor-pointer !py-2.5"></select>
+                <select id="language-selector" class="custom-input flex-1 text-sm !py-2.5 cursor-pointer">
+                    <option value="mr-IN" selected>मराठी (Marathi)</option>
+                    <option value="hi-IN">हिन्दी (Hindi)</option>
+                    <option value="en-IN">English</option>
+                    <option value="bn-IN">বাংলা (Bengali)</option>
+                    <option value="te-IN">తెలుగు (Telugu)</option>
+                    <option value="ta-IN">தமிழ் (Tamil)</option>
+                    <option value="gu-IN">ગુજરાતી (Gujarati)</option>
+                    <option value="kn-IN">ಕನ್ನಡ (Kannada)</option>
+                    <option value="ml-IN">മലയാളം (Malayalam)</option>
+                    <option value="pa-IN">ਪੰਜਾਬੀ (Punjabi)</option>
+                </select>
+            </div>
+        </header>
+
+        <main id="conversation-log" class="flex-1 overflow-y-auto p-4 space-y-5 pb-12 scroll-smooth">
+            <div class="text-gray-400 text-center mt-12 cinzel" id="welcome-msg">
+                <p class="text-yellow-500 text-2xl mb-3">🙏 Welcome 🙏</p>
+                Tap the glowing microphone once to speak.<br>It will automatically send when you pause.
+            </div>
+        </main>
+
+        <footer class="w-full glass-panel rounded-t-3xl p-4 pb-safe flex flex-col items-center flex-shrink-0 relative z-20">
+            
+            <div class="w-full flex gap-3 items-center mb-5 relative z-10">
+                <input type="text" id="text-input" class="custom-input flex-1 text-sm rounded-full px-5 placeholder-slate-500 focus:bg-slate-900" placeholder="Type your message...">
+                <button id="btn-send" class="p-3 bg-cyan-700 hover:bg-cyan-600 rounded-full transition-colors shadow-[0_0_15px_rgba(8,145,178,0.4)]">
+                    <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                </button>
+            </div>
+
+            <div class="w-full flex justify-between items-center px-2 -mt-2">
+                
+                <button id="btn-restart" class="text-gray-400 hover:text-white flex flex-col items-center gap-1 transition-colors w-12">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    <span class="text-[9px] uppercase font-bold tracking-wide">Restart</span>
+                </button>
+
+                <div class="flex items-center gap-2 bg-black/50 p-2 rounded-full border border-white/5 shadow-lg backdrop-blur-md -translate-y-6 z-20">
+                    
+                    <button id="btn-repeat" class="audio-btn" title="Repeat Audio">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.91 11.672a.375.375 0 010 .656l-5.603 3.113a.375.375 0 01-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112z" />
+    </svg>
+</button>
+                    <button id="btn-play-pause" class="audio-btn" title="Pause/Play">
+                        <svg class="w-6 h-6" id="icon-pause" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                        <svg class="w-6 h-6 hidden" id="icon-play" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    </button>
+
+                    <button id="btn-mic" class="big-mic w-14 h-14 rounded-full flex items-center justify-center mx-1 outline-none select-none transition-all">
+                        <svg id="icon-mic-default" class="w-6 h-6 text-white drop-shadow-md" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z"/></svg>
+                        <svg id="icon-mic-thinking" class="w-6 h-6 text-white drop-shadow-md hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    </button>
+
+                    <button id="btn-stop" class="audio-btn" title="Stop Audio">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+                    </button>
+                    <button id="btn-mute" class="audio-btn" title="Mute TTS">
+                        <svg class="w-5 h-5" id="icon-vol" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+                        <svg class="w-5 h-5 hidden text-red-400" id="icon-mute" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/></svg>
+                    </button>
+                </div>
+
+                <button id="btn-share" class="text-gray-400 hover:text-white flex flex-col items-center gap-1 transition-colors w-12">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"/></svg>
+                    <span class="text-[9px] uppercase font-bold tracking-wide">Share</span>
+                </button>
+
+            </div>
+            
+            <button id="btn-end" class="mt-2 text-red-500/80 hover:text-red-400 text-[11px] font-semibold flex items-center gap-1 transition-colors">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                End Darshan
+            </button>
+        </footer>
+    </div>
+
+    <script>
+        // --- 1. SECURITY, KIOSK MODE & WAKE LOCK ---
+        document.addEventListener('contextmenu', event => event.preventDefault());
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'F12' || 
+               (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J')) || 
+               (e.ctrlKey && e.key === 'U')) {
+                e.preventDefault();
+            }
+        });
+
+        let wakeLock = null;
+        async function acquireWakeLock() {
+            if ('wakeLock' in navigator) {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                } catch (err) {
+                    console.log(`Wake Lock Error: ${err.message}`);
+                }
+            }
+        }
+        async function releaseWakeLock() {
+            if (wakeLock !== null) {
+                await wakeLock.release();
+                wakeLock = null;
+            }
+        }
+
+        // --- GLOBAL FULLSCREEN ENFORCER ---
+        document.addEventListener('click', () => {
+            if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            }
+        });
+
+        // --- VISIBILITY (INTERRUPT) HANDLER ---
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                // App went to background (call, swapped app)
+                if (synth.speaking && !synth.paused) {
+                    synth.pause();
+                    togglePlayIcon(true); // User must click play to resume
+                }
+                if (recognition && isListening) {
+                    recognition.stop();
+                }
+            } else {
+                // App came back
+                acquireWakeLock();
+            }
+        });
+
+        // --- 2. CONFIGURATION ---
+        const PROXY_URL = "https://eprashala.pythonanywhere.com/api/chat"; 
+        const DEITY_CONFIG = {
+            "Shiv": { texts: "Shiva Purana, Linga Purana", greeting: "Om Namah Shivaya" },
+            "Vishnu": { texts: "Vishnu Purana, Bhagavad Gita", greeting: "Om Namo Bhagavate Vasudevaya" },
+            "Brahma": { texts: "Brahma Purana", greeting: "Aham Brahmasmi" },
+            "Ganesh": { texts: "Ganesha Purana", greeting: "Om Gam Ganapataye Namaha" },
+            "Rama": { texts: "Valmiki Ramayana", greeting: "Jai Shri Ram" },
+            "Krishna": { texts: "Bhagavata Purana", greeting: "Jai Shri Krishna" },
+            "Durga": { texts: "Devi Mahatmyam", greeting: "Ya Devi Sarvabhuteshu" },
+            "Kali": { texts: "Kalika Purana", greeting: "Om Krim Kalikayai Namaha" },
+            "Saraswati": { texts: "Saraswati Purana", greeting: "Om Aim Saraswatyai Namaha" },
+            "Lakshmi": { texts: "Lakshmi Tantra", greeting: "Om Shreem Mahalakshmiyei Namaha" },
+            "Hanuman": { texts: "Ramayana, Hanuman Chalisa", greeting: "Om Hanumate Namaha" },
+            "Surya": { texts: "Aditya Hrudayam", greeting: "Om Suryaya Namaha" },
+            "Dattatreya": { texts: "Avadhuta Gita", greeting: "Hari Om Tat Sat" }
+        };
+
+        // --- 3. DOM & STATE ---
+        const UI = {
+            overlay: document.getElementById('start-overlay'),
+            log: document.getElementById('conversation-log'),
+            deity: document.getElementById('deity-selector'),
+            lang: document.getElementById('language-selector'),
+            status: document.getElementById('status-indicator'),
+            textIn: document.getElementById('text-input'),
+            btnSend: document.getElementById('btn-send'),
+            btnMic: document.getElementById('btn-mic'),
+            iconMicDefault: document.getElementById('icon-mic-default'),
+            iconMicThinking: document.getElementById('icon-mic-thinking'),
+            btnRepeat: document.getElementById('btn-repeat'),
+            btnPlayPause: document.getElementById('btn-play-pause'),
+            btnStop: document.getElementById('btn-stop'),
+            btnMute: document.getElementById('btn-mute'),
+            btnRestart: document.getElementById('btn-restart'),
+            btnShare: document.getElementById('btn-share'),
+            btnEnd: document.getElementById('btn-end'),
+            iconPlay: document.getElementById('icon-play'),
+            iconPause: document.getElementById('icon-pause'),
+            iconVol: document.getElementById('icon-vol'),
+            iconMute: document.getElementById('icon-mute'),
+            
+            // Settings Modal UI
+            advToggle: document.getElementById('adv-toggle'),
+            settingsModal: document.getElementById('settings-modal'),
+            btnCloseSet: document.getElementById('btn-close-settings'),
+            btnSaveSet: document.getElementById('btn-save-settings'),
+            name: document.getElementById('manual-name'),
+            age: document.getElementById('manual-age'),
+            remember: document.getElementById('remember-checkbox'),
+            keyIn: document.getElementById('custom-api-key-input'),
+            welcome: document.getElementById('welcome-msg')
+        };
+
+        let chatHistory = [];
+        let recognition = null;
+        let synth = window.speechSynthesis;
+        let isListening = false; 
+        
+        let state = {
+            isProcessing: false,
+            isMuted: false,
+            lastAIMessage: "",
+            sessionActive: false
+        };
+
+        // --- 4. INITIALIZATION & FULLSCREEN ---
+        window.onload = () => {
+            for (const god in DEITY_CONFIG) { UI.deity.add(new Option(`Lord ${god}`, god)); }
+            loadData();
+            initSpeechRecognition();
+        };
+
+        UI.overlay.addEventListener('click', () => {
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            }
+            acquireWakeLock();
+            const silent = new SpeechSynthesisUtterance('');
+            silent.volume = 0; synth.speak(silent);
+            UI.overlay.style.display = 'none';
+            setupEventListeners();
+        });
+
+        // --- 5. CORE FUNCTIONS (Storage, TTS, STT, API) ---
+        function saveData() {
+            localStorage.setItem('darshan_name', UI.name.value);
+            localStorage.setItem('darshan_age', UI.age.value);
+            localStorage.setItem('darshan_remember', UI.remember.checked);
+            
+            if (UI.remember.checked && chatHistory.length > 0) {
+                localStorage.setItem('darshan_history', JSON.stringify(chatHistory));
+            } else { 
+                localStorage.removeItem('darshan_history'); 
+            }
+        }
+
+        function loadData() {
+            UI.name.value = localStorage.getItem('darshan_name') || "";
+            UI.age.value = localStorage.getItem('darshan_age') || "";
+            UI.remember.checked = localStorage.getItem('darshan_remember') === 'true';
+            
+            if (UI.remember.checked) {
+                const savedHist = localStorage.getItem('darshan_history');
+                if (savedHist) {
+                    try {
+                        chatHistory = JSON.parse(savedHist);
+                        if (chatHistory.length > 0) {
+                            UI.welcome.style.display = 'none';
+                            chatHistory.forEach(msg => renderMessage(msg.role === 'user' ? (UI.name.value || "Bhakt") : UI.deity.value, msg.parts[0].text, msg.role === 'model'));
+                            const lastModel = [...chatHistory].reverse().find(m => m.role === 'model');
+                            if (lastModel) state.lastAIMessage = lastModel.parts[0].text;
+                        }
+                    } catch (e) { }
+                }
+            }
+        }
+
+        function clearData() {
+            chatHistory = []; state.lastAIMessage = ""; localStorage.removeItem('darshan_history');
+            UI.log.innerHTML = `<div class="text-gray-400 text-center mt-12 cinzel"><p class="text-yellow-500 text-xl mb-2">🙏 Memory Cleared 🙏</p>Begin anew.</div>`;
+            synth.cancel();
+        }
+
+        function setupEventListeners() {
+            // Settings Modal Controls
+            const openSettings = (e) => {
+                e.stopPropagation();
+                UI.settingsModal.classList.remove('hidden');
+                UI.name.value = localStorage.getItem('darshan_name') || UI.name.value;
+                UI.age.value = localStorage.getItem('darshan_age') || UI.age.value;
+            };
+            const closeSettings = (e) => {
+                e.stopPropagation();
+                UI.settingsModal.classList.add('hidden');
+            };
+            
+            UI.advToggle.onclick = openSettings;
+            UI.btnCloseSet.onclick = closeSettings;
+            UI.btnSaveSet.onclick = (e) => {
+                e.stopPropagation();
+                saveData();
+                closeSettings(e);
+            };
+            
+            UI.settingsModal.addEventListener('click', e => e.stopPropagation());
+
+            // Audio Player Controls
+            UI.btnPlayPause.onclick = (e) => {
+                e.stopPropagation();
+                if(synth.paused) { synth.resume(); togglePlayIcon(false); }
+                else if(synth.speaking) { synth.pause(); togglePlayIcon(true); }
+            };
+            UI.btnStop.onclick = (e) => { e.stopPropagation(); synth.cancel(); togglePlayIcon(true); };
+            UI.btnRepeat.onclick = (e) => { e.stopPropagation(); if(state.lastAIMessage) speakText(state.lastAIMessage, UI.lang.value); };
+            UI.btnMute.onclick = (e) => {
+                e.stopPropagation();
+                state.isMuted = !state.isMuted;
+                if(state.isMuted) { synth.cancel(); UI.iconVol.classList.add('hidden'); UI.iconMute.classList.remove('hidden'); }
+                else { UI.iconVol.classList.remove('hidden'); UI.iconMute.classList.add('hidden'); }
+            };
+
+            // Actions
+            UI.btnRestart.onclick = (e) => { e.stopPropagation(); clearData(); };
+            UI.btnEnd.onclick = (e) => { e.stopPropagation(); clearData(); UI.log.innerHTML = `<div class="text-gray-500 text-center mt-12 cinzel text-lg">Darshan Ended.<br>May peace be with you.</div>`; };
+            UI.btnShare.onclick = async (e) => {
+                e.stopPropagation();
+                if(chatHistory.length === 0) return;
+                let text = chatHistory.map(m => `${m.role === 'user' ? 'User' : UI.deity.value}: ${m.parts[0].text}`).join("\n\n");
+                try { await navigator.share({ title: 'Darshan', text: text }); } catch(err) {}
+            };
+
+            // Sending text
+            UI.btnSend.onclick = (e) => { e.stopPropagation(); processInput(UI.textIn.value); };
+            UI.textIn.onkeypress = (e) => { e.stopPropagation(); if(e.key === 'Enter') processInput(UI.textIn.value); };
+
+            UI.btnMic.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (state.isProcessing || !recognition) return;
+
+                if (isListening) {
+                    recognition.stop();
+                } else {
+                    recognition.lang = UI.lang.value;
+                    try { recognition.start(); } catch(err) {}
+                }
+            });
+        }
+
+        function initSpeechRecognition() {
+            const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRec) return;
+            
+            recognition = new SpeechRec();
+            recognition.continuous = false; 
+            recognition.interimResults = false; 
+            
+            recognition.onstart = () => {
+                isListening = true;
+                UI.btnMic.classList.add('mic-pulse');
+                UI.status.style.backgroundColor = '#ef4444'; // Red
+                UI.status.style.boxShadow = '0 0 10px rgba(239,68,68,0.8)';
+                UI.textIn.value = '';
+                UI.textIn.placeholder = "Listening... Speak now.";
+            };
+
+            recognition.onresult = (e) => {
+                const transcript = e.results[e.results.length - 1][0].transcript.trim();
+                if (transcript) {
+                    UI.textIn.value = transcript;
+                    processInput(transcript);
+                }
+            };
+
+            recognition.onend = () => {
+                isListening = false;
+                if (!state.isProcessing) {
+                    resetMicUI();
+                }
+            };
+
+            recognition.onerror = (e) => {
+                if (e.error === 'no-speech' || e.error === 'not-allowed') {
+                    isListening = false;
+                    resetMicUI();
+                }
+            };
+        }
+
+        function resetMicUI() {
+            UI.btnMic.classList.remove('mic-pulse');
+            UI.status.style.backgroundColor = '#4b5563'; // Gray
+            UI.status.style.boxShadow = 'none';
+            UI.textIn.placeholder = "Type your message...";
+            setMicThinkingState(false);
+        }
+
+        function togglePlayIcon(isPaused) {
+            if(isPaused) { UI.iconPause.classList.add('hidden'); UI.iconPlay.classList.remove('hidden'); }
+            else { UI.iconPause.classList.remove('hidden'); UI.iconPlay.classList.add('hidden'); }
+        }
+
+        function setMicThinkingState(isThinking) {
+            if (isThinking) {
+                UI.btnMic.classList.add('mic-thinking');
+                UI.btnMic.classList.remove('mic-pulse');
+                UI.iconMicDefault.classList.add('hidden');
+                UI.iconMicThinking.classList.remove('hidden');
+            } else {
+                UI.btnMic.classList.remove('mic-thinking');
+                UI.iconMicDefault.classList.remove('hidden');
+                UI.iconMicThinking.classList.add('hidden');
+            }
+        }
+
+        async function processInput(userText) {
+            userText = userText.trim();
+            if (!userText || state.isProcessing) return;
+
+            UI.textIn.value = '';
+            UI.textIn.placeholder = "Divine thinking...";
+            if (UI.welcome) UI.welcome.style.display = 'none';
+            
+            state.isProcessing = true;
+            UI.status.style.backgroundColor = '#facc15'; 
+            UI.status.style.boxShadow = '0 0 10px rgba(250,204,21,0.8)';
+            
+            setMicThinkingState(true);
+            
+            if (chatHistory.length === 0) {
+                chatHistory.push({ role: 'user', parts: [{ text: "Pranam." }] });
+                chatHistory.push({ role: 'model', parts: [{ text: `${DEITY_CONFIG[UI.deity.value].greeting}. I am here.` }] });
+            }
+
+            const userName = UI.name.value || "Bhakt";
+            renderMessage(userName, userText, false);
+            chatHistory.push({ role: 'user', parts: [{ text: userText }] });
+            saveData();
+
+            try {
+                const res = await getAIResponse(chatHistory);
+                const cleanRes = res.replace(/[*#`_\[\]()]/g, '').trim();
+                
+                state.lastAIMessage = cleanRes;
+                chatHistory.push({ role: 'model', parts: [{ text: cleanRes }] });
+                renderMessage(UI.deity.value, cleanRes, true);
+                saveData();
+                
+                if (!state.isMuted) speakText(cleanRes, UI.lang.value);
+            } catch (err) {
+                renderMessage("System", "⚠️ Divine connection interrupted. Please try again.", true);
+            }
+
+            // Revert state
+            state.isProcessing = false;
+            resetMicUI();
+        }
+
+        async function getAIResponse(history) {
+            const customKey = (UI.keyIn.value.length > 10) ? UI.keyIn.value : null;
+            const headers = { 'Content-Type': 'application/json' };
+            if (customKey) headers['X-Custom-Api-Key'] = customKey;
+
+            let contextAddon = "";
+            if (UI.age.value) contextAddon = ` The user is ${UI.age.value} years old. Adjust the complexity of your explanation accordingly.`;
+            if (UI.name.value) contextAddon += ` Address them compassionately as ${UI.name.value}.`;
+
+            // Grab the specific holy texts for the selected deity
+            const holyTexts = DEITY_CONFIG[UI.deity.value].texts;
+
+            // The New, Deep-Context Prompt for Verses & Explanations
+            const prompt = `You are Lord ${UI.deity.value}. 
+            
+CRITICAL RULES FOR YOUR RESPONSE:
+1. LANGUAGE: Speak strictly in the language code: ${UI.lang.value}.
+2. NO MARKDOWN: Do not use any markdown characters (*, #, _, [, ]). Write in plain text so the Text-to-Speech engine can read it perfectly.
+3. THE VERSE: You MUST select a highly relevant verse/shloka from your core texts (${holyTexts}) that directly addresses the user's problem.
+4. THE REFERENCE: State the exact reference clearly (e.g., Chapter and Verse number).
+5. THE RECITATION: Recite the original verse clearly in the requested language.
+6. THE EXPLANATION: Explain the deep, profound philosophical meaning of this specific verse. Then, apply it directly to the user's question to provide actionable, divine guidance.
+7. TONE: Maintain a divine, compassionate, and comforting tone.${contextAddon}`;
+
+            const payload = { contents: history.slice(-10), systemInstruction: { parts: [{ text: prompt }] } };
+
+            const response = await fetch(PROXY_URL, { method: 'POST', headers: headers, body: JSON.stringify(payload) });
+            if (!response.ok) throw new Error();
+            const data = await response.json();
+            return data.candidates[0].content.parts[0].text;
+        }
+
+        function renderMessage(sender, text, isModel) {
+            const div = document.createElement('div');
+            div.className = `p-4 rounded-2xl ${isModel ? 'bg-[#0f172a]/90 border border-slate-700/50 shadow-lg ml-2 mr-8' : 'bg-cyan-900/30 text-right mr-2 ml-8'} mb-4`;
+            div.innerHTML = `<div class="text-[10px] uppercase font-bold tracking-wider ${isModel ? 'text-yellow-500 cinzel' : 'text-cyan-400'} mb-1">${sender}</div>
+                             <div class="text-sm leading-relaxed text-gray-100">${text}</div>`;
+            UI.log.appendChild(div);
+            
+            // FIX: Force scroll after DOM paint to ensure visibility over the dock
+            setTimeout(() => {
+                UI.log.scrollTop = UI.log.scrollHeight;
+            }, 50);
+        }
+
+        function speakText(text, langCode) {
+            if (state.isMuted) return;
+            synth.cancel();
+            togglePlayIcon(false);
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = langCode;
+            utterance.rate = 0.85; 
+            utterance.pitch = ['Saraswati', 'Lakshmi', 'Durga', 'Kali'].includes(UI.deity.value) ? 1.2 : 0.8;
+            
+            utterance.onend = () => togglePlayIcon(true);
+            utterance.onerror = () => togglePlayIcon(true);
+
+            synth.speak(utterance);
+        }
+    </script>
+</body>
+</html>
