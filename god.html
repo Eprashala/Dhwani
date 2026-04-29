@@ -6,56 +6,88 @@
     <title>Darshan - Converse with the Divine</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { font-family: 'Inter', sans-serif; touch-action: manipulation; }
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@300;400;600&display=swap');
         
-        .mic-pulse { animation: pulse 1s infinite ease-in-out; }
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 
-            70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            touch-action: manipulation; 
+            user-select: none; /* Prevents text highlighting */
+        }
+        
+        h1, .cinzel { font-family: 'Cinzel', serif; }
+
+        /* The glowing central mic */
+        .big-mic {
+            background: linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%);
+            box-shadow: 0 10px 25px rgba(185, 28, 28, 0.5), inset 0 2px 5px rgba(255,255,255,0.2);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .big-mic:active, .mic-active {
+            transform: scale(0.92);
+            box-shadow: 0 0 30px rgba(239, 68, 68, 0.8), inset 0 5px 10px rgba(0,0,0,0.4);
+        }
+        
+        .mic-pulse { animation: ripple 1.5s infinite; }
+        @keyframes ripple {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+            70% { box-shadow: 0 0 0 30px rgba(239, 68, 68, 0); }
             100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
         }
 
-        .icon-btn {
-            @apply p-2 rounded-full text-white transition-all duration-200 shadow-md flex items-center justify-center w-10 h-10
-                   focus:outline-none focus:ring-2 focus:ring-yellow-500
-                   disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none;
-        }
-        
-        .action-btn {
-            @apply flex-1 py-2 px-2 rounded-lg text-xs font-semibold transition-colors flex flex-col items-center justify-center gap-1
-                   disabled:bg-slate-800 disabled:text-gray-600 disabled:cursor-not-allowed;
+        /* Glassmorphism containers */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
         }
 
         .custom-input {
-            @apply block w-full border border-slate-600 rounded-lg p-3 outline-none transition-all;
-            background-color: #0f172a !important; 
-            color: #facc15 !important;             
+            @apply block w-full border border-slate-600 rounded-xl p-3 outline-none transition-all shadow-inner;
+            background-color: rgba(2, 6, 23, 0.8) !important; 
+            color: #fde047 !important;             
+        }
+        .custom-input:focus { border-color: #eab308; box-shadow: 0 0 10px rgba(234, 179, 8, 0.2); }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+
+        /* Sleek Audio Buttons */
+        .audio-btn {
+            @apply p-2 rounded-full text-gray-400 hover:text-yellow-400 hover:bg-slate-800 transition-all focus:outline-none;
         }
 
-        /* Scrollbar styling for chat */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #020617; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        /* Fullscreen Overlay */
+        #start-overlay {
+            position: fixed; inset: 0; z-index: 100;
+            background: radial-gradient(circle at center, #1e293b 0%, #020617 100%);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
     </style>
 </head>
 
-<body class="bg-slate-950 text-white flex flex-col items-center h-screen overflow-hidden">
+<body class="bg-[#020617] text-white flex flex-col items-center h-screen overflow-hidden">
 
-    <div class="flex flex-col w-full h-full max-w-2xl bg-slate-900 shadow-2xl relative border-x border-slate-800">
+    <div id="start-overlay" class="cursor-pointer text-center px-4">
+        <svg class="w-20 h-20 text-yellow-500 mb-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 2v20m-7-7l7 7 7-7"/></svg>
+        <h1 class="text-4xl cinzel text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-yellow-600 mb-4">Tap to Enter Darshan</h1>
+        <p class="text-slate-400 text-sm">Experience the divine in full screen.</p>
+    </div>
+
+    <div class="flex flex-col w-full h-full max-w-2xl relative shadow-2xl bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]">
         
-        <header class="flex-shrink-0 p-4 border-b border-slate-700 bg-slate-900 z-20 shadow-md">
-            <div class="flex items-center justify-between mb-3">
-                <h1 class="text-xl md:text-2xl font-bold tracking-wide">
-                    <span class="text-cyan-400">Eप्रशाला</span> <span class="text-yellow-400">Darshan</span>
+        <header class="flex-shrink-0 pt-6 pb-4 px-4 glass-panel z-20 rounded-b-3xl">
+            <div class="flex flex-col items-center justify-center mb-5 relative">
+                <div id="status-indicator" class="absolute left-2 top-2 w-2.5 h-2.5 rounded-full bg-gray-600 shadow-[0_0_8px_rgba(75,85,99,0.8)]" title="Idle"></div>
+                <h1 class="text-2xl md:text-3xl font-bold tracking-widest text-center">
+                    <span class="text-cyan-400">Eप्रशाला</span> <span class="text-yellow-500">DARSHAN</span>
                 </h1>
-                <div class="flex items-center gap-2">
-                    <div id="status-indicator" class="w-3 h-3 rounded-full bg-gray-500 transition-colors" title="Idle"></div>
-                </div>
             </div>
 
-            <div class="flex gap-2">
-                <select id="deity-selector" class="custom-input flex-1 text-sm font-bold !text-cyan-300 cursor-pointer !py-2 !px-2"></select>
-                <select id="language-selector" class="custom-input flex-1 text-sm !py-2 !px-2 cursor-pointer">
+            <div class="flex gap-3 mb-4">
+                <select id="deity-selector" class="custom-input flex-1 text-sm font-bold !text-cyan-300 cursor-pointer !py-2.5"></select>
+                <select id="language-selector" class="custom-input flex-1 text-sm !py-2.5 cursor-pointer">
                     <option value="mr-IN" selected>मराठी (Marathi)</option>
                     <option value="hi-IN">हिन्दी (Hindi)</option>
                     <option value="en-IN">English</option>
@@ -66,105 +98,118 @@
                     <option value="kn-IN">ಕನ್ನಡ (Kannada)</option>
                     <option value="ml-IN">മലയാളം (Malayalam)</option>
                     <option value="pa-IN">ਪੰਜਾਬੀ (Punjabi)</option>
-                    <option value="ur-IN">اردو (Urdu)</option>
                 </select>
             </div>
             
-            <div class="flex justify-between items-center mt-3 bg-slate-800/50 rounded-lg p-2">
-                <span class="text-xs text-gray-400 font-semibold uppercase tracking-wider ml-2">Audio</span>
-                <div class="flex gap-3">
-                    <button id="btn-repeat" class="icon-btn bg-cyan-700 hover:bg-cyan-600" title="Repeat Last Message">🔄</button>
-                    <button id="btn-play-pause" class="icon-btn bg-blue-700 hover:bg-blue-600" title="Pause/Play Audio">⏸️</button>
-                    <button id="btn-stop" class="icon-btn bg-red-800 hover:bg-red-700" title="Stop Current Audio">⏹️</button>
-                    <button id="btn-mute" class="icon-btn bg-slate-600 hover:bg-slate-500" title="Toggle Mute (TTS Off)">🔊</button>
-                </div>
+            <div class="flex justify-center items-center gap-6 bg-black/40 rounded-full py-1.5 px-4 w-max mx-auto border border-white/5">
+                <button id="btn-repeat" class="audio-btn" title="Repeat Audio">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                </button>
+                <button id="btn-play-pause" class="audio-btn !text-white" title="Pause/Play">
+                    <svg class="w-7 h-7" id="icon-pause" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                    <svg class="w-7 h-7 hidden" id="icon-play" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                </button>
+                <button id="btn-stop" class="audio-btn" title="Stop Audio">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+                </button>
+                <div class="w-px h-5 bg-white/20 mx-1"></div> <button id="btn-mute" class="audio-btn" title="Mute TTS">
+                    <svg class="w-5 h-5" id="icon-vol" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+                    <svg class="w-5 h-5 hidden text-red-400" id="icon-mute" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/></svg>
+                </button>
             </div>
         </header>
 
-        <main id="conversation-log" class="flex-1 overflow-y-auto p-4 space-y-4 bg-[#050b14] pb-24">
-            <div class="text-gray-400 text-center mt-10" id="welcome-msg">
-                <p class="text-yellow-500 mb-2">🙏 Welcome 🙏</p>
-                Configure settings below, then type or hold the mic to begin Darshan.
+        <main id="conversation-log" class="flex-1 overflow-y-auto p-4 space-y-5 pb-32">
+            <div class="text-gray-400 text-center mt-12 cinzel" id="welcome-msg">
+                <p class="text-yellow-500 text-2xl mb-3">🙏 Welcome 🙏</p>
+                Type your thoughts or press the glowing center microphone.
             </div>
         </main>
 
-        <footer class="flex-shrink-0 bg-slate-900 border-t border-slate-700 p-3 pb-safe shadow-[0_-10px_20px_rgba(0,0,0,0.3)]">
+        <footer class="absolute bottom-0 w-full glass-panel rounded-t-3xl p-4 pb-safe flex flex-col items-center">
             
-            <div class="flex gap-2 items-center mb-3 relative">
-                <input type="text" id="text-input" class="custom-input flex-1 bg-slate-800 !text-white text-sm" placeholder="Type your message to the deity...">
-                <button id="btn-send" class="p-3 bg-cyan-700 hover:bg-cyan-600 rounded-lg transition-colors shadow-lg">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
-                </button>
-                <button id="btn-mic" class="p-3 bg-red-600 active:bg-red-800 active:scale-95 rounded-lg transition-all shadow-lg select-none touch-none" title="Hold to Speak">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+            <div class="w-full flex gap-3 items-center mb-6 relative z-10">
+                <input type="text" id="text-input" class="custom-input flex-1 text-sm rounded-full px-5 placeholder-slate-500 focus:bg-slate-900" placeholder="Type your message...">
+                <button id="btn-send" class="p-3 bg-cyan-700 hover:bg-cyan-600 rounded-full transition-colors shadow-[0_0_15px_rgba(8,145,178,0.4)]">
+                    <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
                 </button>
             </div>
 
-            <div class="flex gap-2 justify-between">
-                <button id="btn-restart" class="action-btn bg-slate-700 text-white hover:bg-slate-600">
-                    <span class="text-base">🗑️</span> Restart
+            <div class="w-full flex justify-between items-center px-4 -mt-2">
+                
+                <button id="btn-restart" class="text-gray-400 hover:text-white flex flex-col items-center gap-1 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    <span class="text-[10px] uppercase font-bold tracking-wide">Restart</span>
                 </button>
-                <button id="btn-share" class="action-btn bg-indigo-900 text-indigo-100 hover:bg-indigo-800">
-                    <span class="text-base">📤</span> Share
-                </button>
-                <button id="btn-end" class="action-btn bg-red-900/40 text-red-200 hover:bg-red-800/60">
-                    <span class="text-base">🚪</span> End Chat
-                </button>
-            </div>
 
-            <div class="mt-3">
-                <button id="advance-toggle-btn" class="w-full text-xs text-gray-500 py-1 flex items-center justify-center gap-1 focus:outline-none">
-                    <span>⚙️ Settings & API Key</span> <span id="adv-arrow">▼</span>
+                <button id="btn-mic" class="big-mic w-20 h-20 rounded-full flex items-center justify-center -translate-y-6 z-20 outline-none select-none touch-none">
+                    <svg class="w-8 h-8 text-white drop-shadow-md" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z"/></svg>
                 </button>
-                <div id="advance-container" class="hidden flex-col gap-3 mt-2 bg-slate-950 p-3 rounded-lg border border-slate-800">
-                    <div class="flex gap-2 text-xs">
-                        <input type="text" id="manual-name" class="custom-input !p-2" placeholder="Your Name">
-                        <input type="number" id="manual-age" class="custom-input !p-2 w-24" placeholder="Age">
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <input type="checkbox" id="remember-checkbox" class="w-4 h-4 text-cyan-500 bg-slate-800 border-slate-600 rounded">
-                        <label for="remember-checkbox" class="text-xs text-gray-300">Remember conversation (Local Cache)</label>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <input type="checkbox" id="use-custom-key-checkbox" class="w-4 h-4 text-cyan-500 bg-slate-800 border-slate-600 rounded">
-                        <label for="use-custom-key-checkbox" class="text-xs text-gray-300">Use Custom Gemini API Key</label>
-                    </div>
-                    <input type="password" id="custom-api-key-input" class="custom-input text-xs !p-2" placeholder="Paste your Gemini API Key here" disabled>
-                    <button id="debug-toggle-btn" class="text-[10px] text-gray-600 underline text-left mt-1">Toggle Developer Console</button>
+
+                <button id="btn-share" class="text-gray-400 hover:text-white flex flex-col items-center gap-1 transition-colors">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"/></svg>
+                    <span class="text-[10px] uppercase font-bold tracking-wide">Share</span>
+                </button>
+
+            </div>
+            
+            <button id="btn-end" class="mt-4 text-red-500/80 hover:text-red-400 text-xs font-semibold flex items-center gap-1 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                End Darshan
+            </button>
+
+            <div id="advance-container" class="hidden w-full flex-col gap-3 mt-4 bg-black/60 p-4 rounded-xl border border-slate-700">
+                 <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs text-cyan-400 font-bold">SETTINGS</span>
+                    <button id="btn-close-settings" class="text-gray-400 hover:text-white">✕</button>
+                 </div>
+                 <div class="flex gap-2 text-xs">
+                    <input type="text" id="manual-name" class="custom-input !p-2 !bg-slate-900" placeholder="Your Name">
+                    <input type="checkbox" id="remember-checkbox" class="w-5 h-5 accent-cyan-500 rounded">
+                    <label class="text-xs text-gray-300 self-center">Remember Session</label>
                 </div>
+                <input type="password" id="custom-api-key-input" class="custom-input text-xs !p-2 !bg-slate-900" placeholder="Paste Custom Gemini API Key here (Optional)">
             </div>
         </footer>
-
     </div>
-
-    <div id="debug-console" class="hidden absolute top-0 left-0 w-full h-48 bg-black/90 border-b border-gray-700 p-3 text-[10px] text-green-400 font-mono overflow-y-auto text-left break-words z-50">
-        <div>[SYSTEM] Debug Console Initialized.</div>
-    </div>
+    
+    <button id="adv-toggle" class="absolute top-4 right-4 z-50 text-white/30 hover:text-white/80">⚙️</button>
 
     <script>
-        // --- CONFIGURATION ---
+        // --- 1. SECURITY & KIOSK MODE CONTROLS ---
+        // Disable Right Click
+        document.addEventListener('contextmenu', event => event.preventDefault());
+        
+        // Disable common DevTools shortcuts (F12, Ctrl+Shift+I, Ctrl+U)
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'F12' || 
+               (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J')) || 
+               (e.ctrlKey && e.key === 'U')) {
+                e.preventDefault();
+            }
+        });
+
+        // --- 2. CONFIGURATION ---
         const PROXY_URL = "https://eprashala.pythonanywhere.com/api/chat"; 
         const DEITY_CONFIG = {
-            "Shiv": { texts: "Shiva Purana, Linga Purana, Skanda Purana, Shiva Samhita", greeting: "Om Namah Shivaya" },
-            "Vishnu": { texts: "Vishnu Purana, Bhagavata Purana, Bhagavad Gita", greeting: "Om Namo Bhagavate Vasudevaya" },
-            "Brahma": { texts: "Brahma Purana, Brahma-samhita, Brahma Vaivarta Purana", greeting: "Aham Brahmasmi" },
-            "Ganesh": { texts: "Ganesha Purana, Mudgala Purana, Ganesha Gita", greeting: "Om Gam Ganapataye Namaha" },
-            "Rama": { texts: "Valmiki Ramayana, Ramcharitmanas", greeting: "Jai Shri Ram" },
-            "Krishna": { texts: "Bhagavata Purana, Bhagavad Gita, Mahabharata", greeting: "Jai Shri Krishna" },
-            "Durga": { texts: "Devi Mahatmyam, Devi Bhagavata Purana", greeting: "Ya Devi Sarvabhuteshu" },
-            "Kali": { texts: "Kalika Purana, Mahanirvana Tantra", greeting: "Om Krim Kalikayai Namaha" },
-            "Saraswati": { texts: "Saraswati Purana, Rigveda", greeting: "Om Aim Saraswatyai Namaha" },
-            "Lakshmi": { texts: "Lakshmi Tantra, Sri Suktam", greeting: "Om Shreem Mahalakshmiyei Namaha" },
-            "Hanuman": { texts: "Ramayana, Hanuman Chalisa, Sundara Kanda", greeting: "Om Hanumate Namaha" },
-            "Surya": { texts: "Aditya Hrudayam, Surya Siddhanta", greeting: "Om Suryaya Namaha" },
-            "Kartikeya": { texts: "Skanda Purana, Kanda Puranam", greeting: "Om Saravanabhavaya Namaha" },
-            "Parvati": { texts: "Shiva Purana, Devi Bhagavata Purana", greeting: "Om Parvatyai Namaha" },
-            "Radha": { texts: "Brahma Vaivarta Purana, Gita Govinda", greeting: "Radhe Radhe" },
-            "Dattatreya": { texts: "Avadhuta Gita, Jivanmukta Gita", greeting: "Hari Om Tat Sat" }
+            "Shiv": { texts: "Shiva Purana, Linga Purana", greeting: "Om Namah Shivaya" },
+            "Vishnu": { texts: "Vishnu Purana, Bhagavad Gita", greeting: "Om Namo Bhagavate Vasudevaya" },
+            "Brahma": { texts: "Brahma Purana", greeting: "Aham Brahmasmi" },
+            "Ganesh": { texts: "Ganesha Purana", greeting: "Om Gam Ganapataye Namaha" },
+            "Rama": { texts: "Valmiki Ramayana", greeting: "Jai Shri Ram" },
+            "Krishna": { texts: "Bhagavata Purana", greeting: "Jai Shri Krishna" },
+            "Durga": { texts: "Devi Mahatmyam", greeting: "Ya Devi Sarvabhuteshu" },
+            "Kali": { texts: "Kalika Purana", greeting: "Om Krim Kalikayai Namaha" },
+            "Saraswati": { texts: "Saraswati Purana", greeting: "Om Aim Saraswatyai Namaha" },
+            "Lakshmi": { texts: "Lakshmi Tantra", greeting: "Om Shreem Mahalakshmiyei Namaha" },
+            "Hanuman": { texts: "Ramayana, Hanuman Chalisa", greeting: "Om Hanumate Namaha" },
+            "Surya": { texts: "Aditya Hrudayam", greeting: "Om Suryaya Namaha" },
+            "Dattatreya": { texts: "Avadhuta Gita", greeting: "Hari Om Tat Sat" }
         };
 
-        // --- DOM ELEMENTS ---
+        // --- 3. DOM & STATE ---
         const UI = {
+            overlay: document.getElementById('start-overlay'),
             log: document.getElementById('conversation-log'),
             deity: document.getElementById('deity-selector'),
             lang: document.getElementById('language-selector'),
@@ -179,81 +224,65 @@
             btnRestart: document.getElementById('btn-restart'),
             btnShare: document.getElementById('btn-share'),
             btnEnd: document.getElementById('btn-end'),
+            iconPlay: document.getElementById('icon-play'),
+            iconPause: document.getElementById('icon-pause'),
+            iconVol: document.getElementById('icon-vol'),
+            iconMute: document.getElementById('icon-mute'),
             name: document.getElementById('manual-name'),
-            age: document.getElementById('manual-age'),
             remember: document.getElementById('remember-checkbox'),
-            advToggle: document.getElementById('advance-toggle-btn'),
-            advCont: document.getElementById('advance-container'),
-            useKey: document.getElementById('use-custom-key-checkbox'),
             keyIn: document.getElementById('custom-api-key-input'),
-            dbgToggle: document.getElementById('debug-toggle-btn'),
-            dbgCons: document.getElementById('debug-console'),
+            advToggle: document.getElementById('adv-toggle'),
+            advCont: document.getElementById('advance-container'),
+            btnCloseSet: document.getElementById('btn-close-settings'),
             welcome: document.getElementById('welcome-msg')
         };
 
-        // --- STATE VARIABLES ---
         let chatHistory = [];
         let recognition = null;
         let synth = window.speechSynthesis;
-        let voices = [];
         
         let state = {
             isProcessing: false,
             isMuted: false,
-            isPaused: false,
             lastAIMessage: "",
             sessionActive: false
         };
 
-        // --- LOGGER ---
-        function dbg(msg) {
-            console.log(msg);
-            const line = document.createElement('div');
-            line.innerHTML = `<span class="text-gray-500">[${new Date().toLocaleTimeString()}]</span> ${msg}`;
-            UI.dbgCons.appendChild(line);
-            UI.dbgCons.scrollTop = UI.dbgCons.scrollHeight;
-        }
-
-        // --- INITIALIZATION ---
+        // --- 4. INITIALIZATION & FULLSCREEN ---
         window.onload = () => {
-            // Populate Deities
-            for (const god in DEITY_CONFIG) {
-                let opt = new Option(`Lord ${god}`, god);
-                UI.deity.add(opt);
-            }
-            
-            // Setup Voices
-            voices = synth.getVoices();
-            if (synth.onvoiceschanged !== undefined) {
-                synth.onvoiceschanged = () => { voices = synth.getVoices(); };
-            }
-
-            // Load from LocalStorage
+            for (const god in DEITY_CONFIG) { UI.deity.add(new Option(`Lord ${god}`, god)); }
             loadData();
-
-            // Setup Event Listeners
-            setupEventListeners();
             initSpeechRecognition();
         };
 
-        // --- STORAGE LOGIC ---
+        // The Overlay Click: Requests Fullscreen, Unlocks Audio, Hides Overlay
+        UI.overlay.addEventListener('click', () => {
+            // Request Full Screen
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch((e) => console.log("Fullscreen denied", e));
+            }
+            
+            // Unlock Audio Engine securely
+            const silent = new SpeechSynthesisUtterance('');
+            silent.volume = 0; synth.speak(silent);
+
+            // Hide overlay, start app
+            UI.overlay.style.display = 'none';
+            setupEventListeners();
+        });
+
+        // --- 5. CORE FUNCTIONS (Storage, TTS, STT, API) ---
         function saveData() {
             localStorage.setItem('darshan_name', UI.name.value);
-            localStorage.setItem('darshan_age', UI.age.value);
             localStorage.setItem('darshan_remember', UI.remember.checked);
-            
             if (UI.remember.checked && chatHistory.length > 0) {
                 localStorage.setItem('darshan_history', JSON.stringify(chatHistory));
-            } else {
-                localStorage.removeItem('darshan_history');
-            }
+            } else { localStorage.removeItem('darshan_history'); }
         }
 
         function loadData() {
             UI.name.value = localStorage.getItem('darshan_name') || "";
-            UI.age.value = localStorage.getItem('darshan_age') || "";
             UI.remember.checked = localStorage.getItem('darshan_remember') === 'true';
-
             if (UI.remember.checked) {
                 const savedHist = localStorage.getItem('darshan_history');
                 if (savedHist) {
@@ -261,220 +290,174 @@
                         chatHistory = JSON.parse(savedHist);
                         if (chatHistory.length > 0) {
                             UI.welcome.style.display = 'none';
-                            state.sessionActive = true;
-                            // Re-render UI
-                            chatHistory.forEach(msg => {
-                                const sender = msg.role === 'user' ? (UI.name.value || "Bhakt") : UI.deity.value;
-                                renderMessage(sender, msg.parts[0].text, msg.role === 'model');
-                            });
-                            // Get last AI message for repeat button
+                            chatHistory.forEach(msg => renderMessage(msg.role === 'user' ? (UI.name.value || "Bhakt") : UI.deity.value, msg.parts[0].text, msg.role === 'model'));
                             const lastModel = [...chatHistory].reverse().find(m => m.role === 'model');
                             if (lastModel) state.lastAIMessage = lastModel.parts[0].text;
                         }
-                    } catch (e) { dbg("Failed to parse history"); }
+                    } catch (e) { }
                 }
             }
         }
 
         function clearData() {
-            chatHistory = [];
-            state.lastAIMessage = "";
-            localStorage.removeItem('darshan_history');
-            UI.log.innerHTML = `<div class="text-gray-400 text-center mt-10"><p class="text-yellow-500 mb-2">🙏 Session Cleared 🙏</p>Darshan ready.</div>`;
-            state.sessionActive = false;
+            chatHistory = []; state.lastAIMessage = ""; localStorage.removeItem('darshan_history');
+            UI.log.innerHTML = `<div class="text-gray-400 text-center mt-12 cinzel"><p class="text-yellow-500 text-xl mb-2">🙏 Memory Cleared 🙏</p>Begin anew.</div>`;
+            synth.cancel();
         }
 
-        // --- EVENT LISTENERS ---
+        // Setup all interactive listeners
         function setupEventListeners() {
-            // Settings UI
-            UI.advToggle.onclick = () => {
-                UI.advCont.classList.toggle('hidden');
-                UI.advCont.classList.toggle('flex');
-            };
-            UI.useKey.onchange = () => UI.keyIn.disabled = !UI.useKey.checked;
-            UI.dbgToggle.onclick = () => UI.dbgCons.classList.toggle('hidden');
-            UI.remember.onchange = saveData;
-            UI.name.oninput = saveData;
-            UI.age.oninput = saveData;
+            UI.advToggle.onclick = () => UI.advCont.classList.toggle('hidden');
+            UI.btnCloseSet.onclick = () => UI.advCont.classList.add('hidden');
+            UI.remember.onchange = saveData; UI.name.oninput = saveData;
 
-            // Audio Controls
+            // Audio Player Controls
             UI.btnPlayPause.onclick = () => {
-                if(synth.paused) { synth.resume(); UI.btnPlayPause.innerHTML = '⏸️'; state.isPaused = false; }
-                else if(synth.speaking) { synth.pause(); UI.btnPlayPause.innerHTML = '▶️'; state.isPaused = true; }
+                if(synth.paused) { synth.resume(); togglePlayIcon(false); }
+                else if(synth.speaking) { synth.pause(); togglePlayIcon(true); }
             };
-            UI.btnStop.onclick = () => { synth.cancel(); UI.btnPlayPause.innerHTML = '⏸️'; state.isPaused = false; };
+            UI.btnStop.onclick = () => { synth.cancel(); togglePlayIcon(true); };
             UI.btnRepeat.onclick = () => { if(state.lastAIMessage) speakText(state.lastAIMessage, UI.lang.value); };
             UI.btnMute.onclick = () => {
                 state.isMuted = !state.isMuted;
-                if(state.isMuted) { synth.cancel(); UI.btnMute.innerHTML = '🔇'; UI.btnMute.classList.replace('bg-slate-600', 'bg-red-600'); }
-                else { UI.btnMute.innerHTML = '🔊'; UI.btnMute.classList.replace('bg-red-600', 'bg-slate-600'); }
+                if(state.isMuted) { synth.cancel(); UI.iconVol.classList.add('hidden'); UI.iconMute.classList.remove('hidden'); }
+                else { UI.iconVol.classList.remove('hidden'); UI.iconMute.classList.add('hidden'); }
             };
 
-            // Session Actions
+            // Actions
             UI.btnRestart.onclick = clearData;
-            UI.btnEnd.onclick = () => { clearData(); UI.log.innerHTML = `<div class="text-gray-400 text-center mt-10">Darshan Ended.<br>May peace be with you.</div>`; };
+            UI.btnEnd.onclick = () => { clearData(); UI.log.innerHTML = `<div class="text-gray-500 text-center mt-12 cinzel text-lg">Darshan Ended.<br>May peace be with you.</div>`; };
             UI.btnShare.onclick = async () => {
-                if(chatHistory.length === 0) return alert("No conversation to share.");
-                let textToShare = chatHistory.map(m => `${m.role === 'user' ? 'User' : UI.deity.value}: ${m.parts[0].text}`).join("\n\n");
-                try {
-                    await navigator.share({ title: 'My Darshan Conversation', text: textToShare });
-                } catch(e) { 
-                    alert("Sharing not supported or cancelled.");
-                }
+                if(chatHistory.length === 0) return;
+                let text = chatHistory.map(m => `${m.role === 'user' ? 'User' : UI.deity.value}: ${m.parts[0].text}`).join("\n\n");
+                try { await navigator.share({ title: 'Darshan', text: text }); } catch(e) {}
             };
 
-            // Input Actions
+            // Sending text
             UI.btnSend.onclick = () => processInput(UI.textIn.value);
             UI.textIn.onkeypress = (e) => { if(e.key === 'Enter') processInput(UI.textIn.value); };
 
-            // Press-To-Talk (Mouse & Touch)
-            const startMic = (e) => { e.preventDefault(); if(!state.isProcessing) { try{ recognition.start(); }catch(e){} UI.btnMic.classList.add('mic-pulse'); UI.status.className='w-3 h-3 rounded-full bg-red-500'; } };
-            const stopMic = (e) => { e.preventDefault(); if(recognition) { recognition.stop(); } UI.btnMic.classList.remove('mic-pulse'); };
+            // PTT (Press To Talk) - Populates Text Box instead of auto-sending
+            const startMic = (e) => { 
+                e.preventDefault(); 
+                if(!state.isProcessing && recognition) { 
+                    recognition.lang = UI.lang.value;
+                    try{ recognition.start(); } catch(err){} 
+                    UI.btnMic.classList.add('mic-pulse'); 
+                    UI.status.style.backgroundColor = '#ef4444'; // Red
+                    UI.status.style.boxShadow = '0 0 10px rgba(239,68,68,0.8)';
+                } 
+            };
+            const stopMic = (e) => { 
+                e.preventDefault(); 
+                if(recognition) recognition.stop(); 
+                UI.btnMic.classList.remove('mic-pulse'); 
+                UI.status.style.backgroundColor = '#4b5563'; // Gray
+                UI.status.style.boxShadow = 'none';
+            };
             
             UI.btnMic.addEventListener('pointerdown', startMic);
             UI.btnMic.addEventListener('pointerup', stopMic);
             UI.btnMic.addEventListener('pointerleave', stopMic);
         }
 
-        // --- SPEECH RECOGNITION (PTT) ---
         function initSpeechRecognition() {
             const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRec) { UI.btnMic.disabled = true; return; }
-            
+            if (!SpeechRec) return;
             recognition = new SpeechRec();
-            recognition.continuous = false; 
-            recognition.interimResults = false;
+            recognition.continuous = true; // Let it gather while holding
+            recognition.interimResults = true; // Show results in text box as they speak
             
-            recognition.onstart = () => { recognition.lang = UI.lang.value; synth.cancel(); };
             recognition.onresult = (e) => {
-                const text = e.results[0][0].transcript.trim();
-                if(text) processInput(text);
+                let finalTranscript = '';
+                for (let i = e.resultIndex; i < e.results.length; ++i) {
+                    if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript;
+                    else UI.textIn.value = e.results[i][0].transcript; // Show interim
+                }
+                if (finalTranscript) UI.textIn.value = finalTranscript.trim(); // populate box
             };
-            recognition.onerror = (e) => dbg("Mic Error: " + e.error);
         }
 
-        // --- CORE LOGIC ---
+        function togglePlayIcon(isPaused) {
+            if(isPaused) { UI.iconPause.classList.add('hidden'); UI.iconPlay.classList.remove('hidden'); }
+            else { UI.iconPause.classList.remove('hidden'); UI.iconPlay.classList.add('hidden'); }
+        }
+
         async function processInput(userText) {
             userText = userText.trim();
             if (!userText || state.isProcessing) return;
-            
-            // Audio unlock on first user interaction
-            const silent = new SpeechSynthesisUtterance(''); silent.volume=0; synth.speak(silent);
 
             UI.textIn.value = '';
             if (UI.welcome) UI.welcome.style.display = 'none';
-            state.sessionActive = true;
             state.isProcessing = true;
-            UI.status.className = 'w-3 h-3 rounded-full bg-yellow-400';
+            UI.status.style.backgroundColor = '#facc15'; // Yellow loading
+            UI.status.style.boxShadow = '0 0 10px rgba(250,204,21,0.8)';
             
-            const uName = UI.name.value || "Bhakt";
-            
-            // Initial God Greeting if first message
             if (chatHistory.length === 0) {
-                const greet = DEITY_CONFIG[UI.deity.value].greeting;
                 chatHistory.push({ role: 'user', parts: [{ text: "Pranam." }] });
-                chatHistory.push({ role: 'model', parts: [{ text: `${greet}. I am here, child.` }] });
+                chatHistory.push({ role: 'model', parts: [{ text: `${DEITY_CONFIG[UI.deity.value].greeting}. I am here.` }] });
             }
 
-            renderMessage(uName, userText, false);
+            renderMessage(UI.name.value || "Bhakt", userText, false);
             chatHistory.push({ role: 'user', parts: [{ text: userText }] });
             saveData();
 
             try {
-                const aiResponse = await getAIResponse(chatHistory);
-                const cleanResponse = aiResponse.replace(/[*#`_\[\]()]/g, '').trim();
+                const res = await getAIResponse(chatHistory);
+                const cleanRes = res.replace(/[*#`_\[\]()]/g, '').trim();
                 
-                state.lastAIMessage = cleanResponse;
-                chatHistory.push({ role: 'model', parts: [{ text: cleanResponse }] });
-                renderMessage(UI.deity.value, cleanResponse, true);
+                state.lastAIMessage = cleanRes;
+                chatHistory.push({ role: 'model', parts: [{ text: cleanRes }] });
+                renderMessage(UI.deity.value, cleanRes, true);
                 saveData();
                 
-                if (!state.isMuted) await speakText(cleanResponse, UI.lang.value);
+                if (!state.isMuted) speakText(cleanRes, UI.lang.value);
             } catch (err) {
                 renderMessage("System", "⚠️ Divine connection interrupted.", true);
             }
 
             state.isProcessing = false;
-            UI.status.className = 'w-3 h-3 rounded-full bg-green-500';
-        }
-
-        function getPrompt() {
-            const god = UI.deity.value;
-            const texts = DEITY_CONFIG[god].texts;
-            const langMap = { "en-IN": "English", "hi-IN": "Hindi (Devanagari)", "mr-IN": "Marathi (Devanagari)", "gu-IN":"Gujarati", "bn-IN":"Bengali", "te-IN":"Telugu", "ta-IN":"Tamil", "kn-IN":"Kannada", "ml-IN":"Malayalam", "pa-IN":"Punjabi", "ur-IN":"Urdu" };
-            
-            return `
-            You are the ultimate physical manifestation of the Hindu deity, Lord ${god}.
-            You possess infinite wisdom, cosmic knowledge, and divine benevolence.
-            The mortal speaking to you is ${UI.name.value || "a devotee"} (Age: ${UI.age.value || "unknown"}).
-            
-            YOUR DIRECTIVES:
-            1. PERSONA: Act exactly as the deity. Do not say you are an AI. Speak with majestic, calm, omniscient, and loving authority.
-            2. LANGUAGE: You MUST respond ENTIRELY in ${langMap[UI.lang.value]}. 
-            3. SOURCE: Draw wisdom strictly from: ${texts}.
-            4. FORMAT: Use plain text only. NO markdown, NO asterisks, NO special formatting. Keep it concise (2-4 sentences max) for audio readability.
-            5. GREETING: Use traditional blessings relevant to ${god}. 
-            `;
+            UI.status.style.backgroundColor = '#4b5563'; // Gray
+            UI.status.style.boxShadow = 'none';
         }
 
         async function getAIResponse(history) {
-            const customKey = (UI.useKey.checked && UI.keyIn.value.length > 10) ? UI.keyIn.value : null;
+            const customKey = (UI.keyIn.value.length > 10) ? UI.keyIn.value : null;
             const headers = { 'Content-Type': 'application/json' };
             if (customKey) headers['X-Custom-Api-Key'] = customKey;
 
-            const payload = { 
-                contents: history.slice(-10), // Send last 10 messages
-                systemInstruction: { parts: [{ text: getPrompt() }] } 
-            };
+            const prompt = `You are Lord ${UI.deity.value}. Speak in the language code: ${UI.lang.value}. Be brief, divine, no markdown.`;
+            const payload = { contents: history.slice(-10), systemInstruction: { parts: [{ text: prompt }] } };
 
             const response = await fetch(PROXY_URL, { method: 'POST', headers: headers, body: JSON.stringify(payload) });
-            if (!response.ok) throw new Error("API Error");
+            if (!response.ok) throw new Error();
             const data = await response.json();
-            
-            if (data.candidates && data.candidates[0]) {
-                return data.candidates[0].content.parts[0].text;
-            } else if (data.error) {
-                throw new Error(data.error.message);
-            }
-            throw new Error("Invalid Format");
+            return data.candidates[0].content.parts[0].text;
         }
 
-        // --- UI RENDERING ---
         function renderMessage(sender, text, isModel) {
             const div = document.createElement('div');
-            div.className = `p-3 rounded-lg ${isModel ? 'bg-slate-800/80 border-l-2 border-yellow-500' : 'bg-cyan-900/20 text-right'} mb-3`;
-            
-            const nameColor = isModel ? 'text-yellow-400' : 'text-cyan-300';
-            div.innerHTML = `<div class="text-[10px] uppercase font-bold tracking-wider ${nameColor} mb-1">${sender}</div>
-                             <div class="text-sm leading-relaxed ${text.includes('⚠️') ? 'text-red-400' : 'text-gray-100'}">${text}</div>`;
-            
+            div.className = `p-4 rounded-2xl ${isModel ? 'bg-[#0f172a]/90 border border-slate-700/50 shadow-lg ml-2 mr-8' : 'bg-cyan-900/30 text-right mr-2 ml-8'} mb-4`;
+            div.innerHTML = `<div class="text-[10px] uppercase font-bold tracking-wider ${isModel ? 'text-yellow-500 cinzel' : 'text-cyan-400'} mb-1">${sender}</div>
+                             <div class="text-sm leading-relaxed text-gray-100">${text}</div>`;
             UI.log.appendChild(div);
             UI.log.scrollTop = UI.log.scrollHeight;
         }
 
-        // --- TEXT TO SPEECH ---
-        async function speakText(text, langCode) {
+        function speakText(text, langCode) {
             if (state.isMuted) return;
             synth.cancel();
+            togglePlayIcon(false);
             
-            return new Promise((resolve) => {
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = langCode;
-                utterance.rate = 0.85; 
-                utterance.pitch = (UI.deity.value === "Saraswati" || UI.deity.value === "Lakshmi" || UI.deity.value === "Parvati" || UI.deity.value === "Durga" || UI.deity.value === "Kali" || UI.deity.value === "Radha") ? 1.2 : 0.8;
-                
-                // Smart Voice Selection
-                if (voices.length === 0) voices = synth.getVoices();
-                let v = voices.find(v => v.lang.replace('_','-') === langCode);
-                if (!v && langCode.includes('mr')) v = voices.find(v => v.lang.includes('hi')); 
-                if (v) utterance.voice = v;
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = langCode;
+            utterance.rate = 0.85; 
+            utterance.pitch = ['Saraswati', 'Lakshmi', 'Durga', 'Kali'].includes(UI.deity.value) ? 1.2 : 0.8;
+            
+            utterance.onend = () => togglePlayIcon(true);
+            utterance.onerror = () => togglePlayIcon(true);
 
-                utterance.onend = () => { UI.btnPlayPause.innerHTML = '⏸️'; resolve(); };
-                utterance.onerror = () => { UI.btnPlayPause.innerHTML = '⏸️'; resolve(); };
-
-                UI.btnPlayPause.innerHTML = '⏸️';
-                synth.speak(utterance);
-            });
+            synth.speak(utterance);
         }
     </script>
 </body>
