@@ -77,12 +77,27 @@
 </head>
 <body class="text-gray-800 min-h-screen pb-10 relative">
 
-    <header class="bhagwa-gradient text-white py-6 shadow-lg mb-8 text-center relative">
-        <div class="container mx-auto px-4">
+<header class="bhagwa-gradient text-white py-6 shadow-lg mb-8 text-center relative overflow-hidden">
+        
+        <!-- Left Side: 3D Khagol Button -->
+        <a href="tm2.html" class="absolute top-4 left-4 md:top-6 md:left-8 bg-white/20 hover:bg-white/30 text-white border border-white/40 px-3 py-2 rounded-xl font-bold transition-all duration-300 flex items-center gap-2 backdrop-blur-md shadow-md z-10 hover:scale-105" title="३D खगोल दर्शन">
+            <i class="fas fa-globe-asia text-lg md:text-xl text-yellow-200"></i> 
+            <span class="text-sm md:text-base hidden sm:inline">३D खगोल</span>
+        </a>
+
+        <!-- Center Text (Pushed down slightly on mobile so it doesn't hit the buttons) -->
+        <div class="container mx-auto px-4 mt-10 sm:mt-0 relative z-0">
             <p class="text-yellow-200 text-lg md:text-xl font-bold mb-3 tracking-widest drop-shadow-md">।। श्री गणेशाय नमः ।।</p>
             <h1 class="text-4xl md:text-5xl font-bold mb-2">संपूर्ण वैदिक पंचांग आणि विज्ञान</h1>
             <p class="text-orange-100 text-lg">।। महर्षी पराशर आणि सूर्य सिद्धांतावर आधारित ।।</p>
         </div>
+
+        <!-- Right Side: Kundli Button -->
+        <a href="kundli.html" class="absolute top-4 right-4 md:top-6 md:right-8 bg-white/20 hover:bg-white/30 text-white border border-white/40 px-3 py-2 rounded-xl font-bold transition-all duration-300 flex items-center gap-2 backdrop-blur-md shadow-md z-10 hover:scale-105" title="कुंडली">
+            <i class="fas fa-scroll text-lg md:text-xl text-yellow-200"></i> 
+            <span class="text-sm md:text-base hidden sm:inline">कुंडली</span>
+        </a>
+
     </header>
 
     <div class="container mx-auto px-4 max-w-6xl">
@@ -655,84 +670,65 @@
             return timeStr;
         }
 
-        function calculateVedicAstrology(date, lat, lon) {
-            const times = SunCalc.getTimes(date, lat, lon);
-            const calcTime = times.sunrise || date; 
+ function calculateExactAstrologyFromAPI(apiData, date, lat, lon) {
+    // 1. Extract exact Nirayana (Sidereal) degrees from your Python server
+    const surya = apiData.grahas_data.find(g => g.name === 'Surya');
+    const chandra = apiData.grahas_data.find(g => g.name === 'Chandra');
+    
+    let sun_nirayana = surya.abs_deg;
+    let moon_nirayana = chandra.abs_deg;
 
-            const jd = (calcTime.getTime() / 86400000) + 2440587.5;
-            const d = jd - 2451545.0; 
+    // 2. Exact Tithi Calculation
+    let diff = moon_nirayana - sun_nirayana;
+    if (diff < 0) diff += 360;
+    let tithiIndex = Math.floor(diff / 12);
+    let paksha = tithiIndex < 15 ? "शुक्ल पक्ष" : "कृष्ण पक्ष";
+    let tithiName = TITHIS[tithiIndex];
 
-            let L_sun = (280.459 + 0.98564736 * d) % 360;
-            let g_sun = (357.529 + 0.98560028 * d) % 360;
-            let sun_true = (L_sun + 1.915 * Math.sin(g_sun * Math.PI/180) + 0.020 * Math.sin(2 * g_sun * Math.PI/180)) % 360;
-            if(sun_true < 0) sun_true += 360;
+    // 3. Exact Nakshatra and Yoga Calculations
+    let nakshatraIndex = Math.floor(moon_nirayana / (360/27));
+    let yogaIndex = Math.floor(((sun_nirayana + moon_nirayana) % 360) / (360/27));
 
-            let L_moon = (218.316 + 13.1763964 * d) % 360;
-            let M_moon = (134.963 + 13.064993 * d) % 360;
-            let moon_true = (L_moon + 6.289 * Math.sin(M_moon * Math.PI/180) - 1.274 * Math.sin((L_moon - L_sun) * 2 * Math.PI/180 - M_moon * Math.PI/180)) % 360;
-            if(moon_true < 0) moon_true += 360;
+    // 4. Exact Karana Calculation
+    let karanaIndex = Math.floor(diff / 6);
+    let k1_name, k2_name;
+    if (karanaIndex === 0) { k1_name = "किंस्तुघ्न"; k2_name = "बव"; }
+    else if (karanaIndex >= 57) {
+        let endKaranas = ["शकुनी", "चतुष्पाद", "नाग", "किंस्तुघ्न"];
+        k1_name = endKaranas[karanaIndex - 57];
+        k2_name = (karanaIndex === 59) ? "किंस्तुघ्न" : endKaranas[karanaIndex - 56];
+    } else {
+        k1_name = KARANAS[(karanaIndex - 1) % 7];
+        k2_name = KARANAS[karanaIndex % 7];
+    }
 
-            const ayanamsa = 24.11 + ((calcTime.getFullYear() - 2024) * 0.01396);
-            let sun_nirayana = (sun_true - ayanamsa + 360) % 360;
-            let moon_nirayana = (moon_true - ayanamsa + 360) % 360;
+    // 5. Month and Eclipse Logic
+    let amantaMonthIdx = (surya.sign + 1) % 12; 
+    let calcTime = new Date(date);
+    
+    // --- Tropical (Sayana) Sun for Rutu ---
+    // Your server uses Lahiri Ayanamsa (approx 24 degrees). We add it back to get the Tropical Sun.
+    const currentAyanamsa = 24.11 + ((calcTime.getFullYear() - 2024) * 0.01396);
+    let sun_true = (sun_nirayana + currentAyanamsa) % 360;
 
-            let diff = moon_nirayana - sun_nirayana;
-            if (diff < 0) diff += 360;
-            let tithiIndex = Math.floor(diff / 12);
-            let paksha = tithiIndex < 15 ? "शुक्ल पक्ष" : "कृष्ण पक्ष";
-            let tithiName = TITHIS[tithiIndex];
-
-            let nakshatraIndex = Math.floor(moon_nirayana / (360/27));
-            let yogaIndex = Math.floor(((sun_nirayana + moon_nirayana) % 360) / (360/27));
-
-            let karanaIndex = Math.floor(diff / 6);
-            let k1_name, k2_name;
-            if (karanaIndex === 0) { k1_name = "किंस्तुघ्न"; k2_name = "बव"; }
-            else if (karanaIndex >= 57) {
-                let endKaranas = ["शकुनी", "चतुष्पाद", "नाग", "किंस्तुघ्न"];
-                k1_name = endKaranas[karanaIndex - 57];
-                k2_name = (karanaIndex === 59) ? "किंस्तुघ्न" : endKaranas[karanaIndex - 56];
-            } else {
-                k1_name = KARANAS[(karanaIndex - 1) % 7];
-                k2_name = KARANAS[karanaIndex % 7];
-            }
-
-            let sunSignIndex = Math.floor(sun_nirayana / 30);
-            let moonSignIndex = Math.floor(moon_nirayana / 30);
-            let amantaMonthIdx = (sunSignIndex + 1) % 12; 
-            
-            // --- अचूक ग्रहण लॉजिक (Rahu/Ketu Nodes Calculation) ---
-            let rahu_mean = (125.04452 - 0.0529537648 * d) % 360;
-            if(rahu_mean < 0) rahu_mean += 360;
-            let ketu_mean = (rahu_mean + 180) % 360;
-            
-            // सूर्याचे राहु आणि केतूपासूनचे कोनीय अंतर (Angular Distance)
-            let distRahu = Math.abs(sun_true - rahu_mean);
-            let distKetu = Math.abs(sun_true - ketu_mean);
-            distRahu = Math.min(distRahu, 360 - distRahu);
-            distKetu = Math.min(distKetu, 360 - distKetu);
-            let nodeDist = Math.min(distRahu, distKetu);
-
-            let eclipseType = "none";
-            if (tithiName === "अमावास्या" && nodeDist < 18.5) {
-                eclipseType = "solar";
-            } else if (tithiName === "पौर्णिमा" && nodeDist < 12.2) {
-                eclipseType = "lunar";
-            }
-
-            return {
-                sun_true: sun_true,
-				tithiIndex: tithiIndex,
-                tithi: tithiName, paksha: paksha, 
-                nakshatraIndex: nakshatraIndex,
-                nakshatra: NAKSHATRAS[nakshatraIndex],
-                yoga: YOGAS[yogaIndex], karana1: k1_name, karana2: k2_name,
-                sunSign: RASHIS[sunSignIndex], moonSign: RASHIS[moonSignIndex],
-                amantaMonth: MONTHS[amantaMonthIdx], vaar: VAAR[calcTime.getDay()], dayOfWeek: calcTime.getDay(),
-                isBhadra: (k1_name === "विष्टी" || k2_name === "विष्टी"),
-                eclipseType: eclipseType 
-            };
-        }
+    return {
+        sun_true: sun_true,
+        tithiIndex: tithiIndex,
+        tithi: tithiName, paksha: paksha, 
+        nakshatraIndex: nakshatraIndex,
+        nakshatra: NAKSHATRAS[nakshatraIndex],
+        yoga: YOGAS[yogaIndex], 
+        karana1: k1_name, karana2: k2_name,
+        sunSign: RASHIS[surya.sign], 
+        moonSign: RASHIS[chandra.sign],
+        amantaMonth: MONTHS[amantaMonthIdx], 
+        vaar: VAAR[calcTime.getDay()], 
+        dayOfWeek: calcTime.getDay(),
+        isBhadra: (k1_name === "विष्टी" || k2_name === "विष्टी"),
+        eclipseType: "none", // For absolute eclipse data, you'd need the Rahu coordinates from API
+        exactLagna: RASHIS[apiData.asc_sign - 1] // Pulled directly from swe.houses_ex
+    };
+}
 
         function calculateMuhurats(baseDate, lat, lon, dayOfWeek) {
             const times = SunCalc.getTimes(baseDate, lat, lon);
@@ -828,8 +824,32 @@
                 rawEvents: rawEvents
             };
         }
+	
+		const PYTHON_SERVER_URL = "https://eprashala.pythonanywhere.com/calculate";
 
-        function calculateAndLoadModules() {
+		async function fetchExactPanchangData(dateStr, lat, lon) {
+		try {
+        // We calculate for 12:00 PM (Midday) for the standard daily Panchang
+        const response = await fetch(PYTHON_SERVER_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                date: dateStr, 
+                time: "12:00:00", 
+                lat: lat, 
+                lon: lon 
+            })
+        });
+        
+        if (!response.ok) throw new Error("Server communication failed");
+        return await response.json();
+    } catch (error) {
+        console.error("API Error:", error);
+        return null;
+    }
+}
+
+        async function calculateAndLoadModules() {
             const dateVal = document.getElementById('dateInput').value;
             const cityVal = document.getElementById('cityInput').value;
             const errorMsg = document.getElementById('error-msg');
@@ -855,9 +875,19 @@
                 let mRise = moonTimes.rise || SunCalc.getMoonTimes(new Date(targetDate.getTime() + 86400000), currentLat, currentLon).rise;
                 let mSet = moonTimes.set || SunCalc.getMoonTimes(new Date(targetDate.getTime() + 86400000), currentLat, currentLon).set;
 
-                const vedic = calculateVedicAstrology(targetDate, currentLat, currentLon);
-                const muhurats = calculateMuhurats(targetDate, currentLat, currentLon, vedic.dayOfWeek);
+                // Fetch the absolute truth from the Python server
+			const apiResponse = await fetchExactPanchangData(parts.join('-'), currentLat, currentLon);
 
+			if (!apiResponse || apiResponse.status !== 'success') {
+			document.getElementById('loading').style.display = 'none';
+			errorMsg.textContent = "सर्व्हरवरून माहिती मिळवण्यात त्रुटी आली. कृपया थोड्या वेळाने प्रयत्न करा.";
+			errorMsg.classList.remove('hidden');
+			return;
+		}
+
+		// Map the absolute backend data to the frontend variables
+				const vedic = calculateExactAstrologyFromAPI(apiResponse, targetDate, currentLat, currentLon);
+				const muhurats = calculateMuhurats(targetDate, currentLat, currentLon, vedic.dayOfWeek);
                 globalPanchangContext = `तारीख: ${dateVal}, वार: ${vedic.vaar}, तिथी: ${vedic.tithi}, नक्षत्र: ${vedic.nakshatra}, चंद्र रास: ${vedic.moonSign}. भद्रा: ${vedic.isBhadra ? 'आहे' : 'नाही'}. राहु काळ: ${muhurats ? muhurats.rahu : 'अज्ञात'}.`;
 
                 // --- 1. Personal Tarabal & Chandrabal ---
