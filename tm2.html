@@ -300,6 +300,51 @@
                     <span style="font-size:12px; color: #60a5fa;">ℹ️</span>
                 </div>
             </div>
+			<div class="filter-item">
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="cbMooltrikona" onchange="updateView(); render2DOverlay();">
+                    <label for="cbMooltrikona" style="color: #34d399;">📐 Show Mooltrikona</label>
+                </div>
+                <div class="lbl-container" onclick="alert('Mooltrikona (Root Trine): A highly favorable state, akin to a planet being in its main office. Displayed visually as a glowing, rotating 3D triangle (Trikona) surrounding the Graha.')" title="Info">
+                    <span style="font-size:12px; color: #60a5fa;">ℹ️</span>
+                </div>
+            </div>
+			<div class="filter-item">
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="cbAwastha" onchange="updateView(); render2DOverlay();">
+                    <label for="cbAwastha" style="color: #60a5fa;">⏱️ Show Awastha (Age)</label>
+                </div>
+                <div class="lbl-container" onclick="alert('Awastha (Planetary Age): Based on the degree in a sign. Odd signs run Infant to Dead. Even signs run Dead to Infant. Visually alters the size and vibration frequency of the Graha.')" title="Info">
+                    <span style="font-size:12px; color: #60a5fa;">ℹ️</span>
+                </div>
+            </div>
+			<div class="filter-item">
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="cbDigbala" onchange="updateView(); render2DOverlay();">
+                    <label for="cbDigbala" style="color: #6ee7b7;">🧭 Show Digbala (Directional)</label>
+                </div>
+                <div class="lbl-container" onclick="alert('Digbala (Directional Strength): A planet gains maximum power when aligned with specific cardinal points relative to the Earth (Houses 1, 4, 7, 10). Visually represented by a glowing pillar of light striking the Earth.')" title="Info">
+                    <span style="font-size:12px; color: #60a5fa;">ℹ️</span>
+                </div>
+            </div>
+			<div class="filter-item">
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="cbMaitri" onchange="updateView();">
+                    <label for="cbMaitri" style="color: #a78bfa;">🕸️ Show Maitri (Friendship Web)</label>
+                </div>
+                <div class="lbl-container" onclick="alert('Maitri (Planetary Friendship): Visualizes constructive and destructive electromagnetic interference. Green = Harmony (Friend). Red = Friction (Enemy). White = Neutral. The gradient shows asymmetric relationships.')" title="Info">
+                    <span style="font-size:12px; color: #60a5fa;">ℹ️</span>
+                </div>
+            </div>
+			<div class="filter-item">
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="cbDrishti" onchange="updateView();">
+                    <label for="cbDrishti" style="color: #f472b6;">👁️ Show Drishti (Aspects)</label>
+                </div>
+                <div class="lbl-container" onclick="alert('Drishti (Aspects): The focused electromagnetic projection of a Graha. All planets aspect 180° (7th). Mangal has special 90°/210° (4th/8th) beams. Guru has 120°/240° (5th/9th) beams. Shani has 60°/270° (3rd/10th) beams.')" title="Info">
+                    <span style="font-size:12px; color: #60a5fa;">ℹ️</span>
+                </div>
+            </div>
         </div>
 		
 		<hr>
@@ -393,7 +438,7 @@
     let skyData = []; let asc_sign_global = 1;
     let scene, camera, renderer, controls, container, canvas2D, ctx2D;
     let planetMeshes = {}; let dynamicOrbits = []; let sacredStarsGroup; let sunLight; let boundariesGroup;
-    let celestialGroup; let horizonGroup;
+    let celestialGroup; let horizonGroup; let maitriGroup; let drishtiGroup;
 
     // Full Parashari Upagrahas List
     const aprakasha = ['Dhuma', 'Vyatipata', 'Parivesha', 'Indrachap', 'Upaketu', 'Kaal', 'Mrityu', 'Ardhaprahar', 'Yaamgandak', 'Gulika', 'Mandi']; 
@@ -452,6 +497,96 @@
         if (planet === 'Shukra') return diff < 25 && (pDeg > sDeg); 
         
         return false;
+    }
+	// BPHS Mooltrikona Absolute Degree Ranges
+    const mooltrikonaRanges = {
+        'Surya': { min: 120, max: 140 },   // Leo 0° to 20°
+        'Chandra': { min: 34, max: 50 },   // Taurus 4° to 20° (0-3 is Ucha)
+        'Mangal': { min: 0, max: 12 },     // Aries 0° to 12°
+        'Budh': { min: 166, max: 170 },    // Virgo 16° to 20° (0-15 is Ucha)
+        'Guru': { min: 240, max: 250 },    // Sagittarius 0° to 10°
+        'Shukra': { min: 180, max: 195 },  // Libra 0° to 15°
+        'Shani': { min: 300, max: 320 }    // Aquarius 0° to 20°
+    };
+	// BPHS Awastha (Planetary States) Definitions
+    const awasthas = [
+        { name: "Bala", symbol: "👶", scale: 0.6 },
+        { name: "Kumara", symbol: "👦", scale: 0.85 },
+        { name: "Yuva", symbol: "👨", scale: 1.3 },
+        { name: "Vriddha", symbol: "👴", scale: 0.7 },
+        { name: "Mrita", symbol: "💀", scale: 0.4 }
+    ];
+	// BPHS Digbala (Directional Strength) House Mapping
+    const digbalaHouses = {
+        'Guru': 1,   // East / Ascendant
+        'Budh': 1,   // East / Ascendant
+        'Chandra': 4,// North / Nadir
+        'Shukra': 4, // North / Nadir
+        'Shani': 7,  // West / Descendant
+        'Surya': 10, // South / Zenith
+        'Mangal': 10 // South / Zenith
+    };
+	
+	// BPHS Natural Friendship Matrix (+1 Friend, 0 Neutral, -1 Enemy)
+    const naisargikaMaitri = {
+        'Surya':   { 'Chandra': 1, 'Mangal': 1, 'Budh': 0, 'Guru': 1, 'Shukra': -1, 'Shani': -1 },
+        'Chandra': { 'Surya': 1, 'Mangal': 0, 'Budh': 1, 'Guru': 0, 'Shukra': 0, 'Shani': 0 },
+        'Mangal':  { 'Surya': 1, 'Chandra': 1, 'Budh': -1, 'Guru': 1, 'Shukra': 0, 'Shani': 0 },
+        'Budh':    { 'Surya': 1, 'Chandra': -1, 'Mangal': 0, 'Guru': 0, 'Shukra': 1, 'Shani': 0 },
+        'Guru':    { 'Surya': 1, 'Chandra': 1, 'Mangal': 1, 'Budh': -1, 'Shukra': -1, 'Shani': 0 },
+        'Shukra':  { 'Surya': -1, 'Chandra': -1, 'Mangal': 0, 'Budh': 1, 'Guru': 0, 'Shani': 1 },
+        'Shani':   { 'Surya': -1, 'Chandra': -1, 'Mangal': -1, 'Budh': 1, 'Guru': 0, 'Shukra': 1 }
+    };
+
+    // Calculate Temporary Friendship based on House Distances
+    function getTatkalika(h1, h2) {
+        if (!h1 || !h2) return 0;
+        let diff = (h2 - h1 + 12) % 12; 
+        let count = diff + 1; // 1 to 12
+        // Planets in 2, 3, 4, 10, 11, 12 from each other are temporary friends (+1)
+        if ([2, 3, 4, 10, 11, 12].includes(count)) return 1;
+        // Planets in 1, 5, 6, 7, 8, 9 are temporary enemies (-1)
+        return -1; 
+    }
+
+    // Colors for the Vector Web
+  
+    const maitriColors = {
+        "2": new THREE.Color(0x10b981),  // Ati Mitra (Great Friend) - Bright Green
+        "1": new THREE.Color(0x6ee7b7),  // Mitra (Friend) - Soft Green
+        "0": new THREE.Color(0x94a3b8),  // Sama (Neutral) - Faded Grey
+        "-1": new THREE.Color(0xfca5a5), // Shatru (Enemy) - Soft Red
+        "-2": new THREE.Color(0xef4444)  // Ati Shatru (Great Enemy) - Bright Red
+    };
+	
+	// BPHS Drishti (Aspect) Angles in Degrees
+    const drishtiAngles = {
+        'Surya': [180],
+        'Chandra': [180],
+        'Budh': [180],
+        'Shukra': [180],
+        'Mangal': [90, 180, 210],     // 4th, 7th, 8th House Aspects
+        'Guru': [120, 180, 240],      // 5th, 7th, 9th House Aspects
+        'Shani': [60, 180, 270],      // 3rd, 7th, 10th House Aspects
+        'Rahu': [120, 180, 240],      // 5th, 7th, 9th
+        'Ketu': [120, 180, 240]       // 5th, 7th, 9th
+    };
+	
+    function getAwastha(abs_deg) {
+        const signIndex = Math.floor(abs_deg / 30); // 0 (Aries) to 11 (Pisces)
+        const degInSign = abs_deg % 30;
+        
+        // Aries is index 0 (even number), but it is the 1st sign (Odd sign in Jyotisha)
+        const isOddSign = (signIndex % 2 === 0); 
+        
+        let stateIndex = Math.floor(degInSign / 6);
+        if (stateIndex >= 5) stateIndex = 4; // Safety clamp
+        
+        // Even signs (Taurus, Cancer, etc.) run in reverse order
+        if (!isOddSign) {
+            stateIndex = 4 - stateIndex;
+        }
+        return awasthas[stateIndex];
     }
 	
     // FIXED SCALING
@@ -530,6 +665,12 @@
 
         celestialGroup = new THREE.Group();
         scene.add(celestialGroup);
+// NEW: Create a dedicated group for the friendship network
+        maitriGroup = new THREE.Group();
+        celestialGroup.add(maitriGroup);
+		
+		drishtiGroup = new THREE.Group();
+        celestialGroup.add(drishtiGroup);
 
         horizonGroup = new THREE.Group();
         scene.add(horizonGroup);
@@ -648,9 +789,40 @@
             mesh.add(vakriAura);
         }
         // ----------------------
+        
+        // --- ADD MOOLTRIKONA TRIANGLE & DIGBALA PILLAR ---
+        // We add these to the 7 main Grahas (Nodes don't get them)
+        if (['Surya', 'Chandra', 'Mangal', 'Budh', 'Guru', 'Shukra', 'Shani'].includes(name)) {
+            
+            // 1. Mooltrikona Triangle
+            const mtGeo = new THREE.RingGeometry(size * 1.8, size * 2.2, 3);
+            const mtMat = new THREE.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
+            const mtTriangle = new THREE.Mesh(mtGeo, mtMat);
+            mtTriangle.rotation.x = Math.PI / 2; // Lay flat along the planetary plane
+            mtTriangle.name = "mtTriangle";
+            mtTriangle.visible = false; // Hidden by default
+            mesh.add(mtTriangle);
+            
+            // 2. Digbala Pillar
+            const pillarGeo = new THREE.CylinderGeometry(size * 0.4, size * 0.1, 4000, 16);
+            const pillarMat = new THREE.MeshBasicMaterial({ 
+                color: colorHex, 
+                transparent: true, 
+                opacity: 0.3, 
+                blending: THREE.AdditiveBlending,
+                side: THREE.DoubleSide
+            });
+            const digbalaPillar = new THREE.Mesh(pillarGeo, pillarMat);
+            pillarGeo.translate(0, -2000, 0); // Move geometry down so it points away from the planet
+            digbalaPillar.name = "digbalaPillar";
+            digbalaPillar.visible = false; 
+            mesh.add(digbalaPillar);
+        }
+        // --------------------------------------------------
 
-        celestialGroup.add(mesh); planetMeshes[name] = mesh;
-    }
+        celestialGroup.add(mesh); 
+        planetMeshes[name] = mesh;
+    } // <--- THIS IS THE CRITICAL MISSING BRACKET!
 
     function createNode(name, colorHex) {
         const mesh = new THREE.Mesh(new THREE.SphereGeometry(sizes.Node, 16, 16), new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.8 }));
@@ -808,7 +980,7 @@
                     mesh.position.copy(body.pos3D);
                     if (key === 'Surya') sunLight.position.copy(mesh.position);
 
-// 1. Safely reset color and scale
+				// 1. Safely reset color and scale
                     if (mesh.material) {
                         let defaultColor = pColors[key] ? parseInt(pColors[key].replace('#', '0x')) : 0xffffff;
                         if (mesh.material.map) defaultColor = 0xffffff;
@@ -822,13 +994,31 @@
                     body.isUcha = false;
                     body.isNeecha = false;
 
-                    // --- QUANTUM STATE: UCHA / NEECHA ---
+// --- MASTER SCALING ENGINE (Awastha + Ucha/Neecha) ---
+                    let currentScale = 1;
+                    body.awasthaState = null;
+                    body.isUcha = false;
+                    body.isNeecha = false;
+
+                    // 1. Calculate Awastha (Age)
+                    const showAwastha = document.getElementById('cbAwastha') ? document.getElementById('cbAwastha').checked : false;
+                    if (showAwastha && ['Surya', 'Chandra', 'Mangal', 'Budh', 'Guru', 'Shukra', 'Shani'].includes(key)) {
+                        const awastha = getAwastha(body.abs_deg);
+                        currentScale *= awastha.scale; // Multiply base size by age
+                        body.awasthaState = awastha;
+                        
+                        // Dim the color significantly if Dead (Mrita)
+                        if (awastha.name === "Mrita" && mesh.material) {
+                            mesh.material.color.lerp(new THREE.Color(0x444444), 0.6);
+                        }
+                    }
+
+                    // 2. Calculate Ucha / Neecha (Dignity Resonance)
                     const showUchaNeecha = document.getElementById('cbUchaNeecha') ? document.getElementById('cbUchaNeecha').checked : false;
-                    
                     if (showUchaNeecha && dignityDegrees[key]) {
                         const uchaDeg = dignityDegrees[key].ucha;
                         const neechaDeg = dignityDegrees[key].neecha;
-                        const orb = 15; // 15-degree visual buildup/fade orb
+                        const orb = 15; 
 
                         let distUcha = Math.abs(body.abs_deg - uchaDeg);
                         if (distUcha > 180) distUcha = 360 - distUcha;
@@ -836,28 +1026,22 @@
                         let distNeecha = Math.abs(body.abs_deg - neechaDeg);
                         if (distNeecha > 180) distNeecha = 360 - distNeecha;
 
-						if (distUcha <= orb) {
-                            // Swell size (up to 1.6x) and brighten
-                            const factor = 1 + (0.6 * (1 - distUcha/orb));
-                            mesh.scale.set(factor, factor, factor);
-                            if (mesh.material.emissive) {
-                                mesh.material.emissive.setHex(0x222222); 
-                            }
-                            // FIX: Apply the 'Ucha' text flag for the entire 15-degree visual orb!
+                        if (distUcha <= orb) {
+                            currentScale *= 1 + (0.6 * (1 - distUcha/orb)); // Swell further
+                            if (mesh.material.emissive) mesh.material.emissive.setHex(0x222222); 
                             body.isUcha = true; 
                         } 
                         else if (distNeecha <= orb) {
-                            // Shrink size (down to 0.5x) and dim color
-                            const factor = 1 - (0.5 * (1 - distNeecha/orb));
-                            mesh.scale.set(factor, factor, factor);
-                            if (mesh.material) {
-                                mesh.material.color.lerp(new THREE.Color(0x333333), 1 - (distNeecha/orb));
-                            }
-                            // FIX: Apply the 'Neecha' text flag for the entire 15-degree visual orb!
+                            currentScale *= 1 - (0.5 * (1 - distNeecha/orb)); // Shrink further
+                            if (mesh.material) mesh.material.color.lerp(new THREE.Color(0x333333), 1 - (distNeecha/orb));
                             body.isNeecha = true; 
                         }
                     }
-                    // ------------------------------------
+
+                    // Apply the final merged scale and save it for the animation loop
+                    mesh.scale.set(currentScale, currentScale, currentScale);
+                    body.baseScale = currentScale; 
+                    // -----------------------------------------------------
 
                     // 2. Apply Combustion Math (Asta) -> (Keep your existing Asta logic here)
                     if (showAsta && !isHelio && sun && combustionOrbs[key]) {
@@ -882,6 +1066,47 @@
                     }
                     body.isVakri = isPlanetVakri;
 					
+					// --- QUANTUM STATE: MOOLTRIKONA ---
+                    const showMT = document.getElementById('cbMooltrikona') ? document.getElementById('cbMooltrikona').checked : false;
+                    let isPlanetMT = false;
+                    
+                    const mtMesh = mesh.children.find(c => c.name === "mtTriangle");
+                    if (mtMesh) mtMesh.visible = false; // Reset to hidden
+
+                    if (showMT && mooltrikonaRanges[key]) {
+                        const range = mooltrikonaRanges[key];
+                        // Check if the planet's degree falls exactly within its Mooltrikona span
+                        if (body.abs_deg >= range.min && body.abs_deg <= range.max) {
+                            isPlanetMT = true;
+                            if (mtMesh) mtMesh.visible = true; // Ignite the Triangle!
+                        }
+                    }
+                    body.isMT = isPlanetMT; // Store flag for the 2D Canvas label
+                    // ----------------------------------
+				// --- QUANTUM STATE: DIGBALA (DIRECTIONAL STRENGTH) ---
+                    const showDigbala = document.getElementById('cbDigbala') ? document.getElementById('cbDigbala').checked : false;
+                    let isPlanetDigbala = false;
+                    
+                    const pillarMesh = mesh.children.find(c => c.name === "digbalaPillar");
+                    if (pillarMesh) pillarMesh.visible = false; // Reset to hidden
+
+                    // Digbala requires the planet to be in a specific house.
+                    // We only show it if the planet has a house assigned and matches the BPHS map.
+                    if (showDigbala && body.house && digbalaHouses[key] === body.house) {
+                        isPlanetDigbala = true;
+                        
+                        if (pillarMesh) {
+                            pillarMesh.visible = true;
+                            // The pillar needs to point directly at the center (Earth/0,0,0)
+                            // We use lookAt to aim it.
+                            pillarMesh.lookAt(0,0,0);
+                            // Because CylinderGeometry defaults to pointing along Y, and lookAt points Z, 
+                            // we rotate it 90 degrees to align correctly toward Earth.
+                            pillarMesh.rotateX(-Math.PI / 2);
+                        }
+                    }
+                    body.isDigbala = isPlanetDigbala; // Store flag for the 2D Canvas label
+                    // -----------------------------------------------------	
                 }
             } else {
                 mesh.visible = false;
@@ -934,6 +1159,125 @@
                 celestialGroup.add(ring); dynamicOrbits.push(ring);
             }
         }
+// --- QUANTUM STATE: MAITRI (VECTOR NETWORK) ---
+        // Clear previous web
+        while(maitriGroup.children.length > 0) { maitriGroup.remove(maitriGroup.children[0]); }
+
+        const showMaitri = document.getElementById('cbMaitri') ? document.getElementById('cbMaitri').checked : false;
+        
+        if (showMaitri) {
+            const coreGrahas = ['Surya', 'Chandra', 'Mangal', 'Budh', 'Guru', 'Shukra', 'Shani'];
+            
+            // Loop through every unique pair of planets
+            for (let i = 0; i < coreGrahas.length; i++) {
+                for (let j = i + 1; j < coreGrahas.length; j++) {
+                    let pA = renderBodies.find(b => b.name === coreGrahas[i]);
+                    let pB = renderBodies.find(b => b.name === coreGrahas[j]);
+                    
+                    // Only draw lines if both planets are physically visible in the current view
+                    let cbA = document.getElementById('cb_' + coreGrahas[i]);
+                    let cbB = document.getElementById('cb_' + coreGrahas[j]);
+                    
+                    if (pA && pB && pA.pos3D && pB.pos3D && (!cbA || cbA.checked) && (!cbB || cbB.checked)) {
+                        
+                        // 1. Natural Relations
+                        let naturalAtoB = naisargikaMaitri[pA.name][pB.name];
+                        let naturalBtoA = naisargikaMaitri[pB.name][pA.name];
+                        
+                        // 2. Temporary Relations (Phase alignment based on houses)
+                        let tatkalika = getTatkalika(pA.house, pB.house);
+                        
+                        // 3. Compound Relations (Panchadha)
+                        let compoundAtoB = naturalAtoB + tatkalika;
+                        let compoundBtoA = naturalBtoA + tatkalika;
+
+                        // 4. Create the Gradient Line Geometry
+                        const lineGeo = new THREE.BufferGeometry().setFromPoints([pA.pos3D, pB.pos3D]);
+                        
+                        // Define vertex colors! (Color at A, Color at B)
+                        const cA = maitriColors[compoundAtoB];
+                        const cB = maitriColors[compoundBtoA];
+                        
+                        const colors = [
+                            cA.r, cA.g, cA.b,  // Vertex 1 (Planet A's feeling toward B)
+                            cB.r, cB.g, cB.b   // Vertex 2 (Planet B's feeling toward A)
+                        ];
+                        
+                        lineGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+                        
+                        // 5. Build Material using vertexColors to create the gradient
+                        const lineMat = new THREE.LineBasicMaterial({ 
+                            vertexColors: true, 
+                            transparent: true, 
+                            opacity: 0.6 
+                        });
+                        
+                        const energyBeam = new THREE.Line(lineGeo, lineMat);
+                        maitriGroup.add(energyBeam);
+                    }
+                }
+            }
+        }
+        // ----------------------------------------------
+
+// --- QUANTUM STATE: DRISHTI (ASPECT BEAMS) ---
+        // Clear previous beams
+        while(drishtiGroup.children.length > 0) { drishtiGroup.remove(drishtiGroup.children[0]); }
+
+        const showDrishti = document.getElementById('cbDrishti') ? document.getElementById('cbDrishti').checked : false;
+
+        if (showDrishti) {
+            const isMobile = window.innerWidth <= 900;
+            const targetRadius = isMobile ? 2600 : 3600; // Strike the outer boundary ring
+
+            renderBodies.forEach(b => {
+                let cbPlanet = document.getElementById('cb_' + b.name);
+                let isEnabled = cbPlanet ? cbPlanet.checked : true;
+                
+                // Only draw beams if the planet is visible and has defined aspects
+                if (isEnabled && b.pos3D && drishtiAngles[b.name]) {
+                    
+                    drishtiAngles[b.name].forEach(angleOffset => {
+                        // Calculate the exact degree the beam is striking
+                        let targetDeg = (b.abs_deg + angleOffset) % 360;
+                        
+                        // Find the 3D coordinate of that degree on the boundary ring
+                        let targetPos = get3DVector(targetRadius, targetDeg, 0).add(originOffset);
+                        
+                        // Create a Dashed Line from the Planet to the Boundary
+                        const lineGeo = new THREE.BufferGeometry().setFromPoints([b.pos3D, targetPos]);
+                        
+                        let beamColor = pColors[b.name] ? parseInt(pColors[b.name].replace('#', '0x')) : 0xffffff;
+                        
+                        const lineMat = new THREE.LineDashedMaterial({
+                            color: beamColor,
+                            linewidth: 2,
+                            scale: 1,
+                            dashSize: 60,
+                            gapSize: 40,
+                            transparent: true,
+                            opacity: 0.8
+                        });
+
+                        const aspectBeam = new THREE.Line(lineGeo, lineMat);
+                        // REQUIRED: Three.js needs this to calculate where the dashes go
+                        aspectBeam.computeLineDistances(); 
+                        
+                        drishtiGroup.add(aspectBeam);
+                        
+                        // Add a small glowing target reticle where the beam hits the wall
+                        const targetGeo = new THREE.RingGeometry(30, 45, 16);
+                        const targetMat = new THREE.MeshBasicMaterial({ color: beamColor, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
+                        const targetMesh = new THREE.Mesh(targetGeo, targetMat);
+                        targetMesh.position.copy(targetPos);
+                        targetMesh.lookAt(0,0,0);
+                        drishtiGroup.add(targetMesh);
+                    });
+                }
+            });
+        }
+        // ----------------------------------------------
+
 
         // TRUE TOPOCENTRIC ROTATION ENGINE
         if (isLocal) {
@@ -955,19 +1299,55 @@
         
         render2DOverlay();
     }
-
-    function animate() { 
+		
+function animate() { 
         requestAnimationFrame(animate); 
         controls.update(); 
 
-        // Make the Vakri auras spin backwards (counter-clockwise)
-        Object.values(planetMeshes).forEach(mesh => {
+        // Make auras, triangles spin, and planets pulse
+        Object.keys(planetMeshes).forEach(key => {
+            const mesh = planetMeshes[key];
+            const body = renderBodies.find(b => b.name === key);
+            
             const aura = mesh.children.find(c => c.name === "vakriAura");
-            if (aura && aura.visible) {
-                aura.rotation.z -= 0.02; // Negative value = retrograde spin
+            if (aura && aura.visible) aura.rotation.z -= 0.02; // Spin backwards
+            
+            const mtTri = mesh.children.find(c => c.name === "mtTriangle");
+            if (mtTri && mtTri.visible) mtTri.rotation.z += 0.01; // Spin forwards
+
+            // Awastha Quantum Pulsation
+            const showAwastha = document.getElementById('cbAwastha') ? document.getElementById('cbAwastha').checked : false;
+            if (showAwastha && body && body.awasthaState && body.baseScale) {
+                if (body.awasthaState.name === "Bala") {
+                    // Infant: Fast, erratic heartbeat pulse
+                    const pulse = 1 + Math.sin(Date.now() * 0.008) * 0.15; 
+                    mesh.scale.set(body.baseScale * pulse, body.baseScale * pulse, body.baseScale * pulse);
+                } else if (body.awasthaState.name === "Mrita") {
+                    // Dead: Barely rotating
+                    mesh.rotation.y += 0.001; 
+                } else {
+                    mesh.rotation.y += 0.01; // Normal rotation
+                }
+            } else {
+                mesh.scale.set(body ? body.baseScale || 1 : 1, body ? body.baseScale || 1 : 1, body ? body.baseScale || 1 : 1);
+                mesh.rotation.y += 0.01; 
+            }
+
+            // --- THE LIGHTHOUSE FIX: LOCK DIGBALA PILLAR TO EARTH ---
+            const pillarMesh = mesh.children.find(c => c.name === "digbalaPillar");
+            if (pillarMesh && pillarMesh.visible) {
+                // Force the cylinder to look at the exact center (Earth) every frame, 
+                // perfectly counteracting the planet's rotation.
+                pillarMesh.lookAt(0, 0, 0);
+                pillarMesh.rotateX(-Math.PI / 2);
+            }
+            // --------------------------------------------------------
+        });
+        drishtiGroup.children.forEach(child => {
+            if (child.isLine && child.material.dashSize) {
+                child.material.dashOffset -= 2; // Subtracting makes the dashes flow forward
             }
         });
-
         renderer.render(scene, camera); 
         render2DOverlay(); 
     }
@@ -1102,15 +1482,22 @@
             const showUchaNeecha = document.getElementById('cbUchaNeecha') ? document.getElementById('cbUchaNeecha').checked : false;
             const uchaSymbol = (showUchaNeecha && b.isUcha) ? " ↑" : "";
             const neechaSymbol = (showUchaNeecha && b.isNeecha) ? " ↓" : "";
-			const labelText = `${symbols[b.name] || ''} ${localName} ${degTxt}${vakriSymbol}${uchaSymbol}${neechaSymbol}`;
-            ctx2D.font = isGraha ? "bold 12px 'Segoe UI', sans-serif" : "italic 10px Arial";
+			const showMT = document.getElementById('cbMooltrikona') ? document.getElementById('cbMooltrikona').checked : false;
+            const mtSymbol = (showMT && b.isMT) ? " △" : "";
+			const showAwastha = document.getElementById('cbAwastha') ? document.getElementById('cbAwastha').checked : false;
+            const awasthaSymbol = (showAwastha && b.awasthaState) ? ` ${b.awasthaState.symbol}` : "";
+			const showDigbala = document.getElementById('cbDigbala') ? document.getElementById('cbDigbala').checked : false;
+            const digbalaSymbol = (showDigbala && b.isDigbala) ? " 🎯" : "";
+			const labelText = `${symbols[b.name] || ''} ${localName} ${degTxt}${vakriSymbol}${uchaSymbol}${neechaSymbol}${mtSymbol}${awasthaSymbol}${digbalaSymbol}`;
+            
+			ctx2D.font = isGraha ? "bold 12px 'Segoe UI', sans-serif" : "italic 10px Arial";
             
             const textW = ctx2D.measureText(labelText).width + 6; 
             const textH = (showNakshatras && b.name !== 'Earth' && b.name !== 'Surya') ? 28 : 14; 
             
             let textRadiusOffset = isMobile ? 20 : 30; let isRightSide = Math.cos(b.abs_deg * Math.PI/180) >= 0; 
             
-            let textX = pos2D.x + (isRightSide ? textRadiusOffset : -textRadiusOffset); 
+            let textX = pos2D.x + (isRightSide ? textRadiusOffset : -1*textRadiusOffset); 
             let rectX = isRightSide ? textX : textX - textW; 
             let rectY = pos2D.y - textH/2;
             let rect = { x: rectX, y: rectY, w: textW, h: textH };
