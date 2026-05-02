@@ -99,6 +99,7 @@
         .controls-overlay { position: absolute; top: 20px; right: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 10; pointer-events: auto;}
         .ctrl-btn { background: rgba(15, 23, 42, 0.85); color: #e2e8f0; border: 1px solid #334155; border-radius: 6px; width: 40px; height: 40px; cursor: pointer; font-size: 18px; display: flex; justify-content: center; align-items: center;}
         .ctrl-btn:hover { border-color: var(--accent-gold); color: white; transform: scale(1.05);}
+        .ctrl-btn-group { display: flex; flex-direction: column; gap: 5px; background: rgba(15, 23, 42, 0.6); padding: 5px; border-radius: 8px; border: 1px solid #334155;}
         
         #error-msg { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); color: #f1c40f; font-size: 13px; z-index: 100; font-weight: bold; padding: 10px 20px; background: rgba(0,0,0,0.85); border-radius: 8px; border: 1px solid #b91c1c; display: none; text-align: center;}
 
@@ -110,6 +111,37 @@
             .filter-panel { position: absolute; top: 0; left: -360px; height: 100%; width: 320px; background: rgba(5, 8, 12, 0.98); }
             .filter-panel.open { left: 0; }
         }
+
+        /* --- BPHS REFERENCE MANUAL WIDGET CSS --- */
+        .manual-fab-container { position: fixed; bottom: 25px; right: 25px; z-index: 1000; display: flex; flex-direction: column; align-items: flex-end; }
+        .manual-menu { display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px; opacity: 0; pointer-events: none; transform: translateY(20px) scale(0.95); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); transform-origin: bottom right; }
+        .manual-menu.open { opacity: 1; pointer-events: auto; transform: translateY(0) scale(1); }
+        .manual-option { background: rgba(15, 23, 42, 0.95); border: 1px solid var(--border-color); color: var(--text-light); padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: bold; white-space: nowrap; box-shadow: 0 4px 15px rgba(0,0,0,0.5); transition: 0.2s; text-align: right; backdrop-filter: blur(10px); }
+        .manual-option:hover { border-color: var(--accent-gold); color: var(--accent-gold); transform: translateX(-5px); }
+        .manual-fab { width: 56px; height: 56px; border-radius: 50%; background: var(--accent-gold); color: #000; font-size: 24px; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 4px 20px rgba(241, 196, 15, 0.4); border: none; transition: 0.3s; z-index: 1001; }
+        .manual-fab:hover { transform: scale(1.1); }
+
+        /* --- MODAL WIDGET CSS --- */
+        .bphs-modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(5px); z-index: 2000; display: flex; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: 0.3s; }
+        .bphs-modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .bphs-modal { background: rgba(5, 8, 12, 0.98); border: 1px solid var(--border-color); border-top: 3px solid var(--accent-gold); border-radius: 12px; width: 90%; max-width: 750px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,0.9); transform: translateY(20px); transition: 0.3s; }
+        .bphs-modal-overlay.active .bphs-modal { transform: translateY(0); }
+        .bphs-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-bottom: 1px solid var(--border-color); }
+        .bphs-modal-header h3 { margin: 0; color: var(--accent-gold); font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
+        .btn-close-modal { background: transparent; border: none; color: #94a3b8; font-size: 24px; cursor: pointer; transition: 0.2s; }
+        .btn-close-modal:hover { color: #ef4444; }
+        .bphs-modal-body { padding: 20px; overflow-y: auto; }
+        .bphs-table { width: 100%; border-collapse: collapse; color: #e2e8f0; font-size: 14px; }
+        .bphs-table th { background: rgba(255, 255, 255, 0.05); color: var(--accent-gold); text-align: left; padding: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+        .bphs-table td { padding: 10px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+        .bphs-table tr:hover td { background: rgba(255, 255, 255, 0.02); }
+
+        /* Matrix Table Specifics */
+        .matrix-table th, .matrix-table td { text-align: center; border: 1px solid rgba(255,255,255,0.1); }
+        .matrix-table th:first-child { text-align: left; background: rgba(255,255,255,0.05); }
+        .text-friend { color: #10b981; font-weight: bold; }
+        .text-enemy { color: #ef4444; font-weight: bold; }
+        .text-neutral { color: #94a3b8; }
     </style>
 </head>
 <body>
@@ -158,8 +190,7 @@
             <button class="mobile-toggle-btn" onclick="toggleMobileFilters()">⚙️ Filters</button>
         </div>
     </div>
-    
-    </header>
+</header>
 
 <main>
     <div class="filter-panel" id="filterDrawer">
@@ -167,11 +198,12 @@
             <h4>Reference Frame</h4>
             <div style="display: flex; gap: 12px; margin-bottom: 10px; padding: 0 5px; flex-wrap: wrap;">
                 <div class="checkbox-wrapper">
-                    <input type="radio" name="focus" id="radBhu" value="Earth" onchange="updateView()"> 
+                    <!-- Default to Earth (Bhu) Centric View -->
+                    <input type="radio" name="focus" id="radBhu" value="Earth" checked onchange="updateView()"> 
                     <label for="radBhu"><span style="color:#3b82f6;">🌍</span> Bhu</label>
                 </div>
                 <div class="checkbox-wrapper">
-                    <input type="radio" name="focus" id="radSurya" value="Sun" checked onchange="updateView()"> 
+                    <input type="radio" name="focus" id="radSurya" value="Sun" onchange="updateView()"> 
                     <label for="radSurya"><span style="color:#f1c40f;">☀️</span> Surya</label>
                 </div>
                 <div class="checkbox-wrapper">
@@ -238,6 +270,10 @@
         <div class="controls-overlay">
             <button class="ctrl-btn" onclick="toggleFullScreen()" title="Full Screen">⛶</button>
             <button class="ctrl-btn" onclick="resetCamera()" title="Reset Origin">⌂</button>
+            <div class="ctrl-btn-group">
+                <button class="ctrl-btn" onclick="zoomIn()" title="Zoom In" style="border:none;">＋</button>
+                <button class="ctrl-btn" onclick="zoomOut()" title="Zoom Out" style="border:none;">－</button>
+            </div>
         </div>
         <div id="error-msg"></div>
         <canvas id="skyCanvas3D"></canvas>
@@ -249,6 +285,36 @@
         <canvas id="kundliCanvas" width="800" height="800"></canvas>
     </div>
 </main>
+
+<!-- BPHS FLOATING MANUAL WIDGET -->
+<div class="manual-fab-container">
+    <div class="manual-menu" id="manualMenu">
+        <div class="manual-option" onclick="openBPHSModal('karaka')">1. Bhav Karak Chart</div>
+        <div class="manual-option" onclick="openBPHSModal('swami')">2. Rashi Swami Chart</div>
+        <div class="manual-option" onclick="openBPHSModal('combustion')">3. Combustion (Asta) Chart</div>
+        <div class="manual-option" onclick="openBPHSModal('dignity')">4. Ucha / Neecha Chart</div>
+        <div class="manual-option" onclick="openBPHSModal('mooltrikona')">5. Mooltrikona Chart</div>
+        <div class="manual-option" onclick="openBPHSModal('drishti')">6. Drishti (Aspects) Chart</div>
+        <div class="manual-option" onclick="openBPHSModal('digbala')">7. Digbala Chart</div>
+        <div class="manual-option" onclick="openBPHSModal('awastha')">8. Awastha (Age) Sequence</div>
+        <div class="manual-option" onclick="openBPHSModal('maitri')">9. Planetary Friendship Matrix</div>
+        <div class="manual-option" onclick="openBPHSModal('nakshatra')">10. Nakshatra Lords & Traits</div>
+    </div>
+    <button class="manual-fab" onclick="toggleManualMenu()" title="BPHS Reference Manual">📜</button>
+</div>
+
+<!-- BPHS DATA MODAL -->
+<div class="bphs-modal-overlay" id="bphsModalOverlay" onclick="if(event.target===this) closeBPHSModal()">
+    <div class="bphs-modal">
+        <div class="bphs-modal-header">
+            <h3 id="bphsModalTitle">Reference Chart</h3>
+            <button class="btn-close-modal" onclick="closeBPHSModal()">×</button>
+        </div>
+        <div class="bphs-modal-body" id="bphsModalBody">
+            <!-- Table injects here -->
+        </div>
+    </div>
+</div>
 
 <script>
     // --- UI & STATE GLOBALS ---
@@ -366,12 +432,17 @@
         return false;
     }
 
-    // --- VISUAL CONSTANTS ---
+    // --- VISUAL CONSTANTS (TYCHONIC ENGINE) ---
     const aprakasha = ['Dhuma', 'Vyatipata', 'Parivesha', 'Indrachap', 'Upaketu', 'Kaal', 'Mrityu', 'Ardhaprahar', 'Yaamgandak', 'Gulika', 'Mandi']; 
     const NAKSHATRA_DEG = 360 / 27; 
-    const geoRadii = { 'Chandra':50, 'Budh':150, 'Shukra':220, 'Surya':330, 'Mangal':430, 'Guru':530, 'Shani':640, 'Arun': 760, 'Varun': 880, 'Yama': 1000 };
-    const helioRadii = { 'Budh':130, 'Shukra':200, 'Earth':300, 'Mangal':400, 'Guru':510, 'Shani':630, 'Arun': 750, 'Varun': 870, 'Yama': 990 };
-    const MOON_ORBIT_RADIUS = 35; const temporalRadius = 220; 
+    
+    const R_ES = 1000; // Earth to Sun Distance
+    // Sun-Centered Orbits
+    const helioRadii = { 'Budh': 500, 'Shukra': 800, 'Mangal': 1600, 'Guru': 2600, 'Shani': 3600, 'Arun': 4600, 'Varun': 5600, 'Yama': 6600 };
+    // Earth-Centered Orbits
+    const geoRadii = { 'Chandra': 150, 'Rahu': 150, 'Ketu': 150 };
+    const upaRadius = 900;
+    
     const sizes = { 'Earth':18, 'Chandra':6, 'Surya':35, 'Budh':8, 'Shukra':14, 'Mangal':11, 'Guru':25, 'Shani':22, 'Node':7, 'Arun':16, 'Varun':15, 'Yama':5 };
     const symbols = { 'Surya':'☉', 'Chandra':'☽', 'Mangal':'♂', 'Budh':'☿', 'Guru':'♃', 'Shukra':'♀', 'Shani':'♄', 'Rahu':'☊', 'Ketu':'☋', 'Earth':'⊕', 'Arun':'♅', 'Varun':'♆', 'Yama':'♇' };
     const pColors = { 'Surya':'#f1c40f', 'Chandra':'#f8fafc', 'Mangal':'#ef4444', 'Budh':'#10b981', 'Guru':'#f59e0b', 'Shukra':'#fbcfe8', 'Shani':'#e2e8f0', 'Rahu':'#94a3b8', 'Ketu':'#78716c', 'Earth':'#3b82f6', 'Arun':'#38bdf8', 'Varun':'#6366f1', 'Yama':'#cbd5e1' };
@@ -388,7 +459,7 @@
         container = document.getElementById('skyContainer'); canvas2D = document.getElementById('skyCanvas2D'); ctx2D = canvas2D.getContext('2d');
         const width = container.clientWidth; const height = container.clientHeight; canvas2D.width = width; canvas2D.height = height;
 
-        scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(45, width / height, 1, 20000); resetCamera();
+        scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(45, width / height, 1, 30000); resetCamera();
         renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('skyCanvas3D'), antialias: true, alpha: true }); renderer.setSize(width, height); renderer.setPixelRatio(window.devicePixelRatio);
         controls = new THREE.OrbitControls(camera, renderer.domElement); controls.enableDamping = true; controls.dampingFactor = 0.05;
         scene.add(new THREE.AmbientLight(0x222222, 1.2));
@@ -398,10 +469,10 @@
         drishtiGroup = new THREE.Group(); celestialGroup.add(drishtiGroup);
         horizonGroup = new THREE.Group(); scene.add(horizonGroup);
         
-        horizonGroup.add(new THREE.PolarGridHelper(8000, 16, 8, 64, 0x1e3a8a, 0x1e3a8a)); horizonGroup.visible = false;
+        horizonGroup.add(new THREE.PolarGridHelper(12000, 16, 8, 64, 0x1e3a8a, 0x1e3a8a)); horizonGroup.visible = false;
 
         const starGeo = new THREE.BufferGeometry(); const starVertices = [];
-        for(let i=0; i<8000; i++) { const r = 10000 + Math.random() * 2000; const th = 2 * Math.PI * Math.random(); const ph = Math.acos(2 * Math.random() - 1); starVertices.push(r * Math.sin(ph) * Math.cos(th), r * Math.sin(ph) * Math.sin(th), r * Math.cos(ph)); }
+        for(let i=0; i<8000; i++) { const r = 12000 + Math.random() * 2000; const th = 2 * Math.PI * Math.random(); const ph = Math.acos(2 * Math.random() - 1); starVertices.push(r * Math.sin(ph) * Math.cos(th), r * Math.sin(ph) * Math.sin(th), r * Math.cos(ph)); }
         starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3)); celestialGroup.add(new THREE.Points(starGeo, new THREE.PointsMaterial({color: 0x8899aa, size: 2.0, transparent: true, opacity: 0.8})));
 
         boundariesGroup = new THREE.Group(); celestialGroup.add(boundariesGroup); buildSacredStars();
@@ -428,29 +499,51 @@
     function buildSacredStars() {
         sacredStarsGroup = new THREE.Group(); celestialGroup.add(sacredStarsGroup);
         sacredStarsList.forEach(s => {
-            const pos = get3DVector(5500, s.lon, s.lat); let points = [pos];
+            const pos = get3DVector(9500, s.lon, s.lat); let points = [pos];
             if(s.cluster) { for(let i=1; i<s.cluster; i++) points.push(pos.clone().add(new THREE.Vector3((Math.random()-0.5)*180, (Math.random()-0.5)*180, (Math.random()-0.5)*180))); sacredStarsGroup.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(points), new THREE.LineBasicMaterial({color: s.col, transparent:true, opacity:0.15}))); }
             sacredStarsGroup.add(new THREE.Points(new THREE.BufferGeometry().setFromPoints(points), new THREE.PointsMaterial({color: s.col, size: s.size || 8})));
             s.meshPos = pos; 
         });
     }
 
-    function buildBoundaries(centerX, centerZ) {
+    function buildBoundaries(centerPoint) {
         while(boundariesGroup.children.length > 0) boundariesGroup.remove(boundariesGroup.children[0]);
-        const rMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.08 });
-        const nMat = new THREE.LineBasicMaterial({ color: 0xa855f7, transparent: true, opacity: 0.15 });
-        const innerR = window.innerWidth <= 900 ? 800 : 1100; const midR = window.innerWidth <= 900 ? 2000 : 2800; const outerR = window.innerWidth <= 900 ? 2600 : 3600;
-        const center = new THREE.Vector3(centerX, 0, centerZ);
+        const rMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.15 });
+        const nMat = new THREE.LineBasicMaterial({ color: 0xa855f7, transparent: true, opacity: 0.25 });
+        const ringMat = new THREE.LineBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.4 });
+        
+        const rashiRadius = 8000;
+        const nakRadius = 8500;
+        const outerEdge = 9000;
 
-        if(document.getElementById('cbRashis').checked) for(let i=0; i<12; i++) boundariesGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([get3DVector(innerR, i * 30).add(center), get3DVector(midR, i * 30).add(center)]), rMat));
-        if(document.getElementById('cbNakshatras').checked) for(let i=0; i<27; i++) boundariesGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([get3DVector(midR, i * NAKSHATRA_DEG).add(center), get3DVector(outerR, i * NAKSHATRA_DEG).add(center)]), nMat));
+        let rPts = [], nPts = [], outPts = [];
+        for(let d=0; d<=360; d++) {
+            rPts.push(get3DVector(rashiRadius, d).add(centerPoint));
+            nPts.push(get3DVector(nakRadius, d).add(centerPoint));
+            outPts.push(get3DVector(outerEdge, d).add(centerPoint));
+        }
+        boundariesGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(rPts), ringMat));
+        boundariesGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(nPts), ringMat));
+        boundariesGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(outPts), ringMat));
+
+        if(document.getElementById('cbRashis').checked) {
+            for(let i=0; i<12; i++) {
+                // Lines start from exact center point
+                boundariesGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([centerPoint, get3DVector(outerEdge, i * 30).add(centerPoint)]), rMat));
+            }
+        }
+        if(document.getElementById('cbNakshatras').checked) {
+            for(let i=0; i<27; i++) {
+                boundariesGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([get3DVector(rashiRadius, i * NAKSHATRA_DEG).add(centerPoint), get3DVector(outerEdge, i * NAKSHATRA_DEG).add(centerPoint)]), nMat));
+            }
+        }
     }
 
     function createPlanet(name, size, colorHex, isSun, textureUrl = null) {
         let mat = isSun ? new THREE.MeshBasicMaterial({ color: 0xffffff }) : new THREE.MeshPhysicalMaterial({ color: colorHex, roughness: 0.5, metalness: 0.1 });
         if (textureUrl && !isSun) textureLoader.load(textureUrl, (tex) => { mat.map = tex; mat.color.setHex(0xffffff); mat.needsUpdate = true; });
         const mesh = new THREE.Mesh(new THREE.SphereGeometry(size, 64, 64), mat);
-        if (isSun) { sunLight = new THREE.PointLight(0xffffee, 3.5, 15000); celestialGroup.add(sunLight); mesh.add(new THREE.Mesh(new THREE.SphereGeometry(size*1.8, 32, 32), new THREE.MeshBasicMaterial({color: 0xffaa00, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending}))); }
+        if (isSun) { sunLight = new THREE.PointLight(0xffffee, 3.5, 20000); celestialGroup.add(sunLight); mesh.add(new THREE.Mesh(new THREE.SphereGeometry(size*1.8, 32, 32), new THREE.MeshBasicMaterial({color: 0xffaa00, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending}))); }
 
         if (!['Surya', 'Chandra', 'Rahu', 'Ketu', 'Earth'].includes(name)) {
             const vakriAura = new THREE.Mesh(new THREE.TorusGeometry(size * 1.6, size * 0.15, 16, 64), new THREE.MeshBasicMaterial({ color: 0xc084fc, transparent: true, opacity: 0.8 }));
@@ -469,7 +562,11 @@
     }
 
     function createNode(name, colorHex) { const mesh = new THREE.Mesh(new THREE.SphereGeometry(sizes.Node, 16, 16), new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.8 })); celestialGroup.add(mesh); planetMeshes[name] = mesh; }
-    function resetCamera() { const isM = window.innerWidth <= 900; camera.position.set(0, isM ? 4500 : 3200, isM ? 2000 : 1500); camera.lookAt(0, 0, 0); if(controls) controls.target.set(0,0,0); }
+    
+    function resetCamera() { camera.position.set(0, 8500, 3500); camera.lookAt(0, 0, 0); if(controls) controls.target.set(0,0,0); }
+    function zoomIn() { camera.position.multiplyScalar(0.8); controls.update(); }
+    function zoomOut() { camera.position.multiplyScalar(1.2); controls.update(); }
+    
     function showError(msg) { const errDiv = document.getElementById('error-msg'); if(msg) { errDiv.innerText = msg; errDiv.style.display = 'block'; } else errDiv.style.display = 'none'; }
 
     function getOfflineEphemeris() {
@@ -496,8 +593,46 @@
         renderBodies = [...flatBodies]; let sun = flatBodies.find(b => b.name === 'Surya');
         if (sun) renderBodies.push({ name: 'Earth', type: 'graha', abs_deg: (sun.abs_deg + 180) % 360, deg: (sun.abs_deg + 180) % 30, house: ((Math.floor(((sun.abs_deg + 180) % 360) / 30) + 1 - asc_sign_global + 12) % 12) + 1 });
 
-        let originOffset = (isHelio && sun) ? get3DVector(helioRadii['Earth'], sun.abs_deg + 180) : new THREE.Vector3(0,0,0);
-        buildBoundaries(originOffset.x, originOffset.z);
+        // --- TYCHONIC UNIFIED PLACEMENT ENGINE (EXACT 3D INTERSECTION) ---
+        let sunDeg = sun ? sun.abs_deg : 0;
+        let sunPosAbsolute = get3DVector(R_ES, sunDeg, 0); 
+        
+        renderBodies.forEach(b => {
+            let lat = b.lat || (orbitalParams[b.name] ? orbitalParams[b.name].inc * Math.sin((b.abs_deg - orbitalParams[b.name].lan) * Math.PI / 180) : 0);
+            let pos = new THREE.Vector3();
+
+            if (b.name === 'Earth') {
+                pos.set(0,0,0);
+            } else if (b.name === 'Surya') {
+                pos = get3DVector(R_ES, b.abs_deg, lat);
+            } else if (['Chandra', 'Rahu', 'Ketu'].includes(b.name)) {
+                pos = get3DVector(geoRadii['Chandra'], b.abs_deg, lat);
+            } else if (helioRadii[b.name]) {
+                // Exact Ray-Sphere Intersection
+                let R = helioRadii[b.name];
+                let uGeo = get3DVector(1, b.abs_deg, lat);
+                let dot = uGeo.x * sunPosAbsolute.x + uGeo.y * sunPosAbsolute.y + uGeo.z * sunPosAbsolute.z;
+                let S2 = sunPosAbsolute.x**2 + sunPosAbsolute.y**2 + sunPosAbsolute.z**2;
+                let desc = dot*dot - S2 + R*R;
+                
+                let t = 1000;
+                if (desc >= 0) {
+                    let t1 = dot + Math.sqrt(desc);
+                    let t2 = dot - Math.sqrt(desc);
+                    let isVakri = checkVakri(b.name, b.abs_deg, sunDeg);
+                    if (['Budh', 'Shukra'].includes(b.name) && isVakri && t2 > 0) t = t2; else t = t1 > 0 ? t1 : t2; 
+                } else t = dot > 0 ? dot : 1000;
+                
+                pos = uGeo.multiplyScalar(t);
+            } else {
+                pos = get3DVector(upaRadius, b.abs_deg, lat);
+            }
+            b.pos3D_abs = pos;
+        });
+
+        let originOffset = new THREE.Vector3(0,0,0);
+        if (isHelio && sun) originOffset = new THREE.Vector3(-sunPosAbsolute.x, -sunPosAbsolute.y, -sunPosAbsolute.z);
+        buildBoundaries(originOffset);
 
         const stAsta = document.getElementById('cbAsta') ? document.getElementById('cbAsta').checked : false;
         const stVakri = document.getElementById('cbVakri') ? document.getElementById('cbVakri').checked : false;
@@ -506,26 +641,10 @@
         const stAwastha = document.getElementById('cbAwastha') ? document.getElementById('cbAwastha').checked : false;
         const stDigbala = document.getElementById('cbDigbala') ? document.getElementById('cbDigbala').checked : false;
 
-        // --- MASTER DECOUPLED DATA ENGINE ---
         renderBodies.forEach(b => {
-            // Positional Math
-            let lat = b.lat || (orbitalParams[b.name] ? orbitalParams[b.name].inc * Math.sin((b.abs_deg - orbitalParams[b.name].lan) * Math.PI / 180) : 0);
-            let pos = new THREE.Vector3();
-            if (isHelio) {
-                if (b.name === 'Surya') pos.set(0,0,0); else if (b.name === 'Earth') pos.copy(originOffset);
-                else if (['Chandra', 'Rahu', 'Ketu'].includes(b.name)) pos = get3DVector(MOON_ORBIT_RADIUS, b.abs_deg, lat).add(originOffset);
-                else if (b.type === 'graha') pos = get3DVector(['Arun', 'Varun', 'Yama'].includes(b.name) ? geoRadii[b.name] : helioRadii[b.name], b.abs_deg, lat);
-                else { pos = get3DVector(aprakasha.includes(b.name) ? helioRadii['Earth'] : temporalRadius, b.abs_deg, lat); if(!aprakasha.includes(b.name)) pos.add(originOffset); }
-            } else {
-                if (b.name === 'Earth') pos.set(0,0,0); else pos = get3DVector((['Rahu', 'Ketu'].includes(b.name) || aprakasha.includes(b.name)) ? geoRadii['Surya'] : (b.type === 'graha' ? geoRadii[b.name] : temporalRadius), b.abs_deg, lat);
-            }
-            b.pos3D = pos; 
-
-            // Quantum State Math
+            b.pos3D = b.pos3D_abs.clone().add(originOffset);
             b.isUcha = false; b.isNeecha = false; b.isVakri = false; b.isMT = false; b.isDigbala = false; b.awasthaState = null; b.isCombust = false;
-
             if (stAwastha && ['Surya', 'Chandra', 'Mangal', 'Budh', 'Guru', 'Shukra', 'Shani'].includes(b.name)) b.awasthaState = getAwastha(b.abs_deg);
-            
             if (stUcha && dignityDegrees[b.name]) {
                 let dU = Math.abs(b.abs_deg - dignityDegrees[b.name].ucha); if(dU > 180) dU = 360 - dU;
                 let dN = Math.abs(b.abs_deg - dignityDegrees[b.name].neecha); if(dN > 180) dN = 360 - dN;
@@ -534,14 +653,12 @@
             if (stVakri && sun && checkVakri(b.name, b.abs_deg, sun.abs_deg)) b.isVakri = true;
             if (stMT && mooltrikonaRanges[b.name] && b.abs_deg >= mooltrikonaRanges[b.name].min && b.abs_deg <= mooltrikonaRanges[b.name].max) b.isMT = true;
             if (stDigbala && b.house && digbalaHouses[b.name] === b.house) b.isDigbala = true;
-            
             if (stAsta && !isHelio && sun && combustionOrbs[b.name]) {
                 let dS = Math.abs(sun.abs_deg - b.abs_deg); if (dS > 180) dS = 360 - dS;
                 if (dS <= combustionOrbs[b.name]) b.isCombust = true;
             }
         });
 
-        // Loop Meshes & Apply Pre-Calculated States
         Object.keys(planetMeshes).forEach(key => {
             const mesh = planetMeshes[key]; const body = renderBodies.find(b => b.name === key);
             let isE = document.getElementById('cb_' + key) ? document.getElementById('cb_' + key).checked : true;
@@ -553,54 +670,45 @@
                 }
                 
                 mesh.visible = true; mesh.position.copy(body.pos3D); if(key==='Surya') sunLight.position.copy(mesh.position);
-
                 let curScale = 1;
                 if (mesh.material) {
                     mesh.material.color.setHex(pColors[key] && !mesh.material.map ? parseInt(pColors[key].replace('#', '0x')) : 0xffffff);
                     if (mesh.material.emissive) mesh.material.emissive.setHex(0x000000); 
                 }
-
-                if (body.awasthaState) {
-                    curScale *= body.awasthaState.scale;
-                    if (body.awasthaState.name === "Mrita" && mesh.material) mesh.material.color.lerp(new THREE.Color(0x444444), 0.6);
-                }
-
-                if (body.isUcha) {
-                    let dU = Math.abs(body.abs_deg - dignityDegrees[key].ucha); if(dU > 180) dU = 360 - dU;
-                    curScale *= 1 + (0.6 * (1 - dU/15));
-                    if(mesh.material.emissive) mesh.material.emissive.setHex(0x222222);
-                } else if (body.isNeecha) {
-                    let dN = Math.abs(body.abs_deg - dignityDegrees[key].neecha); if(dN > 180) dN = 360 - dN;
-                    curScale *= 1 - (0.5 * (1 - dN/15));
-                    if(mesh.material) mesh.material.color.lerp(new THREE.Color(0x333333), 1 - (dN/15));
-                }
-
+                if (body.awasthaState) { curScale *= body.awasthaState.scale; if (body.awasthaState.name === "Mrita" && mesh.material) mesh.material.color.lerp(new THREE.Color(0x444444), 0.6); }
+                if (body.isUcha) { let dU = Math.abs(body.abs_deg - dignityDegrees[key].ucha); if(dU > 180) dU = 360 - dU; curScale *= 1 + (0.6 * (1 - dU/15)); if(mesh.material.emissive) mesh.material.emissive.setHex(0x222222); } 
+                else if (body.isNeecha) { let dN = Math.abs(body.abs_deg - dignityDegrees[key].neecha); if(dN > 180) dN = 360 - dN; curScale *= 1 - (0.5 * (1 - dN/15)); if(mesh.material) mesh.material.color.lerp(new THREE.Color(0x333333), 1 - (dN/15)); }
                 mesh.scale.set(curScale, curScale, curScale); body.baseScale = curScale; 
-
-                if (body.isCombust && mesh.material) {
-                    mesh.material.color.setHex(0x333333); if(mesh.material.emissive) mesh.material.emissive.setHex(0x3a1000); 
-                }
-
+                if (body.isCombust && mesh.material) { mesh.material.color.setHex(0x333333); if(mesh.material.emissive) mesh.material.emissive.setHex(0x3a1000); }
                 const aM = mesh.children.find(c => c.name === "vakriAura"); if (aM) aM.visible = body.isVakri; 
                 const tM = mesh.children.find(c => c.name === "mtTriangle"); if (tM) tM.visible = body.isMT;
-                const pM = mesh.children.find(c => c.name === "digbalaPillar"); 
-                if (pM) { pM.visible = body.isDigbala; if(body.isDigbala) { pM.lookAt(0,0,0); pM.rotateX(-Math.PI / 2); } }
+                const pM = mesh.children.find(c => c.name === "digbalaPillar"); if (pM) { pM.visible = body.isDigbala; if(body.isDigbala) { pM.lookAt(originOffset.x, originOffset.y, originOffset.z); pM.rotateX(-Math.PI / 2); } }
             } else mesh.visible = false;
         });
 
-        // Orbits
+        // Orbits (Tychonic)
         dynamicOrbits.forEach(r => celestialGroup.remove(r)); dynamicOrbits = [];
         const ringMat = new THREE.LineBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.35 });
         if (document.getElementById('cbPlanetOrbits').checked) {
-            Object.keys(isHelio ? helioRadii : geoRadii).forEach(k => {
-                if (k==='Chandra' || (k==='Earth' && !isHelio) || (['Arun','Varun','Yama'].includes(k) && !document.getElementById('cbOuter').checked) || (document.getElementById('cb_'+k) && !document.getElementById('cb_'+k).checked)) return;
-                const pts = []; for(let d=0; d<=360; d+=1) pts.push(get3DVector(isHelio&&['Arun','Varun','Yama'].includes(k) ? geoRadii[k] : (isHelio?helioRadii:geoRadii)[k], d, orbitalParams[k] ? orbitalParams[k].inc * Math.sin((d - orbitalParams[k].lan) * Math.PI / 180) : 0));
-                const r = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), ringMat); r.position.copy(new THREE.Vector3(0,0,0)); celestialGroup.add(r); dynamicOrbits.push(r);
+            let sunCenter = sunPosAbsolute.clone().add(originOffset);
+
+            if (!document.getElementById('cb_Earth') || document.getElementById('cb_Earth').checked) {
+                let ePts = []; for(let d=0; d<=360; d+=1) ePts.push(get3DVector(R_ES, d, 0).add(sunCenter));
+                let eOrbit = new THREE.Line(new THREE.BufferGeometry().setFromPoints(ePts), new THREE.LineBasicMaterial({color: 0x3b82f6, transparent:true, opacity:0.4})); 
+                celestialGroup.add(eOrbit); dynamicOrbits.push(eOrbit);
+            }
+
+            Object.keys(helioRadii).forEach(k => {
+                if (k === 'Earth' || (['Arun','Varun','Yama'].includes(k) && !document.getElementById('cbOuter').checked) || (document.getElementById('cb_'+k) && !document.getElementById('cb_'+k).checked)) return;
+                let pts = []; for(let d=0; d<=360; d+=1) pts.push(get3DVector(helioRadii[k], d, orbitalParams[k] ? orbitalParams[k].inc * Math.sin((d - orbitalParams[k].lan) * Math.PI / 180) : 0).add(sunCenter));
+                let r = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), ringMat); celestialGroup.add(r); dynamicOrbits.push(r);
             });
         }
+        
         if (document.getElementById('cbMoonOrbit') && document.getElementById('cbMoonOrbit').checked && (!document.getElementById('cb_Chandra') || document.getElementById('cb_Chandra').checked)) {
-            const pts = []; for(let d=0; d<=360; d+=2) pts.push(get3DVector(isHelio ? MOON_ORBIT_RADIUS : geoRadii['Chandra'], d, orbitalParams['Chandra'].inc * Math.sin((d - orbitalParams['Chandra'].lan) * Math.PI / 180)));
-            const r = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.5 })); r.position.copy(renderBodies.find(b=>b.name==='Earth').pos3D); celestialGroup.add(r); dynamicOrbits.push(r);
+            let earthCenter = new THREE.Vector3(0,0,0).add(originOffset);
+            let pts = []; for(let d=0; d<=360; d+=2) pts.push(get3DVector(geoRadii['Chandra'], d, orbitalParams['Chandra'].inc * Math.sin((d - orbitalParams['Chandra'].lan) * Math.PI / 180)).add(earthCenter));
+            let r = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.5 })); celestialGroup.add(r); dynamicOrbits.push(r);
         }
 
         // Maitri Network (3D)
@@ -625,7 +733,7 @@
         // Drishti Beams (3D)
         while(drishtiGroup.children.length > 0) drishtiGroup.remove(drishtiGroup.children[0]);
         if (document.getElementById('cbDrishti') && document.getElementById('cbDrishti').checked) {
-            const tRad = window.innerWidth <= 900 ? 2600 : 3600;
+            const tRad = 9000;
             renderBodies.forEach(b => {
                 if ((!document.getElementById('cb_'+b.name) || document.getElementById('cb_'+b.name).checked) && b.pos3D && drishtiAngles[b.name]) {
                     drishtiAngles[b.name].forEach(off => {
@@ -654,6 +762,15 @@
         requestAnimationFrame(animate); 
         if (currentView === '3d') {
             controls.update(); 
+            const focus = document.querySelector('input[name="focus"]:checked').value;
+            let earthCenter = new THREE.Vector3(0,0,0);
+            if (focus === 'Sun') {
+                let sun = renderBodies.find(b => b.name === 'Surya');
+                let sunDeg = sun ? sun.abs_deg : 0;
+                let sunPosAbs = get3DVector(R_ES, sunDeg, 0); 
+                earthCenter = new THREE.Vector3(-sunPosAbs.x, -sunPosAbs.y, -sunPosAbs.z);
+            }
+
             Object.keys(planetMeshes).forEach(k => {
                 const mesh = planetMeshes[k]; const b = renderBodies.find(x => x.name === k);
                 const a = mesh.children.find(c => c.name === "vakriAura"); if (a && a.visible) a.rotation.z -= 0.02; 
@@ -662,34 +779,32 @@
                     if (b.awasthaState.name === "Bala") { const p = 1 + Math.sin(Date.now() * 0.008) * 0.15; mesh.scale.set(b.baseScale * p, b.baseScale * p, b.baseScale * p); } 
                     else if (b.awasthaState.name === "Mrita") mesh.rotation.y += 0.001; else mesh.rotation.y += 0.01; 
                 } else { mesh.scale.set(b?b.baseScale||1:1, b?b.baseScale||1:1, b?b.baseScale||1:1); mesh.rotation.y += 0.01; }
-                const pm = mesh.children.find(c => c.name === "digbalaPillar"); if (pm && pm.visible) { pm.lookAt(0,0,0); pm.rotateX(-Math.PI / 2); }
+                const pm = mesh.children.find(c => c.name === "digbalaPillar"); if (pm && pm.visible) { pm.lookAt(earthCenter.x, earthCenter.y, earthCenter.z); pm.rotateX(-Math.PI / 2); }
             });
             drishtiGroup.children.forEach(c => { if (c.isLine && c.material.dashSize) c.material.dashOffset -= 2; });
             renderer.render(scene, camera); render2DOverlay(); 
         }
     }
 
-function drawKundli() {
-        const cvs = document.getElementById('kundliCanvas'); const ctx = cvs.getContext('2d'); ctx.clearRect(0, 0, cvs.width, cvs.height);
+    function drawKundli() {
+        const cvs = document.getElementById('kundliCanvas'); 
+        const ctx = cvs.getContext('2d'); 
+        ctx.clearRect(0, 0, cvs.width, cvs.height);
         
-        // Draw the Chart Geometry
         ctx.strokeStyle = "#f1c40f"; ctx.lineWidth = 2; ctx.lineJoin = "round";
         ctx.strokeRect(50, 50, 700, 700);
         ctx.beginPath(); ctx.moveTo(50, 50); ctx.lineTo(750, 750); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(750, 50); ctx.lineTo(50, 750); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(400, 50); ctx.lineTo(750, 400); ctx.lineTo(400, 750); ctx.lineTo(50, 400); ctx.closePath(); ctx.stroke();
 
-        // House Centers (For drawing Planets)
         const ha = { 1:{x:400,y:230}, 2:{x:225,y:130}, 3:{x:130,y:225}, 4:{x:230,y:400}, 5:{x:130,y:575}, 6:{x:225,y:670}, 7:{x:400,y:570}, 8:{x:575,y:670}, 9:{x:670,y:575}, 10:{x:570,y:400}, 11:{x:670,y:225}, 12:{x:575,y:130} };
-        
-        // Number Positions (For drawing Rashi Numbers)
         const na = { 1:{x:400,y:100}, 2:{x:150,y:70}, 3:{x:70,y:150}, 4:{x:100,y:400}, 5:{x:70,y:650}, 6:{x:150,y:730}, 7:{x:400,y:700}, 8:{x:650,y:730}, 9:{x:730,y:650}, 10:{x:700,y:400}, 11:{x:730,y:150}, 12:{x:650,y:70} };
-        
+        const rashiSwamis = ['Mangal', 'Shukra', 'Budh', 'Chandra', 'Surya', 'Budh', 'Shukra', 'Mangal', 'Guru', 'Shani', 'Shani', 'Guru'];
+
         const sO = document.getElementById('cbOuter').checked; const sN = document.getElementById('cbNodes').checked; const sU = document.getElementById('cbUpagrahas').checked; const sL = document.getElementById('cbShowLabels').checked; 
         const showRashis = document.getElementById('cbRashis') ? document.getElementById('cbRashis').checked : true;
         const showNakshatras = document.getElementById('cbNakshatras') ? document.getElementById('cbNakshatras').checked : true;
         
-        // --- 2D GRAPHICS LAYER: MAITRI & DRISHTI ---
         if (document.getElementById('cbMaitri') && document.getElementById('cbMaitri').checked) {
             const cg = ['Surya', 'Chandra', 'Mangal', 'Budh', 'Guru', 'Shukra', 'Shani'];
             for (let i=0; i<cg.length; i++) for (let j=i+1; j<cg.length; j++) {
@@ -700,7 +815,6 @@ function drawKundli() {
                     let tat = getTatkalika(pA.house, pB.house);
                     let cA = maitriColors[String(naisargikaMaitri[pA.name][pB.name] + tat)].getStyle();
                     let cB = maitriColors[String(naisargikaMaitri[pB.name][pA.name] + tat)].getStyle();
-                    
                     let grad = ctx.createLinearGradient(ha[pA.house].x, ha[pA.house].y, ha[pB.house].x, ha[pB.house].y);
                     grad.addColorStop(0, cA); grad.addColorStop(1, cB);
                     ctx.beginPath(); ctx.moveTo(ha[pA.house].x, ha[pA.house].y);
@@ -735,18 +849,17 @@ function drawKundli() {
                 }
             });
         }
-        // ----------------------------------------------
 
-        // Draw Planets, Rashis, and Nakshatras
         for (let h=1; h<=12; h++) {
-            
-            // Draw Rashi Number
             if (showRashis) {
-                let rashiNum = (h - 1 + asc_sign_global - 1 + 12) % 12 + 1;
-                ctx.fillStyle = "rgba(241, 196, 15, 0.7)"; // Gold, slightly transparent
-                ctx.font = "bold 20px 'Segoe UI', sans-serif"; 
-                ctx.textAlign = "center"; 
-                ctx.fillText(rashiNum, na[h].x, na[h].y);
+                let rashiIdx = (h - 1 + asc_sign_global - 1 + 12) % 12; let rashiNum = rashiIdx + 1;
+                let fullRashiName = i18n[currentLang].rashis[rashiIdx]; let rashiNameOnly = fullRashiName.includes(' ') ? fullRashiName.split(' ')[1] : fullRashiName;
+                let swamiName = i18n[currentLang].names[rashiSwamis[rashiIdx]] || rashiSwamis[rashiIdx];
+
+                ctx.fillStyle = "rgba(241, 196, 15, 0.85)"; ctx.textAlign = "center"; 
+                ctx.font = "bold 13px 'Segoe UI', sans-serif"; ctx.fillText(`${rashiNum} ${rashiNameOnly}`, na[h].x, na[h].y);
+                ctx.font = "italic 11px 'Segoe UI', sans-serif"; ctx.fillStyle = "rgba(148, 163, 184, 0.9)";
+                ctx.fillText(`Ld: ${swamiName}`, na[h].x, na[h].y + 14);
             }
 
             let bh = renderBodies.filter(b => b.house === h && b.name !== 'Earth' && activeHouses.has(b.house)).filter(b => {
@@ -755,30 +868,18 @@ function drawKundli() {
                 return !((!sO && iO) || (!sN && iN) || (!sU && !iG && !iN));
             });
 
-            ctx.textAlign = "center"; 
-            
-            // Adjust starting Y position to account for the extra Nakshatra lines
-            let lineSpacing = showNakshatras ? 30 : 18; 
-            let sY = ha[h].y - ((bh.length - 1) * (lineSpacing / 2));
+            ctx.textAlign = "center"; let lineSpacing = showNakshatras ? 34 : 18; let sY = ha[h].y - ((bh.length - 1) * (lineSpacing / 2));
             
             bh.forEach((b, i) => {
-                // Determine Symbols
-                let sym = ""; 
-                if(sL) sym = `${b.isVakri?" (R)":""}${b.isUcha?" ↑":""}${b.isNeecha?" ↓":""}${b.isMT?" △":""}${b.awasthaState?` ${b.awasthaState.symbol}`:""}${b.isDigbala?" 🎯":""}`;
-                
-                // Set Planet Text Color (Grey if combust)
+                let sym = ""; if(sL) sym = `${b.isVakri?" (R)":""}${b.isUcha?" ↑":""}${b.isNeecha?" ↓":""}${b.isMT?" △":""}${b.awasthaState?` ${b.awasthaState.symbol}`:""}${b.isDigbala?" 🎯":""}`;
                 ctx.fillStyle = b.isCombust ? "#64748b" : (pColors[b.name] || "#ffffff"); 
-                
-                // Draw Planet Name and Degree
                 ctx.font = "bold 14px 'Segoe UI', sans-serif";
-                let mainText = `${(i18n[currentLang].names[b.name]||b.name).substring(0,3)} ${formatDegree(b.deg)}${sym}`;
+                let mainText = `${(i18n[currentLang].names[b.name]||b.name).substring(0,4)} ${formatDegree(b.deg)}${sym}`;
                 ctx.fillText(mainText, ha[h].x, sY + (i * lineSpacing));
-
-                // Draw Nakshatra directly below if enabled
                 if (showNakshatras) {
-                    ctx.font = "italic 11px Arial";
-                    ctx.fillStyle = "#94a3b8"; // Light grey for Nakshatras
-                    ctx.fillText(`(${getNakshatraLocal(b.abs_deg)})`, ha[h].x, sY + (i * lineSpacing) + 14);
+                    ctx.font = "11px Arial"; ctx.fillStyle = "#a855f7";
+                    let nakshatraExact = b.abs_deg / (360/27); let pada = Math.floor((nakshatraExact % 1) * 4) + 1;
+                    ctx.fillText(`${getNakshatraLocal(b.abs_deg)} - P${pada}`, ha[h].x, sY + (i * lineSpacing) + 14);
                 }
             });
         }
@@ -786,17 +887,25 @@ function drawKundli() {
 
     function render2DOverlay() {
         ctx2D.clearRect(0, 0, canvas2D.width, canvas2D.height); if (!renderBodies || renderBodies.length === 0 || !document.getElementById('cbShowLabels').checked) return;
-        const ctr = document.querySelector('input[name="focus"]:checked').value === 'Sun' ? renderBodies.find(b=>b.name==='Surya') : renderBodies.find(b=>b.name==='Earth');
-        const cP = ctr ? ctr.pos3D : new THREE.Vector3(0,0,0); let dL = [];
+        const focus = document.querySelector('input[name="focus"]:checked').value;
+        let earthCenter = new THREE.Vector3(0,0,0);
+        if (focus === 'Sun') {
+            let sun = renderBodies.find(b => b.name === 'Surya'); let sunDeg = sun ? sun.abs_deg : 0; let sunPosAbs = get3DVector(R_ES, sunDeg, 0); 
+            earthCenter = new THREE.Vector3(-sunPosAbs.x, -sunPosAbs.y, -sunPosAbs.z);
+        }
         
-        if (document.querySelector('input[name="focus"]:checked').value === 'Local') {
+        let dL = [];
+        if (focus === 'Local') {
             [{l:'N',p:new THREE.Vector3(0,0,-4000),c:"#3498db"},{l:'S',p:new THREE.Vector3(0,0,4000),c:"#e74c3c"},{l:'E',p:new THREE.Vector3(4000,0,0),c:"#f1c40f"},{l:'W',p:new THREE.Vector3(-4000,0,0),c:"#f1c40f"}].forEach(cd => {
                 let pt = toScreenXY(cd.p); if (pt.z < 1) { ctx2D.fillStyle=cd.c; ctx2D.font="bold 20px Arial"; ctx2D.fillText(cd.l,pt.x,pt.y); dL.push({x:pt.x-15,y:pt.y-15,w:30,h:30}); }
             });
         }
         
-        if (document.getElementById('cbRashis').checked) for (let i = 0; i < 12; i++) { let pt = toScreenXY(get3DVector((window.innerWidth <= 900 ? 2000 : 2800) - 200, i * 30 + 15).add(cP).applyMatrix4(celestialGroup.matrixWorld)); if(pt.z < 1) { ctx2D.fillStyle = "rgba(241, 196, 15, 0.9)"; ctx2D.font = "bold 14px 'Segoe UI', sans-serif"; ctx2D.textAlign = "center"; ctx2D.fillText(i18n[currentLang].rashis[i], pt.x, pt.y); ctx2D.fillStyle = "rgba(16, 185, 129, 0.9)"; ctx2D.font = "italic 11px Arial"; ctx2D.fillText("Bhava " + ((i - (asc_sign_global - 1) + 12) % 12 + 1), pt.x, pt.y + 14); dL.push({ x: pt.x - 30, y: pt.y - 12, w: 60, h: 28 }); } }
-        if (document.getElementById('cbNakshatras').checked) for (let i = 0; i < 27; i++) { let pt = toScreenXY(get3DVector((window.innerWidth <= 900 ? 2600 : 3600) - 150, i * NAKSHATRA_DEG + (NAKSHATRA_DEG / 2)).add(cP).applyMatrix4(celestialGroup.matrixWorld)); if(pt.z < 1) { ctx2D.fillStyle = "rgba(168, 85, 247, 0.9)"; ctx2D.font = "12px Arial"; ctx2D.textAlign = "center"; ctx2D.fillText(i18n[currentLang].nakshatras[i], pt.x, pt.y); dL.push({ x: pt.x - 40, y: pt.y - 10, w: 80, h: 14 }); } }
+        const outerLblRadius = 8100;
+        let centerPoint = new THREE.Vector3(0,0,0);
+        
+        if (document.getElementById('cbRashis').checked) for (let i = 0; i < 12; i++) { let pt = toScreenXY(get3DVector(outerLblRadius, i * 30 + 15).add(centerPoint).applyMatrix4(celestialGroup.matrixWorld)); if(pt.z < 1) { ctx2D.fillStyle = "rgba(241, 196, 15, 0.9)"; ctx2D.font = "bold 14px 'Segoe UI', sans-serif"; ctx2D.textAlign = "center"; ctx2D.fillText(i18n[currentLang].rashis[i], pt.x, pt.y); ctx2D.fillStyle = "rgba(16, 185, 129, 0.9)"; ctx2D.font = "italic 11px Arial"; ctx2D.fillText("Bhava " + ((i - (asc_sign_global - 1) + 12) % 12 + 1), pt.x, pt.y + 14); dL.push({ x: pt.x - 30, y: pt.y - 12, w: 60, h: 28 }); } }
+        if (document.getElementById('cbNakshatras').checked) for (let i = 0; i < 27; i++) { let pt = toScreenXY(get3DVector(outerLblRadius + 600, i * NAKSHATRA_DEG + (NAKSHATRA_DEG / 2)).add(centerPoint).applyMatrix4(celestialGroup.matrixWorld)); if(pt.z < 1) { ctx2D.fillStyle = "rgba(168, 85, 247, 0.9)"; ctx2D.font = "12px Arial"; ctx2D.textAlign = "center"; ctx2D.fillText(i18n[currentLang].nakshatras[i], pt.x, pt.y); dL.push({ x: pt.x - 40, y: pt.y - 10, w: 80, h: 14 }); } }
         if (document.getElementById('cbVedicStars').checked) sacredStarsList.forEach(s => { let pt = toScreenXY(s.meshPos.clone().applyMatrix4(celestialGroup.matrixWorld)); if(pt.z < 1) { ctx2D.fillStyle = "rgba(255, 255, 255, 0.85)"; ctx2D.font = "italic 11px Arial"; ctx2D.textAlign = "left"; ctx2D.fillText("✦ " + (i18n[currentLang].stars[s.id] || s.id), pt.x + 6, pt.y + 4); dL.push({ x: pt.x, y: pt.y - 8, w: 80, h: 14 }); } });
 
         renderBodies.forEach(b => {
@@ -823,6 +932,184 @@ function drawKundli() {
     function toScreenXY(pos3D) { const pos = pos3D.clone(); pos.project(camera); return { x: (pos.x * canvas2D.width/2) + canvas2D.width/2, y: -(pos.y * canvas2D.height/2) + canvas2D.height/2, z: pos.z }; }
     function checkOverlap(rect, drawnRects) { for(let r of drawnRects) if(rect.x < r.x+r.w+6 && rect.x+rect.w+6 > r.x && rect.y < r.y+r.h+6 && rect.y+rect.h+6 > r.y) return true; return false; }
     
+    // --- BPHS REFERENCE MANUAL LOGIC ---
+    function toggleManualMenu() { document.getElementById('manualMenu').classList.toggle('open'); }
+    function closeBPHSModal() { document.getElementById('bphsModalOverlay').classList.remove('active'); }
+
+    const bphsData = {
+        'karaka': {
+            title: "Bhav Karak (House Significators)",
+            html: `<table class="bphs-table">
+                <tr><th>Bhava (House)</th><th>Primary Karaka(s)</th><th>Core Significations</th></tr>
+                <tr><td>1st (Lagna)</td><td>Surya (Sun)</td><td>Self, Vitality, Body, Soul</td></tr>
+                <tr><td>2nd</td><td>Guru (Jupiter)</td><td>Wealth, Speech, Family, Food</td></tr>
+                <tr><td>3rd</td><td>Mangal (Mars)</td><td>Courage, Siblings, Effort, Valor</td></tr>
+                <tr><td>4th</td><td>Chandra (Moon), Budh (Mercury)</td><td>Mother, Mind, Home, Vehicles, Education</td></tr>
+                <tr><td>5th</td><td>Guru (Jupiter)</td><td>Children, Intellect, Mantra, Past Punya</td></tr>
+                <tr><td>6th</td><td>Mangal (Mars), Shani (Saturn)</td><td>Diseases, Debts, Enemies, Service</td></tr>
+                <tr><td>7th</td><td>Shukra (Venus)</td><td>Spouse, Partnerships, Desires</td></tr>
+                <tr><td>8th</td><td>Shani (Saturn)</td><td>Longevity, Occult, Sudden Changes</td></tr>
+                <tr><td>9th</td><td>Guru (Jupiter), Surya (Sun)</td><td>Dharma, Father, Guru, Luck</td></tr>
+                <tr><td>10th</td><td>Surya, Budh, Guru, Shani</td><td>Karma, Profession, Status, Authority</td></tr>
+                <tr><td>11th</td><td>Guru (Jupiter)</td><td>Gains, Elder Siblings, Desires Fulfilled</td></tr>
+                <tr><td>12th</td><td>Shani (Saturn), Ketu</td><td>Losses, Moksha, Foreign Lands, Isolation</td></tr>
+            </table>`
+        },
+        'swami': {
+            title: "Rashi Swami (Sign Lords)",
+            html: `<table class="bphs-table">
+                <tr><th>Rashi (Sign)</th><th>Number</th><th>Swami (Lord)</th></tr>
+                <tr><td>Aries (Mesh)</td><td>1</td><td>Mangal (Mars)</td></tr>
+                <tr><td>Taurus (Vrish)</td><td>2</td><td>Shukra (Venus)</td></tr>
+                <tr><td>Gemini (Mithun)</td><td>3</td><td>Budh (Mercury)</td></tr>
+                <tr><td>Cancer (Karka)</td><td>4</td><td>Chandra (Moon)</td></tr>
+                <tr><td>Leo (Simha)</td><td>5</td><td>Surya (Sun)</td></tr>
+                <tr><td>Virgo (Kanya)</td><td>6</td><td>Budh (Mercury)</td></tr>
+                <tr><td>Libra (Tula)</td><td>7</td><td>Shukra (Venus)</td></tr>
+                <tr><td>Scorpio (Vrishchik)</td><td>8</td><td>Mangal (Mars) / Ketu</td></tr>
+                <tr><td>Sagittarius (Dhanu)</td><td>9</td><td>Guru (Jupiter)</td></tr>
+                <tr><td>Capricorn (Makar)</td><td>10</td><td>Shani (Saturn)</td></tr>
+                <tr><td>Aquarius (Kumbha)</td><td>11</td><td>Shani (Saturn) / Rahu</td></tr>
+                <tr><td>Pisces (Meen)</td><td>12</td><td>Guru (Jupiter)</td></tr>
+            </table>`
+        },
+        'combustion': {
+            title: "Combustion (Asta) Orbs from Surya",
+            html: `<table class="bphs-table">
+                <tr><th>Graha</th><th>Direct Combustion Orb</th><th>Retrograde (Vakri) Orb</th></tr>
+                <tr><td>Chandra</td><td>12°</td><td>-</td></tr>
+                <tr><td>Mangal</td><td>17°</td><td>17°</td></tr>
+                <tr><td>Budh</td><td>14°</td><td>12°</td></tr>
+                <tr><td>Guru</td><td>11°</td><td>11°</td></tr>
+                <tr><td>Shukra</td><td>10°</td><td>8°</td></tr>
+                <tr><td>Shani</td><td>15°</td><td>15°</td></tr>
+            </table>`
+        },
+        'dignity': {
+            title: "Ucha (Exaltation) & Neecha (Debilitation)",
+            html: `<table class="bphs-table">
+                <tr><th>Graha</th><th>Ucha Rashi (Exact Degree)</th><th>Neecha Rashi (Exact Degree)</th></tr>
+                <tr><td>Surya</td><td>Aries (10°)</td><td>Libra (10°)</td></tr>
+                <tr><td>Chandra</td><td>Taurus (3°)</td><td>Scorpio (3°)</td></tr>
+                <tr><td>Mangal</td><td>Capricorn (28°)</td><td>Cancer (28°)</td></tr>
+                <tr><td>Budh</td><td>Virgo (15°)</td><td>Pisces (15°)</td></tr>
+                <tr><td>Guru</td><td>Cancer (5°)</td><td>Capricorn (5°)</td></tr>
+                <tr><td>Shukra</td><td>Pisces (27°)</td><td>Virgo (27°)</td></tr>
+                <tr><td>Shani</td><td>Libra (20°)</td><td>Aries (20°)</td></tr>
+                <tr><td>Rahu</td><td>Taurus / Gemini</td><td>Scorpio / Sagittarius</td></tr>
+                <tr><td>Ketu</td><td>Scorpio / Sagittarius</td><td>Taurus / Gemini</td></tr>
+            </table>`
+        },
+        'mooltrikona': {
+            title: "Mooltrikona (Root Trine) Positions",
+            html: `<table class="bphs-table">
+                <tr><th>Graha</th><th>Mooltrikona Rashi</th><th>Degree Range</th></tr>
+                <tr><td>Surya</td><td>Leo</td><td>0° to 20°</td></tr>
+                <tr><td>Chandra</td><td>Taurus</td><td>4° to 20°</td></tr>
+                <tr><td>Mangal</td><td>Aries</td><td>0° to 12°</td></tr>
+                <tr><td>Budh</td><td>Virgo</td><td>16° to 20°</td></tr>
+                <tr><td>Guru</td><td>Sagittarius</td><td>0° to 10°</td></tr>
+                <tr><td>Shukra</td><td>Libra</td><td>0° to 15°</td></tr>
+                <tr><td>Shani</td><td>Aquarius</td><td>0° to 20°</td></tr>
+            </table>`
+        },
+        'drishti': {
+            title: "Graha Drishti (Aspects)",
+            html: `<table class="bphs-table">
+                <tr><th>Graha</th><th>Normal Drishti</th><th>Special Drishti</th></tr>
+                <tr><td>Surya, Chandra, Budh, Shukra</td><td>7th House</td><td>-</td></tr>
+                <tr><td>Mangal</td><td>7th House</td><td>4th & 8th House</td></tr>
+                <tr><td>Guru</td><td>7th House</td><td>5th & 9th House</td></tr>
+                <tr><td>Shani</td><td>7th House</td><td>3rd & 10th House</td></tr>
+                <tr><td>Rahu / Ketu</td><td>7th House</td><td>5th & 9th House</td></tr>
+            </table>`
+        },
+        'digbala': {
+            title: "Digbala (Directional Strength)",
+            html: `<table class="bphs-table">
+                <tr><th>Direction</th><th>Bhava (House)</th><th>Grahas with Digbala (Maximum Power)</th><th>Zero Digbala House</th></tr>
+                <tr><td>East</td><td>1st House (Lagna)</td><td>Guru, Budh</td><td>7th House</td></tr>
+                <tr><td>North</td><td>4th House (Nadir)</td><td>Chandra, Shukra</td><td>10th House</td></tr>
+                <tr><td>West</td><td>7th House (Descendant)</td><td>Shani</td><td>1st House</td></tr>
+                <tr><td>South</td><td>10th House (Zenith)</td><td>Surya, Mangal</td><td>4th House</td></tr>
+            </table>`
+        },
+        'awastha': {
+            title: "Awastha (Planetary Age/State) by Sign",
+            html: `<table class="bphs-table matrix-table" style="font-size:12px;">
+                <tr><th style="width: 120px;">Rashi (Sign)</th><th>0° to 6°</th><th>6° to 12°</th><th>12° to 18°</th><th>18° to 24°</th><th>24° to 30°</th></tr>
+                <tr><th style="color:#ef4444;">1. Aries (Odd)</th><td>Bala 👶</td><td>Kumara 👦</td><td>Yuva 👨</td><td>Vriddha 👴</td><td>Mrita 💀</td></tr>
+                <tr><th style="color:#fbcfe8;">2. Taurus (Even)</th><td>Mrita 💀</td><td>Vriddha 👴</td><td>Yuva 👨</td><td>Kumara 👦</td><td>Bala 👶</td></tr>
+                <tr><th style="color:#10b981;">3. Gemini (Odd)</th><td>Bala 👶</td><td>Kumara 👦</td><td>Yuva 👨</td><td>Vriddha 👴</td><td>Mrita 💀</td></tr>
+                <tr><th style="color:#f8fafc;">4. Cancer (Even)</th><td>Mrita 💀</td><td>Vriddha 👴</td><td>Yuva 👨</td><td>Kumara 👦</td><td>Bala 👶</td></tr>
+                <tr><th style="color:#f1c40f;">5. Leo (Odd)</th><td>Bala 👶</td><td>Kumara 👦</td><td>Yuva 👨</td><td>Vriddha 👴</td><td>Mrita 💀</td></tr>
+                <tr><th style="color:#10b981;">6. Virgo (Even)</th><td>Mrita 💀</td><td>Vriddha 👴</td><td>Yuva 👨</td><td>Kumara 👦</td><td>Bala 👶</td></tr>
+                <tr><th style="color:#fbcfe8;">7. Libra (Odd)</th><td>Bala 👶</td><td>Kumara 👦</td><td>Yuva 👨</td><td>Vriddha 👴</td><td>Mrita 💀</td></tr>
+                <tr><th style="color:#ef4444;">8. Scorpio (Even)</th><td>Mrita 💀</td><td>Vriddha 👴</td><td>Yuva 👨</td><td>Kumara 👦</td><td>Bala 👶</td></tr>
+                <tr><th style="color:#f59e0b;">9. Sagittarius (Odd)</th><td>Bala 👶</td><td>Kumara 👦</td><td>Yuva 👨</td><td>Vriddha 👴</td><td>Mrita 💀</td></tr>
+                <tr><th style="color:#e2e8f0;">10. Capricorn (Even)</th><td>Mrita 💀</td><td>Vriddha 👴</td><td>Yuva 👨</td><td>Kumara 👦</td><td>Bala 👶</td></tr>
+                <tr><th style="color:#e2e8f0;">11. Aquarius (Odd)</th><td>Bala 👶</td><td>Kumara 👦</td><td>Yuva 👨</td><td>Vriddha 👴</td><td>Mrita 💀</td></tr>
+                <tr><th style="color:#f59e0b;">12. Pisces (Even)</th><td>Mrita 💀</td><td>Vriddha 👴</td><td>Yuva 👨</td><td>Kumara 👦</td><td>Bala 👶</td></tr>
+            </table>`
+        },
+        'maitri': {
+            title: "Naisargika Maitri (Planetary Friendship Matrix)",
+            html: `<table class="bphs-table matrix-table">
+                <tr><th>Planet A \\ B</th><th>Surya</th><th>Chandra</th><th>Mangal</th><th>Budh</th><th>Guru</th><th>Shukra</th><th>Shani</th></tr>
+                <tr><th style="color:#f1c40f;">Surya</th><td class="text-neutral">-</td><td class="text-friend">Friend</td><td class="text-friend">Friend</td><td class="text-neutral">Neutral</td><td class="text-friend">Friend</td><td class="text-enemy">Enemy</td><td class="text-enemy">Enemy</td></tr>
+                <tr><th style="color:#f8fafc;">Chandra</th><td class="text-friend">Friend</td><td class="text-neutral">-</td><td class="text-neutral">Neutral</td><td class="text-friend">Friend</td><td class="text-neutral">Neutral</td><td class="text-neutral">Neutral</td><td class="text-neutral">Neutral</td></tr>
+                <tr><th style="color:#ef4444;">Mangal</th><td class="text-friend">Friend</td><td class="text-friend">Friend</td><td class="text-neutral">-</td><td class="text-enemy">Enemy</td><td class="text-friend">Friend</td><td class="text-neutral">Neutral</td><td class="text-neutral">Neutral</td></tr>
+                <tr><th style="color:#10b981;">Budh</th><td class="text-friend">Friend</td><td class="text-enemy">Enemy</td><td class="text-neutral">Neutral</td><td class="text-neutral">-</td><td class="text-neutral">Neutral</td><td class="text-friend">Friend</td><td class="text-neutral">Neutral</td></tr>
+                <tr><th style="color:#f59e0b;">Guru</th><td class="text-friend">Friend</td><td class="text-friend">Friend</td><td class="text-friend">Friend</td><td class="text-enemy">Enemy</td><td class="text-neutral">-</td><td class="text-enemy">Enemy</td><td class="text-neutral">Neutral</td></tr>
+                <tr><th style="color:#fbcfe8;">Shukra</th><td class="text-enemy">Enemy</td><td class="text-enemy">Enemy</td><td class="text-neutral">Neutral</td><td class="text-friend">Friend</td><td class="text-neutral">Neutral</td><td class="text-neutral">-</td><td class="text-friend">Friend</td></tr>
+                <tr><th style="color:#e2e8f0;">Shani</th><td class="text-enemy">Enemy</td><td class="text-enemy">Enemy</td><td class="text-enemy">Enemy</td><td class="text-friend">Friend</td><td class="text-neutral">Neutral</td><td class="text-friend">Friend</td><td class="text-neutral">-</td></tr>
+            </table>`
+        },
+        'nakshatra': {
+            title: "27 Nakshatras & Ruling Lords",
+            html: `<table class="bphs-table" style="font-size:13px;">
+                <tr><th>#</th><th>Nakshatra</th><th>Lord (Swami)</th><th>Core Characteristic</th></tr>
+                <tr><td>1</td><td>Ashwini</td><td style="color:#78716c">Ketu</td><td>Speed, Healing, Beginnings</td></tr>
+                <tr><td>2</td><td>Bharani</td><td style="color:#fbcfe8">Shukra</td><td>Restraint, Transformation, Struggle</td></tr>
+                <tr><td>3</td><td>Krittika</td><td style="color:#f1c40f">Surya</td><td>Purification, Cutting, Ambition</td></tr>
+                <tr><td>4</td><td>Rohini</td><td style="color:#f8fafc">Chandra</td><td>Growth, Fertility, Material Desires</td></tr>
+                <tr><td>5</td><td>Mrigashira</td><td style="color:#ef4444">Mangal</td><td>Seeking, Searching, Curiosity</td></tr>
+                <tr><td>6</td><td>Ardra</td><td style="color:#94a3b8">Rahu</td><td>Destruction, Storms, Effort</td></tr>
+                <tr><td>7</td><td>Punarvasu</td><td style="color:#f59e0b">Guru</td><td>Renewal, Return of Light, Safety</td></tr>
+                <tr><td>8</td><td>Pushya</td><td style="color:#e2e8f0">Shani</td><td>Nourishment, Auspiciousness, Care</td></tr>
+                <tr><td>9</td><td>Ashlesha</td><td style="color:#10b981">Budh</td><td>Clinging, Poison, Mysticism</td></tr>
+                <tr><td>10</td><td>Magha</td><td style="color:#78716c">Ketu</td><td>Royalty, Ancestors, Heritage</td></tr>
+                <tr><td>11</td><td>Purva Phalguni</td><td style="color:#fbcfe8">Shukra</td><td>Rest, Relaxation, Enjoyment</td></tr>
+                <tr><td>12</td><td>Uttara Phalguni</td><td style="color:#f1c40f">Surya</td><td>Patronage, Charity, Contracts</td></tr>
+                <tr><td>13</td><td>Hasta</td><td style="color:#f8fafc">Chandra</td><td>Skill with hands, Grasping, Craft</td></tr>
+                <tr><td>14</td><td>Chitra</td><td style="color:#ef4444">Mangal</td><td>Architecture, Brilliance, Magic</td></tr>
+                <tr><td>15</td><td>Swati</td><td style="color:#94a3b8">Rahu</td><td>Independence, Wind, Scatter</td></tr>
+                <tr><td>16</td><td>Vishakha</td><td style="color:#f59e0b">Guru</td><td>Purpose, Triumph, Fixation</td></tr>
+                <tr><td>17</td><td>Anuradha</td><td style="color:#e2e8f0">Shani</td><td>Success, Devotion, Friendship</td></tr>
+                <tr><td>18</td><td>Jyeshtha</td><td style="color:#10b981">Budh</td><td>Seniority, Protection, Eldest</td></tr>
+                <tr><td>19</td><td>Mula</td><td style="color:#78716c">Ketu</td><td>Roots, Destruction, Unearthing</td></tr>
+                <tr><td>20</td><td>Purva Ashadha</td><td style="color:#fbcfe8">Shukra</td><td>Invincibility, Water, Faith</td></tr>
+                <tr><td>21</td><td>Uttara Ashadha</td><td style="color:#f1c40f">Surya</td><td>Unchallenged Victory, Alliance</td></tr>
+                <tr><td>22</td><td>Shravana</td><td style="color:#f8fafc">Chandra</td><td>Listening, Learning, Wisdom</td></tr>
+                <tr><td>23</td><td>Dhanishta</td><td style="color:#ef4444">Mangal</td><td>Symphony, Wealth, Rhythm</td></tr>
+                <tr><td>24</td><td>Shatabhisha</td><td style="color:#94a3b8">Rahu</td><td>Healing, Veils, 100 Physicians</td></tr>
+                <tr><td>25</td><td>Purva Bhadrapada</td><td style="color:#f59e0b">Guru</td><td>Fire, Transformation, Zeal</td></tr>
+                <tr><td>26</td><td>Uttara Bhadrapada</td><td style="color:#e2e8f0">Shani</td><td>Deep Sleep, Depth, Wisdom</td></tr>
+                <tr><td>27</td><td>Revati</td><td style="color:#10b981">Budh</td><td>Nourishment, Safe Journey, Wealth</td></tr>
+            </table>`
+        }
+    };
+
+    function openBPHSModal(key) {
+        const data = bphsData[key];
+        if (data) {
+            document.getElementById('bphsModalTitle').innerText = data.title;
+            document.getElementById('bphsModalBody').innerHTML = data.html;
+            document.getElementById('bphsModalOverlay').classList.add('active');
+            document.getElementById('manualMenu').classList.remove('open'); 
+        }
+    }
+
     window.addEventListener('resize', () => { 
         if(currentView === '3d') {
             const w = container.clientWidth; const h = container.clientHeight; camera.aspect = w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h); canvas2D.width=w; canvas2D.height=h; 
