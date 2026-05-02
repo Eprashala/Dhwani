@@ -269,9 +269,43 @@
                 </label>
             </div>
         </div>
+        
         <hr>
         <div>
-            <h4>Bhava View (Houses)</h4>
+            <h4>Quantum States</h4>
+            <div class="filter-item">
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="cbAsta" onchange="updateView()">
+                    <label for="cbAsta" style="color: #f87171;">🔥 Show Combustion (Asta)</label>
+                </div>
+                <div class="lbl-container" onclick="alert('Asta (Combustion): When a Graha is too close to Surya, its light and energy are overwhelmed by the Sun. Visually, the planet will darken to show it has lost its independent power.')" title="Info">
+                    <span style="font-size:12px; color: #60a5fa;">ℹ️</span>
+                </div>
+            </div>
+			<div class="filter-item">
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="cbVakri" onchange="updateView(); render2DOverlay();">
+                    <label for="cbVakri" style="color: #c084fc;">🌀 Show Retrogression (Vakri)</label>
+                </div>
+                <div class="lbl-container" onclick="alert('Vakri (Retrogression): An optical illusion where a planet appears to move backward as Earth overtakes it. Spiritually represents intense, repeating, internalized karma. Highlighted with a backward-spinning purple aura and the ℞ symbol.')" title="Info">
+                    <span style="font-size:12px; color: #60a5fa;">ℹ️</span>
+                </div>
+            </div>
+			<div class="filter-item">
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="cbUchaNeecha" onchange="updateView(); render2DOverlay();">
+                    <label for="cbUchaNeecha" style="color: #fbbf24;">🌟 Show Ucha / Neecha</label>
+                </div>
+                <div class="lbl-container" onclick="alert('Ucha (Exalted) & Neecha (Debilitated): Spatial resonance. An Exalted planet physically swells and brightens in the engine, showing maximum strength (↑). A Debilitated planet shrinks and darkens, showing minimum strength (↓).')" title="Info">
+                    <span style="font-size:12px; color: #60a5fa;">ℹ️</span>
+                </div>
+            </div>
+        </div>
+		
+		<hr>
+		<div>
+            
+			<h4>Bhava View (Houses)</h4>
             <button class="house-all-btn active" id="btnHouseAll" onclick="toggleAllHouses()">Observe All Bhavas</button>
             <div class="house-grid" id="houseGrid">
                 <div class="house-btn active" onclick="toggleHouse(1)">1</div><div class="house-btn active" onclick="toggleHouse(2)">2</div>
@@ -379,6 +413,47 @@
         'Chandra': { inc: 5.14, lan: 125.0 }
     };
 
+// BPHS Combustion Orbs (Degrees from Surya)
+    const combustionOrbs = {
+        'Chandra': 12,
+        'Mangal': 17,
+        'Budh': 14,
+        'Guru': 11,
+        'Shukra': 10,
+        'Shani': 15
+    };
+	
+	// BPHS Exaltation (Ucha) and Debilitation (Neecha) Absolute Degrees
+    const dignityDegrees = {
+        'Surya': { ucha: 10, neecha: 190 },   // Aries 10°, Libra 10°
+        'Chandra': { ucha: 33, neecha: 213 }, // Taurus 3°, Scorpio 3°
+        'Mangal': { ucha: 298, neecha: 118 }, // Capricorn 28°, Cancer 28°
+        'Budh': { ucha: 165, neecha: 345 },   // Virgo 15°, Pisces 15°
+        'Guru': { ucha: 95, neecha: 275 },    // Cancer 5°, Capricorn 5°
+        'Shukra': { ucha: 357, neecha: 177 }, // Pisces 27°, Virgo 27°
+        'Shani': { ucha: 200, neecha: 20 }    // Libra 20°, Aries 20°
+    };
+
+    // Heuristic for Retrogression based on Sun Angle (Geocentric Phase)
+
+    function checkVakri(planet, pDeg, sDeg) {
+        // FIX: Check for null/undefined explicitly, allowing 0 degrees to pass
+        if (sDeg == null || ['Surya', 'Chandra', 'Rahu', 'Ketu', 'Earth'].includes(planet)) return false;
+        
+        let diff = Math.abs(sDeg - pDeg);
+        if (diff > 180) diff = 360 - diff;
+        
+        if (['Mangal'].includes(planet)) return diff > 135;
+        if (['Guru'].includes(planet)) return diff > 115;
+        if (['Shani'].includes(planet)) return diff > 105;
+        if (['Arun', 'Varun', 'Yama'].includes(planet)) return diff > 100;
+        
+        if (planet === 'Budh') return diff < 20 && (pDeg > sDeg); 
+        if (planet === 'Shukra') return diff < 25 && (pDeg > sDeg); 
+        
+        return false;
+    }
+	
     // FIXED SCALING
     const geoRadii = { 'Chandra':50, 'Budh':150, 'Shukra':220, 'Surya':330, 'Mangal':430, 'Guru':530, 'Shani':640, 'Arun': 760, 'Varun': 880, 'Yama': 1000 };
     const helioRadii = { 'Budh':130, 'Shukra':200, 'Earth':300, 'Mangal':400, 'Guru':510, 'Shani':630, 'Arun': 750, 'Varun': 870, 'Yama': 990 };
@@ -544,7 +619,7 @@
         }
     }
 
-    function createPlanet(name, size, colorHex, isSun, textureUrl = null) {
+		function createPlanet(name, size, colorHex, isSun, textureUrl = null) {
         let mat;
         if (isSun) {
             mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
@@ -561,6 +636,19 @@
             const glow = new THREE.Mesh(new THREE.SphereGeometry(size*1.8, 32, 32), new THREE.MeshBasicMaterial({color: 0xffaa00, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending}));
             mesh.add(glow);
         }
+
+        // --- ADD VAKRI AURA ---
+        if (!['Surya', 'Chandra', 'Rahu', 'Ketu', 'Earth'].includes(name)) {
+            const auraGeo = new THREE.TorusGeometry(size * 1.6, size * 0.15, 16, 64);
+            const auraMat = new THREE.MeshBasicMaterial({ color: 0xc084fc, transparent: true, opacity: 0.8 });
+            const vakriAura = new THREE.Mesh(auraGeo, auraMat);
+            vakriAura.rotation.x = Math.PI / 2; // Lay flat on the orbit
+            vakriAura.name = "vakriAura";
+            vakriAura.visible = false; // Hidden by default
+            mesh.add(vakriAura);
+        }
+        // ----------------------
+
         celestialGroup.add(mesh); planetMeshes[name] = mesh;
     }
 
@@ -698,24 +786,106 @@
         const showNodes = document.getElementById('cbNodes').checked;
         const showUpagrahas = document.getElementById('cbUpagrahas').checked;
 
+		const showAsta = document.getElementById('cbAsta') ? document.getElementById('cbAsta').checked : false;
+
         Object.keys(planetMeshes).forEach(key => {
-            const mesh = planetMeshes[key]; const body = renderBodies.find(b => b.name === key);
+            const mesh = planetMeshes[key]; 
+            const body = renderBodies.find(b => b.name === key);
             
             let cbPlanet = document.getElementById('cb_' + key);
             let isIndividuallyEnabled = cbPlanet ? cbPlanet.checked : true;
 
             if (body && isIndividuallyEnabled) {
-                const isNode = key === 'Rahu' || key === 'Ketu'; const isOuter = ['Arun', 'Varun', 'Yama'].includes(key);
+                const isNode = key === 'Rahu' || key === 'Ketu'; 
+                const isOuter = ['Arun', 'Varun', 'Yama'].includes(key);
                 const isCenterAnchor = key === 'Earth' || (isHelio && key === 'Surya');
                 const isHouseActive = activeHouses.has(body.house) || isCenterAnchor;
 
                 if (!isHouseActive || (isNode && !showNodes) || (isOuter && !showOuter) || (!isNode && !isOuter && !isCenterAnchor && !body.type)) {
                     mesh.visible = false;
                 } else {
-                    mesh.visible = true; mesh.position.copy(body.pos3D);
+                    mesh.visible = true; 
+                    mesh.position.copy(body.pos3D);
                     if (key === 'Surya') sunLight.position.copy(mesh.position);
+
+// 1. Safely reset color and scale
+                    if (mesh.material) {
+                        let defaultColor = pColors[key] ? parseInt(pColors[key].replace('#', '0x')) : 0xffffff;
+                        if (mesh.material.map) defaultColor = 0xffffff;
+                        mesh.material.color.setHex(defaultColor);
+                        if (mesh.material.emissive) {
+                            mesh.material.emissive.setHex(0x000000); 
+                        }
+                    }
+                    mesh.scale.set(1, 1, 1); // Reset default size
+                    
+                    body.isUcha = false;
+                    body.isNeecha = false;
+
+                    // --- QUANTUM STATE: UCHA / NEECHA ---
+                    const showUchaNeecha = document.getElementById('cbUchaNeecha') ? document.getElementById('cbUchaNeecha').checked : false;
+                    
+                    if (showUchaNeecha && dignityDegrees[key]) {
+                        const uchaDeg = dignityDegrees[key].ucha;
+                        const neechaDeg = dignityDegrees[key].neecha;
+                        const orb = 15; // 15-degree visual buildup/fade orb
+
+                        let distUcha = Math.abs(body.abs_deg - uchaDeg);
+                        if (distUcha > 180) distUcha = 360 - distUcha;
+
+                        let distNeecha = Math.abs(body.abs_deg - neechaDeg);
+                        if (distNeecha > 180) distNeecha = 360 - distNeecha;
+
+						if (distUcha <= orb) {
+                            // Swell size (up to 1.6x) and brighten
+                            const factor = 1 + (0.6 * (1 - distUcha/orb));
+                            mesh.scale.set(factor, factor, factor);
+                            if (mesh.material.emissive) {
+                                mesh.material.emissive.setHex(0x222222); 
+                            }
+                            // FIX: Apply the 'Ucha' text flag for the entire 15-degree visual orb!
+                            body.isUcha = true; 
+                        } 
+                        else if (distNeecha <= orb) {
+                            // Shrink size (down to 0.5x) and dim color
+                            const factor = 1 - (0.5 * (1 - distNeecha/orb));
+                            mesh.scale.set(factor, factor, factor);
+                            if (mesh.material) {
+                                mesh.material.color.lerp(new THREE.Color(0x333333), 1 - (distNeecha/orb));
+                            }
+                            // FIX: Apply the 'Neecha' text flag for the entire 15-degree visual orb!
+                            body.isNeecha = true; 
+                        }
+                    }
+                    // ------------------------------------
+
+                    // 2. Apply Combustion Math (Asta) -> (Keep your existing Asta logic here)
+                    if (showAsta && !isHelio && sun && combustionOrbs[key]) {
+                        let diff = Math.abs(sun.abs_deg - body.abs_deg);
+                        if (diff > 180) diff = 360 - diff;
+
+                        if (diff <= combustionOrbs[key]) {
+                            mesh.material.color.setHex(0x333333);
+                            if (mesh.material.emissive) mesh.material.emissive.setHex(0x3a1000); 
+                        }
+                    }
+
+                    // 3. Apply Vakri (Retrogression) -> (Keep your existing Vakri logic here)
+                    const showVakri = document.getElementById('cbVakri') ? document.getElementById('cbVakri').checked : false;
+                    let isPlanetVakri = false;
+                    const auraMesh = mesh.children.find(c => c.name === "vakriAura");
+                    if (auraMesh) auraMesh.visible = false; 
+
+                    if (showVakri && sun) {
+                        isPlanetVakri = checkVakri(key, body.abs_deg, sun.abs_deg);
+                        if (isPlanetVakri && auraMesh) auraMesh.visible = true;
+                    }
+                    body.isVakri = isPlanetVakri;
+					
                 }
-            } else mesh.visible = false;
+            } else {
+                mesh.visible = false;
+            }
         });
 
         // MATHEMATICALLY PRECISE ORBITS
@@ -786,7 +956,21 @@
         render2DOverlay();
     }
 
-    function animate() { requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); render2DOverlay(); }
+    function animate() { 
+        requestAnimationFrame(animate); 
+        controls.update(); 
+
+        // Make the Vakri auras spin backwards (counter-clockwise)
+        Object.values(planetMeshes).forEach(mesh => {
+            const aura = mesh.children.find(c => c.name === "vakriAura");
+            if (aura && aura.visible) {
+                aura.rotation.z -= 0.02; // Negative value = retrograde spin
+            }
+        });
+
+        renderer.render(scene, camera); 
+        render2DOverlay(); 
+    }
 
     function toScreenXY(pos3D) {
         const pos = pos3D.clone(); pos.project(camera);
@@ -912,7 +1096,13 @@
             if (!drawText) return; 
 
             const degTxt = formatDegree(b.deg); const localName = i18n[currentLang].names[b.name] || b.name;
-            const labelText = `${symbols[b.name] || ''} ${localName} ${degTxt}`;
+			// Check if Vakri is active and append Rx symbol
+			const showVakri = document.getElementById('cbVakri') ? document.getElementById('cbVakri').checked : false;
+            const vakriSymbol = (showVakri && b.isVakri) ? " (R)" : "";
+            const showUchaNeecha = document.getElementById('cbUchaNeecha') ? document.getElementById('cbUchaNeecha').checked : false;
+            const uchaSymbol = (showUchaNeecha && b.isUcha) ? " ↑" : "";
+            const neechaSymbol = (showUchaNeecha && b.isNeecha) ? " ↓" : "";
+			const labelText = `${symbols[b.name] || ''} ${localName} ${degTxt}${vakriSymbol}${uchaSymbol}${neechaSymbol}`;
             ctx2D.font = isGraha ? "bold 12px 'Segoe UI', sans-serif" : "italic 10px Arial";
             
             const textW = ctx2D.measureText(labelText).width + 6; 
