@@ -106,8 +106,16 @@
             <div class="text-center md:text-left mb-4 md:mb-0 w-full md:w-1/2 border-b md:border-b-0 md:border-r border-orange-200 pr-4">
                 <h3 class="text-orange-800 font-bold text-xl mb-1">सध्याची वेळ (इंग्रजी)</h3>
                 <p id="clock-gregorian" class="text-2xl font-semibold text-gray-800 tracking-wide">लोड होत आहे...</p>
-                <p class="text-md text-orange-900 font-bold mt-2 bg-orange-100/80 inline-block px-3 py-1 rounded border border-orange-200">सध्याची होरा (Hora): <span id="current-hora" class="text-red-700">...</span></p>
-				<a href="#" onclick="showHoraList(); return false;" class="block text-sm text-indigo-600 hover:text-indigo-800 hover:underline mt-2 transition-colors font-semibold"><i class="fas fa-list-ul mr-1"></i>संपूर्ण दिवसाची होरा पहा</a>
+                <!-- Hora Single Line -->
+        <div class="mt-3 flex flex-wrap items-center justify-center md:justify-start gap-3">
+            <p class="text-md text-orange-900 font-bold bg-orange-100/80 px-3 py-1 rounded border border-orange-200 m-0">सध्याची होरा (Hora): <span id="current-hora" class="text-red-700">...</span></p>
+            <a href="#" onclick="showHoraList(); return false;" class="text-sm text-indigo-600 hover:text-indigo-800 hover:underline transition-colors font-semibold"><i class="fas fa-list-ul mr-1"></i>संपूर्ण दिवसाची होरा पहा</a>
+        </div>
+        <!-- Yamardha Single Line -->
+        <div class="mt-3 flex flex-wrap items-center justify-center md:justify-start gap-3">
+            <p class="text-md text-green-900 font-bold bg-green-100/80 px-3 py-1 rounded border border-green-200 shadow-sm m-0">सध्याचा यामार्ध (Shift): <span id="current-yamardha" class="text-green-700 font-extrabold">...</span></p>
+            <a href="#" onclick="showYamardhaList(); return false;" class="text-sm text-green-600 hover:text-green-800 hover:underline transition-colors font-semibold"><i class="fas fa-sun mr-1"></i>संपूर्ण दिवसाचे ८ यामार्ध पहा</a>
+        </div>
 			</div>
             <div class="text-center md:text-right w-full md:w-1/2 pl-4">
                 <h3 class="text-orange-800 font-bold text-xl mb-1">सध्याची वेळ (हिंदू वैदिक)</h3>
@@ -357,6 +365,16 @@
             <div id="hora-list-container" class="overflow-y-auto pr-1 custom-scrollbar flex-grow pb-2 space-y-2"></div>
         </div>
     </div>
+	<div id="yamardha-modal" class="fixed top-0 left-0 w-full h-full bg-black/70 hidden justify-center items-center z-[1000]" onclick="if(event.target === this) { this.classList.add('hidden'); this.classList.remove('flex'); }">
+    <div class="bg-white p-5 rounded-xl w-11/12 max-w-md max-h-[90vh] flex flex-col relative shadow-2xl border-t-4 border-green-500">
+        <div class="flex justify-between items-center mb-3 border-b pb-2">
+            <h3 class="text-xl font-bold text-green-800 title-font"><i class="fas fa-clock mr-2"></i>BPHS यामार्ध (८ प्रहर)</h3>
+            <button onclick="document.getElementById('yamardha-modal').classList.add('hidden'); document.getElementById('yamardha-modal').classList.remove('flex');" class="text-gray-500 hover:text-red-500 transition-colors"><i class="fas fa-times text-2xl"></i></button>
+        </div>
+        <p class="text-xs text-gray-600 mb-3 bg-gray-50 p-2 rounded border border-gray-200"><strong>पंचांग रहस्य:</strong> महर्षी पराशरांनुसार दिनमान आणि रात्रीमानाचे प्रत्येकी ८ भाग केले जातात. ८ वा प्रहर नेहमी <strong>निरीश्वर (स्वामीहीन)</strong> असतो, जो भौतिक कार्यांसाठी वर्ज्य मानला जातो.</p>
+        <div id="yamardha-list-container" class="overflow-y-auto pr-1 custom-scrollbar flex-grow pb-2 space-y-2"></div>
+    </div>
+	</div>
     <script>
         const TITHIS = ["प्रतिपदा", "द्वितीया", "तृतीया", "चतुर्थी", "पंचमी", "षष्ठी", "सप्तमी", "अष्टमी", "नवमी", "दशमी", "एकादशी", "द्वादशी", "त्रयोदशी", "चतुर्दशी", "पौर्णिमा", "प्रतिपदा", "द्वितीया", "तृतीया", "चतुर्थी", "पंचमी", "षष्ठी", "सप्तमी", "अष्टमी", "नवमी", "दशमी", "एकादशी", "द्वादशी", "त्रयोदशी", "चतुर्दशी", "अमावास्या"];
         const NAKSHATRAS = ["अश्विनी", "भरणी", "कृत्तिका", "रोहिणी", "मृगशीर्ष", "आर्द्रा", "पुनर्वसु", "पुष्य", "आश्लेषा", "मघा", "पूर्वा फाल्गुनी", "उत्तरा फाल्गुनी", "हस्त", "चित्रा", "स्वाती", "विशाखा", "अनुराधा", "ज्येष्ठा", "मूळ", "पूर्वाषाढा", "उत्तराषाढा", "श्रवण", "धनिष्ठा", "शततारका", "पूर्वा भाद्रपदा", "उत्तरा भाद्रपदा", "रेवती"];
@@ -560,7 +578,7 @@
             todaySunrise = times.sunrise;
         }
 
-        function startClocks() {
+		function startClocks() {
             updateTodaySunrise();
             
             setInterval(() => {
@@ -589,7 +607,60 @@
                     const horaElem = document.getElementById('current-hora');
                     if (horaElem) horaElem.innerText = currentHoraLord;
                 }
+                
+                // === BPHS YAMARDHA (8 SHIFTS) LOGIC ===
+                if (todaySunrise) {
+                    let timesCurrent = SunCalc.getTimes(now, currentLat, currentLon);
+                    let baseDate = now;
+                    
+                    // If we are in the pre-dawn hours, the Vedic day technically started yesterday
+                    if (now < timesCurrent.sunrise) {
+                        baseDate = new Date(now.getTime() - 86400000);
+                    }
+                    
+                    let timesVedicDay = SunCalc.getTimes(baseDate, currentLat, currentLon);
+                    let timesVedicNextDay = SunCalc.getTimes(new Date(baseDate.getTime() + 86400000), currentLat, currentLon);
 
+                    let dayStart = timesVedicDay.sunrise;
+                    let dayEnd = timesVedicDay.sunset;
+                    let nightStart = timesVedicDay.sunset;
+                    let nightEnd = timesVedicNextDay.sunrise;
+
+                    let isDayTime = now >= dayStart && now < dayEnd;
+                    let shiftStartTime, totalDurationMs, startLordIndex;
+                    let weekday = dayStart.getDay(); 
+
+                    if (isDayTime) {
+                        shiftStartTime = dayStart;
+                        totalDurationMs = dayEnd.getTime() - dayStart.getTime();
+                        startLordIndex = weekday; // Daytime starts with weekday lord
+                    } else {
+                        shiftStartTime = nightStart;
+                        totalDurationMs = nightEnd.getTime() - nightStart.getTime();
+                        startLordIndex = (weekday + 4) % 7; // Nighttime starts from 5th day lord
+                    }
+
+                    const yamardhaLordsSequence = ["सूर्य", "चंद्र", "मंगळ", "बुध", "गुरु", "शुक्र", "शनि"];
+                    const shiftDurationMs = totalDurationMs / 8;
+                    const timeElapsedMs = Math.max(0, now.getTime() - shiftStartTime.getTime());
+                    const currentShiftIndex = Math.floor(timeElapsedMs / shiftDurationMs);
+
+                    let currentYamardhaLord = "";
+                    if (currentShiftIndex >= 7) {
+                        currentYamardhaLord = "निरीश्वर (रिकामा)";
+                    } else {
+                        currentYamardhaLord = yamardhaLordsSequence[(startLordIndex + currentShiftIndex) % 7];
+                    }
+
+                    const yamardhaElem = document.getElementById('current-yamardha');
+                    if (yamardhaElem) {
+                        yamardhaElem.innerText = currentYamardhaLord;
+                        if(currentShiftIndex >= 7) yamardhaElem.className = "text-red-600 font-extrabold";
+                        else yamardhaElem.className = "text-green-800 font-extrabold";
+                    }
+                }
+
+                // === LIVE LAGNA & HINDU CLOCK LOGIC ===
                 const liveLagnaElem = document.getElementById('live-lagna');
                 if (liveLagnaElem) liveLagnaElem.innerText = getCurrentLagna(now, currentLat, currentLon);
 
@@ -1483,6 +1554,87 @@
             }
         }
         
+function showYamardhaList() {
+            if (!todaySunrise) {
+                alert("सूर्योदयाची वेळ अद्याप निश्चित झालेली नाही. कृपया प्रतीक्षा करा.");
+                return;
+            }
+
+            const yamardhaLordsSequence = ["सूर्य", "चंद्र", "मंगळ", "बुध", "गुरु", "शुक्र", "शनि"];
+            const now = new Date();
+            
+            // Vedic Day logic to ensure pre-dawn checks load the correct night sequence
+            let timesCurrent = SunCalc.getTimes(now, currentLat, currentLon);
+            let baseDate = now;
+            if (now < timesCurrent.sunrise) {
+                baseDate = new Date(now.getTime() - 86400000);
+            }
+            
+            let timesVedicDay = SunCalc.getTimes(baseDate, currentLat, currentLon);
+            let timesVedicNextDay = SunCalc.getTimes(new Date(baseDate.getTime() + 86400000), currentLat, currentLon);
+
+            let dayStart = timesVedicDay.sunrise;
+            let dayEnd = timesVedicDay.sunset;
+            let nightStart = timesVedicDay.sunset;
+            let nightEnd = timesVedicNextDay.sunrise;
+
+            let weekday = dayStart.getDay(); 
+            let dayLordIdx = weekday;
+            let nightLordIdx = (weekday + 4) % 7; 
+
+            let dayShiftMs = (dayEnd.getTime() - dayStart.getTime()) / 8;
+            let nightShiftMs = (nightEnd.getTime() - nightStart.getTime()) / 8;
+
+            let html = '<h4 class="font-bold text-orange-800 mb-2 border-b-2 border-orange-200 pb-1 flex items-center"><i class="fas fa-sun mr-2"></i> दिनमान यामार्ध (Day Shifts)</h4>';
+
+            // Calculate 8 Daytime Shifts
+            for(let i=0; i<8; i++) {
+                let sTime = new Date(dayStart.getTime() + (i * dayShiftMs));
+                let eTime = new Date(dayStart.getTime() + ((i+1) * dayShiftMs));
+                let isEighth = (i === 7);
+                let lord = isEighth ? "निरीश्वर (स्वामीहीन)" : yamardhaLordsSequence[(dayLordIdx + i) % 7];
+                
+                let isCurrent = (now >= sTime && now < eTime);
+                let bgClass = isCurrent ? "bg-orange-100 border-orange-500 shadow-md transform scale-[1.02] border-l-[6px] border-r-[6px]" : "bg-white border-gray-200";
+                let textClass = isEighth ? "text-red-600" : "text-orange-900";
+                let icon = isEighth ? "⚠️" : "🪐";
+
+                html += `
+                <div class="flex justify-between items-center p-3 rounded-lg border ${bgClass} mb-2 transition-all">
+                    <span class="text-sm font-semibold text-gray-700">${sTime.toLocaleTimeString('mr-IN', {hour:'2-digit', minute:'2-digit'})} ते ${eTime.toLocaleTimeString('mr-IN', {hour:'2-digit', minute:'2-digit'})}</span>
+                    <span class="text-sm font-bold ${textClass}">${icon} ${lord} ${isCurrent ? '<span class="ml-2 text-[10px] bg-red-600 text-white px-2 py-0.5 rounded-full animate-pulse shadow">सुरू</span>' : ''}</span>
+                </div>`;
+            }
+
+            html += '<h4 class="font-bold text-indigo-800 mb-2 mt-5 border-b-2 border-indigo-200 pb-1 flex items-center"><i class="fas fa-moon mr-2"></i> रात्रीमान यामार्ध (Night Shifts)</h4>';
+
+            // Calculate 8 Nighttime Shifts
+            for(let i=0; i<8; i++) {
+                let sTime = new Date(nightStart.getTime() + (i * nightShiftMs));
+                let eTime = new Date(nightStart.getTime() + ((i+1) * nightShiftMs));
+                let isEighth = (i === 7);
+                let lord = isEighth ? "निरीश्वर (स्वामीहीन)" : yamardhaLordsSequence[(nightLordIdx + i) % 7];
+                
+                let isCurrent = (now >= sTime && now < eTime);
+                let bgClass = isCurrent ? "bg-indigo-100 border-indigo-500 shadow-md transform scale-[1.02] border-l-[6px] border-r-[6px]" : "bg-white border-gray-200";
+                let textClass = isEighth ? "text-red-600" : "text-indigo-900";
+                let icon = isEighth ? "⚠️" : "✨";
+
+                html += `
+                <div class="flex justify-between items-center p-3 rounded-lg border ${bgClass} mb-2 transition-all">
+                    <span class="text-sm font-semibold text-gray-700">${sTime.toLocaleTimeString('mr-IN', {hour:'2-digit', minute:'2-digit'})} ते ${eTime.toLocaleTimeString('mr-IN', {hour:'2-digit', minute:'2-digit'})}</span>
+                    <span class="text-sm font-bold ${textClass}">${icon} ${lord} ${isCurrent ? '<span class="ml-2 text-[10px] bg-red-600 text-white px-2 py-0.5 rounded-full animate-pulse shadow">सुरू</span>' : ''}</span>
+                </div>`;
+            }
+
+            document.getElementById('yamardha-list-container').innerHTML = html;
+            
+            // Tailwind specific visibility toggle
+            let modal = document.getElementById('yamardha-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
         window.onload = init;
     </script>
 </body>
