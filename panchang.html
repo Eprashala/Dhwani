@@ -73,6 +73,41 @@
             70% { box-shadow: 0 0 0 20px rgba(220, 38, 38, 0); }
             100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
         }
+		
+		/* Floating Language Selector UI */
+.lang-floating-box {
+    position: fixed; 
+    bottom: 30px; 
+    left: 30px; 
+    background: white;
+    border: 2px solid #ea580c; 
+    border-radius: 30px; 
+    padding: 8px 16px;
+    box-shadow: 0 10px 25px rgba(234, 88, 12, 0.3); 
+    z-index: 100;
+    display: flex; 
+    align-items: center; 
+    gap: 10px;
+    transition: all 0.3s ease;
+}
+
+.lang-floating-box:hover {
+    transform: scale(1.05); 
+    box-shadow: 0 15px 35px rgba(234, 88, 12, 0.4);
+}
+
+.lang-floating-box select {
+    border: none; 
+    outline: none; 
+    background: transparent;
+    font-weight: bold; 
+    color: #ea580c; 
+    cursor: pointer; 
+    font-size: 16px;
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 5px;
+}
     </style>
 </head>
 <body class="text-gray-800 min-h-screen pb-10 relative">
@@ -321,11 +356,42 @@
 
         </div>
     </div>
+	
+	<!-- Floating Language Selector -->
+<div class="lang-floating-box" title="भाषा निवडा / Choose Language">
+    <i class="fas fa-language text-orange-600 text-2xl"></i>
+    <select id="appLang" onchange="translatePage(this.value)">
+        <!-- The values are Google Translate ISO codes -->
+        <option value="mr" selected>मराठी (Marathi)</option>
+        <option value="hi">हिंदी (Hindi)</option>
+        <option value="sa">संस्कृत (Sanskrit)</option>
+        <option value="gu">ગુજરાતી (Gujarati)</option>
+        <option value="ta">தமிழ் (Tamil)</option>
+        <option value="te">తెలుగు (Telugu)</option>
+        <option value="kn">ಕನ್ನಡ (Kannada)</option>
+        <option value="ml">മലയാളം (Malayalam)</option>
+        <option value="bn">বাংলা (Bengali)</option>
+        <option value="pa">ਪੰਜਾਬੀ (Punjabi)</option>
+        <option value="ur">اردو (Urdu)</option>
+        <option value="or">ଓଡ଼ିଆ (Odia)</option>
+        <option value="as">অসমীয়া (Assamese)</option>
+        <option value="mai">मैथिली (Maithili)</option>
+        <option value="doi">डोगरी (Dogri)</option>
+        <option value="kok">कोंकणी (Konkani)</option>
+        <option value="ne">नेपाली (Nepali)</option>
+        <option value="sd">सिंधी (Sindhi)</option>
+        <option value="mni">ꯃꯤꯇꯩꯂꯣꯟ (Manipuri)</option>
+        <option value="en">English</option>
+    </select>
+    <i class="fas fa-chevron-down text-orange-600 text-sm ml-1"></i>
+</div>
 
-    <div id="ninad-btn" class="ai-floating-btn" onclick="toggleChat()" title="निनाद AI शी बोला">
+<!-- Hidden Google Translate Element -->
+<div id="google_translate_element" style="display:none;"></div>
+
+	<div id="ninad-btn" class="ai-floating-btn" onclick="toggleChat()" title="निनाद AI शी बोला">
         <i class="fas fa-microphone"></i>
     </div>
-
     <div id="ninad-chat" class="ai-chat-panel">
         <div class="ai-header">
             <span><i class="fas fa-robot mr-2"></i> निनाद AI (वैदिक असिस्टंट)</span>
@@ -376,6 +442,31 @@
     </div>
 	</div>
     <script>
+	// --- GOOGLE TRANSLATE LOGIC ---
+        const googleTranslateScript = document.createElement('script');
+        googleTranslateScript.type = 'text/javascript';
+        googleTranslateScript.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
+        document.head.appendChild(googleTranslateScript);
+
+        function googleTranslateElementInit() {
+            new google.translate.TranslateElement({
+                pageLanguage: 'mr', // Base language is Marathi
+                autoDisplay: false
+            }, 'google_translate_element');
+        }
+
+        function translatePage(langCode) {
+            let selectField = document.querySelector('.goog-te-combo');
+            if (selectField) {
+                selectField.value = langCode;
+                selectField.dispatchEvent(new Event('change'));
+            } else {
+                // In case the widget takes a second to load
+                setTimeout(() => translatePage(langCode), 500);
+            }
+        }
+        // ------------------------------
+	
         const TITHIS = ["प्रतिपदा", "द्वितीया", "तृतीया", "चतुर्थी", "पंचमी", "षष्ठी", "सप्तमी", "अष्टमी", "नवमी", "दशमी", "एकादशी", "द्वादशी", "त्रयोदशी", "चतुर्दशी", "पौर्णिमा", "प्रतिपदा", "द्वितीया", "तृतीया", "चतुर्थी", "पंचमी", "षष्ठी", "सप्तमी", "अष्टमी", "नवमी", "दशमी", "एकादशी", "द्वादशी", "त्रयोदशी", "चतुर्दशी", "अमावास्या"];
         const NAKSHATRAS = ["अश्विनी", "भरणी", "कृत्तिका", "रोहिणी", "मृगशीर्ष", "आर्द्रा", "पुनर्वसु", "पुष्य", "आश्लेषा", "मघा", "पूर्वा फाल्गुनी", "उत्तरा फाल्गुनी", "हस्त", "चित्रा", "स्वाती", "विशाखा", "अनुराधा", "ज्येष्ठा", "मूळ", "पूर्वाषाढा", "उत्तराषाढा", "श्रवण", "धनिष्ठा", "शततारका", "पूर्वा भाद्रपदा", "उत्तरा भाद्रपदा", "रेवती"];
         const RASHIS = ["मेष", "वृषभ", "मिथुन", "कर्क", "सिंह", "कन्या", "तूळ", "वृश्चिक", "धनु", "मकर", "कुंभ", "मीन"];
@@ -485,7 +576,8 @@
                 goodFor: "आर्थिक हिशोब (चोपडी पूजन), नवीन व्यापारी करार, लक्ष्मी उपासना."
             }
         };
-
+		
+		
         const STORAGE_KEY_CITY = 'panchang_last_city';
         const STORAGE_KEY_LAT = 'panchang_last_lat';
         const STORAGE_KEY_LON = 'panchang_last_lon';
@@ -1403,12 +1495,16 @@
             const btn = document.getElementById('ninad-btn');
             btn.classList.add('listening');
 
-            try {
+			try {
+                // Get the actual text name of the language, not the 2-letter code
+                const langDropdown = document.getElementById('appLang');
+                const selectedLangText = langDropdown.options[langDropdown.selectedIndex].text;
+                
                 const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        contents: [{ parts: [{ text: `तू 'निनाद' नावाचा एक नम्र आणि हुशार वैदिक ज्योतिष AI असिस्टंट आहेस. आजचा पंचांग डेटा: [${globalPanchangContext}]. युझरचे नाव प्रमोद आहे. युझरचा प्रश्न: "${question}". पंचांग डेटा वापरून अतिशय थोडक्यात (२-३ ओळीत), अचूक आणि मराठीत उत्तर दे.` }] }]
+                        contents: [{ parts: [{ text: `तू 'निनाद' नावाचा एक नम्र आणि हुशार वैदिक ज्योतिष AI असिस्टंट आहेस. आजचा पंचांग डेटा: [${globalPanchangContext}]. युझरचे नाव प्रमोद आहे. युझरचा प्रश्न: "${question}". पंचांग डेटा वापरून अतिशय थोडक्यात (२-३ ओळीत), अचूक आणि ${selectedLangText} भाषेत उत्तर दे.` }] }]
                     })
                 });
                 
