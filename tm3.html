@@ -369,7 +369,25 @@
         if(activeHouses.size === 12) allBtn.classList.add('active'); else allBtn.classList.remove('active');
     }
 
-    function initDefaults() {
+	function initDefaults() {
+    // 1. Check if data was passed from Kundli.html
+    const passedDate = localStorage.getItem('tmDate');
+    
+    if (passedDate) {
+        // Apply the passed data
+        document.getElementById('date').value = passedDate;
+        document.getElementById('time').value = localStorage.getItem('tmTime');
+        document.getElementById('lat').value = localStorage.getItem('tmLat');
+        document.getElementById('lon').value = localStorage.getItem('tmLon');
+        document.getElementById('placeSearch').value = localStorage.getItem('tmName') + "'s Coordinates";
+        
+        // Optional: Auto-calculate the map immediately upon arrival
+        setTimeout(() => { generateMap(); }, 500);
+        
+        // Clear the storage so it doesn't get stuck on these coords if refreshed later
+        localStorage.removeItem('tmDate');
+    } else {
+        // 2. Original Fallback Logic (Current Time & Location)
         const now = new Date(); const offset = now.getTimezoneOffset() * 60000;
         const localISOTime = (new Date(now - offset)).toISOString().slice(0, -1);
         document.getElementById('date').value = localISOTime.split('T')[0];
@@ -378,6 +396,7 @@
         document.getElementById('placeSearch').value = "Bhiwandi";
         fetchBrowserLocation(); 
     }
+}
 
     function fetchBrowserLocation() {
         if (navigator.geolocation) {
