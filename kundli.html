@@ -405,6 +405,10 @@
             }
         };
 
+
+
+
+
 let currentChartType = 'D1';
 let asc_degree_global = null; // Important: We need the exact Lagna degree
 
@@ -417,6 +421,62 @@ function switchChart(type) {
         updateLedgerView(); // <--- ADD THIS
     }
 }
+
+// Ishta Devata Calculation Engine
+function calculateIshtaDevata(allBodies) {
+    // 1. Identify the Atmakaraka (AK)
+    let karakaMap = calculateJaiminiKarakas(allBodies);
+    let akName = Object.keys(karakaMap).find(k => karakaMap[k] === '1>AK');
+    if (!akName) return null;
+
+    let akBody = allBodies.find(b => b.name === akName);
+
+    // 2. Find Karakamsha (Sign of AK in D9)
+    let karakamshaSign = getD9Sign(akBody.abs_deg);
+
+    // 3. Find Jivanmuktamsa (12th Sign from Karakamsha)
+    let jivanmuktamsaSign = karakamshaSign === 1 ? 12 : karakamshaSign - 1;
+
+    // 4. Find standard planets in the Jivanmuktamsa in D9
+    const standardGrahas = ['Surya', 'Chandra', 'Mangal', 'Budh', 'Guru', 'Shukra', 'Shani', 'Rahu', 'Ketu'];
+    let planetsIn12th = allBodies.filter(b => 
+        standardGrahas.includes(b.name) && getD9Sign(b.abs_deg) === jivanmuktamsaSign
+    );
+
+    let rulingPlanet = null;
+
+    if (planetsIn12th.length > 0) {
+        // If multiple planets, sort by highest degree in D1 as a proxy for strength
+        planetsIn12th.sort((a, b) => b.deg - a.deg);
+        rulingPlanet = planetsIn12th[0].name;
+    } else {
+        // 5. If empty, take the Lord of the Jivanmuktamsa sign
+        const signLords = { 1: 'Mangal', 2: 'Shukra', 3: 'Budh', 4: 'Chandra', 5: 'Surya', 6: 'Budh', 7: 'Shukra', 8: 'Mangal', 9: 'Guru', 10: 'Shani', 11: 'Shani', 12: 'Guru' };
+        rulingPlanet = signLords[jivanmuktamsaSign];
+    }
+
+    // 6. Map to the Divine Frequency
+    const devataMap = {
+        'Surya': 'Lord Shiva / Lord Rama',
+        'Chandra': 'Goddess Gauri / Sri Krishna',
+        'Mangal': 'Lord Narasimha / Lord Hanuman / Kartikeya',
+        'Budh': 'Lord Vishnu / Lord Buddha',
+        'Guru': 'Lord Dattatreya / Lord Vamana / Any Guru',
+        'Shukra': 'Goddess Mahalakshmi / Parvati',
+        'Shani': 'Lord Narayana / Lord Kurma',
+        'Rahu': 'Goddess Durga / Chinnamasta',
+        'Ketu': 'Lord Ganesha / Lord Matsya'
+    };
+
+    return {
+        ak: akName,
+        karakamsha: karakamshaSign,
+        jivanmuktamsa: jivanmuktamsaSign,
+        planet: rulingPlanet,
+        devata: devataMap[rulingPlanet]
+    };
+}
+
 
 // BPHS D9 Calculation Engine
 function getD9Sign(absoluteDegree) {
@@ -1165,21 +1225,45 @@ function populateKundali(houses, ascSign) {
             }
         }
 
-        function renderJaiminiLedger() {
+		function renderJaiminiLedger() {
             const listDiv = document.getElementById('rankingList');
             listDiv.innerHTML = '';
             
             let flatBodies = [];
             skyData.forEach(h => h.forEach(b => { if (b.abs_deg !== undefined) flatBodies.push(b); }));
             
-            // Re-use your existing Karaka calculator
+            // --- NEW: Calculate and Render Ishta Devata First ---
+            let ishta = calculateIshtaDevata(flatBodies);
+            if (ishta) {
+                const ishtaSignRaw = i18n[currentLang].rashis[ishta.jivanmuktamsa - 1];
+                const ishtaSignName = ishtaSignRaw.split(' ')[1] || ishtaSignRaw;
+                const planetLocal = i18n[currentLang].names[ishta.planet] || ishta.planet;
+                const pCol = pColors[ishta.planet] || '#f1c40f';
+
+                listDiv.innerHTML += `
+                    <div class="rank-card" style="grid-column: 1 / -1; background: linear-gradient(135deg, #fdfaf6 0%, #fffdf0 100%); border: 2px solid #f1c40f; box-shadow: 0 4px 15px rgba(241, 196, 15, 0.15);">
+                        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px dashed #e5c100; padding-bottom: 10px; margin-bottom: 10px;">
+                            <div>
+                                <h4 style="margin: 0; color: #d35400; font-size: 18px;">✨ Ishta Devata (The Guiding Light)</h4>
+                                <div style="font-size: 12px; color: #7f8c8d; margin-top: 4px;">12th from Karakamsha in Navamsha</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 20px; font-weight: bold; color: ${pCol};">${ishta.devata}</div>
+                                <div style="font-size: 13px; color: #2c3e50;">Signified by <strong>${symbols[ishta.planet]} ${planetLocal}</strong> (Sign: ${ishtaSignName})</div>
+                            </div>
+                        </div>
+                        <div style="font-size: 12.5px; color: #34495e; line-height: 1.5; font-style: italic;">
+                            <strong>Cosmic Math:</strong> Your Atmakaraka (Soul Planet) is ${ishta.ak}. In the D9 chart, it resides in Sign ${ishta.karakamsha}. The 12th house from this position is Sign ${ishta.jivanmuktamsa} (${ishtaSignName}). The strongest energy governing this sign of liberation is ${planetLocal}, tuning your spiritual path to the frequency of <strong>${ishta.devata}</strong>.
+                        </div>
+                    </div>
+                `;
+            }
+            // ---------------------------------------------------
+
             let karakaMap = calculateJaiminiKarakas(flatBodies); 
-            
-            // Standard Jaimini Order
             const order = ['1>AK', '2>AmK', '3>BK', '4>MK', '5>PK', '6>GK', '7>DK'];
             const labels = {'1>AK':'Atmakaraka (AK)', '2>AmK':'Amatyakaraka (AmK)', '3>BK':'Bhratrukaraka (BK)', '4>MK':'Matrukaraka (MK)', '5>PK':'Putrakaraka (PK)', '6>GK':'Gnyatikaraka (GK)', '7>DK':'Darakaraka (DK)'};
             
-            // Reverse map Karakas to their respective Graha objects
             let grahaByKaraka = {};
             Object.keys(karakaMap).forEach(gName => {
                 grahaByKaraka[karakaMap[gName]] = flatBodies.find(b => b.name === gName);
@@ -1195,7 +1279,6 @@ function populateKundali(houses, ascSign) {
                 const signNameRaw = (i18n[currentLang] && i18n[currentLang].rashis[Math.floor(body.abs_deg/30)]) ? i18n[currentLang].rashis[Math.floor(body.abs_deg/30)] : i18n['en'].rashis[Math.floor(body.abs_deg/30)];
                 const signName = signNameRaw.split(' ')[1] || signNameRaw;
                 
-                // Styling: Gold for AK, Silver/Grey for others, slightly darker for DK
                 let rankClass = index === 0 ? 'rank-1' : (index === 6 ? 'rank-3' : 'rank-2'); 
                 
                 listDiv.innerHTML += `
