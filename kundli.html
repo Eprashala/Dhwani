@@ -414,6 +414,7 @@ function switchChart(type) {
     document.getElementById('btnD9').classList.toggle('active', type === 'D9');
     if (skyData && skyData.length > 0) {
         populateKundali(skyData, asc_sign_global);
+        updateLedgerView(); // <--- ADD THIS
     }
 }
 
@@ -1092,11 +1093,12 @@ function populateKundali(houses, ascSign) {
             scores.forEach((s, i) => s.rankNum = i + 1);
             globalScores = scores;
             
-            // Call your existing pristine render functions
-            renderRanking(scores);
+		// Call your existing pristine render functions
+            globalScores = scores;
+            updateLedgerView(); // <--- Dynamically routes to D1 or D9 ledger
             renderDeepBhavaOccupants(housesArray, scores);
         }
-
+		
         function renderRanking(scores) {
             const listDiv = document.getElementById('rankingList');
             listDiv.innerHTML = '';
@@ -1142,7 +1144,84 @@ function populateKundali(houses, ascSign) {
 			'Varun': { adhyatmik: "Cosmic consciousness, dissolution of ego, dreams, and profound illusions.", astronomical: "A massive blue ice giant with the strongest winds in the solar system.", scientific: "Correlates to the pineal gland, deep REM sleep, and the subconscious mind.", benefits: "Grants profound intuition, artistic inspiration, and spiritual empathy.", remedy: "Adhyatmik: Avoid escapism. Astro/Sci: Practice strict reality testing." },
 			'Yama': { adhyatmik: "Death, rebirth, ultimate transformation, and the unveiling of hidden truths.", astronomical: "A distant dwarf planet with a highly eccentric orbit in the Kuiper Belt.", scientific: "Represents cellular apoptosis (programmed cell death) and psychological regeneration.", benefits: "Grants immense hidden power, psychological resilience, and deep systemic rebuilding.", remedy: "Adhyatmik: Surrender to inevitable transformations. Astro/Sci: Engage in shadow work." }
 		};
+		const jaiminiKnowledge = {
+            '1>AK': { adhyatmik: "The King of the Chart. Represents the soul's primary unfinished business, deepest desires, and the core karmic lesson for this incarnation.", astronomical: "The planet closest to completing its transit through its current 30-degree zodiacal sector (Highest degree).", scientific: "Represents the most heavily conditioned neural pathway; the undeniable psychological core of the individual's drive." },
+            '2>AmK': { adhyatmik: "The Minister. Guides the Atmakaraka towards its purpose. Represents career, advisors, intellectual execution, and the path to worldly success.", astronomical: "The planet immediately trailing the AK in orbital progression through the sign.", scientific: "The secondary psychological driver; governs executive function, strategic planning, and problem-solving mechanisms." },
+            '3>BK': { adhyatmik: "The Guru or Sibling. Represents the immediate support system, spiritual guides, mentors, and the courage required to fulfill one's dharma.", astronomical: "The third planet in the sign's degree sequence.", scientific: "Peer-to-peer social conditioning, early competitive instincts, and the psychological capacity for collaborative effort." },
+            '4>MK': { adhyatmik: "The Mother and the Heart. Represents inner peace, emotional nourishment, home, and the foundation of psychological security.", astronomical: "The fourth planet in the degree sequence.", scientific: "Correlates to the limbic system; regulates emotional homeostasis, foundational attachments, and the biological feeling of safety." },
+            '5>PK': { adhyatmik: "The Child and Creator. Crucially holds Purva Punya (past life merit). Represents supreme intelligence, creativity, students, and spiritual mantras.", astronomical: "The fifth planet in the degree sequence.", scientific: "The reproductive and creative drive; governs dopaminergic reward loops associated with creation and legacy-building." },
+            '6>GK': { adhyatmik: "The Challenger. Represents relatives, rivals, obstacles, debts (Shadripu), and the karmic friction necessary for growth.", astronomical: "The sixth planet in the degree sequence.", scientific: "The psychological shadow; represents areas of cognitive dissonance, stress-response triggers, and the immune system's baseline." },
+            '7>DK': { adhyatmik: "The Spouse and Mirror. Represents the 'other', worldly partnerships, and how the soul seeks external completion through relationships.", astronomical: "The planet that has most recently entered the zodiacal sign (Lowest degree), carrying fresh, raw energy.", scientific: "The mechanism of psychological projection; governs interpersonal binding dynamics and how one seeks hormonal regulation through others." }
+        };
 
+		function updateLedgerView() {
+            const headerText = currentChartType === 'D1' ? "Parashari Sthana & Dig Bala Ledger" : "Jaimini Chara Karaka Ledger (Soul Hierarchy)";
+            document.querySelector('.ledger-panel .ledger-header h3').innerText = headerText;
+
+            if (currentChartType === 'D1') {
+                if (typeof globalScores !== 'undefined') renderRanking(globalScores);
+            } else {
+                renderJaiminiLedger();
+            }
+        }
+
+        function renderJaiminiLedger() {
+            const listDiv = document.getElementById('rankingList');
+            listDiv.innerHTML = '';
+            
+            let flatBodies = [];
+            skyData.forEach(h => h.forEach(b => { if (b.abs_deg !== undefined) flatBodies.push(b); }));
+            
+            // Re-use your existing Karaka calculator
+            let karakaMap = calculateJaiminiKarakas(flatBodies); 
+            
+            // Standard Jaimini Order
+            const order = ['1>AK', '2>AmK', '3>BK', '4>MK', '5>PK', '6>GK', '7>DK'];
+            const labels = {'1>AK':'Atmakaraka (AK)', '2>AmK':'Amatyakaraka (AmK)', '3>BK':'Bhratrukaraka (BK)', '4>MK':'Matrukaraka (MK)', '5>PK':'Putrakaraka (PK)', '6>GK':'Gnyatikaraka (GK)', '7>DK':'Darakaraka (DK)'};
+            
+            // Reverse map Karakas to their respective Graha objects
+            let grahaByKaraka = {};
+            Object.keys(karakaMap).forEach(gName => {
+                grahaByKaraka[karakaMap[gName]] = flatBodies.find(b => b.name === gName);
+            });
+            
+            order.forEach((kLabel, index) => {
+                let body = grahaByKaraka[kLabel];
+                if (!body) return;
+                
+                const kData = jaiminiKnowledge[kLabel];
+                const localName = (i18n[currentLang] && i18n[currentLang].names[body.name]) ? i18n[currentLang].names[body.name] : body.name;
+                const pCol = pColors[body.name] || '#3498db';
+                const signNameRaw = (i18n[currentLang] && i18n[currentLang].rashis[Math.floor(body.abs_deg/30)]) ? i18n[currentLang].rashis[Math.floor(body.abs_deg/30)] : i18n['en'].rashis[Math.floor(body.abs_deg/30)];
+                const signName = signNameRaw.split(' ')[1] || signNameRaw;
+                
+                // Styling: Gold for AK, Silver/Grey for others, slightly darker for DK
+                let rankClass = index === 0 ? 'rank-1' : (index === 6 ? 'rank-3' : 'rank-2'); 
+                
+                listDiv.innerHTML += `
+                    <div class="rank-card ${rankClass}" style="border-left: 6px solid ${pCol};">
+                        <div class="rank-header" style="border-bottom: 1px dashed #ccc; padding-bottom: 8px; margin-bottom: 8px;">
+                            <div class="rank-info" style="margin-left: 0;">
+                                <strong style="font-size: 16px; color: #2c3e50;">
+                                    <span style="color:${pCol}; font-size:18px; margin-right:5px;">${symbols[body.name]}</span> 
+                                    ${labels[kLabel]} : ${localName}
+                                </strong>
+                                <div class="rank-details" style="color: #e67e22; font-weight: bold; margin-top: 5px;">
+                                    Sign Advancement: ${formatDegree(body.deg)} in ${signName}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="font-size: 12.5px; line-height: 1.6; color: #34495e;">
+                            <div style="margin-bottom: 6px;"><strong>🕉️ Spiritual Reality:</strong> ${kData.adhyatmik}</div>
+                            <div style="margin-bottom: 6px;"><strong>🔭 Astronomical Reality:</strong> ${kData.astronomical}</div>
+                            <div><strong>🧬 Scientific Correlation:</strong> ${kData.scientific}</div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+		
 		function renderDeepBhavaOccupants(housesArray, scores) {
 			let flatHouses = [[],[],[],[],[],[],[],[],[],[],[],[]];
 			housesArray.forEach((h, i) => flatHouses[i] = [...h]);
