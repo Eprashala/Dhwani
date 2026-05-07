@@ -161,9 +161,10 @@
 			<div class="panel chart-panel">
 				<div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
 				<h3 data-i18n="kundali_title" style="margin: 0 0 10px 0;">Spashtha Lagna Kundali</h3>
-				<div class="chart-toggle">
-				<button id="btnD1" class="chart-btn active" onclick="switchChart('D1')">D1 (Lagna)</button>
-				<button id="btnD9" class="chart-btn" onclick="switchChart('D9')">D9 (Navamsha)</button>
+			<div class="chart-toggle">
+			<button id="btnD1" class="chart-btn active" onclick="switchChart('D1')">D1 (Lagna)</button>
+			<button id="btnD9" class="chart-btn" onclick="switchChart('D9')">D9 (Navamsha)</button>
+			<button class="chart-btn" onclick="generateAIPrompt()" style="background: #27ae60; color: white; border-left: 1px solid #2ecc71;">✨ Copy AI Prompt</button>
 			</div>
 		</div>
 		<canvas id="kundaliCanvas" width="550" height="550"></canvas>
@@ -494,6 +495,71 @@ function getD9Sign(absoluteDegree) {
     return ((startRashi + navamshaPart) % 12) + 1; // 1 to 12
 }
 
+			function generateAIPrompt() {
+    if (!skyData || skyData.length === 0) {
+        alert("Please calculate the cosmic map first.");
+        return;
+    }
+
+    const name = document.getElementById('name').value;
+    const dob = document.getElementById('date').value;
+    const tob = document.getElementById('time').value;
+    const lat = document.getElementById('lat').value;
+    const lon = document.getElementById('lon').value;
+    
+    // Header for Zero-Knowledge/Incognito Protocol
+    let promptHeader = `SYSTEM PROTOCOL: INCOGNITO MODE. 
+Do not reference the user's account history, previous chats, or personal identity. 
+The subject of this analysis is a third party named ${name}. 
+Treat this as a standalone, professional BPHS & Jaimini consultation.\n\n`;
+
+    let content = `I am presenting the high-precision astronomical data for ${name} (Born: ${dob} at ${tob}, Lat: ${lat}, Lon: ${lon}).\n`;
+    content += `Act as Maharishi Parashara and a Jaimini Sutra expert. Provide a deep, technical, and predictive analysis based on the following ${currentChartType} placements:\n\n`;
+
+    // Extracting Planetary Details
+    let allBodies = [];
+    skyData.forEach(h => h.forEach(b => { if (b.abs_deg !== undefined) allBodies.push(b); }));
+
+    if (currentChartType === 'D1') {
+        content += `### D1 LAGNA KUNDLI DATA (Parashari Focus)\n`;
+        content += `Ascendant (Lagna) Degree: ${formatDegree(asc_degree_global)} in Sign ${asc_sign_global}\n`;
+        allBodies.forEach(b => {
+            const sign = Math.floor(b.abs_deg / 30) + 1;
+            const nak = getNakshatraLocal(b.abs_deg);
+            content += `- ${b.name}: ${formatDegree(b.deg)} in Sign ${sign} (${nak})\n`;
+        });
+    } else {
+        content += `### D9 NAVAMSHA DATA (Jaimini & Soul Hierarchy Focus)\n`;
+        let d9Lagna = getD9Sign(asc_degree_global);
+        content += `Navamsha Ascendant: Sign ${d9Lagna}\n`;
+        
+        let karakaMap = calculateJaiminiKarakas(allBodies);
+        allBodies.forEach(b => {
+            const d9Sign = getD9Sign(b.abs_deg);
+            const kLabel = karakaMap[b.name] ? ` [Chara Karaka: ${karakaMap[b.name]}]` : "";
+            content += `- ${b.name}: Navamsha Sign ${d9Sign} (Exact D1 Degree: ${formatDegree(b.deg)})${kLabel}\n`;
+        });
+    }
+
+    content += `\nINSTRUCTIONS FOR ANALYSIS:
+1. Use Brihat Parashara Hora Shastra (BPHS) principles for strength and bhava results.
+2. Evaluate Argala and Dashas if applicable.
+3. Provide specific predictions for career, health, and spiritual evolution.
+4. Maintain a professional, Vedic-astrological tone.`;
+
+    // Copy to Clipboard
+    const finalPrompt = promptHeader + content;
+    navigator.clipboard.writeText(finalPrompt).then(() => {
+        alert("The " + currentChartType + " AI Prompt has been copied to your clipboard. Paste it into Gemini or Claude.");
+    }).catch(err => {
+        console.error('Failed to copy prompt: ', err);
+    });
+}
+
+
+
+
+
         // Master update function to sync 2D Kundli with 3D Map Filters
         function updateAllViews() {
             updateView();
@@ -699,6 +765,7 @@ function getD9Sign(absoluteDegree) {
                 const response = await fetch('https://eprashala.pythonanywhere.com/calculate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 const data = await response.json();
                 
+				
 				if (data.status === 'success') {
                     document.getElementById('error-msg').innerText = "";
                     skyData = data.houses; 
@@ -1225,7 +1292,7 @@ function populateKundali(houses, ascSign) {
             }
         }
 
-		function renderJaiminiLedger() {
+	function renderJaiminiLedger() {
             const listDiv = document.getElementById('rankingList');
             listDiv.innerHTML = '';
             
