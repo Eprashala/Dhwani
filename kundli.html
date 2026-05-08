@@ -6,8 +6,68 @@
     <title>High-Precision Parashari & 3D Astronomical Engine</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <style>
-       
+    <script src="bphs.js"></script>
+	
+	<style>
+		/* --- BPHS REFERENCE MANUAL WIDGET CSS --- */
+:root { --accent-gold: #f1c40f; --border-color: #1e293b; --text-light: #e2e8f0; }
+.manual-fab-container { position: fixed; bottom: 25px; right: 25px; z-index: 1000; display: flex; flex-direction: column; align-items: flex-end; }
+.manual-menu { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 8px; 
+    margin-bottom: 15px; 
+    opacity: 0; 
+    pointer-events: none; 
+    transform: translateY(20px) scale(0.95); 
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+    transform-origin: bottom right; 
+    /* NEW SCROLL PROPERTIES */
+    max-height: 60vh; /* Prevents it from getting taller than 60% of the screen */
+    overflow-y: auto; /* Enables vertical scrolling when items exceed max-height */
+    padding-right: 8px; /* Breathing room so the scrollbar doesn't touch the buttons */
+}
+
+/* Add these new lines right below it to style the scrollbar */
+.manual-menu::-webkit-scrollbar { 
+    width: 4px; 
+}
+.manual-menu::-webkit-scrollbar-thumb { 
+    background: var(--accent-gold); /* Uses your gold accent color */
+    border-radius: 4px; 
+}
+.manual-menu::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.5); /* Matches your glassmorphism panel background */
+    border-radius: 4px;
+}
+.manual-menu.open { opacity: 1; pointer-events: auto; transform: translateY(0) scale(1); }
+.manual-option { background: rgba(15, 23, 42, 0.95); border: 1px solid var(--border-color); color: var(--text-light); padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: bold; white-space: nowrap; box-shadow: 0 4px 15px rgba(0,0,0,0.5); transition: 0.2s; text-align: right; backdrop-filter: blur(10px); }
+.manual-option:hover { border-color: var(--accent-gold); color: var(--accent-gold); transform: translateX(-5px); }
+.manual-fab { width: 56px; height: 56px; border-radius: 50%; background: var(--accent-gold); color: #000; font-size: 24px; display: flex; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 4px 20px rgba(241, 196, 15, 0.4); border: none; transition: 0.3s; z-index: 1001; }
+.manual-fab:hover { transform: scale(1.1); }
+
+/* --- MODAL WIDGET CSS --- */
+.bphs-modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(5px); z-index: 2000; display: flex; justify-content: center; align-items: center; opacity: 0; pointer-events: none; transition: 0.3s; }
+.bphs-modal-overlay.active { opacity: 1; pointer-events: auto; }
+.bphs-modal { background: rgba(5, 8, 12, 0.98); border: 1px solid var(--border-color); border-top: 3px solid var(--accent-gold); border-radius: 12px; width: 90%; max-width: 750px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,0.9); transform: translateY(20px); transition: 0.3s; }
+.bphs-modal-overlay.active .bphs-modal { transform: translateY(0); }
+.bphs-modal-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-bottom: 1px solid var(--border-color); }
+.bphs-modal-header h3 { margin: 0; color: var(--accent-gold); font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
+.btn-close-modal { background: transparent; border: none; color: #94a3b8; font-size: 24px; cursor: pointer; transition: 0.2s; }
+.btn-close-modal:hover { color: #ef4444; }
+.bphs-modal-body { padding: 20px; overflow-y: auto; color: var(--text-light); }
+.bphs-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.bphs-table th { background: rgba(255, 255, 255, 0.05); color: var(--accent-gold); text-align: left; padding: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+.bphs-table td { padding: 10px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.bphs-table tr:hover td { background: rgba(255, 255, 255, 0.02); }
+.matrix-table th, .matrix-table td { text-align: center; border: 1px solid rgba(255,255,255,0.1); }
+.matrix-table th:first-child { text-align: left; background: rgba(255,255,255,0.05); }
+.text-friend { color: #10b981; font-weight: bold; }
+.text-enemy { color: #ef4444; font-weight: bold; }
+.text-neutral { color: #94a3b8; }
+		
+		
+		
 		.chart-toggle { display: flex; background: #ecf0f1; border-radius: 5px; overflow: hidden; margin-bottom: 15px; }
 		.chart-btn { flex: 1; padding: 8px 12px; border: none; background: none; cursor: pointer; font-size: 13px; font-weight: bold; color: #7f8c8d; transition: 0.3s; }
 		.chart-btn:hover { background: #d5dbdb; }
@@ -358,7 +418,37 @@
                 </div>
             </div>
         </div>
+    <div class="manual-fab-container">
+    <div class="manual-menu" id="manualMenu">
+        <div class="manual-option" onclick="openBPHSModal('karaka')">1. Bhav Karak Chart</div>
+        <div class="manual-option" onclick="openBPHSModal('swami')">2. Rashi Swami Chart</div>
+        <div class="manual-option" onclick="openBPHSModal('combustion')">3. Combustion (Asta) Chart</div>
+        <div class="manual-option" onclick="openBPHSModal('dignity')">4. Ucha / Neecha Chart</div>
+        <div class="manual-option" onclick="openBPHSModal('mooltrikona')">5. Mooltrikona Chart</div>
+        <div class="manual-option" onclick="openBPHSModal('drishti')">6. Drishti (Aspects) Chart</div>
+        <div class="manual-option" onclick="openBPHSModal('digbala')">7. Digbala Chart</div>
+        <div class="manual-option" onclick="openBPHSModal('awastha')">8. Awastha (Age) Sequence</div>
+        <div class="manual-option" onclick="openBPHSModal('maitri')">9. Planetary Friendship Matrix</div>
+        <div class="manual-option" onclick="openBPHSModal('nakshatra')">10. Nakshatra Lords & Traits</div>
+		<div class="manual-option" onclick="openBPHSModal('yamartha')">11. Yamartha & Kaalas (Shifts)</div>
+        <div class="manual-option" onclick="openBPHSModal('panchang')">12. Bhadra, Panchak & Karana</div>
+		<div class="manual-option" onclick="openBPHSModal('karakas_deep')">13. Sthir & Chara (Atma) Karakas</div>
     </div>
+    <button class="manual-fab" onclick="toggleManualMenu()" title="BPHS Reference Manual">📜</button>
+</div>
+
+<div class="bphs-modal-overlay" id="bphsModalOverlay" onclick="if(event.target===this) closeBPHSModal()">
+    <div class="bphs-modal">
+        <div class="bphs-modal-header">
+            <h3 id="bphsModalTitle">Reference Chart</h3>
+            <button class="btn-close-modal" onclick="closeBPHSModal()">×</button>
+        </div>
+        <div class="bphs-modal-body" id="bphsModalBody">
+            </div>
+    </div>
+</div>
+	
+	</div>
 
     <script>
         const i18n = {
@@ -1459,7 +1549,26 @@ function populateKundali(houses, ascSign) {
     // Redirect to the new file
     window.location.href = "tm3.html";
 }
-		
+// --- BPHS REFERENCE MANUAL LOGIC ---
+function toggleManualMenu() { 
+    document.getElementById('manualMenu').classList.toggle('open'); 
+}
+
+function closeBPHSModal() { 
+    document.getElementById('bphsModalOverlay').classList.remove('active'); 
+}
+
+function openBPHSModal(key) {
+    // bphsData is automatically available here because of bphs.js
+    const data = bphsData[key];
+    if (data) {
+        document.getElementById('bphsModalTitle').innerText = data.title;
+        document.getElementById('bphsModalBody').innerHTML = data.html;
+        document.getElementById('bphsModalOverlay').classList.add('active');
+        document.getElementById('manualMenu').classList.remove('open'); 
+    }
+}	
+	
     </script>
 </body>
 </html>
