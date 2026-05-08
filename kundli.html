@@ -186,10 +186,32 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                     <h3 data-i18n="jataka_details" style="margin: 0;">Jataka Details</h3>
                     <select class="lang-select" id="langToggle" onchange="changeLanguage()">
-                        <option value="en">English</option>
-                        <option value="sa">संस्कृतम्</option>
-                        <option value="hi">हिन्दी</option>
-                        <option value="mr">मराठी</option>
+<option value="en" selected>English</option>
+
+    <option value="as">অসমীয়া (Assamese)</option>
+    <option value="bn">বাংলা (Bengali)</option>
+    <option value="brx">बड़ो (Bodo)</option>
+    <option value="doi">डोगरी (Dogri)</option>
+    <option value="gu">ગુજરાતી (Gujarati)</option>
+    <option value="hi">हिन्दी (Hindi)</option>
+    <option value="kn">ಕನ್ನಡ (Kannada)</option>
+    <option value="ks">کأشُر (Kashmiri)</option>
+    <option value="kok">कोंकणी (Konkani)</option>
+    <option value="mai">मैथिली (Maithili)</option>
+    <option value="ml">മലയാളം (Malayalam)</option>
+    <option value="mni-Mtei">ꯃꯤꯇꯩꯂꯣꯟ (Manipuri)</option>
+    <option value="mr">मराठी (Marathi)</option>
+    <option value="ne">नेपाली (Nepali)</option>
+    <option value="or">ଓଡ଼ିଆ (Odia)</option>
+    <option value="pa">ਪੰਜਾਬੀ (Punjabi)</option>
+    <option value="sa">संस्कृतम् (Sanskrit)</option>
+    <option value="sat">ᱥᱟᱱᱛᱟᱲᱤ (Santali)</option>
+    <option value="sd">सिंधी (Sindhi)</option>
+    <option value="ta">தமிழ் (Tamil)</option>
+    <option value="te">తెలుగు (Telugu)</option>
+    <option value="ur">اردو (Urdu)</option>
+
+    <option value="bho">भोजपुरी (Bhojpuri)</option>
                     </select>
                 </div>
                 
@@ -352,15 +374,17 @@
             </div>
         </div>
 
-        <div class="panel ledger-panel">
+		<div class="panel ledger-panel">
             <div class="ledger-header">
                 <h3 data-i18n="graha_bala">Parashari Sthana & Dig Bala Ledger</h3>
             </div>
+            
+            <div id="lagneshAnalysisBox" style="margin-bottom: 25px;"></div>
+            
             <div id="rankingList" class="ranking-grid">
                 <p style="text-align:center; font-size: 14px; color: #7f8c8d; grid-column: 1 / -1;" data-i18n="awaiting_calc">Calculate chart to reveal the deep karmic ranking of your Grahas...</p>
             </div>
         </div>
-
         <div class="panel chart-panel" style="background-color: #090c11; padding: 20px; width: 100%; box-sizing: border-box;">
             <h3 class="sky-title" style="margin:0 0 15px 0;" data-i18n="map_title">Khagol Mandal (Interactive 3D Engine)</h3>
             
@@ -449,7 +473,32 @@
 </div>
 	
 	</div>
+<div id="google_translate_element" style="display:none;"></div>
+<script>
+    // --- GOOGLE TRANSLATE ENGINE ---
+    const googleTranslateScript = document.createElement('script');
+    googleTranslateScript.type = 'text/javascript';
+    googleTranslateScript.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
+    document.head.appendChild(googleTranslateScript);
 
+    function googleTranslateElementInit() {
+        new google.translate.TranslateElement({
+            pageLanguage: 'en', // Base language of your engine is English
+            autoDisplay: false
+        }, 'google_translate_element');
+    }
+
+    function translateHTML(langCode) {
+        let selectField = document.querySelector('.goog-te-combo');
+        if (selectField) {
+            selectField.value = langCode;
+            selectField.dispatchEvent(new Event('change'));
+        } else {
+            // If Google Translate hasn't fully loaded yet, try again in 500ms
+            setTimeout(() => translateHTML(langCode), 500);
+        }
+    }
+</script>
     <script>
         const i18n = {
             en: {
@@ -511,9 +560,19 @@ function switchChart(type) {
     document.getElementById('btnD9').classList.toggle('active', type === 'D9');
     if (skyData && skyData.length > 0) {
         populateKundali(skyData, asc_sign_global);
-        updateLedgerView(); // <--- ADD THIS
+        updateLedgerView(); 
+        
+        // --- ADD THIS TO UPDATE LAGNESH ON TOGGLE ---
+        let flatBodies = [];
+        skyData.forEach(h => h.forEach(b => { if (b.abs_deg !== undefined) flatBodies.push(b); }));
+        renderLagneshAnalysis(flatBodies, asc_sign_global, globalScores);
     }
 }
+
+
+
+
+
 
 // Ishta Devata Calculation Engine
 function calculateIshtaDevata(allBodies) {
@@ -660,15 +719,19 @@ Treat this as a standalone, professional BPHS & Jaimini consultation.\n\n`;
             }
         }
 
-        let currentLang = 'en';
-        function changeLanguage() {
-            currentLang = document.getElementById('langToggle').value;
-            document.querySelectorAll('[data-i18n]').forEach(el => {
-                const key = el.getAttribute('data-i18n');
-                if(i18n[currentLang][key]) el.innerText = i18n[currentLang][key];
-            });
-            if(skyData.length > 0) { updateAllViews(); calculateGrahaStrength(skyData); }
+	let currentLang = 'en';
+    
+    function changeLanguage() {
+        currentLang = document.getElementById('langToggle').value;
+        
+        // 1. Google translates the HTML UI, Dashboards, and Ledgers
+        translateHTML(currentLang); 
+        
+        // 2. The Canvas engine redraws the 2D Kundli lines and text
+        if(skyData && skyData.length > 0) { 
+            updateAllViews(); 
         }
+    }
 
         let isMobileMode = localStorage.getItem('mobileView') === 'true';
         function applyMobileState() {
@@ -1145,6 +1208,213 @@ const degTxt = formatDegree(b.deg);
             });
         }
 		
+		// ==========================================
+// BPHS LAGNESH (ASCENDANT LORD) ENGINE
+// ==========================================
+
+function evaluateExactDignity(pName, sign, degInSign) {
+    // 5 = Exalted (Ucha), 4 = Mooltrikona, 3 = Own (Swa), 2 = Friendly/Neutral, 1 = Enemy, 0 = Debilitated (Neecha)
+    if (pName === 'Surya') {
+        if (sign === 1 && degInSign <= 10) return { val: 5, text: "Ucha (Exalted)" };
+        if (sign === 7 && degInSign <= 10) return { val: 0, text: "Neecha (Debilitated)" };
+        if (sign === 5 && degInSign <= 20) return { val: 4, text: "Mooltrikona" };
+        if (sign === 5) return { val: 3, text: "Swa-Rashi (Own Sign)" };
+    } else if (pName === 'Chandra') {
+        if (sign === 2 && degInSign <= 3) return { val: 5, text: "Ucha (Exalted)" };
+        if (sign === 8 && degInSign <= 3) return { val: 0, text: "Neecha (Debilitated)" };
+        if (sign === 2 && degInSign > 3 && degInSign <= 20) return { val: 4, text: "Mooltrikona" };
+        if (sign === 4) return { val: 3, text: "Swa-Rashi (Own Sign)" };
+    } else if (pName === 'Mangal') {
+        if (sign === 10 && degInSign <= 28) return { val: 5, text: "Ucha (Exalted)" };
+        if (sign === 4 && degInSign <= 28) return { val: 0, text: "Neecha (Debilitated)" };
+        if (sign === 1 && degInSign <= 12) return { val: 4, text: "Mooltrikona" };
+        if (sign === 1 || sign === 8) return { val: 3, text: "Swa-Rashi (Own Sign)" };
+    } else if (pName === 'Budh') {
+        if (sign === 6 && degInSign <= 15) return { val: 5, text: "Ucha (Exalted)" };
+        if (sign === 12 && degInSign <= 15) return { val: 0, text: "Neecha (Debilitated)" };
+        if (sign === 6 && degInSign > 15 && degInSign <= 20) return { val: 4, text: "Mooltrikona" };
+        if (sign === 3 || sign === 6) return { val: 3, text: "Swa-Rashi (Own Sign)" };
+    } else if (pName === 'Guru') {
+        if (sign === 4 && degInSign <= 5) return { val: 5, text: "Ucha (Exalted)" };
+        if (sign === 10 && degInSign <= 5) return { val: 0, text: "Neecha (Debilitated)" };
+        if (sign === 9 && degInSign <= 10) return { val: 4, text: "Mooltrikona" };
+        if (sign === 9 || sign === 12) return { val: 3, text: "Swa-Rashi (Own Sign)" };
+    } else if (pName === 'Shukra') {
+        if (sign === 12 && degInSign <= 27) return { val: 5, text: "Ucha (Exalted)" };
+        if (sign === 6 && degInSign <= 27) return { val: 0, text: "Neecha (Debilitated)" };
+        if (sign === 7 && degInSign <= 15) return { val: 4, text: "Mooltrikona" };
+        if (sign === 2 || sign === 7) return { val: 3, text: "Swa-Rashi (Own Sign)" };
+    } else if (pName === 'Shani') {
+        if (sign === 7 && degInSign <= 20) return { val: 5, text: "Ucha (Exalted)" };
+        if (sign === 1 && degInSign <= 20) return { val: 0, text: "Neecha (Debilitated)" };
+        if (sign === 11 && degInSign <= 20) return { val: 4, text: "Mooltrikona" };
+        if (sign === 10 || sign === 11) return { val: 3, text: "Swa-Rashi (Own Sign)" };
+    }
+    return { val: 2, text: "Ordinary (Check Maitri)" };
+}
+
+function calculateDrishtiOnSign(targetSign, flatBodies) {
+    let aspecting = [];
+    const validGrahas = ['Surya', 'Chandra', 'Mangal', 'Budh', 'Guru', 'Shukra', 'Shani', 'Rahu', 'Ketu'];
+    
+    flatBodies.forEach(p => {
+        if (!validGrahas.includes(p.name)) return;
+        let pSign = Math.floor(p.abs_deg / 30) + 1;
+        let aspects = [(pSign + 6) % 12 || 12]; // 7th aspect for all
+        
+        if (p.name === 'Mangal') { aspects.push((pSign + 3)%12||12, (pSign + 7)%12||12); } // 4th, 8th
+        if (['Guru', 'Rahu', 'Ketu'].includes(p.name)) { aspects.push((pSign + 4)%12||12, (pSign + 8)%12||12); } // 5th, 9th
+        if (p.name === 'Shani') { aspects.push((pSign + 2)%12||12, (pSign + 9)%12||12); } // 3rd, 10th
+        
+        if (aspects.includes(targetSign)) aspecting.push(p.name);
+    });
+    return aspecting;
+}
+
+function renderLagneshAnalysis(flatBodies, ascSign, scores) {
+    const box = document.getElementById('lagneshAnalysisBox');
+    if (!box) return;
+
+    const signLords = { 1:'Mangal', 2:'Shukra', 3:'Budh', 4:'Chandra', 5:'Surya', 6:'Budh', 7:'Shukra', 8:'Mangal', 9:'Guru', 10:'Shani', 11:'Shani', 12:'Guru' };
+    
+    // --- DYNAMIC LAGNA CALCULATION ---
+    let activeAscSign = ascSign;
+    let lagnaType = "D1 (Physical Lagna)";
+    let rulerTitle = "Pilot of the Physical Body";
+    
+    // If we are in D9 view, calculate the exact D9 Ascendant sign
+    if (currentChartType === 'D9') {
+        if (typeof asc_degree_global !== 'undefined' && asc_degree_global !== null) {
+            activeAscSign = getD9Sign(asc_degree_global);
+        }
+        lagnaType = "D9 (Navamsha / Soul Lagna)";
+        rulerTitle = "Pilot of the Soul & Dharma";
+    }
+
+    const lagneshName = signLords[activeAscSign];
+    const lagnesh = flatBodies.find(b => b.name === lagneshName);
+    
+    if (!lagnesh) return;
+
+    // Determine placements based on the current chart context
+    const lSignD1 = Math.floor(lagnesh.abs_deg / 30) + 1;
+    const lSignD9 = getD9Sign(lagnesh.abs_deg);
+    
+    // The active sign for house calculation depends on the view
+    let lHouseContext;
+    if (currentChartType === 'D1') {
+        lHouseContext = (lSignD1 - ascSign + 12) % 12 + 1;
+    } else {
+        lHouseContext = (lSignD9 - activeAscSign + 12) % 12 + 1;
+    }
+    
+    const d1Dignity = evaluateExactDignity(lagneshName, lSignD1, lagnesh.deg);
+    const d9Dignity = evaluateExactDignity(lagneshName, lSignD9, lagnesh.deg); 
+    
+    const isVargottama = (lSignD1 === lSignD9);
+    
+    // Calculate Drishti on the active sign
+    let aspectsContext = [];
+    if (currentChartType === 'D1') {
+        aspectsContext = calculateDrishtiOnSign(lSignD1, flatBodies).filter(n => n !== lagneshName);
+    } else {
+        // D9 Drishti usually follows Jaimini or Parashari, but for structural consistency here:
+        aspectsContext = calculateDrishtiOnSign(lSignD9, flatBodies).filter(n => n !== lagneshName);
+    }
+
+    const shadbalaData = scores.find(s => s.name === lagneshName);
+    
+    // Classify House based on the dynamic context
+    let houseType = "Neutral";
+    if ([1, 4, 7, 10].includes(lHouseContext)) houseType = "Kendra (Pillar of Strength)";
+    else if ([5, 9].includes(lHouseContext)) houseType = "Trikona (Supreme Auspiciousness)";
+    else if ([6, 8, 12].includes(lHouseContext)) houseType = "Dusthana (Obstacles & Suffering)";
+    else if ([3, 11].includes(lHouseContext)) houseType = "Upachaya (Growth over time)";
+    else if (lHouseContext === 2) houseType = "Maraka / Wealth";
+
+    // Synthesize Parashari Verdict
+    let verdictTitle = "Neutral / Mixed";
+    let verdictColor = "#f39c12";
+    let verdictText = "";
+
+    // Weighing strength based on active context
+    let activeDignityVal = currentChartType === 'D1' ? d1Dignity.val : d9Dignity.val;
+    
+    let strengthPoints = activeDignityVal + (isVargottama ? 2 : 0);
+    if ([1, 4, 5, 7, 9, 10].includes(lHouseContext)) strengthPoints += 2;
+    if ([6, 8, 12].includes(lHouseContext)) strengthPoints -= 2;
+
+    if (strengthPoints >= 7 || (activeDignityVal === 5 && ![6,8,12].includes(lHouseContext))) {
+        verdictTitle = "Supremely Strong (Bali)";
+        verdictColor = "#27ae60";
+        verdictText = currentChartType === 'D1' 
+            ? `The D1 Ascendant Lord is exceptionally powerful. This grants robust physical health, a highly resilient immune system, and the magnetic charisma to bend circumstances to your will.`
+            : `The Navamsha Ascendant Lord is exceptionally powerful. This grants deep inner resolve, a highly auspicious marital life, and an unshakable spiritual dharma.`;
+    } else if (strengthPoints <= 2 || activeDignityVal === 0) {
+        verdictTitle = "Struggling / Afflicted (Nirbali)";
+        verdictColor = "#c0392b";
+        verdictText = currentChartType === 'D1'
+            ? `The D1 Ascendant Lord is weakened. You must consciously guard physical health and vitality. There may be early-life struggles with self-confidence. Remedies for ${lagneshName} are strictly required.`
+            : `The Navamsha Ascendant Lord is weakened. This indicates internal struggles with faith, potential friction in deep partnerships, or a need to work intensely to find your true soul purpose.`;
+    } else {
+        verdictTitle = "Moderate / Dependent";
+        verdictColor = "#2980b9";
+        verdictText = `The ${currentChartType} Lagnesh has moderate strength. Success in this domain relies heavily on the Dashas (timings) of friendly planets and the sheer force of conscious free will (Karma).`;
+    }
+
+    if (isVargottama) verdictText += ` <strong>Because ${lagneshName} is Vargottama (same sign in D1 and D9), its core essence is unbreakable.</strong>`;
+
+    box.innerHTML = `
+        <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-left: 5px solid ${verdictColor}; border-radius: 8px; padding: 20px; color: #e2e8f0; box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; margin-bottom: 15px;">
+                <div>
+                    <h3 style="margin: 0; color: #f1c40f; font-size: 20px;">👑 ${lagnaType} Lord</h3>
+                    <div style="font-size: 14px; margin-top: 5px;">The active Ascendant is ${i18n[currentLang].rashis[activeAscSign - 1]}, making <strong>${lagneshName}</strong> the ${rulerTitle}.</div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 18px; font-weight: bold; color: ${verdictColor};">${verdictTitle}</div>
+                    <div style="font-size: 12px; color: #94a3b8;">BPHS Synthesis Verdict</div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px;">
+                <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 6px;">
+                    <strong style="color: #38bdf8;">Bhava (House) Placement</strong><br>
+                    <span style="font-size: 16px;">Sitting in House ${lHouseContext} (in ${currentChartType})</span><br>
+                    <span style="font-size: 12px; color: #94a3b8;">${houseType}</span>
+                </div>
+                <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 6px;">
+                    <strong style="color: #34d399;">D1 (Physical) Dignity</strong><br>
+                    <span style="font-size: 16px;">${d1Dignity.text}</span><br>
+                    <span style="font-size: 12px; color: #94a3b8;">Sign ${lSignD1} at ${formatDegree(lagnesh.deg)}</span>
+                </div>
+                <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 6px;">
+                    <strong style="color: #a78bfa;">D9 (Soul) Dignity</strong><br>
+                    <span style="font-size: 16px;">${d9Dignity.text} ${isVargottama ? '🌟' : ''}</span><br>
+                    <span style="font-size: 12px; color: #94a3b8;">Navamsha Sign ${lSignD9} ${isVargottama ? '(Vargottama)' : ''}</span>
+                </div>
+                <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 6px;">
+                    <strong style="color: #f87171;">Shadbala (Mathematical Power)</strong><br>
+                    <span style="font-size: 16px;">Rank #${shadbalaData ? shadbalaData.rankNum : '-'} (${shadbalaData ? shadbalaData.total : '-'} Pts)</span><br>
+                    <span style="font-size: 12px; color: #94a3b8;">Relative to other Grahas</span>
+                </div>
+            </div>
+
+            <div style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 6px; font-size: 13.5px; line-height: 1.5; margin-bottom: 15px;">
+                <strong style="color: #f1c40f;">Graha Drishti in ${currentChartType}:</strong> 
+                ${aspectsContext.length > 0 ? aspectsContext.join(', ') + ' are casting their gaze upon ' + lagneshName + ', modifying its behavior.' : 'None. ' + lagneshName + ' operates in isolation here.'}
+            </div>
+
+            <div style="font-size: 14px; line-height: 1.6; color: #cbd5e1; font-style: italic; border-top: 1px dashed rgba(255,255,255,0.2); padding-top: 12px;">
+                " ${verdictText} "
+            </div>
+        </div>
+    `;
+}
+		
+		
+		
+		
 		// Jaimini Chara Karaka Calculation Engine (Top 7 Grahas)
 function calculateJaiminiKarakas(allBodies) {
     const jaiminiGrahas = ['Surya', 'Chandra', 'Mangal', 'Budh', 'Guru', 'Shukra', 'Shani'];
@@ -1274,7 +1544,7 @@ function populateKundali(houses, ascSign) {
     });
 }
 
- function renderBackendStrength(backendGrahas, housesArray) {
+		function renderBackendStrength(backendGrahas, housesArray) {
             // Keep the UI aesthetic data (colors and short descriptions) on the frontend
             const uiMeta = {
                 'Surya': { color: '#e67e22', desc: 'Atmakaraka (Soul)' },
@@ -1316,7 +1586,13 @@ function populateKundali(houses, ascSign) {
             globalScores = scores;
             updateLedgerView(); // <--- Dynamically routes to D1 or D9 ledger
             renderDeepBhavaOccupants(housesArray, scores);
-        }
+        
+		let flatBodies = [];
+            housesArray.forEach(h => h.forEach(b => { if (b.abs_deg !== undefined) flatBodies.push(b); }));
+            renderLagneshAnalysis(flatBodies, asc_sign_global, scores);
+		
+		
+		}
 		
         function renderRanking(scores) {
             const listDiv = document.getElementById('rankingList');
