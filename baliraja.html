@@ -200,7 +200,8 @@
         const customApiKeyInput = document.getElementById('custom-api-key-input');
         const pasteKeyBtn = document.getElementById('paste-key-btn');
 
-        const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
+// --- CONFIGURATION ---
+        const PROXY_URL = "https://eprashala.pythonanywhere.com/api/chat";
         let appState = 'IDLE'; 
         let userName = '';
         let userAge = 35; 
@@ -213,45 +214,11 @@
         let voices = [];
         let wakeLock = null;
 
-        window.onload = () => {
-            if (synth.speaking) synth.cancel();
-            loadUserData(); 
-            loadVoices();   
-        };
-
-        advanceToggleBtn.addEventListener('click', () => {
-            advanceContainer.classList.toggle('hidden');
-            advanceContainer.classList.toggle('flex');
-        });
-
-        useCustomKeyCheckbox.addEventListener('change', () => {
-            const isChecked = useCustomKeyCheckbox.checked;
-            customApiKeyInput.disabled = !isChecked;
-            pasteKeyBtn.disabled = !isChecked;
-            saveUserData(); 
-            if (isChecked) customApiKeyInput.focus();
-        });
-
-        customApiKeyInput.addEventListener('input', saveUserData);
-
-        pasteKeyBtn.addEventListener('click', async () => {
-            try {
-                const text = await navigator.clipboard.readText();
-                if(text) {
-                    customApiKeyInput.value = text;
-                    saveUserData();
-                    const originalText = pasteKeyBtn.innerHTML;
-                    pasteKeyBtn.textContent = "पेस्ट झाले!";
-                    setTimeout(() => { pasteKeyBtn.innerHTML = originalText; }, 1000);
-                }
-            } catch (err) { alert('पेस्ट करता आले नाही. कृपया टाईप करा.'); }
-        });
-
-        function getEffectiveApiKey() {
+        function getEffectiveCustomKey() {
             if (useCustomKeyCheckbox.checked && customApiKeyInput.value.trim().length > 10) {
                 return customApiKeyInput.value.trim();
             }
-            return DEFAULT_API_KEY;
+            return null;
         }
 
         function loadUserData() {
@@ -609,13 +576,16 @@
             restartChatButton.disabled = false;
         }
 
-        // --- API कॉल्स ---
+// --- API CALLS ---
         async function getAIResponse(historyData) {
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${getEffectiveApiKey()}`;
+            const customKey = getEffectiveCustomKey();
+            const headers = { 'Content-Type': 'application/json' };
+            if (customKey) headers['X-Custom-Api-Key'] = customKey;
+
             try {
-                const response = await fetch(apiUrl, {
+                const response = await fetch(PROXY_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: headers,
                     body: JSON.stringify({
                         contents: historyData,
                         systemInstruction: { parts: [{ text: systemInstruction }] }
@@ -629,11 +599,14 @@
         async function generateTextResponseFromChat() { return await getAIResponse(chatHistory); }
 
         async function extractNameFromTranscript(transcript) {
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${getEffectiveApiKey()}`;
+            const customKey = getEffectiveCustomKey();
+            const headers = { 'Content-Type': 'application/json' };
+            if (customKey) headers['X-Custom-Api-Key'] = customKey;
+
             try {
-                const response = await fetch(apiUrl, {
+                const response = await fetch(PROXY_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: headers,
                     body: JSON.stringify({ contents: [{ parts: [{ text: `Extract First Name from audio: "${transcript}". Return ONLY the name in Marathi script. If unclear return "बळीराजा".` }] }] })
                 });
                 const result = await response.json();
@@ -643,11 +616,14 @@
         }
 
         async function extractAgeFromTranscript(transcript) {
-             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${getEffectiveApiKey()}`;
+             const customKey = getEffectiveCustomKey();
+             const headers = { 'Content-Type': 'application/json' };
+             if (customKey) headers['X-Custom-Api-Key'] = customKey;
+
              try {
-                const response = await fetch(apiUrl, {
+                const response = await fetch(PROXY_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: headers,
                     body: JSON.stringify({ contents: [{ parts: [{ text: `Extract age number from: "${transcript}". Return ONLY digits. Default 35.` }] }] })
                 });
                 const result = await response.json();
@@ -656,6 +632,7 @@
             } catch (e) { return 35; }
         }
 
+       
         function cleanBrackets(text) {
              // Strict cleanup as per user request: no brackets, no asterisks
              return text.replace(/[\*\[\]\(\)<>`]/g, '')
