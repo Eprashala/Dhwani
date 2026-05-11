@@ -187,7 +187,7 @@
         const pasteKeyBtn = document.getElementById('paste-key-btn');
 
         // --- CONFIGURATION ---
-        const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
+        const PROXY_URL = "https://eprashala.pythonanywhere.com/api/chat";
         const SILENCE_TIMEOUT = 4000; // 4000 milliseconds = 4 Seconds
 	    let appState = 'IDLE'; 
         let userName = '';
@@ -200,6 +200,13 @@
         const synth = window.speechSynthesis;
         let voices = [];
         let wakeLock = null;
+		
+		function getEffectiveCustomKey() {
+            if (useCustomKeyCheckbox.checked && customApiKeyInput.value.trim().length > 10) {
+                return customApiKeyInput.value.trim();
+            }
+            return null;
+        }
 
         // --- INITIALIZATION ---
         window.onload = () => {
@@ -237,12 +244,6 @@
             } catch (err) { alert('Could not paste. Type manually.'); }
         });
 
-        function getEffectiveApiKey() {
-            if (useCustomKeyCheckbox.checked && customApiKeyInput.value.trim().length > 10) {
-                return customApiKeyInput.value.trim();
-            }
-            return DEFAULT_API_KEY;
-        }
 
         // --- MEMORY LOGIC ---
         function loadUserData() {
@@ -590,13 +591,16 @@
             restartChatButton.disabled = false;
         }
 
-        // --- API CALLS ---
+// --- API CALLS ---
         async function getAIResponse(historyData) {
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${getEffectiveApiKey()}`;
+            const customKey = getEffectiveCustomKey();
+            const headers = { 'Content-Type': 'application/json' };
+            if (customKey) headers['X-Custom-Api-Key'] = customKey;
+
             try {
-                const response = await fetch(apiUrl, {
+                const response = await fetch(PROXY_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: headers,
                     body: JSON.stringify({
                         contents: historyData,
                         systemInstruction: { parts: [{ text: systemInstruction }] }
@@ -610,11 +614,14 @@
         async function generateTextResponseFromChat() { return await getAIResponse(chatHistory); }
 
         async function extractNameFromTranscript(transcript) {
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${getEffectiveApiKey()}`;
+            const customKey = getEffectiveCustomKey();
+            const headers = { 'Content-Type': 'application/json' };
+            if (customKey) headers['X-Custom-Api-Key'] = customKey;
+
             try {
-                const response = await fetch(apiUrl, {
+                const response = await fetch(PROXY_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: headers,
                     body: JSON.stringify({ contents: [{ parts: [{ text: `Extract First Name from Marathi audio: "${transcript}". If unclear return "सखी".` }] }] })
                 });
                 const result = await response.json();
@@ -624,11 +631,14 @@
         }
 
         async function extractAgeFromTranscript(transcript) {
-             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${getEffectiveApiKey()}`;
+             const customKey = getEffectiveCustomKey();
+             const headers = { 'Content-Type': 'application/json' };
+             if (customKey) headers['X-Custom-Api-Key'] = customKey;
+
              try {
-                const response = await fetch(apiUrl, {
+                const response = await fetch(PROXY_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: headers,
                     body: JSON.stringify({ contents: [{ parts: [{ text: `Extract age number from: "${transcript}". Return ONLY digits. Default 18.` }] }] })
                 });
                 const result = await response.json();
