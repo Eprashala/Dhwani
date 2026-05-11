@@ -540,11 +540,11 @@
             }
         }
 
-        // --- THE BRAIN: DOCTOR PIHU'S LOGIC ---
+// --- THE BRAIN: DOCTOR PIHU'S LOGIC ---
         function buildSystemPrompt() {
             let ageTone = "";
             if (userAge <= 13) {
-                ageTone = "User is a YOUNG GIRL (10-13). Speak like a caring 'Big Sister' or 'Mother'. Use very simple analogies (e.g., 'flowering', 'cleaning cycle'). Avoid scary medical terms unless explained simply. Keep answers short (3-4 sentences).";
+                ageTone = "User is a YOUNG GIRL (10-13). Speak like a caring 'Big Sister' or 'Mother'. Use very simple analogies. Avoid scary medical terms unless explained simply. Keep answers short (3-4 sentences).";
             } else {
                 ageTone = "User is a TEENAGER/ADULT (14+). Speak like a Professional Gynecologist. You can use biological terms but explain them. Answers can be detailed (5-8 sentences).";
             }
@@ -553,13 +553,13 @@
             const curriculum = `
             MODULES TO TEACH (Use as reference):
             1. Introduction: Prepare body for pregnancy, nature's way.
-            2. Menstrual Cycle: Menstrual, follicular, ovulation, luteal phases. Hormones (Estrogen, Progesterone). 28-day cycle.
-            3. During Menstruation: Uterine lining shedding. Normal blood flow (2-7 days). Types of discharge.
-            4. Hygiene: Pads vs Cups vs Tampons. Change every 4-6 hours. Disposal.
+            2. Monthly Cycle: Follicular, luteal phases. Hormones (Estrogen, Progesterone). 28-day cycle.
+            3. During Cycle: Normal flow (2-7 days). Types of discharge.
+            4. Hygiene: Pads vs Cups. Change every 4-6 hours. Disposal.
             5. Pain Management: Cramps (Dysmenorrhea). Heat pads. 
             6. Emotions: PMS, Mood swings. Self-care.
             7. Myths: You CAN touch pickles, swim, enter kitchen. Celebration of womanhood.
-            8. Personal Hygiene: Clean underwear, washing blood stains.
+            8. Personal Hygiene: Clean clothes, washing routines.
             9. Preparation: Talking to parents/teachers.
             `;
 
@@ -570,7 +570,7 @@
                 CORE SOURCES: Charaka Samhita (Striroga Chikitsa), Kashyapa Samhita, Sushruta Samhita, Ashtanga Hridaya.
 
                 STRICT RULES:
-                1. VULGARITY FILTER: If the user asks vulgar/sexual non-medical questions, ONLY say: "माफ करा मी या प्रश्नाचे उत्तर देऊ शकत नाही, कृपया दुसरे काहीतरी विचारा."
+                1. FILTER: If the user asks inappropriate non-medical questions, ONLY say: "माफ करा मी या प्रश्नाचे उत्तर देऊ शकत नाही, कृपया आरोग्याविषयी विचारा."
                 2. TONE: ${ageTone}
                 3. ALWAYS PROVIDE:
                    - A direct answer in Marathi.
@@ -599,8 +599,21 @@
                     })
                 });
                 const result = await response.json();
-                return result.candidates[0].content.parts[0].text.trim();
-            } catch (error) { return "Network Error. Please try again."; }
+                
+                // SAFETY CHECK: If Gemini blocks the medical term, handle it gracefully!
+                if (result.candidates && result.candidates[0]) {
+                    if (result.candidates[0].finishReason === 'SAFETY' || !result.candidates[0].content) {
+                        return "माफ करा, पण काही तांत्रिक किंवा सुरक्षा कारणांमुळे मी या प्रश्नाचे उत्तर देऊ शकत नाही. आपण आरोग्याविषयी दुसरा प्रश्न विचारू शकता.";
+                    }
+                    return result.candidates[0].content.parts[0].text.trim();
+                } else {
+                    return "डॉक्टर सध्या उपलब्ध नाहीत. कृपया थोड्या वेळाने प्रयत्न करा.";
+                }
+
+            } catch (error) { 
+                console.error("API Error:", error);
+                return "Network Error. Please check your internet connection."; 
+            }
         }
 
         async function generateTextResponseFromChat() { return await getAIResponse(chatHistory); }
@@ -614,11 +627,14 @@
                 const response = await fetch(PROXY_URL, {
                     method: 'POST',
                     headers: headers,
-                    body: JSON.stringify({ contents: [{ parts: [{ text: `Extract First Name from Marathi audio: "${transcript}". If unclear return "बाळा".` }] }] })
+                    body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: `Extract First Name from Marathi audio: "${transcript}". If unclear return "बाळा".` }] }] })
                 });
                 const result = await response.json();
-                let name = result.candidates[0].content.parts[0].text.trim();
-                return (name.length < 2) ? "बाळा" : name.replace(/['".]/g, '');
+                if (result.candidates && result.candidates[0].content) {
+                    let name = result.candidates[0].content.parts[0].text.trim();
+                    return (name.length < 2) ? "बाळा" : name.replace(/['".]/g, '');
+                }
+                return "बाळा";
             } catch (error) { return "बाळा"; }
         }
 
@@ -631,14 +647,17 @@
                 const response = await fetch(PROXY_URL, {
                     method: 'POST',
                     headers: headers,
-                    body: JSON.stringify({ contents: [{ parts: [{ text: `Extract age number from: "${transcript}". Return ONLY digits. Default 12.` }] }] })
+                    body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: `Extract age number from: "${transcript}". Return ONLY digits. Default 12.` }] }] })
                 });
                 const result = await response.json();
-                let age = parseInt(result.candidates[0].content.parts[0].text.trim());
-                return isNaN(age) ? 12 : age;
+                if (result.candidates && result.candidates[0].content) {
+                    let age = parseInt(result.candidates[0].content.parts[0].text.trim());
+                    return isNaN(age) ? 12 : age;
+                }
+                return 12;
             } catch (e) { return 12; }
         }
-        
+		
         function cleanTextForTTS(text) {
             let cleaned = text.replace(/\[.*?\]|\(.*?\)|{.*?}/g, ""); 
             return cleaned.replace(/[\*#`]/g, ' ').replace(/\s+/g, ' ').trim();
