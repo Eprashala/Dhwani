@@ -198,10 +198,10 @@
         const customApiKeyInput = document.getElementById('custom-api-key-input');
         const pasteKeyBtn = document.getElementById('paste-key-btn');
 
-        // --- CONFIGURATION & STATE ---
-        const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
+		// --- CONFIGURATION & STATE ---
+        const PROXY_URL = "https://eprashala.pythonanywhere.com/api/chat";
         const SILENCE_TIMEOUT = 4000; // 4000 milliseconds = 4 Seconds
-	let appState = 'IDLE'; 
+        let appState = 'IDLE'; 
         let userName = '';
         let userAge = 18;
         let chatHistory = []; // Current session
@@ -213,6 +213,12 @@
         let voices = [];
         let wakeLock = null;
 
+        function getEffectiveCustomKey() {
+            if (useCustomKeyCheckbox.checked && customApiKeyInput.value.trim().length > 10) {
+                return customApiKeyInput.value.trim();
+            }
+            return null;
+        }
         // --- INITIALIZATION ---
         window.onload = () => {
             if (synth.speaking) synth.cancel();
@@ -256,12 +262,6 @@
             }
         });
 
-        function getEffectiveApiKey() {
-            if (useCustomKeyCheckbox.checked && customApiKeyInput.value.trim().length > 10) {
-                return customApiKeyInput.value.trim();
-            }
-            return DEFAULT_API_KEY;
-        }
 
         // --- MEMORY LOGIC: LOCAL STORAGE & HISTORY ---
         
@@ -632,7 +632,7 @@
             restartChatButton.disabled = false;
         }
 
-        // --- API CALLS (Google Gemini) ---
+// --- API CALLS (Google Gemini) ---
         
         // Helper to get response specifically for chat flow
         async function generateTextResponseFromChat() {
@@ -641,53 +641,79 @@
 
         // Generic API Fetcher
         async function getAIResponse(historyData) {
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${getEffectiveApiKey()}`;
+            const customKey = getEffectiveCustomKey();
+            const headers = { 'Content-Type': 'application/json' };
+            if (customKey) headers['X-Custom-Api-Key'] = customKey;
+
             try {
-                const response = await fetch(apiUrl, {
+                const response = await fetch(PROXY_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: headers,
                     body: JSON.stringify({
                         contents: historyData,
                         systemInstruction: { parts: [{ text: systemInstruction }] }
                     })
                 });
                 const result = await response.json();
-                return result.candidates[0].content.parts[0].text.trim();
-            } catch (error) {
-                return "मला माफ करा, पुन्हा सांगा? तू स्वतःची नवीन  A P I की टाकून बघ."; // "Sorry, say again?"
+                
+                // SAFETY CHECK: Handle Gemini safety blocks gracefully
+                if (result.candidates && result.candidates[0]) {
+                    if (result.candidates[0].finishReason === 'SAFETY' || !result.candidates[0].content) {
+                        return "मला माफ करा, काही तांत्रिक अडचणींमुळे मी उत्तर देऊ शकत नाही. दुसरा प्रश्न विचारा.";
+                    }
+                    return result.candidates[0].content.parts[0].text.trim();
+                } else {
+                    return "मला माफ करा, पुन्हा सांगा?";
+                }
+
+            } catch (error) { 
+                console.error("API Error:", error);
+                return "Network Error. कृपया इंटरनेट तपासा."; 
             }
         }
 
         async function extractNameFromTranscript(transcript) {
-            // Simple AI call to clean up the name (remove sentences like "My name is...")
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${getEffectiveApiKey()}`;
+            const customKey = getEffectiveCustomKey();
+            const headers = { 'Content-Type': 'application/json' };
+            if (customKey) headers['X-Custom-Api-Key'] = customKey;
+
             try {
-                const response = await fetch(apiUrl, {
+                const response = await fetch(PROXY_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: `Extract First Name from: "${transcript}". Return ONLY the name. If unclear return "बाळा".` }] }] })
+                    headers: headers,
+                    body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: `Extract First Name from: "${transcript}". Return ONLY the name. If unclear return "बाळा".` }] }] })
                 });
                 const result = await response.json();
-                let name = result.candidates[0].content.parts[0].text.trim();
-                name = name.replace(/['".]/g, '');
-                return (name.length < 2) ? "बाळा" : name;
+                
+                if (result.candidates && result.candidates[0].content) {
+                    let name = result.candidates[0].content.parts[0].text.trim();
+                    name = name.replace(/['".]/g, '');
+                    return (name.length < 2) ? "बाळा" : name;
+                }
+                return "बाळा";
             } catch (error) { return "बाळा"; }
         }
 
         async function extractAgeFromTranscript(transcript) {
-             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${getEffectiveApiKey()}`;
+             const customKey = getEffectiveCustomKey();
+             const headers = { 'Content-Type': 'application/json' };
+             if (customKey) headers['X-Custom-Api-Key'] = customKey;
+
              try {
-                const response = await fetch(apiUrl, {
+                const response = await fetch(PROXY_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: `Extract age number from: "${transcript}". Return ONLY digits. Default 18.` }] }] })
+                    headers: headers,
+                    body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: `Extract age number from: "${transcript}". Return ONLY digits. Default 18.` }] }] })
                 });
                 const result = await response.json();
-                let age = parseInt(result.candidates[0].content.parts[0].text.trim());
-                return isNaN(age) ? 18 : age;
+                
+                if (result.candidates && result.candidates[0].content) {
+                    let age = parseInt(result.candidates[0].content.parts[0].text.trim());
+                    return isNaN(age) ? 18 : age;
+                }
+                return 18;
             } catch (e) { return 18; }
         }
-        
         // Remove Markdown symbols so the Robot voice doesn't say "Asterisk"
         function cleanTextForTTS(text) {
             let cleaned = text.replace(/\[.*?\]|\(.*?\)|{.*?}/g, ""); 
