@@ -1,256 +1,154 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Samudrika Shastra & Astrological Profiling Engine</title>
-    <style>
-        :root {
-            --bg-primary: #0f172a;
-            --bg-secondary: #1e293b;
-            --accent-gold: #f59e0b;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --border-color: #334155;
-        }
+<script>
+    let streamReference = null;
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
+    async function initializeCamera() {
+        const video = document.getElementById('video-preview');
+        const img = document.getElementById('image-preview');
+        
+        // Reset display states
+        img.style.display = 'none';
+        video.style.display = 'block';
 
-        body {
-            background-color: var(--bg-primary);
-            color: var(--text-main);
-            padding: 2rem;
-            line-height: 1.6;
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
-        header {
-            text-align: center;
-            margin-bottom: 3rem;
-            border-bottom: 2px solid var(--border-color);
-            padding-bottom: 1.5rem;
-        }
-
-        header h1 {
-            color: var(--accent-gold);
-            font-size: 2.5rem;
-            letter-spacing: 1px;
-        }
-
-        header p {
-            color: var(--text-muted);
-            margin-top: 0.5rem;
-        }
-
-        .grid-layout {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2.5rem;
-        }
-
-        @media (max-width: 968px) {
-            .grid-layout {
-                grid-template-columns: 1fr;
+        try {
+            // Stop any existing stream before starting a new one
+            if (streamReference) {
+                streamReference.getTracks().forEach(track => track.stop());
             }
+
+            // Use 'ideal' so it doesn't fail if exact 720p isn't supported by the webcam
+            streamReference = await navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    width: { ideal: 1280 }, 
+                    height: { ideal: 720 }, 
+                    facingMode: "user" 
+                } 
+            });
+            
+            video.srcObject = streamReference;
+            
+            // Explicitly call play() to bypass strict browser autoplay policies
+            await video.play();
+            
+        } catch (err) {
+            alert("Camera access denied or unavailable. Please check browser permissions.");
+            console.error("Camera Init Error:", err);
+        }
+    }
+
+    function captureSnapshot() {
+        const video = document.getElementById('video-preview');
+        const img = document.getElementById('image-preview');
+        
+        // 1. Check if the camera was actually started
+        if (!streamReference) {
+            alert("Please start the camera first.");
+            return;
         }
 
-        .panel {
-            background-color: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 2rem;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+        // 2. Ensure video metadata has loaded so we don't draw a 0x0 canvas
+        if (video.videoWidth === 0 || video.videoHeight === 0) {
+            alert("Camera hardware is still initializing. Please wait one second and try again.");
+            return;
         }
 
-        .panel h2 {
-            color: var(--accent-gold);
-            margin-bottom: 1.5rem;
-            font-size: 1.4rem;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 0.5rem;
+        try {
+            // Create canvas matching actual video feed dimensions
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+
+            // Draw the current video frame onto the canvas
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Extract the image data
+            const imageDataUrl = canvas.toDataURL('image/png');
+
+            // Failsafe: check if canvas returned an empty string
+            if (imageDataUrl === 'data:,') {
+                alert("Failed to capture image. Canvas data is empty.");
+                return;
+            }
+
+            // Apply to image tag and swap visibility
+            img.src = imageDataUrl;
+            video.style.display = 'none';
+            img.style.display = 'block';
+            
+            // 3. Stop the camera stream to free up system memory/battery
+            streamReference.getTracks().forEach(track => track.stop());
+            streamReference = null; // Clear reference so the app knows the camera is off
+
+        } catch (error) {
+            console.error("Snapshot Error:", error);
+            alert("An error occurred while processing the image frame.");
         }
+    }
 
-        .form-group {
-            margin-bottom: 1.25rem;
+    function handleImageUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = document.getElementById('image-preview');
+            const video = document.getElementById('video-preview');
+            
+            // If camera is running, shut it down when user uploads a file instead
+            if (streamReference) {
+                streamReference.getTracks().forEach(track => track.stop());
+                streamReference = null;
+            }
+            
+            video.style.display = 'none';
+            img.style.display = 'block';
+            img.src = e.target.result;
         }
+        reader.readAsDataURL(file);
+    }
 
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-            margin-bottom: 1.25rem;
+    function executeAnalysis(event) {
+        event.preventDefault();
+        
+        // Basic validation to ensure an image is actually present before analyzing
+        const img = document.getElementById('image-preview');
+        if (img.style.display === 'none' || !img.src || img.src === '') {
+            alert("Please capture a photo or upload an image before executing the analysis.");
+            return;
         }
-
-        label {
-            display: block;
-            color: var(--text-muted);
-            margin-bottom: 0.5rem;
-            font-size: 0.9rem;
-            font-weight: 600;
-        }
-
-        input, select {
-            width: 100%;
-            padding: 0.75rem;
-            background-color: var(--bg-primary);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            color: var(--text-main);
-            font-size: 1rem;
-            transition: border-color 0.2s;
-        }
-
-        input:focus, select:focus {
-            outline: none;
-            border-color: var(--accent-gold);
-        }
-
-        /* Camera & Upload Styles */
-        .media-container {
-            position: relative;
-            width: 100%;
-            height: 320px;
-            background-color: var(--bg-primary);
-            border: 2px dashed var(--border-color);
-            border-radius: 8px;
-            overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 1rem;
-        }
-
-        #video-preview, #image-preview {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        #image-preview {
-            display: none;
-        }
-
-        .media-controls {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        button {
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.2s;
-            font-size: 1rem;
-        }
-
-        .btn-secondary {
-            background-color: var(--border-color);
-            color: var(--text-main);
-        }
-
-        .btn-secondary:hover {
-            background-color: #475569;
-        }
-
-        .btn-primary {
-            background-color: var(--accent-gold);
-            color: var(--bg-primary);
-            grid-column: span 2;
-            font-size: 1.1rem;
-            margin-top: 1rem;
-        }
-
-        .btn-primary:hover {
-            background-color: #f59e0b;
-            opacity: 0.9;
-        }
-
-        /* Report / Output Styles */
-        .report-section {
-            margin-bottom: 1.5rem;
-            padding: 1rem;
-            background-color: var(--bg-primary);
-            border-left: 4px solid var(--accent-gold);
-            border-radius: 0 8px 8px 0;
-        }
-
-        .report-section h3 {
-            color: var(--accent-gold);
-            font-size: 1.1rem;
-            margin-bottom: 0.5rem;
-            display: flex;
-            justify-content: space-between;
-        }
-
-        .citation {
-            font-size: 0.8rem;
-            background-color: var(--border-color);
-            padding: 0.2rem 0.5rem;
-            border-radius: 4px;
-            color: #e2e8f0;
-            font-style: italic;
-        }
-
-        .verse-text {
-            font-family: 'Georgia', serif;
-            font-size: 0.95rem;
-            color: #cbd5e1;
-            margin: 0.5rem 0;
-            padding-left: 0.5rem;
-            border-left: 2px solid #475569;
-        }
-
-        .analysis-text {
-            font-size: 0.95rem;
-            color: var(--text-main);
-        }
-
-        .status-message {
-            text-align: center;
-            color: var(--text-muted);
-            font-style: italic;
-            padding: 4rem 0;
-        }
-
-        .hidden {
-            display: none !important;
-        }
-    </style>
-</head>
-<body>
-
-<div class="container">
-    <header>
-        <h1>Physical & Astrological Evaluation Engine</h1>
-        <p>Integrative Synchronization of Deep Facial Metrics with Canonical Vedic Treatises</p>
-    </header>
-
-    <div class="grid-layout">
-        <!-- Input & Capture Panel -->
-        <div class="panel">
-            <h2>Data Acquisition Pipeline</h2>
-            <form id="analysisForm" onsubmit="executeAnalysis(event)">
-                
-                <label>High-Resolution Target Capture</label>
-                <div class="media-container">
-                    <video id="video-preview" autoplay playsinline></video>
-                    <img id="image-preview" alt="Captured target template">
+        
+        document.getElementById('status-placeholder').classList.add('hidden');
+        const results = document.getElementById('results-container');
+        results.classList.remove('hidden');
+        
+        // The mock results injection remains the same
+        results.innerHTML = `
+            <div class="report-section">
+                <h3>
+                    <span>1. Craniofacial Symmetry & Forehead Geometry</span>
+                    <span class="citation">Brihat Samhita, Ch. 68, Verse 12</span>
+                </h3>
+                <div class="verse-text">
+                    "अन्विद्धा विपुलाः शङ्खास्त्र्यश्राश्च सुकुमारकाः। अर्धेन्दुसदृशाश्चैव ललाटा मानवाधिपान्॥"
                 </div>
+                <div class="analysis-text">
+                    <strong>Metric Extraction:</strong> Broad, smooth, semi-circular forehead boundary curve (2.4:1 ratio). Horizontal rekhās scanning reveals two clearly defined, deep uninterrupted lines corresponding to standard Jupiter and Sun markers. Indicative of highly structured analytical capacity, robust logical processing, and baseline administrative stability.
+                </div>
+            </div>
 
-                <div class="media-controls">
-                    <button type="button" class="btn-secondary" onclick="initializeCamera()">Start Camera</button>
-                    <button type="button" class="btn-secondary" onclick="captureSnapshot()">Capture Frame</button>
-                    <input type="file" id="file-upload" accept="image/*" onchange="handleImageUpload(event)" style="display: no
+            <!-- Remaining mock sections... -->
+            <div class="report-section">
+                <h3>
+                    <span>2. Ocular Proportions & Gaze Stability</span>
+                    <span class="citation">Garuda Purana, Vol 1, Ch. 65, p. 192</span>
+                </h3>
+                <div class="verse-text">
+                    "स्निग्धाः समाः समायूता विपुलाः कृष्णतारकाः। नयनाः स्युः सुखावह नराणां न च संशयाः॥"
+                </div>
+                <div class="analysis-text">
+                    <strong>Metric Extraction:</strong> Clear iris boundaries with normal sclera visibility. High structural fixity and blink-rate moderation during recording indicate high sustained focus, baseline emotional resiliency, and a high processing capacity for intricate patterns—excellent indicators for specialized analytical engineering roles.
+                </div>
+            </div>
+        `;
+    }
+</script>
