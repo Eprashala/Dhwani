@@ -261,7 +261,8 @@
         let state = {
             isProcessing: false,
             isListening: false,
-            editingPersonaId: null, // Tracks if we are editing an existing persona
+            editingPersonaId: null, 
+            ttsPaused: false,
             chatHistory: [], 
             currentBase64File: null,
             currentFileType: null,
@@ -325,7 +326,7 @@
             pPersonality: document.getElementById('p-personality'),
             pBooks: document.getElementById('p-books'),
             btnAddPersona: document.getElementById('btn-add-persona'),
-            btnCancelEdit: document.getElementById('btn-cancel-edit'), // NEW
+            btnCancelEdit: document.getElementById('btn-cancel-edit'), 
             btnPreviewVoice: document.getElementById('btn-preview-voice'),
             btnAddVoices: document.getElementById('btn-add-voices'), 
             personaList: document.getElementById('persona-list')
@@ -380,7 +381,11 @@
 
         // --- 5. AUDIO HELPER ---
         function stopTTS() {
+            // CRITICAL FIX: Wake up the engine before canceling, 
+            // otherwise Chrome gets permanently stuck in a paused state.
+            synth.resume(); 
             synth.cancel();
+            state.ttsPaused = false;
             DOM.btnTtsToggle.classList.add('hidden');
         }
 
@@ -426,7 +431,7 @@
             DOM.pAge.value = p.age || '';
             
             DOM.pLang.value = p.lang || 'en-US';
-            DOM.pLang.dispatchEvent(new Event('change')); // Trigger voice filtering
+            DOM.pLang.dispatchEvent(new Event('change')); 
             
             setTimeout(() => { DOM.pVoice.value = p.voiceURI || ''; }, 50);
 
@@ -482,7 +487,7 @@
             renderPersonas();
             
             if (state.activePersonaId === personaData.id) {
-                 loadHistory(); // Refresh chat UI to reflect new name/parameters safely
+                 loadHistory(); 
             }
         }
 
@@ -631,16 +636,31 @@
                 synth.speak(utterance);
             };
 
+            // THE MANUAL TTS PAUSE BUG FIX
             DOM.btnTtsToggle.onclick = (e) => {
                 e.stopPropagation();
-                if (synth.speaking) {
-                    if (synth.paused) {
-                        synth.resume();
-                        DOM.btnTtsToggle.innerText = '⏸️'; 
-                    } else {
-                        synth.pause();
-                        DOM.btnTtsToggle.innerText = '▶️'; 
-                    }
+                if (state.ttsPaused) {
+                    synth.resume();
+                    
+                    // Magic Fix for Android/Chrome: Force a rapid loop of resume commands
+                    // to kick the TTS engine out of its deep suspended state.
+                    let kick = setInterval(() => {
+                        if (!synth.paused) {
+                            clearInterval(kick);
+                        } else {
+                            synth.resume();
+                        }
+                    }, 50);
+                    
+                    // Failsafe to stop the loop after 1 second
+                    setTimeout(() => clearInterval(kick), 1000);
+
+                    state.ttsPaused = false;
+                    DOM.btnTtsToggle.innerText = '⏸️'; 
+                } else {
+                    synth.pause();
+                    state.ttsPaused = true;
+                    DOM.btnTtsToggle.innerText = '▶️'; 
                 }
             };
 
