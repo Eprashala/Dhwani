@@ -20,21 +20,16 @@
         }
     </script>
     <style>
-        :root { --color-primary: #f59e0b; /* Default Amber/Mango color */ }
-        body { font-family: 'Inter', system-ui, sans-serif; touch-action: manipulation; }
+        :root { --color-primary: #f59e0b; }
+        body { font-family: 'Inter', system-ui, sans-serif; touch-action: manipulation; user-select: none; }
         
-        /* Mango Splash Animation */
-        #splash-screen {
-            transition: opacity 1s ease-out, transform 1s ease-out;
-            z-index: 9999;
-        }
+        #splash-screen { transition: opacity 1s ease-out, transform 1s ease-out; z-index: 9999; }
         .mango-bounce { animation: bounce-mango 2s infinite; }
         @keyframes bounce-mango {
             0%, 100% { transform: translateY(0) scale(1); }
             50% { transform: translateY(-20px) scale(1.1); }
         }
 
-        /* Mic Animations */
         .mic-active {
             background: #ef4444 !important;
             box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
@@ -52,7 +47,6 @@
         }
         @keyframes spin-slow { 100% { transform: rotate(360deg); } }
 
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--color-primary); border-radius: 4px; }
@@ -94,7 +88,11 @@
                         <option value="claude">Anthropic (Claude)</option>
                     </select>
                     <select id="set-model" class="w-full mb-2 p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none"></select>
-                    <input type="password" id="set-apikey" placeholder="Enter API Key for selected provider" class="w-full p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none">
+                    
+                    <div class="flex gap-2 w-full mt-2">
+                        <input type="password" id="set-apikey" placeholder="API Key" class="flex-1 p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none">
+                        <button id="btn-paste-key" class="bg-slate-200 dark:bg-slate-600 hover:bg-slate-300 dark:hover:bg-slate-500 px-4 rounded-lg text-sm font-semibold transition-colors shadow-inner border border-slate-300 dark:border-slate-500">Paste</button>
+                    </div>
                 </div>
 
                 <div class="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border dark:border-slate-600">
@@ -106,7 +104,13 @@
                         <option value="empathetic">Empathetic & Supportive</option>
                     </select>
                     <textarea id="set-custom-prompt" placeholder="Custom System Prompt (Optional)" class="w-full mb-2 p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none text-sm h-20"></textarea>
-                    <select id="set-voice" class="w-full p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none text-sm"></select>
+                    
+                    <div class="flex gap-2 w-full">
+                        <select id="set-voice" class="flex-1 p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none text-sm"></select>
+                        <button id="btn-play-voice" class="bg-primary hover:bg-orange-500 text-white px-3 rounded-lg text-sm transition-colors shadow-lg flex items-center justify-center" title="Preview Voice">
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border dark:border-slate-600 flex justify-between items-center">
@@ -124,7 +128,6 @@
     </div>
 
     <div class="flex flex-col w-full h-full max-w-3xl mx-auto relative shadow-2xl">
-        
         <header class="flex-shrink-0 p-4 bg-white/80 dark:bg-slate-900/80 glass-panel z-20 flex justify-between items-center shadow-sm">
             <div class="flex items-center gap-3">
                 <div class="text-3xl">🥭</div>
@@ -134,8 +137,8 @@
                 </div>
             </div>
             <div class="flex gap-3">
-                <button id="btn-clear" class="text-slate-400 hover:text-red-500 p-2" title="Clear Chat">🗑️</button>
-                <button id="btn-settings" class="text-slate-400 hover:text-primary p-2" title="Settings">⚙️</button>
+                <button id="btn-clear" class="text-slate-400 hover:text-red-500 p-2 outline-none" title="Clear Chat">🗑️</button>
+                <button id="btn-settings" class="text-slate-400 hover:text-primary p-2 outline-none" title="Settings">⚙️</button>
             </div>
         </header>
 
@@ -144,30 +147,47 @@
         <div id="image-preview-container" class="hidden px-4 py-2 bg-slate-100 dark:bg-slate-800 flex items-center gap-2">
             <span class="text-xs text-slate-500">Attached:</span>
             <img id="image-preview" class="h-10 rounded border border-slate-300" src="" alt="preview">
-            <button id="btn-remove-image" class="text-red-500 text-sm ml-2 font-bold">✕</button>
+            <button id="btn-remove-image" class="text-red-500 text-sm ml-2 font-bold outline-none">✕</button>
         </div>
 
         <footer class="w-full bg-white/90 dark:bg-slate-900/90 glass-panel p-3 pb-safe flex items-center gap-2 relative z-20">
-            <label for="file-upload" class="p-3 text-slate-500 hover:text-primary cursor-pointer transition-colors">
-                📎
-            </label>
+            <label for="file-upload" class="p-3 text-slate-500 hover:text-primary cursor-pointer transition-colors outline-none">📎</label>
             <input id="file-upload" type="file" accept="image/*" class="hidden">
 
             <input type="text" id="text-input" class="flex-1 bg-slate-100 dark:bg-slate-800 dark:text-white border border-transparent focus:border-primary rounded-full px-5 py-3 outline-none transition-colors" placeholder="Message Mango...">
             
-            <button id="btn-send" class="p-3 bg-primary hover:bg-orange-500 text-white rounded-full transition-colors shadow-lg outline-none hidden">
-                ➤
-            </button>
-
-            <button id="btn-mic" class="w-12 h-12 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-full flex items-center justify-center transition-all outline-none">
-                🎤
-            </button>
+            <button id="btn-send" class="p-3 bg-primary hover:bg-orange-500 text-white rounded-full transition-colors shadow-lg outline-none hidden">➤</button>
+            <button id="btn-mic" class="w-12 h-12 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-full flex items-center justify-center transition-all outline-none">🎤</button>
         </footer>
     </div>
 
     <script>
-        // --- 1. CONFIGURATION & STATE ---
-		const MODELS = {
+        // --- 1. FULLSCREEN & WAKE LOCK ---
+        let wakeLock = null;
+        async function acquireWakeLock() {
+            if ('wakeLock' in navigator) {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                } catch (err) {}
+            }
+        }
+
+        // Click anywhere to ensure fullscreen and wake lock
+        document.addEventListener('click', () => {
+            if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            }
+            acquireWakeLock();
+        });
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                acquireWakeLock();
+            }
+        });
+
+        // --- 2. CONFIGURATION & STATE (2026 Models) ---
+        const MODELS = {
             gemini: ["gemini-3.5-flash", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite"],
             openai: ["o3", "gpt-4.1", "gpt-4o"], 
             groq: ["llama-4-scout-17b", "llama-4-maverick-17b", "mixtral-8x7b-32768"], 
@@ -177,7 +197,7 @@
         let state = {
             isProcessing: false,
             isListening: false,
-            chatHistory: [], // Structure: { role: 'user'|'assistant', content: string }
+            chatHistory: [], 
             currentBase64Image: null,
             apiKeys: JSON.parse(localStorage.getItem('mango_keys')) || {},
             settings: JSON.parse(localStorage.getItem('mango_settings')) || {
@@ -190,7 +210,7 @@
         let recognition = null;
         let synth = window.speechSynthesis;
 
-        // --- 2. DOM ELEMENTS ---
+        // --- 3. DOM ELEMENTS ---
         const DOM = {
             splash: document.getElementById('splash-screen'),
             log: document.getElementById('chat-log'),
@@ -202,6 +222,8 @@
             modalSettings: document.getElementById('settings-modal'),
             btnCloseSettings: document.getElementById('btn-close-settings'),
             btnSaveSettings: document.getElementById('btn-save-settings'),
+            btnPasteKey: document.getElementById('btn-paste-key'),
+            btnPlayVoice: document.getElementById('btn-play-voice'),
             status: document.getElementById('status-indicator'),
             fileInput: document.getElementById('file-upload'),
             imgPreviewCont: document.getElementById('image-preview-container'),
@@ -221,19 +243,19 @@
             sColor: document.getElementById('set-color')
         };
 
-        // --- 3. INITIALIZATION ---
+        // --- 4. INITIALIZATION ---
         window.onload = () => {
             setTimeout(() => {
                 DOM.splash.style.opacity = '0';
                 DOM.splash.style.transform = 'scale(1.1)';
                 setTimeout(() => DOM.splash.style.display = 'none', 1000);
+                acquireWakeLock(); // Try to acquire after splash
             }, 1500);
 
             applySettingsToUI();
             populateModels(state.settings.provider);
             DOM.sModel.value = state.settings.model;
             
-            // Load Voices
             const loadVoices = () => {
                 DOM.sVoice.innerHTML = '';
                 synth.getVoices().forEach(v => {
@@ -249,7 +271,7 @@
             setupEventListeners();
         };
 
-        // --- 4. SETTINGS & UI LOGIC ---
+        // --- 5. SETTINGS & UI LOGIC ---
         function applySettingsToUI() {
             if (state.settings.darkmode) document.documentElement.classList.add('dark');
             else document.documentElement.classList.remove('dark');
@@ -291,13 +313,45 @@
             DOM.modalSettings.classList.add('hidden');
         }
 
-        // --- 5. EVENT LISTENERS ---
+        // --- 6. EVENT LISTENERS ---
         function setupEventListeners() {
-            DOM.btnSettings.onclick = () => DOM.modalSettings.classList.remove('hidden');
-            DOM.btnCloseSettings.onclick = () => DOM.modalSettings.classList.add('hidden');
-            DOM.btnSaveSettings.onclick = saveSettings;
+            DOM.btnSettings.onclick = (e) => { e.stopPropagation(); DOM.modalSettings.classList.remove('hidden'); };
+            DOM.btnCloseSettings.onclick = (e) => { e.stopPropagation(); DOM.modalSettings.classList.add('hidden'); };
+            DOM.btnSaveSettings.onclick = (e) => { e.stopPropagation(); saveSettings(); };
+            DOM.modalSettings.onclick = (e) => e.stopPropagation(); // Prevent fullscreen trigger when clicking inside modal
+
             DOM.btnClear.onclick = () => {
                 if(confirm("Erase all memory?")) { state.chatHistory = []; localStorage.removeItem('mango_history'); DOM.log.innerHTML=''; }
+            };
+
+            // Paste Button Logic
+            DOM.btnPasteKey.onclick = async (e) => {
+                e.stopPropagation(); 
+                try {
+                    const text = await navigator.clipboard.readText();
+                    if (text) {
+                        DOM.sKey.value = text;
+                        const originalText = DOM.btnPasteKey.innerText;
+                        DOM.btnPasteKey.innerText = "Pasted!";
+                        DOM.btnPasteKey.classList.replace('bg-slate-200', 'bg-green-500');
+                        DOM.btnPasteKey.classList.replace('dark:bg-slate-600', 'dark:bg-green-600');
+                        DOM.btnPasteKey.classList.add('text-white');
+                        setTimeout(() => { 
+                            DOM.btnPasteKey.innerText = originalText; 
+                            DOM.btnPasteKey.classList.replace('bg-green-500', 'bg-slate-200');
+                            DOM.btnPasteKey.classList.replace('dark:bg-green-600', 'dark:bg-slate-600');
+                            DOM.btnPasteKey.classList.remove('text-white');
+                        }, 1500);
+                    }
+                } catch (err) {
+                    alert('Could not access clipboard. Please paste manually.');
+                }
+            };
+
+            // Voice Preview Button Logic
+            DOM.btnPlayVoice.onclick = (e) => {
+                e.stopPropagation();
+                previewVoice();
             };
 
             // Input handling
@@ -313,7 +367,8 @@
             DOM.textIn.onkeypress = (e) => { if(e.key === 'Enter') processInput(DOM.textIn.value); };
 
             // Mic
-            DOM.btnMic.onclick = () => {
+            DOM.btnMic.onclick = (e) => {
+                e.stopPropagation();
                 if (state.isProcessing || !recognition) return;
                 if (state.isListening) recognition.stop();
                 else {
@@ -321,7 +376,7 @@
                 }
             };
 
-            // File Upload (Image -> Base64)
+            // File Upload
             DOM.fileInput.addEventListener('change', (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -339,17 +394,14 @@
                 state.currentBase64Image = null;
                 DOM.imgPreviewCont.classList.add('hidden');
                 DOM.fileInput.value = '';
-                DOM.textIn.dispatchEvent(new Event('input')); // toggle send/mic button
+                DOM.textIn.dispatchEvent(new Event('input')); 
             };
         }
 
-        // --- 6. EAR (Speech Recognition) ---
+        // --- 7. EAR (Speech Recognition) ---
         function initSpeechRecognition() {
             const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRec) {
-                DOM.btnMic.style.display = 'none';
-                return;
-            }
+            if (!SpeechRec) { DOM.btnMic.style.display = 'none'; return; }
             recognition = new SpeechRec();
             recognition.continuous = false;
             recognition.interimResults = false;
@@ -358,15 +410,12 @@
                 state.isListening = true;
                 DOM.btnMic.classList.add('mic-active');
                 DOM.textIn.placeholder = "Listening...";
-                synth.cancel(); // Stop talking if user speaks
+                synth.cancel(); 
             };
             
             recognition.onresult = (e) => {
                 const transcript = e.results[0][0].transcript.trim();
-                if (transcript) {
-                    DOM.textIn.value = transcript;
-                    processInput(transcript);
-                }
+                if (transcript) { DOM.textIn.value = transcript; processInput(transcript); }
             };
 
             recognition.onend = () => {
@@ -376,38 +425,43 @@
             };
         }
 
-        // --- 7. MOUTH (Speech Synthesis) ---
+        // --- 8. MOUTH (Speech Synthesis) ---
+        function previewVoice() {
+            synth.cancel();
+            const utterance = new SpeechSynthesisUtterance("Hi, I am Mango. How do I sound?");
+            const voices = synth.getVoices();
+            const selectedVoice = voices.find(v => v.voiceURI === DOM.sVoice.value);
+            if (selectedVoice) utterance.voice = selectedVoice;
+            
+            const ageVal = parseInt(DOM.sAge.value) || 25;
+            if (ageVal < 12) { utterance.rate = 0.8; utterance.pitch = 1.2; } 
+            else if (ageVal > 60) { utterance.rate = 0.9; utterance.pitch = 0.9; } 
+            else { utterance.rate = 1.0; }
+
+            synth.speak(utterance);
+        }
+
         function speakText(text) {
             synth.cancel();
-            // Remove emojis and markdown for speech
             let cleanText = text.replace(/[\u{1F600}-\u{1F6FF}|[\u{2600}-\u{26FF}]/gu, '');
             cleanText = cleanText.replace(/[*#`_\[\]()]/g, '').trim();
             if(!cleanText) return;
 
             const utterance = new SpeechSynthesisUtterance(cleanText);
             
-            // Age based modulation
-            if (state.settings.age < 12) {
-                utterance.rate = 0.8; // Slower for kids
-                utterance.pitch = 1.2; // Slightly higher pitch
-            } else if (state.settings.age > 60) {
-                utterance.rate = 0.9;
-                utterance.pitch = 0.9;
-            } else {
-                utterance.rate = 1.0;
-            }
+            if (state.settings.age < 12) { utterance.rate = 0.8; utterance.pitch = 1.2; } 
+            else if (state.settings.age > 60) { utterance.rate = 0.9; utterance.pitch = 0.9; } 
+            else { utterance.rate = 1.0; }
 
-            // Set specific voice
             if (state.settings.voiceURI) {
                 const voices = synth.getVoices();
                 const selectedVoice = voices.find(v => v.voiceURI === state.settings.voiceURI);
                 if (selectedVoice) utterance.voice = selectedVoice;
             }
-
             synth.speak(utterance);
         }
 
-        // --- 8. BRAIN (Core Logic & API Fetch) ---
+        // --- 9. BRAIN (Core Logic & API Fetch) ---
         async function processInput(text) {
             if (state.isProcessing || (!text.trim() && !state.currentBase64Image)) return;
             if (!state.apiKeys[state.settings.provider]) {
@@ -418,7 +472,6 @@
             const userText = text.trim();
             const imgData = state.currentBase64Image;
             
-            // Reset UI
             DOM.textIn.value = '';
             DOM.btnRemoveImg.click();
             DOM.textIn.placeholder = "Mango is thinking...";
@@ -426,13 +479,10 @@
             DOM.status.innerText = "Thinking...";
             state.isProcessing = true;
 
-            // Render User Message
             renderMessage('user', userText, imgData);
             
-            // Build History Array
             let msgContent = userText;
             if (imgData && state.settings.provider !== 'claude') { 
-                // Only storing text in history for simplicity, avoiding huge base64 storage
                 msgContent = userText ? `${userText} [Image Attached]` : "[Image Attached]"; 
             }
             state.chatHistory.push({ role: 'user', content: msgContent });
@@ -448,12 +498,11 @@
                 renderMessage('assistant', "Oops! I hit a snag connecting to my brain. Check your API keys and internet connection.");
             }
 
-            // Cleanup
             state.isProcessing = false;
             DOM.btnMic.classList.remove('mic-thinking');
             DOM.textIn.placeholder = "Message Mango...";
             DOM.status.innerText = "Online";
-            DOM.textIn.dispatchEvent(new Event('input')); // Reset buttons
+            DOM.textIn.dispatchEvent(new Event('input')); 
         }
 
         async function fetchAIResponse(userText, imgData) {
@@ -464,10 +513,8 @@
 
             if (p === 'openai' || p === 'groq') {
                 const url = p === 'openai' ? 'https://api.openai.com/v1/chat/completions' : 'https://api.groq.com/openai/v1/chat/completions';
-                
                 let messages = [{ role: "system", content: sysPrompt }, ...state.chatHistory.slice(-8)];
                 
-                // Inject current message with/without image
                 let currentMessageContent = userText || "Analyze this image";
                 if (imgData && p === 'openai') {
                     currentMessageContent = [
@@ -475,7 +522,7 @@
                         { type: "image_url", image_url: { url: imgData } }
                     ];
                 }
-                messages.pop(); // remove the standard text push
+                messages.pop(); 
                 messages.push({ role: "user", content: currentMessageContent });
 
                 const res = await fetch(url, {
@@ -490,7 +537,6 @@
             } else if (p === 'gemini') {
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${mod}:generateContent?key=${key}`;
                 
-                // Convert history format to Gemini format
                 let contents = state.chatHistory.slice(-8, -1).map(m => ({
                     role: m.role === 'assistant' ? 'model' : 'user',
                     parts: [{ text: m.content }]
@@ -514,14 +560,13 @@
                 return data.candidates[0].content.parts[0].text;
 
             } else if (p === 'claude') {
-                // Note: Anthropic often blocks browser CORS. Handled gracefully if so.
                 const res = await fetch('https://api.anthropic.com/v1/messages', {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json', 
                         'x-api-key': key,
                         'anthropic-version': '2023-06-01',
-                        'anthropic-dangerously-allow-browser': 'true' // Sometimes required for client side
+                        'anthropic-dangerously-allow-browser': 'true' 
                     },
                     body: JSON.stringify({
                         model: mod,
@@ -530,7 +575,7 @@
                         messages: state.chatHistory.slice(-8)
                     })
                 });
-                if(!res.ok) throw new Error("API Error / CORS blocked");
+                if(!res.ok) throw new Error("API Error");
                 const data = await res.json();
                 return data.content[0].text;
             }
@@ -560,7 +605,7 @@ Personality Preset: ${state.settings.personality}.
 Additional Custom Instructions: ${state.settings.customPrompt}`;
         }
 
-        // --- 9. UTILITIES ---
+        // --- 10. UTILITIES ---
         function renderMessage(role, text, imgData = null) {
             const div = document.createElement('div');
             const isModel = role === 'assistant';
@@ -571,7 +616,6 @@ Additional Custom Instructions: ${state.settings.customPrompt}`;
                 imgHTML = `<img src="${imgData}" class="max-w-full h-auto rounded mb-2 border border-white/20">`;
             }
 
-            // Very basic markdown bolding to HTML
             let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
 
             div.innerHTML = `
