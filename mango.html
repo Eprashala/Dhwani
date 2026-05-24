@@ -56,6 +56,31 @@
             -webkit-backdrop-filter: blur(12px);
             border-top: 1px solid rgba(255,255,255,0.1);
         }
+
+        /* Range slider styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: var(--color-primary);
+            cursor: pointer;
+            margin-top: -6px;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 2px;
+        }
+        .dark input[type=range]::-webkit-slider-runnable-track {
+            background: #475569;
+        }
     </style>
 </head>
 <body class="bg-bgLight dark:bg-bgDark text-slate-800 dark:text-slate-200 h-screen flex flex-col overflow-hidden transition-colors duration-300">
@@ -105,8 +130,20 @@
                         <input type="number" id="p-age" placeholder="Age of Persona" class="w-full mb-2 p-2 rounded bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 outline-none text-sm">
                         
                         <div class="flex gap-2 w-full mb-2">
+                            <select id="p-lang" class="flex-1 p-2 rounded bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 outline-none text-xs"><option value="">Any Language</option></select>
                             <select id="p-voice" class="flex-1 p-2 rounded bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 outline-none text-xs"></select>
-                            <button id="btn-preview-voice" class="bg-slate-200 dark:bg-slate-700 px-3 rounded text-sm hover:bg-slate-300 dark:hover:bg-slate-600" title="Preview Voice">▶️</button>
+                        </div>
+
+                        <div class="flex gap-2 w-full mb-2 items-center bg-slate-50 dark:bg-slate-800 p-2 rounded border dark:border-slate-700">
+                            <div class="flex-1 flex flex-col gap-1">
+                                <div class="flex justify-between text-[10px] text-slate-500"><span>Pitch</span><span id="val-pitch">1.0</span></div>
+                                <input type="range" id="p-pitch" min="0" max="2" step="0.1" value="1">
+                            </div>
+                            <div class="flex-1 flex flex-col gap-1">
+                                <div class="flex justify-between text-[10px] text-slate-500"><span>Speed</span><span id="val-rate">1.0</span></div>
+                                <input type="range" id="p-rate" min="0.5" max="2" step="0.1" value="1">
+                            </div>
+                            <button id="btn-preview-voice" class="ml-1 bg-slate-200 dark:bg-slate-700 h-8 w-8 flex items-center justify-center rounded-full text-sm hover:bg-slate-300 dark:hover:bg-slate-600" title="Preview Voice">▶️</button>
                         </div>
                         
                         <textarea id="p-personality" placeholder="Detailed Personality (e.g. Strict but caring sister...)" class="w-full mb-2 p-2 rounded bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 outline-none text-sm h-16"></textarea>
@@ -174,17 +211,18 @@
             
             <div class="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                 <button id="btn-tts-toggle" class="w-10 h-10 sm:w-12 sm:h-12 hidden bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-800 rounded-full flex items-center justify-center transition-all outline-none text-xl shadow-inner" title="Pause/Play Audio">⏸️</button>
-                
                 <button id="btn-send" class="w-10 h-10 sm:w-12 sm:h-12 bg-primary hover:bg-orange-500 text-white rounded-full transition-colors shadow-lg outline-none hidden flex items-center justify-center text-lg sm:text-xl">➤</button>
-                
                 <button id="btn-mic" class="w-10 h-10 sm:w-12 sm:h-12 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-full flex items-center justify-center transition-all outline-none text-lg sm:text-xl">🎤</button>
             </div>
         </footer>
     </div>
 
     <script>
-        // --- 1. FULLSCREEN & WAKE LOCK ---
+        // --- 1. FULLSCREEN, WAKE LOCK, GLOBAL VARIABLES ---
         let wakeLock = null;
+        // CRITICAL FOR ANDROID: Store utterance globally to prevent garbage collection
+        window.currentUtterance = null; 
+
         async function acquireWakeLock() {
             if ('wakeLock' in navigator) {
                 try { wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
@@ -210,7 +248,8 @@
 
         const defaultPersona = {
             id: 'default', name: 'Mango', fname: 'Virtual Friend', age: 25, 
-            voiceURI: '', personality: 'Highly conversational, helpful, and humorous virtual friend.',
+            lang: 'en-US', voiceURI: '', pitch: 1.0, rate: 1.0,
+            personality: 'Highly conversational, helpful, and humorous virtual friend.',
             referenceBooks: ''
         };
 
@@ -270,7 +309,12 @@
             pName: document.getElementById('p-name'),
             pFname: document.getElementById('p-fname'),
             pAge: document.getElementById('p-age'),
+            pLang: document.getElementById('p-lang'),
             pVoice: document.getElementById('p-voice'),
+            pPitch: document.getElementById('p-pitch'),
+            pRate: document.getElementById('p-rate'),
+            valPitch: document.getElementById('val-pitch'),
+            valRate: document.getElementById('val-rate'),
             pPersonality: document.getElementById('p-personality'),
             pBooks: document.getElementById('p-books'),
             btnAddPersona: document.getElementById('btn-add-persona'),
@@ -292,13 +336,37 @@
             DOM.sModel.value = state.settings.model;
             
             const loadVoices = () => {
+                const voices = synth.getVoices();
                 DOM.pVoice.innerHTML = '';
-                synth.getVoices().forEach(v => {
-                    DOM.pVoice.add(new Option(`${v.name} (${v.lang})`, v.voiceURI));
+                const langs = new Set();
+                
+                // Keep track of current selected voice to re-select it
+                const currentVoice = DOM.pVoice.value;
+
+                voices.forEach(v => {
+                    // Filter by language if a language is selected
+                    if (!DOM.pLang.value || v.lang === DOM.pLang.value) {
+                        DOM.pVoice.add(new Option(`${v.name} (${v.lang})`, v.voiceURI));
+                    }
+                    langs.add(v.lang);
                 });
+
+                // Only populate language dropdown if it's empty (first load)
+                if (DOM.pLang.options.length <= 1) {
+                    Array.from(langs).sort().forEach(l => DOM.pLang.add(new Option(l, l)));
+                }
+
+                if(currentVoice) DOM.pVoice.value = currentVoice;
             };
+
+            // Trigger voice load and setup language filter
             if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = loadVoices;
             loadVoices();
+            DOM.pLang.addEventListener('change', loadVoices);
+
+            // Update Slider Text Values
+            DOM.pPitch.addEventListener('input', (e) => DOM.valPitch.innerText = parseFloat(e.target.value).toFixed(1));
+            DOM.pRate.addEventListener('input', (e) => DOM.valRate.innerText = parseFloat(e.target.value).toFixed(1));
 
             renderPersonas();
             loadHistory();
@@ -344,7 +412,10 @@
                 name: DOM.pName.value,
                 fname: DOM.pFname.value || DOM.pName.value,
                 age: parseInt(DOM.pAge.value) || 30,
+                lang: DOM.pLang.value || 'en-US',
                 voiceURI: DOM.pVoice.value,
+                pitch: parseFloat(DOM.pPitch.value) || 1.0,
+                rate: parseFloat(DOM.pRate.value) || 1.0,
                 personality: DOM.pPersonality.value,
                 referenceBooks: DOM.pBooks.value
             };
@@ -466,24 +537,26 @@
                 } catch (err) { alert('Could not access clipboard. Please paste manually.'); }
             };
 
-            // ANDROID MAGIC FIX ADDED TO PREVIEW VOICE
+            // ANDROID MAGIC FIX: Set explicit lang, pitch, and rate BEFORE voice. Bind to window.
             DOM.btnPreviewVoice.onclick = (e) => {
                 e.stopPropagation();
                 stopTTS();
                 const utterance = new SpeechSynthesisUtterance(`Hi, I am ${DOM.pName.value || 'your new persona'}. How do I sound?`);
-                const voices = synth.getVoices();
                 
-                // Match by voiceURI, fallback to name
+                // Set explicitly requested language, pitch, and rate
+                utterance.lang = DOM.pLang.value || 'en-US';
+                utterance.pitch = parseFloat(DOM.pPitch.value) || 1.0;
+                utterance.rate = parseFloat(DOM.pRate.value) || 1.0;
+
+                const voices = synth.getVoices();
                 const selectedVoice = voices.find(v => v.voiceURI === DOM.pVoice.value || v.name === DOM.pVoice.value);
+                
                 if (selectedVoice) {
                     utterance.voice = selectedVoice;
-                    utterance.lang = selectedVoice.lang; // <-- Android Fix
+                    utterance.lang = selectedVoice.lang; // Override with exact voice lang
                 }
                 
-                const ageVal = parseInt(DOM.pAge.value) || 30;
-                if (ageVal < 12) { utterance.rate = 0.8; utterance.pitch = 1.2; } 
-                else if (ageVal > 60) { utterance.rate = 0.9; utterance.pitch = 0.9; } 
-                
+                window.currentUtterance = utterance; // Prevent Android Garbage Collection
                 synth.speak(utterance);
             };
 
@@ -594,13 +667,13 @@
             const activePersona = getActivePersona();
             const utterance = new SpeechSynthesisUtterance(cleanText);
             
-            if (activePersona.age < 12) { utterance.rate = 0.8; utterance.pitch = 1.2; } 
-            else if (activePersona.age > 60) { utterance.rate = 0.9; utterance.pitch = 0.9; } 
-            else { utterance.rate = 1.0; }
+            // Apply saved Pitch and Rate for the active persona
+            utterance.lang = activePersona.lang || 'en-US';
+            utterance.pitch = activePersona.pitch !== undefined ? activePersona.pitch : 1.0;
+            utterance.rate = activePersona.rate !== undefined ? activePersona.rate : 1.0;
 
             if (activePersona.voiceURI) {
                 const voices = synth.getVoices();
-                // Match by voiceURI, fallback to name
                 const selectedVoice = voices.find(v => v.voiceURI === activePersona.voiceURI || v.name === activePersona.voiceURI);
                 if (selectedVoice) {
                     utterance.voice = selectedVoice;
@@ -619,6 +692,7 @@
                 DOM.btnTtsToggle.classList.add('hidden');
             };
 
+            window.currentUtterance = utterance; // Prevent Android Garbage Collection
             synth.speak(utterance);
         }
 
@@ -783,9 +857,10 @@ User Profile: You are speaking to ${state.settings.name} (Nickname: ${state.sett
 STRICT RULES:
 1. ${ageRule}
 2. Stay deeply in character as ${activePersona.name} at all times.
-3. ABSOLUTELY DO NOT write, generate, or output any computer code, HTML, or scripts under any circumstances.
-4. ABSOLUTELY DO NOT generate, create, or request images.
-5. Keep responses concise as they will be read aloud via Text-to-Speech. Do not use complex markdown like tables.`;
+3. Speak and respond ONLY in the language associated with this code: ${activePersona.lang}.
+4. ABSOLUTELY DO NOT write, generate, or output any computer code, HTML, or scripts under any circumstances.
+5. ABSOLUTELY DO NOT generate, create, or request images.
+6. Keep responses concise as they will be read aloud via Text-to-Speech. Do not use complex markdown like tables.`;
 
             if (state.settings.customPrompt) {
                 prompt += `\nAdditional Global Instructions: ${state.settings.customPrompt}`;
