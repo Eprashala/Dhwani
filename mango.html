@@ -1,223 +1,604 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="light">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>MANGO - Your Virtual Friend</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: 'var(--color-primary)',
+                        bgLight: '#f8fafc',
+                        bgDark: '#0f172a',
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        /* CSS Variables for Dynamic Theming */
-        :root {
-            --primary-bg: #ffffff;
-            --primary-text: #1f2937;
-            --chat-bg: #f3f4f6;
-            --accent-color: #f59e0b; /* Mango Orange */
-        }
-
-        .dark-mode {
-            --primary-bg: #111827;
-            --primary-text: #f9fafb;
-            --chat-bg: #1f2937;
-            --accent-color: #fbbf24;
-        }
-
-        body {
-            background-color: var(--primary-bg);
-            color: var(--primary-text);
-            transition: background-color 0.3s, color 0.3s;
-            font-family: 'Inter', sans-serif;
-            overflow: hidden;
-        }
-
-        /* The Mango Loading Animation */
-        #loader {
-            position: fixed;
-            inset: 0;
-            background-color: var(--primary-bg);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 50;
-            transition: opacity 0.8s ease-in-out;
-        }
-
-        .mango-shape {
-            width: 100px;
-            height: 120px;
-            background: linear-gradient(135deg, #fcd34d, #f59e0b);
-            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
-            box-shadow: inset -10px -10px 20px rgba(0,0,0,0.1), 0 10px 20px rgba(245, 158, 11, 0.3);
-            animation: float 2s ease-in-out infinite, pulse 2s infinite;
-            position: relative;
-        }
-
-        .mango-leaf {
-            position: absolute;
-            top: -15px;
-            right: 15px;
-            width: 30px;
-            height: 30px;
-            background-color: #22c55e;
-            border-radius: 0 50% 0 50%;
-            transform: rotate(-15deg);
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-15px); }
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1) translateY(0); }
-            50% { transform: scale(1.05) translateY(-15px); }
-        }
-
-        /* App Layout transition */
-        #app-container {
-            opacity: 0;
-            transform: scale(0.95);
-            transition: opacity 0.8s ease-out, transform 0.8s ease-out;
-        }
+        :root { --color-primary: #f59e0b; /* Default Amber/Mango color */ }
+        body { font-family: 'Inter', system-ui, sans-serif; touch-action: manipulation; }
         
-        .chat-container { background-color: var(--chat-bg); }
+        /* Mango Splash Animation */
+        #splash-screen {
+            transition: opacity 1s ease-out, transform 1s ease-out;
+            z-index: 9999;
+        }
+        .mango-bounce { animation: bounce-mango 2s infinite; }
+        @keyframes bounce-mango {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-20px) scale(1.1); }
+        }
+
+        /* Mic Animations */
+        .mic-active {
+            background: #ef4444 !important;
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            animation: pulse-mic 1.5s infinite;
+        }
+        .mic-thinking {
+            background: #eab308 !important;
+            animation: spin-slow 2s linear infinite;
+            pointer-events: none;
+        }
+        @keyframes pulse-mic {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        @keyframes spin-slow { 100% { transform: rotate(360deg); } }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--color-primary); border-radius: 4px; }
+
+        .glass-panel {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
     </style>
 </head>
-<body class="h-screen w-screen flex flex-col">
+<body class="bg-bgLight dark:bg-bgDark text-slate-800 dark:text-slate-200 h-screen flex flex-col overflow-hidden transition-colors duration-300">
 
-    <div id="loader">
-        <div class="mango-shape">
-            <div class="mango-leaf"></div>
-        </div>
-        <h1 class="mt-8 text-2xl font-bold tracking-widest text-amber-500">M A N G O</h1>
+    <div id="splash-screen" class="fixed inset-0 bg-yellow-400 dark:bg-yellow-600 flex flex-col items-center justify-center">
+        <div class="text-9xl mango-bounce">🥭</div>
+        <h1 class="text-4xl font-bold mt-4 text-white tracking-widest">MANGO</h1>
+        <p class="text-yellow-100 mt-2">Loading your virtual friend...</p>
     </div>
 
-    <div id="app-container" class="hidden h-full w-full flex-col max-w-4xl mx-auto shadow-2xl relative">
-        
-        <header class="p-4 flex justify-between items-center border-b border-gray-200 dark:border-gray-700 z-10" style="background-color: var(--primary-bg);">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center text-white font-bold text-xl">M</div>
-                <h1 class="text-xl font-bold">MANGO</h1>
-            </div>
-            <button id="settings-btn" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition">
-                ⚙️ Settings
-            </button>
-        </header>
+    <div id="settings-modal" class="hidden fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm overflow-y-auto">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 w-full max-w-md shadow-2xl relative my-auto">
+            <button id="btn-close-settings" class="absolute top-4 right-4 text-slate-400 hover:text-red-500 text-xl font-bold">✕</button>
+            <h2 class="text-2xl font-bold text-primary mb-4 flex items-center gap-2">🥭 MANGO Settings</h2>
+            
+            <div class="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+                <div class="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border dark:border-slate-600">
+                    <h3 class="font-semibold mb-2 text-sm uppercase text-slate-500">Your Profile</h3>
+                    <input type="text" id="set-name" placeholder="Full Name" class="w-full mb-2 p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none">
+                    <input type="text" id="set-fname" placeholder="Friendly Name (Nickname)" class="w-full mb-2 p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none">
+                    <input type="number" id="set-age" placeholder="Age" class="w-full p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none">
+                </div>
 
-        <main id="chat-area" class="flex-1 overflow-y-auto p-4 space-y-4 chat-container pb-24">
-            <div class="flex justify-start">
-                <div class="max-w-[75%] p-3 rounded-2xl rounded-tl-none text-white" style="background-color: var(--accent-color);">
-                    Hey there! I'm Mango. What are we getting into today? Got any fun files for me to look at? 🥭
+                <div class="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border dark:border-slate-600">
+                    <h3 class="font-semibold mb-2 text-sm uppercase text-slate-500">AI Provider & Model</h3>
+                    <select id="set-provider" class="w-full mb-2 p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none font-semibold">
+                        <option value="gemini">Google Gemini</option>
+                        <option value="openai">OpenAI (ChatGPT)</option>
+                        <option value="groq">Groq (Llama/Mixtral)</option>
+                        <option value="claude">Anthropic (Claude)</option>
+                    </select>
+                    <select id="set-model" class="w-full mb-2 p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none"></select>
+                    <input type="password" id="set-apikey" placeholder="Enter API Key for selected provider" class="w-full p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none">
+                </div>
+
+                <div class="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border dark:border-slate-600">
+                    <h3 class="font-semibold mb-2 text-sm uppercase text-slate-500">Behavior & Voice</h3>
+                    <select id="set-personality" class="w-full mb-2 p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none">
+                        <option value="friendly">Friendly & Warm</option>
+                        <option value="humorous">Humorous & Sarcastic</option>
+                        <option value="strict">Strict & Educational</option>
+                        <option value="empathetic">Empathetic & Supportive</option>
+                    </select>
+                    <textarea id="set-custom-prompt" placeholder="Custom System Prompt (Optional)" class="w-full mb-2 p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none text-sm h-20"></textarea>
+                    <select id="set-voice" class="w-full p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none text-sm"></select>
+                </div>
+
+                <div class="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border dark:border-slate-600 flex justify-between items-center">
+                    <h3 class="font-semibold text-sm uppercase text-slate-500">Dark Mode</h3>
+                    <input type="checkbox" id="set-darkmode" class="w-5 h-5 accent-primary cursor-pointer">
+                </div>
+                <div class="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border dark:border-slate-600">
+                    <h3 class="font-semibold mb-2 text-sm uppercase text-slate-500">Theme Color</h3>
+                    <input type="color" id="set-color" value="#f59e0b" class="w-full h-10 cursor-pointer rounded">
                 </div>
             </div>
-        </main>
+            
+            <button id="btn-save-settings" class="w-full mt-4 bg-primary hover:bg-orange-500 text-white font-bold py-3 rounded-xl transition-colors shadow-lg">Save Configuration</button>
+        </div>
+    </div>
 
-        <footer class="absolute bottom-0 w-full p-4 border-t border-gray-200 dark:border-gray-700" style="background-color: var(--primary-bg);">
-            <div class="flex items-center gap-2">
-                <button class="p-3 text-gray-500 hover:text-amber-500 transition">
-                    📎
-                </button>
-                
-                <input type="text" placeholder="Chat with Mango..." class="flex-1 p-3 rounded-full border border-gray-300 dark:border-gray-600 bg-transparent outline-none focus:border-amber-500 transition">
-                
-                <button class="w-12 h-12 rounded-full text-white flex items-center justify-center transition shadow-lg hover:scale-105" style="background-color: var(--accent-color);">
-                    🎤
-                </button>
+    <div class="flex flex-col w-full h-full max-w-3xl mx-auto relative shadow-2xl">
+        
+        <header class="flex-shrink-0 p-4 bg-white/80 dark:bg-slate-900/80 glass-panel z-20 flex justify-between items-center shadow-sm">
+            <div class="flex items-center gap-3">
+                <div class="text-3xl">🥭</div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-wider text-primary">MANGO</h1>
+                    <div id="status-indicator" class="text-xs text-slate-500 dark:text-slate-400">Online & Ready</div>
+                </div>
             </div>
+            <div class="flex gap-3">
+                <button id="btn-clear" class="text-slate-400 hover:text-red-500 p-2" title="Clear Chat">🗑️</button>
+                <button id="btn-settings" class="text-slate-400 hover:text-primary p-2" title="Settings">⚙️</button>
+            </div>
+        </header>
+
+        <main id="chat-log" class="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth pb-20"></main>
+
+        <div id="image-preview-container" class="hidden px-4 py-2 bg-slate-100 dark:bg-slate-800 flex items-center gap-2">
+            <span class="text-xs text-slate-500">Attached:</span>
+            <img id="image-preview" class="h-10 rounded border border-slate-300" src="" alt="preview">
+            <button id="btn-remove-image" class="text-red-500 text-sm ml-2 font-bold">✕</button>
+        </div>
+
+        <footer class="w-full bg-white/90 dark:bg-slate-900/90 glass-panel p-3 pb-safe flex items-center gap-2 relative z-20">
+            <label for="file-upload" class="p-3 text-slate-500 hover:text-primary cursor-pointer transition-colors">
+                📎
+            </label>
+            <input id="file-upload" type="file" accept="image/*" class="hidden">
+
+            <input type="text" id="text-input" class="flex-1 bg-slate-100 dark:bg-slate-800 dark:text-white border border-transparent focus:border-primary rounded-full px-5 py-3 outline-none transition-colors" placeholder="Message Mango...">
+            
+            <button id="btn-send" class="p-3 bg-primary hover:bg-orange-500 text-white rounded-full transition-colors shadow-lg outline-none hidden">
+                ➤
+            </button>
+
+            <button id="btn-mic" class="w-12 h-12 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-full flex items-center justify-center transition-all outline-none">
+                🎤
+            </button>
         </footer>
     </div>
 
-    <div id="settings-modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 backdrop-blur-sm">
-        <div class="p-6 rounded-2xl w-full max-w-md shadow-2xl" style="background-color: var(--primary-bg);">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold">Settings</h2>
-                <button id="close-settings" class="text-gray-500 hover:text-red-500 text-xl font-bold">✕</button>
-            </div>
-
-            <div class="space-y-4">
-                <div class="flex justify-between items-center">
-                    <label class="font-semibold">Dark Mode</label>
-                    <input type="checkbox" id="theme-toggle" class="w-5 h-5 accent-amber-500">
-                </div>
-
-                <div class="flex flex-col">
-                    <label class="font-semibold mb-1">Accent Color</label>
-                    <input type="color" id="color-picker" value="#f59e0b" class="w-full h-10 border-none rounded cursor-pointer">
-                </div>
-
-                <div class="flex flex-col">
-                    <label class="font-semibold mb-1">Mango's Voice</label>
-                    <select class="p-2 border rounded dark:bg-gray-800 dark:border-gray-600 outline-none">
-                        <option>Playful (Default)</option>
-                        <option>Deep & Calm</option>
-                        <option>Energetic</option>
-                    </select>
-                </div>
-
-                <div class="flex flex-col">
-                    <label class="font-semibold mb-1">Personality Mode</label>
-                    <select class="p-2 border rounded dark:bg-gray-800 dark:border-gray-600 outline-none">
-                        <option>Friendly & Humorous</option>
-                        <option>Strict & Direct</option>
-                        <option>Sarcastic Bestie</option>
-                    </select>
-                </div>
-
-                <div class="flex flex-col">
-                    <label class="font-semibold mb-1">Custom System Prompt</label>
-                    <textarea rows="3" placeholder="Tell Mango how to behave..." class="p-2 border rounded dark:bg-gray-800 dark:border-gray-600 outline-none resize-none text-sm"></textarea>
-                    <p class="text-xs text-gray-500 mt-1">Note: Mango is strictly restricted from writing code or generating images.</p>
-                </div>
-            </div>
-
-            <button id="save-settings" class="w-full mt-6 py-3 rounded-lg text-white font-bold transition shadow" style="background-color: var(--accent-color);">
-                Save Preferences
-            </button>
-        </div>
-    </div>
-
     <script>
-        // Sequence the Mango Animation into the App
-        document.addEventListener('DOMContentLoaded', () => {
+        // --- 1. CONFIGURATION & STATE ---
+        const MODELS = {
+            gemini: ["gemini-1.5-pro-latest", "gemini-1.5-flash-latest"],
+            openai: ["gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"],
+            groq: ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"],
+            claude: ["claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"]
+        };
+
+        let state = {
+            isProcessing: false,
+            isListening: false,
+            chatHistory: [], // Structure: { role: 'user'|'assistant', content: string }
+            currentBase64Image: null,
+            apiKeys: JSON.parse(localStorage.getItem('mango_keys')) || {},
+            settings: JSON.parse(localStorage.getItem('mango_settings')) || {
+                name: "Friend", fname: "Buddy", age: 25, provider: "gemini", 
+                model: "gemini-1.5-flash-latest", personality: "friendly", customPrompt: "",
+                darkmode: false, color: "#f59e0b", voiceURI: ""
+            }
+        };
+
+        let recognition = null;
+        let synth = window.speechSynthesis;
+
+        // --- 2. DOM ELEMENTS ---
+        const DOM = {
+            splash: document.getElementById('splash-screen'),
+            log: document.getElementById('chat-log'),
+            textIn: document.getElementById('text-input'),
+            btnSend: document.getElementById('btn-send'),
+            btnMic: document.getElementById('btn-mic'),
+            btnSettings: document.getElementById('btn-settings'),
+            btnClear: document.getElementById('btn-clear'),
+            modalSettings: document.getElementById('settings-modal'),
+            btnCloseSettings: document.getElementById('btn-close-settings'),
+            btnSaveSettings: document.getElementById('btn-save-settings'),
+            status: document.getElementById('status-indicator'),
+            fileInput: document.getElementById('file-upload'),
+            imgPreviewCont: document.getElementById('image-preview-container'),
+            imgPreview: document.getElementById('image-preview'),
+            btnRemoveImg: document.getElementById('btn-remove-image'),
+            // Settings Inputs
+            sName: document.getElementById('set-name'),
+            sFname: document.getElementById('set-fname'),
+            sAge: document.getElementById('set-age'),
+            sProv: document.getElementById('set-provider'),
+            sModel: document.getElementById('set-model'),
+            sKey: document.getElementById('set-apikey'),
+            sPers: document.getElementById('set-personality'),
+            sCust: document.getElementById('set-custom-prompt'),
+            sVoice: document.getElementById('set-voice'),
+            sDark: document.getElementById('set-darkmode'),
+            sColor: document.getElementById('set-color')
+        };
+
+        // --- 3. INITIALIZATION ---
+        window.onload = () => {
             setTimeout(() => {
-                const loader = document.getElementById('loader');
-                const app = document.getElementById('app-container');
+                DOM.splash.style.opacity = '0';
+                DOM.splash.style.transform = 'scale(1.1)';
+                setTimeout(() => DOM.splash.style.display = 'none', 1000);
+            }, 1500);
+
+            applySettingsToUI();
+            populateModels(state.settings.provider);
+            DOM.sModel.value = state.settings.model;
+            
+            // Load Voices
+            const loadVoices = () => {
+                DOM.sVoice.innerHTML = '';
+                synth.getVoices().forEach(v => {
+                    DOM.sVoice.add(new Option(`${v.name} (${v.lang})`, v.voiceURI));
+                });
+                if(state.settings.voiceURI) DOM.sVoice.value = state.settings.voiceURI;
+            };
+            if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = loadVoices;
+            loadVoices();
+
+            loadHistory();
+            initSpeechRecognition();
+            setupEventListeners();
+        };
+
+        // --- 4. SETTINGS & UI LOGIC ---
+        function applySettingsToUI() {
+            if (state.settings.darkmode) document.documentElement.classList.add('dark');
+            else document.documentElement.classList.remove('dark');
+            document.documentElement.style.setProperty('--color-primary', state.settings.color);
+            
+            DOM.sName.value = state.settings.name;
+            DOM.sFname.value = state.settings.fname;
+            DOM.sAge.value = state.settings.age;
+            DOM.sProv.value = state.settings.provider;
+            DOM.sPers.value = state.settings.personality;
+            DOM.sCust.value = state.settings.customPrompt;
+            DOM.sDark.checked = state.settings.darkmode;
+            DOM.sColor.value = state.settings.color;
+            DOM.sKey.value = state.apiKeys[state.settings.provider] || '';
+        }
+
+        function populateModels(provider) {
+            DOM.sModel.innerHTML = '';
+            MODELS[provider].forEach(m => DOM.sModel.add(new Option(m, m)));
+        }
+
+        DOM.sProv.addEventListener('change', (e) => {
+            populateModels(e.target.value);
+            DOM.sKey.value = state.apiKeys[e.target.value] || '';
+        });
+
+        function saveSettings() {
+            state.settings = {
+                name: DOM.sName.value, fname: DOM.sFname.value, age: parseInt(DOM.sAge.value) || 25,
+                provider: DOM.sProv.value, model: DOM.sModel.value, personality: DOM.sPers.value,
+                customPrompt: DOM.sCust.value, voiceURI: DOM.sVoice.value,
+                darkmode: DOM.sDark.checked, color: DOM.sColor.value
+            };
+            state.apiKeys[DOM.sProv.value] = DOM.sKey.value;
+            
+            localStorage.setItem('mango_settings', JSON.stringify(state.settings));
+            localStorage.setItem('mango_keys', JSON.stringify(state.apiKeys));
+            applySettingsToUI();
+            DOM.modalSettings.classList.add('hidden');
+        }
+
+        // --- 5. EVENT LISTENERS ---
+        function setupEventListeners() {
+            DOM.btnSettings.onclick = () => DOM.modalSettings.classList.remove('hidden');
+            DOM.btnCloseSettings.onclick = () => DOM.modalSettings.classList.add('hidden');
+            DOM.btnSaveSettings.onclick = saveSettings;
+            DOM.btnClear.onclick = () => {
+                if(confirm("Erase all memory?")) { state.chatHistory = []; localStorage.removeItem('mango_history'); DOM.log.innerHTML=''; }
+            };
+
+            // Input handling
+            DOM.textIn.addEventListener('input', () => {
+                if(DOM.textIn.value.trim().length > 0 || state.currentBase64Image) {
+                    DOM.btnSend.classList.remove('hidden'); DOM.btnMic.classList.add('hidden');
+                } else {
+                    DOM.btnSend.classList.add('hidden'); DOM.btnMic.classList.remove('hidden');
+                }
+            });
+
+            DOM.btnSend.onclick = () => processInput(DOM.textIn.value);
+            DOM.textIn.onkeypress = (e) => { if(e.key === 'Enter') processInput(DOM.textIn.value); };
+
+            // Mic
+            DOM.btnMic.onclick = () => {
+                if (state.isProcessing || !recognition) return;
+                if (state.isListening) recognition.stop();
+                else {
+                    try { recognition.start(); } catch(err) { console.error(err); }
+                }
+            };
+
+            // File Upload (Image -> Base64)
+            DOM.fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    state.currentBase64Image = event.target.result;
+                    DOM.imgPreview.src = state.currentBase64Image;
+                    DOM.imgPreviewCont.classList.remove('hidden');
+                    DOM.btnSend.classList.remove('hidden'); DOM.btnMic.classList.add('hidden');
+                };
+                reader.readAsDataURL(file);
+            });
+
+            DOM.btnRemoveImg.onclick = () => {
+                state.currentBase64Image = null;
+                DOM.imgPreviewCont.classList.add('hidden');
+                DOM.fileInput.value = '';
+                DOM.textIn.dispatchEvent(new Event('input')); // toggle send/mic button
+            };
+        }
+
+        // --- 6. EAR (Speech Recognition) ---
+        function initSpeechRecognition() {
+            const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRec) {
+                DOM.btnMic.style.display = 'none';
+                return;
+            }
+            recognition = new SpeechRec();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+
+            recognition.onstart = () => {
+                state.isListening = true;
+                DOM.btnMic.classList.add('mic-active');
+                DOM.textIn.placeholder = "Listening...";
+                synth.cancel(); // Stop talking if user speaks
+            };
+            
+            recognition.onresult = (e) => {
+                const transcript = e.results[0][0].transcript.trim();
+                if (transcript) {
+                    DOM.textIn.value = transcript;
+                    processInput(transcript);
+                }
+            };
+
+            recognition.onend = () => {
+                state.isListening = false;
+                DOM.btnMic.classList.remove('mic-active');
+                if(!state.isProcessing) DOM.textIn.placeholder = "Message Mango...";
+            };
+        }
+
+        // --- 7. MOUTH (Speech Synthesis) ---
+        function speakText(text) {
+            synth.cancel();
+            // Remove emojis and markdown for speech
+            let cleanText = text.replace(/[\u{1F600}-\u{1F6FF}|[\u{2600}-\u{26FF}]/gu, '');
+            cleanText = cleanText.replace(/[*#`_\[\]()]/g, '').trim();
+            if(!cleanText) return;
+
+            const utterance = new SpeechSynthesisUtterance(cleanText);
+            
+            // Age based modulation
+            if (state.settings.age < 12) {
+                utterance.rate = 0.8; // Slower for kids
+                utterance.pitch = 1.2; // Slightly higher pitch
+            } else if (state.settings.age > 60) {
+                utterance.rate = 0.9;
+                utterance.pitch = 0.9;
+            } else {
+                utterance.rate = 1.0;
+            }
+
+            // Set specific voice
+            if (state.settings.voiceURI) {
+                const voices = synth.getVoices();
+                const selectedVoice = voices.find(v => v.voiceURI === state.settings.voiceURI);
+                if (selectedVoice) utterance.voice = selectedVoice;
+            }
+
+            synth.speak(utterance);
+        }
+
+        // --- 8. BRAIN (Core Logic & API Fetch) ---
+        async function processInput(text) {
+            if (state.isProcessing || (!text.trim() && !state.currentBase64Image)) return;
+            if (!state.apiKeys[state.settings.provider]) {
+                alert(`Please enter your API Key for ${state.settings.provider} in Settings.`);
+                return;
+            }
+
+            const userText = text.trim();
+            const imgData = state.currentBase64Image;
+            
+            // Reset UI
+            DOM.textIn.value = '';
+            DOM.btnRemoveImg.click();
+            DOM.textIn.placeholder = "Mango is thinking...";
+            DOM.btnMic.classList.add('mic-thinking');
+            DOM.status.innerText = "Thinking...";
+            state.isProcessing = true;
+
+            // Render User Message
+            renderMessage('user', userText, imgData);
+            
+            // Build History Array
+            let msgContent = userText;
+            if (imgData && state.settings.provider !== 'claude') { 
+                // Only storing text in history for simplicity, avoiding huge base64 storage
+                msgContent = userText ? `${userText} [Image Attached]` : "[Image Attached]"; 
+            }
+            state.chatHistory.push({ role: 'user', content: msgContent });
+
+            try {
+                const response = await fetchAIResponse(userText, imgData);
+                renderMessage('assistant', response);
+                state.chatHistory.push({ role: 'assistant', content: response });
+                localStorage.setItem('mango_history', JSON.stringify(state.chatHistory));
+                speakText(response);
+            } catch (err) {
+                console.error(err);
+                renderMessage('assistant', "Oops! I hit a snag connecting to my brain. Check your API keys and internet connection.");
+            }
+
+            // Cleanup
+            state.isProcessing = false;
+            DOM.btnMic.classList.remove('mic-thinking');
+            DOM.textIn.placeholder = "Message Mango...";
+            DOM.status.innerText = "Online";
+            DOM.textIn.dispatchEvent(new Event('input')); // Reset buttons
+        }
+
+        async function fetchAIResponse(userText, imgData) {
+            const sysPrompt = buildSystemPrompt();
+            const p = state.settings.provider;
+            const key = state.apiKeys[p];
+            const mod = state.settings.model;
+
+            if (p === 'openai' || p === 'groq') {
+                const url = p === 'openai' ? 'https://api.openai.com/v1/chat/completions' : 'https://api.groq.com/openai/v1/chat/completions';
                 
-                loader.style.opacity = '0';
-                setTimeout(() => {
-                    loader.style.display = 'none';
-                    app.classList.remove('hidden');
-                    app.style.display = 'flex';
-                    // Trigger reflow
-                    void app.offsetWidth;
-                    app.style.opacity = '1';
-                    app.style.transform = 'scale(1)';
-                }, 800);
-            }, 2500); // Mango stays on screen for 2.5 seconds
-        });
+                let messages = [{ role: "system", content: sysPrompt }, ...state.chatHistory.slice(-8)];
+                
+                // Inject current message with/without image
+                let currentMessageContent = userText || "Analyze this image";
+                if (imgData && p === 'openai') {
+                    currentMessageContent = [
+                        { type: "text", text: userText || "What is in this image?" },
+                        { type: "image_url", image_url: { url: imgData } }
+                    ];
+                }
+                messages.pop(); // remove the standard text push
+                messages.push({ role: "user", content: currentMessageContent });
 
-        // Settings Modal Logic
-        const settingsBtn = document.getElementById('settings-btn');
-        const settingsModal = document.getElementById('settings-modal');
-        const closeSettings = document.getElementById('close-settings');
-        const saveSettings = document.getElementById('save-settings');
-        const themeToggle = document.getElementById('theme-toggle');
-        const colorPicker = document.getElementById('color-picker');
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+                    body: JSON.stringify({ model: mod, messages: messages })
+                });
+                if(!res.ok) throw new Error("API Error");
+                const data = await res.json();
+                return data.choices[0].message.content;
 
-        settingsBtn.onclick = () => settingsModal.classList.remove('hidden');
-        closeSettings.onclick = () => settingsModal.classList.add('hidden');
-        saveSettings.onclick = () => settingsModal.classList.add('hidden');
+            } else if (p === 'gemini') {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${mod}:generateContent?key=${key}`;
+                
+                // Convert history format to Gemini format
+                let contents = state.chatHistory.slice(-8, -1).map(m => ({
+                    role: m.role === 'assistant' ? 'model' : 'user',
+                    parts: [{ text: m.content }]
+                }));
 
-        // Dark Mode Toggle
-        themeToggle.addEventListener('change', (e) => {
-            if (e.target.checked) document.body.classList.add('dark-mode');
-            else document.body.classList.remove('dark-mode');
-        });
+                let currentParts = [{ text: userText || "Analyze this." }];
+                if (imgData) {
+                    const base64Str = imgData.split(',')[1];
+                    const mimeType = imgData.match(/[^:]\w+\/[\w-+\d.]+(?=;|,)/)[0];
+                    currentParts.push({ inline_data: { mime_type: mimeType, data: base64Str } });
+                }
+                contents.push({ role: 'user', parts: currentParts });
 
-        // Accent Color Injection
-        colorPicker.addEventListener('input', (e) => {
-            document.documentElement.style.setProperty('--accent-color', e.target.value);
-        });
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ system_instruction: { parts: [{text: sysPrompt}] }, contents: contents })
+                });
+                if(!res.ok) throw new Error("API Error");
+                const data = await res.json();
+                return data.candidates[0].content.parts[0].text;
+
+            } else if (p === 'claude') {
+                // Note: Anthropic often blocks browser CORS. Handled gracefully if so.
+                const res = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json', 
+                        'x-api-key': key,
+                        'anthropic-version': '2023-06-01',
+                        'anthropic-dangerously-allow-browser': 'true' // Sometimes required for client side
+                    },
+                    body: JSON.stringify({
+                        model: mod,
+                        system: sysPrompt,
+                        max_tokens: 1024,
+                        messages: state.chatHistory.slice(-8)
+                    })
+                });
+                if(!res.ok) throw new Error("API Error / CORS blocked");
+                const data = await res.json();
+                return data.content[0].text;
+            }
+        }
+
+        function buildSystemPrompt() {
+            let ageRule = "";
+            if (state.settings.age < 12) {
+                ageRule = "Keep your answers very short, simple, and easy to understand for a child. Use emojis and be very playful.";
+            } else if (state.settings.age < 18) {
+                ageRule = "Talk like a cool teenager. Relatable, concise, and fun.";
+            } else {
+                ageRule = "Maintain a natural, adult-level conversational tone.";
+            }
+
+            return `You are MANGO, a highly conversational, helpful, and humorous virtual friend.
+User Profile: Real name is ${state.settings.name}, but call them by their nickname: ${state.settings.fname}. 
+The user is ${state.settings.age} years old.
+
+STRICT RULES:
+1. ${ageRule}
+2. ABSOLUTELY DO NOT write, generate, or output any computer code, HTML, or scripts under any circumstances.
+3. ABSOLUTELY DO NOT generate, create, or request images.
+4. Keep responses concise as they will be read aloud via Text-to-Speech. Do not use complex markdown like tables.
+
+Personality Preset: ${state.settings.personality}.
+Additional Custom Instructions: ${state.settings.customPrompt}`;
+        }
+
+        // --- 9. UTILITIES ---
+        function renderMessage(role, text, imgData = null) {
+            const div = document.createElement('div');
+            const isModel = role === 'assistant';
+            div.className = `p-4 rounded-2xl max-w-[85%] ${isModel ? 'bg-white dark:bg-slate-800 border dark:border-slate-700 shadow mr-auto' : 'bg-primary text-white ml-auto'} mb-2`;
+            
+            let imgHTML = '';
+            if (imgData) {
+                imgHTML = `<img src="${imgData}" class="max-w-full h-auto rounded mb-2 border border-white/20">`;
+            }
+
+            // Very basic markdown bolding to HTML
+            let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+            div.innerHTML = `
+                <div class="text-[10px] uppercase font-bold tracking-wider ${isModel ? 'text-primary' : 'text-white/70'} mb-1">
+                    ${isModel ? '🥭 Mango' : state.settings.fname}
+                </div>
+                ${imgHTML}
+                <div class="text-sm leading-relaxed">${formattedText}</div>
+            `;
+            DOM.log.appendChild(div);
+            DOM.log.scrollTop = DOM.log.scrollHeight;
+        }
+
+        function loadHistory() {
+            const hist = localStorage.getItem('mango_history');
+            if (hist) {
+                try {
+                    const parsed = JSON.parse(hist);
+                    if (parsed.length > 0) {
+                        state.chatHistory = parsed;
+                        parsed.forEach(m => renderMessage(m.role, m.content));
+                    }
+                } catch (e) { console.error(e); }
+            } else {
+                renderMessage('assistant', `Hi ${state.settings.fname}! I'm Mango 🥭. Ready to chat?`);
+            }
+        }
     </script>
 </body>
 </html>
