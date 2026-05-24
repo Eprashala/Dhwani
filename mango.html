@@ -124,13 +124,16 @@
                     <h3 class="font-semibold mb-2 text-sm uppercase text-slate-500">Manage AI Personas</h3>
                     
                     <div class="bg-white dark:bg-slate-900 p-3 rounded-lg border dark:border-slate-600 mb-3">
-                        <h4 class="text-xs font-bold text-primary mb-2">Create New Persona</h4>
+                        <h4 id="persona-form-title" class="text-xs font-bold text-primary mb-2">Create New Persona</h4>
                         <input type="text" id="p-name" placeholder="Name (e.g. Mrs. Smith)" class="w-full mb-2 p-2 rounded bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 outline-none text-sm">
                         <input type="text" id="p-fname" placeholder="Role (e.g. Math Teacher)" class="w-full mb-2 p-2 rounded bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 outline-none text-sm">
                         <input type="number" id="p-age" placeholder="Age of Persona" class="w-full mb-2 p-2 rounded bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 outline-none text-sm">
                         
                         <div class="flex gap-2 w-full mb-2">
                             <select id="p-lang" class="flex-1 p-2 rounded bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 outline-none text-xs"><option value="">Any Language</option></select>
+                            
+                            <button id="btn-add-voices" class="bg-slate-200 dark:bg-slate-700 px-2 rounded text-xs font-semibold hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300" title="Download more voices via Android Settings">⚙️ Add</button>
+                            
                             <select id="p-voice" class="flex-1 p-2 rounded bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 outline-none text-xs"></select>
                         </div>
 
@@ -149,7 +152,10 @@
                         <textarea id="p-personality" placeholder="Detailed Personality (e.g. Strict but caring sister...)" class="w-full mb-2 p-2 rounded bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 outline-none text-sm h-16"></textarea>
                         <textarea id="p-books" placeholder="Reference Books (Comma separated)" class="w-full mb-2 p-2 rounded bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 outline-none text-sm h-12"></textarea>
                         
-                        <button id="btn-add-persona" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded transition-colors text-sm">Add Persona</button>
+                        <div class="flex gap-2 w-full">
+                            <button id="btn-add-persona" class="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded transition-colors text-sm">Add Persona</button>
+                            <button id="btn-cancel-edit" class="hidden bg-slate-500 hover:bg-slate-400 text-white font-bold py-2 px-3 rounded transition-colors text-sm">Cancel</button>
+                        </div>
                     </div>
 
                     <h4 class="text-xs font-bold text-slate-500 mb-2">Existing Personas</h4>
@@ -220,7 +226,6 @@
     <script>
         // --- 1. FULLSCREEN, WAKE LOCK, GLOBAL VARIABLES ---
         let wakeLock = null;
-        // CRITICAL FOR ANDROID: Store utterance globally to prevent garbage collection
         window.currentUtterance = null; 
 
         async function acquireWakeLock() {
@@ -256,6 +261,7 @@
         let state = {
             isProcessing: false,
             isListening: false,
+            editingPersonaId: null, // Tracks if we are editing an existing persona
             chatHistory: [], 
             currentBase64File: null,
             currentFileType: null,
@@ -306,6 +312,7 @@
             sDark: document.getElementById('set-darkmode'),
             sColor: document.getElementById('set-color'),
 
+            personaFormTitle: document.getElementById('persona-form-title'),
             pName: document.getElementById('p-name'),
             pFname: document.getElementById('p-fname'),
             pAge: document.getElementById('p-age'),
@@ -318,7 +325,9 @@
             pPersonality: document.getElementById('p-personality'),
             pBooks: document.getElementById('p-books'),
             btnAddPersona: document.getElementById('btn-add-persona'),
+            btnCancelEdit: document.getElementById('btn-cancel-edit'), // NEW
             btnPreviewVoice: document.getElementById('btn-preview-voice'),
+            btnAddVoices: document.getElementById('btn-add-voices'), 
             personaList: document.getElementById('persona-list')
         };
 
@@ -340,18 +349,15 @@
                 DOM.pVoice.innerHTML = '';
                 const langs = new Set();
                 
-                // Keep track of current selected voice to re-select it
                 const currentVoice = DOM.pVoice.value;
 
                 voices.forEach(v => {
-                    // Filter by language if a language is selected
                     if (!DOM.pLang.value || v.lang === DOM.pLang.value) {
                         DOM.pVoice.add(new Option(`${v.name} (${v.lang})`, v.voiceURI));
                     }
                     langs.add(v.lang);
                 });
 
-                // Only populate language dropdown if it's empty (first load)
                 if (DOM.pLang.options.length <= 1) {
                     Array.from(langs).sort().forEach(l => DOM.pLang.add(new Option(l, l)));
                 }
@@ -359,12 +365,10 @@
                 if(currentVoice) DOM.pVoice.value = currentVoice;
             };
 
-            // Trigger voice load and setup language filter
             if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = loadVoices;
             loadVoices();
             DOM.pLang.addEventListener('change', loadVoices);
 
-            // Update Slider Text Values
             DOM.pPitch.addEventListener('input', (e) => DOM.valPitch.innerText = parseFloat(e.target.value).toFixed(1));
             DOM.pRate.addEventListener('input', (e) => DOM.valRate.innerText = parseFloat(e.target.value).toFixed(1));
 
@@ -395,20 +399,65 @@
             DOM.personaList.innerHTML = '';
             state.personas.forEach(p => {
                 const div = document.createElement('div');
-                div.className = "flex justify-between items-center bg-white dark:bg-slate-800 p-2 rounded border dark:border-slate-700 text-sm";
+                div.className = "flex justify-between items-center bg-white dark:bg-slate-800 p-2 rounded border dark:border-slate-700 text-sm gap-2";
+                
                 div.innerHTML = `
-                    <div><span class="font-bold text-primary">${p.name}</span> <span class="text-xs text-slate-500">(${p.fname})</span></div>
-                    ${p.id !== 'default' ? `<button class="text-red-500 hover:text-red-700 font-bold px-2" onclick="deletePersona('${p.id}')">✕</button>` : '<span class="text-xs text-slate-400 px-2">Default</span>'}
+                    <div class="flex-1 min-w-0"><span class="font-bold text-primary truncate block">${p.name} <span class="text-xs text-slate-500 font-normal">(${p.fname})</span></span></div>
+                    <div class="flex items-center gap-1 flex-shrink-0">
+                        <button class="text-blue-500 hover:text-blue-700 font-bold px-2" onclick="editPersona('${p.id}')" title="Edit">✏️</button>
+                        ${p.id !== 'default' ? `<button class="text-red-500 hover:text-red-700 font-bold px-2" onclick="deletePersona('${p.id}')" title="Delete">✕</button>` : '<span class="text-xs text-slate-400 px-2 w-7 text-center"></span>'}
+                    </div>
                 `;
                 DOM.personaList.appendChild(div);
             });
         }
 
+        window.editPersona = function(id) {
+            const p = state.personas.find(per => per.id === id);
+            if(!p) return;
+            
+            state.editingPersonaId = id;
+            DOM.personaFormTitle.innerText = "Edit Persona";
+            DOM.btnAddPersona.innerText = "Update Persona";
+            DOM.btnCancelEdit.classList.remove('hidden');
+
+            DOM.pName.value = p.name || '';
+            DOM.pFname.value = p.fname || '';
+            DOM.pAge.value = p.age || '';
+            
+            DOM.pLang.value = p.lang || 'en-US';
+            DOM.pLang.dispatchEvent(new Event('change')); // Trigger voice filtering
+            
+            setTimeout(() => { DOM.pVoice.value = p.voiceURI || ''; }, 50);
+
+            DOM.pPitch.value = p.pitch !== undefined ? p.pitch : 1.0;
+            DOM.pRate.value = p.rate !== undefined ? p.rate : 1.0;
+            DOM.valPitch.innerText = parseFloat(DOM.pPitch.value).toFixed(1);
+            DOM.valRate.innerText = parseFloat(DOM.pRate.value).toFixed(1);
+
+            DOM.pPersonality.value = p.personality || '';
+            DOM.pBooks.value = p.referenceBooks || '';
+            
+            DOM.personaFormTitle.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        };
+
+        function cancelEdit() {
+            state.editingPersonaId = null;
+            DOM.personaFormTitle.innerText = "Create New Persona";
+            DOM.btnAddPersona.innerText = "Add Persona";
+            DOM.btnCancelEdit.classList.add('hidden');
+
+            DOM.pName.value = ''; DOM.pFname.value = ''; DOM.pAge.value = ''; 
+            DOM.pPersonality.value = ''; DOM.pBooks.value = '';
+            DOM.pPitch.value = 1.0; DOM.pRate.value = 1.0;
+            DOM.valPitch.innerText = '1.0'; DOM.valRate.innerText = '1.0';
+        }
+
         function addPersona() {
             if(!DOM.pName.value || !DOM.pPersonality.value) { alert("Name and Detailed Personality are required."); return; }
             
-            const newPersona = {
-                id: 'p_' + Date.now(),
+            const personaData = {
+                id: state.editingPersonaId || 'p_' + Date.now(),
                 name: DOM.pName.value,
                 fname: DOM.pFname.value || DOM.pName.value,
                 age: parseInt(DOM.pAge.value) || 30,
@@ -420,20 +469,30 @@
                 referenceBooks: DOM.pBooks.value
             };
 
-            state.personas.push(newPersona);
+            if (state.editingPersonaId) {
+                const index = state.personas.findIndex(p => p.id === state.editingPersonaId);
+                if(index !== -1) state.personas[index] = personaData;
+            } else {
+                state.personas.push(personaData);
+            }
+
             localStorage.setItem('mango_personas', JSON.stringify(state.personas));
             
-            DOM.pName.value = ''; DOM.pFname.value = ''; DOM.pAge.value = ''; 
-            DOM.pPersonality.value = ''; DOM.pBooks.value = '';
-            
+            cancelEdit();
             renderPersonas();
+            
+            if (state.activePersonaId === personaData.id) {
+                 loadHistory(); // Refresh chat UI to reflect new name/parameters safely
+            }
         }
 
         window.deletePersona = function(id) {
             state.personas = state.personas.filter(p => p.id !== id);
             localStorage.removeItem(`mango_history_${id}`); 
             
-            if(state.activePersonaId === id) state.activePersonaId = 'default';
+            if (state.editingPersonaId === id) cancelEdit();
+            if (state.activePersonaId === id) state.activePersonaId = 'default';
+            
             localStorage.setItem('mango_personas', JSON.stringify(state.personas));
             localStorage.setItem('mango_active_persona', state.activePersonaId);
             renderPersonas();
@@ -493,7 +552,9 @@
             DOM.btnCloseSettings.onclick = (e) => { e.stopPropagation(); DOM.modalSettings.classList.add('hidden'); };
             DOM.btnSaveSettings.onclick = (e) => { e.stopPropagation(); saveSettings(); };
             DOM.modalSettings.onclick = (e) => e.stopPropagation();
+            
             DOM.btnAddPersona.onclick = (e) => { e.stopPropagation(); addPersona(); };
+            DOM.btnCancelEdit.onclick = (e) => { e.stopPropagation(); cancelEdit(); };
 
             DOM.btnClear.onclick = () => {
                 const p = getActivePersona();
@@ -503,6 +564,18 @@
                     localStorage.removeItem(`mango_history_${state.activePersonaId}`); 
                     loadHistory(); 
                 }
+            };
+
+            DOM.btnAddVoices.onclick = (e) => {
+                e.stopPropagation();
+                try {
+                    window.location.href = "intent:#Intent;action=com.android.settings.TTS_SETTINGS;end";
+                } catch(err) {
+                    console.log("Intent failed to launch.");
+                }
+                setTimeout(() => {
+                    alert("To add more languages to your phone:\n\n1. Go to your phone's Settings.\n2. Search for 'Text-to-Speech' or 'TTS'.\n3. Tap the gear icon next to your Preferred Engine.\n4. Tap 'Install voice data'.\n5. Download the languages you want, then return here and refresh!");
+                }, 500);
             };
 
             DOM.btnShare.onclick = async (e) => {
@@ -537,13 +610,11 @@
                 } catch (err) { alert('Could not access clipboard. Please paste manually.'); }
             };
 
-            // ANDROID MAGIC FIX: Set explicit lang, pitch, and rate BEFORE voice. Bind to window.
             DOM.btnPreviewVoice.onclick = (e) => {
                 e.stopPropagation();
                 stopTTS();
                 const utterance = new SpeechSynthesisUtterance(`Hi, I am ${DOM.pName.value || 'your new persona'}. How do I sound?`);
                 
-                // Set explicitly requested language, pitch, and rate
                 utterance.lang = DOM.pLang.value || 'en-US';
                 utterance.pitch = parseFloat(DOM.pPitch.value) || 1.0;
                 utterance.rate = parseFloat(DOM.pRate.value) || 1.0;
@@ -553,10 +624,10 @@
                 
                 if (selectedVoice) {
                     utterance.voice = selectedVoice;
-                    utterance.lang = selectedVoice.lang; // Override with exact voice lang
+                    utterance.lang = selectedVoice.lang; 
                 }
                 
-                window.currentUtterance = utterance; // Prevent Android Garbage Collection
+                window.currentUtterance = utterance; 
                 synth.speak(utterance);
             };
 
@@ -667,7 +738,6 @@
             const activePersona = getActivePersona();
             const utterance = new SpeechSynthesisUtterance(cleanText);
             
-            // Apply saved Pitch and Rate for the active persona
             utterance.lang = activePersona.lang || 'en-US';
             utterance.pitch = activePersona.pitch !== undefined ? activePersona.pitch : 1.0;
             utterance.rate = activePersona.rate !== undefined ? activePersona.rate : 1.0;
@@ -677,7 +747,7 @@
                 const selectedVoice = voices.find(v => v.voiceURI === activePersona.voiceURI || v.name === activePersona.voiceURI);
                 if (selectedVoice) {
                     utterance.voice = selectedVoice;
-                    utterance.lang = selectedVoice.lang; // <-- Android Fix
+                    utterance.lang = selectedVoice.lang; 
                 }
             }
             
@@ -692,7 +762,7 @@
                 DOM.btnTtsToggle.classList.add('hidden');
             };
 
-            window.currentUtterance = utterance; // Prevent Android Garbage Collection
+            window.currentUtterance = utterance; 
             synth.speak(utterance);
         }
 
