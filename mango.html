@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MANGO - Your Virtual Friend</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* CSS Variables for Dynamic Theming */
+        :root {
+            --primary-bg: #ffffff;
+            --primary-text: #1f2937;
+            --chat-bg: #f3f4f6;
+            --accent-color: #f59e0b; /* Mango Orange */
+        }
+
+        .dark-mode {
+            --primary-bg: #111827;
+            --primary-text: #f9fafb;
+            --chat-bg: #1f2937;
+            --accent-color: #fbbf24;
+        }
+
+        body {
+            background-color: var(--primary-bg);
+            color: var(--primary-text);
+            transition: background-color 0.3s, color 0.3s;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+        }
+
+        /* The Mango Loading Animation */
+        #loader {
+            position: fixed;
+            inset: 0;
+            background-color: var(--primary-bg);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+            transition: opacity 0.8s ease-in-out;
+        }
+
+        .mango-shape {
+            width: 100px;
+            height: 120px;
+            background: linear-gradient(135deg, #fcd34d, #f59e0b);
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            box-shadow: inset -10px -10px 20px rgba(0,0,0,0.1), 0 10px 20px rgba(245, 158, 11, 0.3);
+            animation: float 2s ease-in-out infinite, pulse 2s infinite;
+            position: relative;
+        }
+
+        .mango-leaf {
+            position: absolute;
+            top: -15px;
+            right: 15px;
+            width: 30px;
+            height: 30px;
+            background-color: #22c55e;
+            border-radius: 0 50% 0 50%;
+            transform: rotate(-15deg);
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-15px); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1) translateY(0); }
+            50% { transform: scale(1.05) translateY(-15px); }
+        }
+
+        /* App Layout transition */
+        #app-container {
+            opacity: 0;
+            transform: scale(0.95);
+            transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+        }
+        
+        .chat-container { background-color: var(--chat-bg); }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col">
+
+    <div id="loader">
+        <div class="mango-shape">
+            <div class="mango-leaf"></div>
+        </div>
+        <h1 class="mt-8 text-2xl font-bold tracking-widest text-amber-500">M A N G O</h1>
+    </div>
+
+    <div id="app-container" class="hidden h-full w-full flex-col max-w-4xl mx-auto shadow-2xl relative">
+        
+        <header class="p-4 flex justify-between items-center border-b border-gray-200 dark:border-gray-700 z-10" style="background-color: var(--primary-bg);">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center text-white font-bold text-xl">M</div>
+                <h1 class="text-xl font-bold">MANGO</h1>
+            </div>
+            <button id="settings-btn" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition">
+                ⚙️ Settings
+            </button>
+        </header>
+
+        <main id="chat-area" class="flex-1 overflow-y-auto p-4 space-y-4 chat-container pb-24">
+            <div class="flex justify-start">
+                <div class="max-w-[75%] p-3 rounded-2xl rounded-tl-none text-white" style="background-color: var(--accent-color);">
+                    Hey there! I'm Mango. What are we getting into today? Got any fun files for me to look at? 🥭
+                </div>
+            </div>
+        </main>
+
+        <footer class="absolute bottom-0 w-full p-4 border-t border-gray-200 dark:border-gray-700" style="background-color: var(--primary-bg);">
+            <div class="flex items-center gap-2">
+                <button class="p-3 text-gray-500 hover:text-amber-500 transition">
+                    📎
+                </button>
+                
+                <input type="text" placeholder="Chat with Mango..." class="flex-1 p-3 rounded-full border border-gray-300 dark:border-gray-600 bg-transparent outline-none focus:border-amber-500 transition">
+                
+                <button class="w-12 h-12 rounded-full text-white flex items-center justify-center transition shadow-lg hover:scale-105" style="background-color: var(--accent-color);">
+                    🎤
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <div id="settings-modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 backdrop-blur-sm">
+        <div class="p-6 rounded-2xl w-full max-w-md shadow-2xl" style="background-color: var(--primary-bg);">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Settings</h2>
+                <button id="close-settings" class="text-gray-500 hover:text-red-500 text-xl font-bold">✕</button>
+            </div>
+
+            <div class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <label class="font-semibold">Dark Mode</label>
+                    <input type="checkbox" id="theme-toggle" class="w-5 h-5 accent-amber-500">
+                </div>
+
+                <div class="flex flex-col">
+                    <label class="font-semibold mb-1">Accent Color</label>
+                    <input type="color" id="color-picker" value="#f59e0b" class="w-full h-10 border-none rounded cursor-pointer">
+                </div>
+
+                <div class="flex flex-col">
+                    <label class="font-semibold mb-1">Mango's Voice</label>
+                    <select class="p-2 border rounded dark:bg-gray-800 dark:border-gray-600 outline-none">
+                        <option>Playful (Default)</option>
+                        <option>Deep & Calm</option>
+                        <option>Energetic</option>
+                    </select>
+                </div>
+
+                <div class="flex flex-col">
+                    <label class="font-semibold mb-1">Personality Mode</label>
+                    <select class="p-2 border rounded dark:bg-gray-800 dark:border-gray-600 outline-none">
+                        <option>Friendly & Humorous</option>
+                        <option>Strict & Direct</option>
+                        <option>Sarcastic Bestie</option>
+                    </select>
+                </div>
+
+                <div class="flex flex-col">
+                    <label class="font-semibold mb-1">Custom System Prompt</label>
+                    <textarea rows="3" placeholder="Tell Mango how to behave..." class="p-2 border rounded dark:bg-gray-800 dark:border-gray-600 outline-none resize-none text-sm"></textarea>
+                    <p class="text-xs text-gray-500 mt-1">Note: Mango is strictly restricted from writing code or generating images.</p>
+                </div>
+            </div>
+
+            <button id="save-settings" class="w-full mt-6 py-3 rounded-lg text-white font-bold transition shadow" style="background-color: var(--accent-color);">
+                Save Preferences
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Sequence the Mango Animation into the App
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                const loader = document.getElementById('loader');
+                const app = document.getElementById('app-container');
+                
+                loader.style.opacity = '0';
+                setTimeout(() => {
+                    loader.style.display = 'none';
+                    app.classList.remove('hidden');
+                    app.style.display = 'flex';
+                    // Trigger reflow
+                    void app.offsetWidth;
+                    app.style.opacity = '1';
+                    app.style.transform = 'scale(1)';
+                }, 800);
+            }, 2500); // Mango stays on screen for 2.5 seconds
+        });
+
+        // Settings Modal Logic
+        const settingsBtn = document.getElementById('settings-btn');
+        const settingsModal = document.getElementById('settings-modal');
+        const closeSettings = document.getElementById('close-settings');
+        const saveSettings = document.getElementById('save-settings');
+        const themeToggle = document.getElementById('theme-toggle');
+        const colorPicker = document.getElementById('color-picker');
+
+        settingsBtn.onclick = () => settingsModal.classList.remove('hidden');
+        closeSettings.onclick = () => settingsModal.classList.add('hidden');
+        saveSettings.onclick = () => settingsModal.classList.add('hidden');
+
+        // Dark Mode Toggle
+        themeToggle.addEventListener('change', (e) => {
+            if (e.target.checked) document.body.classList.add('dark-mode');
+            else document.body.classList.remove('dark-mode');
+        });
+
+        // Accent Color Injection
+        colorPicker.addEventListener('input', (e) => {
+            document.documentElement.style.setProperty('--accent-color', e.target.value);
+        });
+    </script>
+</body>
+</html>
