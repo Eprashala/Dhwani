@@ -466,13 +466,19 @@
                 } catch (err) { alert('Could not access clipboard. Please paste manually.'); }
             };
 
+            // ANDROID MAGIC FIX ADDED TO PREVIEW VOICE
             DOM.btnPreviewVoice.onclick = (e) => {
                 e.stopPropagation();
                 stopTTS();
                 const utterance = new SpeechSynthesisUtterance(`Hi, I am ${DOM.pName.value || 'your new persona'}. How do I sound?`);
                 const voices = synth.getVoices();
-                const selectedVoice = voices.find(v => v.voiceURI === DOM.pVoice.value);
-                if (selectedVoice) utterance.voice = selectedVoice;
+                
+                // Match by voiceURI, fallback to name
+                const selectedVoice = voices.find(v => v.voiceURI === DOM.pVoice.value || v.name === DOM.pVoice.value);
+                if (selectedVoice) {
+                    utterance.voice = selectedVoice;
+                    utterance.lang = selectedVoice.lang; // <-- Android Fix
+                }
                 
                 const ageVal = parseInt(DOM.pAge.value) || 30;
                 if (ageVal < 12) { utterance.rate = 0.8; utterance.pitch = 1.2; } 
@@ -594,8 +600,12 @@
 
             if (activePersona.voiceURI) {
                 const voices = synth.getVoices();
-                const selectedVoice = voices.find(v => v.voiceURI === activePersona.voiceURI);
-                if (selectedVoice) utterance.voice = selectedVoice;
+                // Match by voiceURI, fallback to name
+                const selectedVoice = voices.find(v => v.voiceURI === activePersona.voiceURI || v.name === activePersona.voiceURI);
+                if (selectedVoice) {
+                    utterance.voice = selectedVoice;
+                    utterance.lang = selectedVoice.lang; // <-- Android Fix
+                }
             }
             
             utterance.onstart = () => {
