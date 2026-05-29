@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MANGO - Your Virtual Friend</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: 'var(--color-primary)',
+                        appBg: 'var(--color-bg)',
+                        bgLight: '#ffffff',
+                        bgDark: '#212121', 
+                        sidebarDark: '#171717',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root { 
+            --color-primary: #f59e0b; 
+            --color-bg: #212121;
+        }
+        body { 
+            font-family: 'Inter', system-ui, sans-serif; 
+            touch-action: manipulation; 
+            background-color: var(--color-bg);
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            background-repeat: no-repeat;
+            transition: background-color 0.3s;
+        }
+        
+        #splash-screen { transition: opacity 1s ease-out, transform 1s ease-out; z-index: 9999; }
+        .mango-bounce { animation: bounce-mango 2s infinite; }
+        @keyframes bounce-mango {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-20px) scale(1.1); }
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+        .dark ::-webkit-scrollbar-thumb { background: #444; }
+
+        .glass-panel {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        input[type=range] { -webkit-appearance: none; background: transparent; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%; background: var(--color-primary); cursor: pointer; margin-top: -6px; }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; cursor: pointer; background: #cbd5e1; border-radius: 2px; }
+        .dark input[type=range]::-webkit-slider-runnable-track { background: #475569; }
+
+        .tab-btn.active { border-bottom: 2px solid var(--color-primary); color: var(--color-primary); font-weight: bold; }
+        
+        /* Custom hide for the tiny select arrow */
+        .select-hide-arrow {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+        }
+    </style>
+</head>
+<body class="text-slate-800 dark:text-slate-200 h-screen overflow-hidden flex relative">
+
+    <div id="splash-screen" class="fixed inset-0 bg-yellow-400 dark:bg-yellow-600 flex flex-col items-center justify-center z-[9999]">
+        <div class="text-9xl mango-bounce">🥭</div>
+        <h1 class="text-4xl font-bold mt-4 text-white tracking-widest">MANGO</h1>
+        <p class="text-yellow-100 mt-2">Loading your virtual friend...</p>
+    </div>
+
+    <div id="crop-modal" class="hidden fixed inset-0 bg-black/90 z-[200] flex flex-col items-center justify-center p-4 backdrop-blur-sm">
+        <div class="w-full max-w-md bg-slate-900 rounded-xl overflow-hidden shadow-2xl flex flex-col h-[75vh]">
+            <div class="p-4 bg-slate-800 flex justify-between items-center text-white border-b border-slate-700">
+                <h3 class="font-bold text-lg">Crop Image</h3>
+                <button id="btn-crop-cancel" class="text-slate-400 hover:text-red-500 font-bold text-xl">✕</button>
+            </div>
+            <div class="flex-1 bg-black overflow-hidden flex items-center justify-center relative p-2">
+                <img id="crop-image" class="max-w-full max-h-full block" src="" alt="To crop">
+            </div>
+            <div class="p-4 bg-slate-800 flex gap-2 justify-center border-t border-slate-700">
+                <button id="btn-crop-apply" class="flex-1 bg-primary hover:bg-orange-500 text-white font-bold px-4 py-3 rounded-lg shadow-lg">Apply</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="fixed right-2 sm:right-4 top-1/2 -translate-y-1/2 flex flex-col gap-4 bg-white/80 dark:bg-sidebarDark/80 backdrop-blur-lg p-2.5 rounded-full border border-slate-200 dark:border-slate-700 shadow-2xl z-50">
+        <button id="btn-open-models" class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-primary hover:text-white transition-all flex items-center justify-center text-xl shadow" title="AI Models">🤖</button>
+        <button id="btn-open-personas" class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-primary hover:text-white transition-all flex items-center justify-center text-xl shadow" title="Personas">👥</button>
+        <button id="btn-open-settings" class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-primary hover:text-white transition-all flex items-center justify-center text-xl shadow" title="Settings">⚙️</button>
+    </div>
+
+    <div id="models-modal" class="hidden fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white dark:bg-sidebarDark rounded-2xl p-6 w-full max-w-sm shadow-2xl relative border border-slate-200 dark:border-slate-700">
+            <button class="close-modal absolute top-4 right-4 text-slate-400 hover:text-red-500 text-xl font-bold">✕</button>
+            <h2 class="text-2xl font-bold text-primary mb-4 flex items-center gap-2">🤖 AI Engines</h2>
+            
+            <div class="space-y-4">
+                <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700">
+                    <label class="text-[10px] text-slate-500 font-bold mb-1 block uppercase">Select Provider</label>
+                    <select id="mod-provider" class="w-full mb-3 p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none font-semibold text-sm cursor-pointer">
+                        <option value="gemini">Google (Gemini)</option>
+                        <option value="openai">OpenAI (ChatGPT)</option>
+                        <option value="groq">Groq (Llama, Mixtral)</option>
+                        <option value="claude">Anthropic (Claude)</option>
+                    </select>
+
+                    <label class="text-[10px] text-slate-500 font-bold mb-1 block uppercase">Select Fallback Base Model</label>
+                    <select id="mod-model" class="w-full mb-3 p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none text-sm cursor-pointer"></select>
+                    
+                    <label class="text-[10px] text-slate-500 font-bold mb-1 block uppercase">API Key</label>
+                    <div class="flex gap-2 w-full">
+                        <input type="password" id="mod-apikey" placeholder="Enter API Key" class="flex-1 p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none text-sm">
+                        <button id="btn-paste-key" class="bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 px-3 rounded-lg text-xs font-semibold transition-colors border border-slate-300 dark:border-slate-500">Paste</button>
+                    </div>
+                    <div class="text-[10px] text-slate-400 mt-2 text-center">Gemini Smart Routing is Active. Models will automatically switch based on context.</div>
+                </div>
+            </div>
+            <button id="btn-save-models" class="w-full mt-4 bg-primary hover:bg-orange-500 text-white font-bold py-3 rounded-xl transition-colors shadow-lg">Save Engine</button>
+        </div>
+    </div>
+
+    <div id="settings-modal" class="hidden fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm overflow-y-auto">
+        <div class="bg-white dark:bg-sidebarDark rounded-2xl p-6 w-full max-w-md shadow-2xl relative my-auto border border-slate-200 dark:border-slate-700">
+            <button class="close-modal absolute top-4 right-4 text-slate-400 hover:text-red-500 text-xl font-bold">✕</button>
+            <h2 class="text-2xl font-bold text-primary mb-4 flex items-center gap-2">⚙️ Global Settings</h2>
+            
+            <div class="space-y-4 max-h-[70vh] overflow-y-auto pr-2 pb-2">
+                
+                <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700">
+                    <h3 class="font-semibold mb-2 text-sm uppercase text-slate-500">1. Appearance</h3>
+                    <div class="flex justify-between items-center mb-3 p-2 bg-white dark:bg-slate-900 rounded border dark:border-slate-700">
+                        <span class="text-sm font-medium">Dark Mode</span>
+                        <input type="checkbox" id="set-darkmode" class="w-5 h-5 cursor-pointer">
+                    </div>
+                    <div class="flex gap-2">
+                        <div class="flex-1">
+                            <label class="text-[10px] text-slate-500 font-bold mb-1 block">Chat Color</label>
+                            <input type="color" id="set-color" value="#f59e0b" class="w-full h-10 cursor-pointer rounded border dark:border-slate-700">
+                        </div>
+                        <div class="flex-1">
+                            <label class="text-[10px] text-slate-500 font-bold mb-1 block">Background</label>
+                            <input type="color" id="set-bgcolor" value="#212121" class="w-full h-10 cursor-pointer rounded border dark:border-slate-700">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700">
+                    <h3 class="font-semibold mb-2 text-sm uppercase text-slate-500">2. Our Profile</h3>
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-14 h-14 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden border-2 border-primary flex items-center justify-center flex-shrink-0">
+                            <img id="set-user-img-preview" class="w-full h-full object-cover hidden" src="">
+                            <span id="set-user-img-emoji" class="text-2xl">👤</span>
+                        </div>
+                        <input type="file" id="set-user-img" accept="image/*" class="text-xs text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-slate-200 dark:file:bg-slate-700 outline-none w-full">
+                    </div>
+                    <div class="flex gap-2 mb-2">
+                        <input type="text" id="set-name" placeholder="Name" class="flex-1 p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none text-sm">
+                        <input type="text" id="set-fname" placeholder="Nickname" class="flex-1 p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none text-sm">
+                    </div>
+                    <div class="flex gap-2 mb-2">
+                        <input type="number" id="set-age" placeholder="Age" class="w-1/3 p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none text-sm">
+                        <select id="set-gender" class="w-2/3 p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none text-sm">
+                            <option value="">Gender</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
+                    </div>
+                    <textarea id="set-address" placeholder="Address..." class="w-full p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none text-sm h-12"></textarea>
+                </div>
+
+                <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border dark:border-slate-700">
+                    <h3 class="font-semibold mb-2 text-sm uppercase text-slate-500">3. Speech & Languages</h3>
+                    <div class="space-y-2">
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-500">Primary Spoken Language</label>
+                            <select id="set-lang-primary" class="w-full p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none text-sm">
+                                </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-500">Secondary Spoken Language</label>
+                            <select id="set-lang-secondary" class="w-full p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none text-sm">
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-500">Additional Learning Language</label>
+                            <select id="set-lang-learning" class="w-full p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none text-sm">
+                            </select>
+                        </div>
+                        <div class="mt-4 border-t border-slate-300 dark:border-slate-700 pt-2">
+                            <label class="text-[10px] font-bold text-slate-500">Global AI TTS Voice</label>
+                            <select id="set-global-voice" class="w-full p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none text-sm"></select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <button id="btn-save-settings" class="w-full mt-4 bg-primary hover:bg-orange-500 text-white font-bold py-3 rounded-xl transition-colors shadow-lg">Save Settings</button>
+        </div>
+    </div>
+
+    <div id="personas-modal" class="hidden fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm overflow-y-auto">
+        <div class="bg-white dark:bg-sidebarDark rounded-2xl w-full max-w-md shadow-2xl relative my-auto border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[90vh]">
+            <button class="close-modal absolute top-4 right-4 text-slate-400 hover:text-red-500 text-xl font-bold z-10">✕</button>
+            
+            <div class="p-4 bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex gap-4">
+                <button id="tab-manage" class="tab-btn active pb-1 text-sm text-slate-500 transition-colors">📋 Manage</button>
+                <button id="tab-add" class="tab-btn pb-1 text-sm text-slate-500 transition-colors">➕ Add Persona</button>
+            </div>
+            
+            <div class="p-5 overflow-y-auto flex-1">
+                
+                <div id="view-manage" class="space-y-2">
+                    <div id="modal-persona-list" class="space-y-2"></div>
+                </div>
+
+                <div id="view-add" class="hidden space-y-4">
+                    <h4 id="persona-form-title" class="text-sm font-bold text-primary hidden">Edit Persona</h4>
+                    
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden border border-slate-300 dark:border-slate-600 flex items-center justify-center flex-shrink-0">
+                            <img id="p-thumb-preview" class="w-full h-full object-cover hidden" src="">
+                            <span id="p-thumb-emoji" class="text-xl">👤</span>
+                        </div>
+                        <input type="file" id="p-thumb" accept="image/*" class="text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-slate-200 dark:file:bg-slate-700 outline-none w-full">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="p-name" placeholder="Name (e.g. Banku)" class="col-span-2 p-2 rounded bg-slate-50 dark:bg-slate-900 border dark:border-slate-700 outline-none text-sm">
+                        <input type="text" id="p-role" placeholder="Role (e.g. Friend)" class="col-span-2 p-2 rounded bg-slate-50 dark:bg-slate-900 border dark:border-slate-700 outline-none text-sm">
+                        <input type="number" id="p-age" placeholder="Age" class="p-2 rounded bg-slate-50 dark:bg-slate-900 border dark:border-slate-700 outline-none text-sm">
+                        <select id="p-gender" class="p-2 rounded bg-slate-50 dark:bg-slate-900 border dark:border-slate-700 outline-none text-sm">
+                            <option value="">Gender</option><option value="Male">Male</option><option value="Female">Female</option>
+                        </select>
+                    </div>
+
+                    <textarea id="p-desc" placeholder="Description (Behavior, characteristics, habits...)" class="w-full p-2 rounded bg-slate-50 dark:bg-slate-900 border dark:border-slate-700 outline-none text-sm h-16"></textarea>
+                    
+                    <div class="bg-slate-50 dark:bg-slate-900 p-2 rounded border dark:border-slate-700">
+                        <label class="text-[10px] text-slate-500 font-bold mb-1 block uppercase">References</label>
+                        <input type="text" id="p-ref-text" placeholder="Books (e.g. Hanuman Chalisa)" class="w-full mb-2 p-2 rounded bg-white dark:bg-slate-800 border dark:border-slate-600 outline-none text-sm">
+                        <input type="file" id="p-ref-file" accept=".pdf, text/plain" class="text-[10px] text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-slate-200 dark:file:bg-slate-700 outline-none w-full" title="Attach context file (Max 1.5MB)">
+                        <div id="p-ref-file-name" class="text-xs text-primary mt-1 hidden font-semibold">File Attached</div>
+                    </div>
+
+                    <div class="bg-slate-50 dark:bg-slate-900 p-2 rounded border dark:border-slate-700">
+                        <label class="text-[10px] text-slate-500 font-bold mb-1 block uppercase">Language & Voice</label>
+                        <div class="flex gap-2 mb-2">
+                            <select id="p-lang" class="w-1/3 p-2 rounded bg-white dark:bg-slate-800 border dark:border-slate-600 outline-none text-xs"></select>
+                            <select id="p-voice" class="w-2/3 p-2 rounded bg-white dark:bg-slate-800 border dark:border-slate-600 outline-none text-xs"></select>
+                        </div>
+                        <div class="flex gap-2 items-center">
+                            <div class="flex-1 flex flex-col">
+                                <span class="text-[10px] text-slate-500">Pitch</span>
+                                <input type="range" id="p-pitch" min="0" max="2" step="0.1" value="1">
+                            </div>
+                            <div class="flex-1 flex flex-col">
+                                <span class="text-[10px] text-slate-500">Speed</span>
+                                <input type="range" id="p-rate" min="0.5" max="2" step="0.1" value="1">
+                            </div>
+                            <button id="btn-preview-voice" class="ml-1 bg-slate-200 dark:bg-slate-700 h-8 w-8 rounded-full text-sm hover:bg-slate-300 dark:hover:bg-slate-600" title="Preview Voice">▶️</button>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-2 w-full pt-2">
+                        <button id="btn-save-persona" class="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded transition-colors text-sm">Save Persona</button>
+                        <button id="btn-cancel-edit" class="hidden bg-slate-500 hover:bg-slate-400 text-white font-bold py-2 px-3 rounded transition-colors text-sm">Cancel</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <aside id="sidebar" class="w-72 bg-gray-50 dark:bg-sidebarDark flex-shrink-0 flex flex-col transition-transform transform -translate-x-full md:translate-x-0 absolute md:relative z-40 h-full border-r border-slate-200 dark:border-slate-800">
+        <div class="p-4 flex items-center gap-3 border-b border-slate-200 dark:border-slate-800">
+            <div class="text-3xl">🥭</div>
+            <h1 class="text-2xl font-bold tracking-widest text-slate-800 dark:text-white">MANGO</h1>
+        </div>
+        <div class="p-3">
+            <button id="btn-new-chat" class="w-full flex items-center justify-between p-3 rounded-xl bg-primary text-white hover:bg-orange-500 transition-colors font-semibold text-sm outline-none shadow-md">
+                <span class="flex items-center gap-2"><span class="text-lg">➕</span> New Chat / Reset</span>
+            </button>
+        </div>
+        <div class="px-4 py-2 text-xs font-semibold text-slate-500 tracking-wider">ALL CHATS HISTORY</div>
+        <div id="sidebar-persona-list" class="flex-1 overflow-y-auto px-3 space-y-1"></div>
+    </aside>
+
+    <div id="sidebar-overlay" class="hidden fixed inset-0 bg-black/50 z-30 md:hidden"></div>
+
+    <main class="flex-1 flex flex-col relative h-full w-full min-w-0 bg-transparent">
+        
+        <header class="flex-shrink-0 px-4 py-3 bg-white/80 dark:bg-sidebarDark/80 glass-panel z-20 flex justify-between items-center border-b border-slate-200 dark:border-slate-800 shadow-sm">
+            <div class="flex items-center gap-2">
+                <button id="btn-toggle-sidebar" class="md:hidden text-slate-600 dark:text-slate-300 text-2xl outline-none p-1">☰</button>
+                <div id="active-chat-name" class="font-bold text-slate-800 dark:text-slate-200 text-lg ml-2">Mango</div>
+            </div>
+            
+            <div class="flex items-center gap-2 sm:gap-4 bg-slate-100 dark:bg-slate-800 px-4 py-1.5 rounded-full border border-slate-200 dark:border-slate-700">
+                <button id="btn-tts-toggle" class="text-slate-600 dark:text-slate-300 hover:text-primary outline-none transition-colors flex items-center gap-1 text-sm font-medium" title="Turn Voice On/Off">
+                    <span id="tts-icon" class="text-lg">🔊</span> <span class="hidden sm:inline">Voice</span>
+                </button>
+                <div class="w-px h-4 bg-slate-300 dark:bg-slate-600"></div>
+                <button id="btn-clear" class="text-slate-600 dark:text-slate-300 hover:text-red-500 outline-none transition-colors flex items-center gap-1 text-sm font-medium" title="Delete Chat">
+                    <span class="text-lg">🗑️</span> <span class="hidden sm:inline">Delete</span>
+                </button>
+                <div class="w-px h-4 bg-slate-300 dark:bg-slate-600"></div>
+                <button id="btn-share" class="text-slate-600 dark:text-slate-300 hover:text-blue-500 outline-none transition-colors flex items-center gap-1 text-sm font-medium" title="Share Chat">
+                    <span class="text-lg">📤</span> <span class="hidden sm:inline">Share</span>
+                </button>
+            </div>
+            <div class="w-8 md:hidden"></div>
+        </header>
+
+        <div id="status-indicator" class="absolute top-[60px] right-20 z-20 text-[10px] font-bold uppercase tracking-widest text-slate-500 bg-slate-100/80 dark:bg-sidebarDark/80 px-2 py-1 rounded-bl border-b border-l border-slate-200 dark:border-slate-800 glass-panel">
+            Online
+        </div>
+
+        <div id="chat-log" class="flex-1 overflow-y-auto p-4 scroll-smooth w-full flex flex-col items-center">
+            <div id="chat-inner" class="w-full max-w-4xl flex flex-col space-y-6 pb-32 pt-4"></div>
+        </div>
+
+        <div class="w-full absolute bottom-0 left-0 bg-gradient-to-t from-white via-white to-transparent dark:from-[var(--color-bg)] dark:via-[var(--color-bg)] dark:to-transparent pt-6 pb-4 px-4 flex justify-center pr-16 sm:pr-20">
+            <div class="w-full max-w-4xl flex flex-col gap-2 relative z-20">
+                <div id="image-preview-container" class="hidden px-4 py-2 bg-slate-100 dark:bg-sidebarDark rounded-xl border border-slate-300 dark:border-slate-700 flex items-center gap-2 self-start mb-2 shadow-sm">
+                    <img id="image-preview" class="h-12 rounded border border-slate-300 dark:border-slate-600 object-cover hidden" src="">
+                    <div id="pdf-preview" class="h-12 px-4 bg-red-100 text-red-600 rounded border border-red-300 flex items-center font-bold text-xs hidden">PDF Document</div>
+                    <button id="btn-remove-image" class="text-red-500 text-sm ml-2 font-bold outline-none hover:bg-red-200 p-1 rounded">✕</button>
+                </div>
+
+                <div class="flex items-center gap-2 bg-white dark:bg-sidebarDark rounded-full border-2 border-slate-200 dark:border-slate-700 px-3 py-2 shadow-lg focus-within:border-primary transition-colors">
+                    <label for="file-upload" class="p-2 text-xl text-slate-400 hover:text-primary cursor-pointer transition-colors outline-none flex-shrink-0" title="Attach File">📎</label>
+                    <input id="file-upload" type="file" accept="image/*, application/pdf" class="hidden">
+
+                    <textarea id="text-input" rows="1" class="flex-1 min-w-0 bg-transparent text-slate-800 dark:text-white px-2 py-2 outline-none resize-none max-h-32 text-base leading-relaxed placeholder-slate-400" placeholder="Message..."></textarea>
+                    
+                    <div class="flex items-center gap-1 flex-shrink-0 pl-2 border-l border-slate-200 dark:border-slate-700 relative">
+                        
+                        <div class="relative group flex items-center bg-slate-100 dark:bg-slate-800 rounded-full px-2 py-1 cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors mr-1">
+                            <span class="text-xs font-bold text-slate-500 dark:text-slate-400 mr-1">🎙️</span>
+                            <select id="active-stt-lang" class="select-hide-arrow bg-transparent outline-none text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer w-12 text-center" title="Listening Language">
+                                </select>
+                        </div>
+
+                        <button id="btn-mic" class="w-10 h-10 text-slate-500 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full flex items-center justify-center transition-all outline-none text-xl" title="Use Voice Typing">🎤</button>
+                        <button id="btn-send" class="w-10 h-10 bg-primary hover:bg-orange-500 text-white rounded-full transition-transform transform hover:scale-105 shadow-md outline-none flex items-center justify-center text-lg disabled:opacity-50 disabled:cursor-not-allowed">➤</button>
+                    </div>
+                </div>
+                <div class="text-center text-[10px] text-slate-400 font-medium">AI can make mistakes. Verify important information.</div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- 1. GLOBALS & INIT ---
+        let wakeLock = null;
+        let cropper = null;
+        let recognition = null;
+        let synth = window.speechSynthesis;
+
+        // Comprehensive Language List for Settings
+        const LANGUAGES = [
+            { code: 'en-US', name: 'English (US)' }, { code: 'en-GB', name: 'English (UK)' },
+            { code: 'es-ES', name: 'Spanish (Spain)' }, { code: 'es-MX', name: 'Spanish (Mexico)' },
+            { code: 'fr-FR', name: 'French' }, { code: 'de-DE', name: 'German' },
+            { code: 'it-IT', name: 'Italian' }, { code: 'hi-IN', name: 'Hindi' },
+            { code: 'mr-IN', name: 'Marathi' }, { code: 'gu-IN', name: 'Gujarati' },
+            { code: 'ja-JP', name: 'Japanese' }, { code: 'zh-CN', name: 'Chinese (Mandarin)' },
+            { code: 'ko-KR', name: 'Korean' }, { code: 'ru-KR', name: 'Russian' },
+            { code: 'pt-BR', name: 'Portuguese (Brazil)' }, { code: 'ar-SA', name: 'Arabic' }
+        ];
+
+        const MODELS = {
+            gemini: ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-pro", "gemini-3.1-flash", "gemini-3.1-flash-lite", "gemini-2.5-flash", "gemini-2.5-flash-lite"],
+            openai: ["gpt-4o", "gpt-5"], 
+            groq: ["llama-3-70b", "mixtral-8x7b-32768"], 
+            claude: ["claude-3-5-sonnet", "claude-3-opus", "claude-3-haiku"]
+        };
+
+        const defaultPersona = {
+            id: 'default', name: 'Mango', role: 'Virtual Friend', age: 25, gender: '',
+            lang: 'en-US', voiceURI: '', pitch: 1.0, rate: 1.0,
+            thumbnail: null, desc: 'Highly conversational, helpful, and humorous virtual friend.',
+            refText: '', refFileBase64: null
+        };
+
+        let state = {
+            isProcessing: false, isListening: false,
+            editingPersonaId: null, tempThumb: null, tempRefFile: null,
+            ttsPaused: false, // Voice is ON by default
+            chatHistory: [], 
+            currentBase64File: null, currentFileType: null,
+            apiKeys: JSON.parse(localStorage.getItem('mango_keys')) || {},
+            personas: JSON.parse(localStorage.getItem('mango_personas')) || [defaultPersona],
+            activePersonaId: localStorage.getItem('mango_active_persona') || 'default',
+            settings: JSON.parse(localStorage.getItem('mango_settings')) || {
+                name: "User", fname: "Buddy", age: 25, gender: "", address: "", userImage: null,
+                provider: "gemini", model: "gemini-3.5-flash",
+                darkmode: true, color: "#f59e0b", bgcolor: "#212121", globalVoice: "",
+                langPrimary: "en-US", langSecondary: "es-ES", langLearning: "hi-IN"
+            }
+        };
+
+        const DOM = {
+            // Main UI
+            log: document.getElementById('chat-log'), inner: document.getElementById('chat-inner'),
+            textIn: document.getElementById('text-input'), btnSend: document.getElementById('btn-send'),
+            btnMic: document.getElementById('btn-mic'), ttsToggle: document.getElementById('btn-tts-toggle'),
+            ttsIcon: document.getElementById('tts-icon'), activeSttLang: document.getElementById('active-stt-lang'),
+            
+            // Sidebars & Headers
+            sidebar: document.getElementById('sidebar'), overlay: document.getElementById('sidebar-overlay'),
+            btnToggleSb: document.getElementById('btn-toggle-sidebar'), sbList: document.getElementById('sidebar-persona-list'),
+            btnNewChat: document.getElementById('btn-new-chat'), activeChatName: document.getElementById('active-chat-name'),
+            
+            // Right Menu Buttons
+            btnMModels: document.getElementById('btn-open-models'),
+            btnMPersonas: document.getElementById('btn-open-personas'),
+            btnMSettings: document.getElementById('btn-open-settings'),
+            
+            // Modals
+            modModels: document.getElementById('models-modal'),
+            modSettings: document.getElementById('settings-modal'),
+            modPersonas: document.getElementById('personas-modal'),
+            
+            // Inputs: Models
+            mProv: document.getElementById('mod-provider'), mModel: document.getElementById('mod-model'), mKey: document.getElementById('mod-apikey'),
+            
+            // Inputs: Settings
+            sDark: document.getElementById('set-darkmode'), sColor: document.getElementById('set-color'), sBg: document.getElementById('set-bgcolor'),
+            sUImg: document.getElementById('set-user-img'), sUImgPrev: document.getElementById('set-user-img-preview'), sUEmo: document.getElementById('set-user-img-emoji'),
+            sName: document.getElementById('set-name'), sFname: document.getElementById('set-fname'), sAge: document.getElementById('set-age'),
+            sGen: document.getElementById('set-gender'), sAddr: document.getElementById('set-address'), sVoice: document.getElementById('set-global-voice'),
+            sLangPrimary: document.getElementById('set-lang-primary'), sLangSecondary: document.getElementById('set-lang-secondary'), sLangLearning: document.getElementById('set-lang-learning'),
+            
+            // Inputs: Personas
+            tabManage: document.getElementById('tab-manage'), tabAdd: document.getElementById('tab-add'),
+            viewManage: document.getElementById('view-manage'), viewAdd: document.getElementById('view-add'),
+            pList: document.getElementById('modal-persona-list'), pFormTitle: document.getElementById('persona-form-title'),
+            pName: document.getElementById('p-name'), pRole: document.getElementById('p-role'), pAge: document.getElementById('p-age'), pGen: document.getElementById('p-gender'),
+            pDesc: document.getElementById('p-desc'), pRefTxt: document.getElementById('p-ref-text'), pRefFile: document.getElementById('p-ref-file'), pRefFileName: document.getElementById('p-ref-file-name'),
+            pThumb: document.getElementById('p-thumb'), pThumbPrev: document.getElementById('p-thumb-preview'), pThumbEmo: document.getElementById('p-thumb-emoji'),
+            pLang: document.getElementById('p-lang'), pVoice: document.getElementById('p-voice'),
+            pPitch: document.getElementById('p-pitch'), pRate: document.getElementById('p-rate'),
+            btnSaveP: document.getElementById('btn-save-persona'), btnCancelP: document.getElementById('btn-cancel-edit')
+        };
+
+        window.onload = () => {
+            setTimeout(() => { document.getElementById('splash-screen').style.display = 'none'; }, 800);
+            
+            // Populate Language Dropdowns in Settings
+            LANGUAGES.forEach(l => {
+                DOM.sLangPrimary.add(new Option(l.name, l.code));
+                DOM.sLangSecondary.add(new Option(l.name, l.code));
+                DOM.sLangLearning.add(new Option(l.name, l.code));
+                DOM.pLang.add(new Option(l.name, l.code));
+            });
+
+            applyGlobalSettings();
+            
+            // Init Models
+            DOM.mProv.value = state.settings.provider;
+            populateModels(state.settings.provider);
+            DOM.mModel.value = state.settings.model;
+            DOM.mKey.value = state.apiKeys[state.settings.provider] || '';
+
+            initVoices();
+            renderSidebarPersonas();
+            switchPersona(state.activePersonaId);
+            initSpeechRecognition();
+            setupEventListeners();
+        };
+
+        // --- 2. THEME & SETTINGS ---
+        function applyGlobalSettings() {
+            const root = document.documentElement;
+            if (state.settings.darkmode) root.classList.add('dark'); else root.classList.remove('dark');
+            root.style.setProperty('--color-primary', state.settings.color || '#f59e0b');
+            root.style.setProperty('--color-bg', state.settings.bgcolor || (state.settings.darkmode ? '#212121' : '#f8fafc'));
+            
+            DOM.sDark.checked = state.settings.darkmode; DOM.sColor.value = state.settings.color || '#f59e0b'; DOM.sBg.value = state.settings.bgcolor || '#212121';
+            DOM.sName.value = state.settings.name || ""; DOM.sFname.value = state.settings.fname || ""; DOM.sAge.value = state.settings.age || "";
+            DOM.sGen.value = state.settings.gender || ""; DOM.sAddr.value = state.settings.address || "";
+            
+            DOM.sLangPrimary.value = state.settings.langPrimary || "en-US";
+            DOM.sLangSecondary.value = state.settings.langSecondary || "es-ES";
+            DOM.sLangLearning.value = state.settings.langLearning || "hi-IN";
+
+            if (state.settings.userImage) { DOM.sUImgPrev.src = state.settings.userImage; DOM.sUImgPrev.classList.remove('hidden'); DOM.sUEmo.classList.add('hidden'); }
+            
+            updateSTTLanguageOptions();
+        }
+
+        // Update the Quick Toggle near the Mic
+        function updateSTTLanguageOptions() {
+            DOM.activeSttLang.innerHTML = '';
+            
+            const addOption = (code) => {
+                if(!code) return;
+                const shortCode = code.split('-')[0].toUpperCase();
+                // Avoid duplicates in the tiny dropdown
+                if (!Array.from(DOM.activeSttLang.options).some(opt => opt.value === code)) {
+                    DOM.activeSttLang.add(new Option(shortCode, code));
+                }
+            };
+
+            addOption(state.settings.langPrimary);
+            addOption(state.settings.langSecondary);
+            addOption(state.settings.langLearning);
+            // Also append the active persona's expected language just in case
+            addOption(getActivePersona().lang);
+            
+            // Set current value to primary by default if current isn't valid anymore
+            if(!Array.from(DOM.activeSttLang.options).some(opt => opt.value === DOM.activeSttLang.value)) {
+                DOM.activeSttLang.value = state.settings.langPrimary;
+            }
+        }
+
+        DOM.mProv.addEventListener('change', (e) => {
+            populateModels(e.target.value);
+            DOM.mKey.value = state.apiKeys[e.target.value] || '';
+        });
+
+        function populateModels(provider) {
+            DOM.mModel.innerHTML = '';
+            (MODELS[provider] || []).forEach(m => DOM.mModel.add(new Option(m, m)));
+        }
+
+        DOM.sUImg.addEventListener('change', (e) => {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                state.settings.userImage = ev.target.result;
+                DOM.sUImgPrev.src = ev.target.result; DOM.sUImgPrev.classList.remove('hidden'); DOM.sUEmo.classList.add('hidden');
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // Save buttons
+        document.getElementById('btn-save-models').onclick = () => {
+            state.settings.provider = DOM.mProv.value; state.settings.model = DOM.mModel.value;
+            state.apiKeys[DOM.mProv.value] = DOM.mKey.value;
+            localStorage.setItem('mango_settings', JSON.stringify(state.settings));
+            localStorage.setItem('mango_keys', JSON.stringify(state.apiKeys));
+            DOM.modModels.classList.add('hidden');
+        };
+
+        document.getElementById('btn-save-settings').onclick = () => {
+            state.settings.darkmode = DOM.sDark.checked; state.settings.color = DOM.sColor.value; state.settings.bgcolor = DOM.sBg.value;
+            state.settings.name = DOM.sName.value; state.settings.fname = DOM.sFname.value; state.settings.age = DOM.sAge.value;
+            state.settings.gender = DOM.sGen.value; state.settings.address = DOM.sAddr.value; state.settings.globalVoice = DOM.sVoice.value;
+            state.settings.langPrimary = DOM.sLangPrimary.value;
+            state.settings.langSecondary = DOM.sLangSecondary.value;
+            state.settings.langLearning = DOM.sLangLearning.value;
+
+            localStorage.setItem('mango_settings', JSON.stringify(state.settings));
+            applyGlobalSettings(); DOM.modSettings.classList.add('hidden'); loadHistory(); 
+        };
+
+        // --- 3. PERSONAS ---
+        function getActivePersona() { return state.personas.find(p => p.id === state.activePersonaId) || state.personas[0]; }
+
+        function renderSidebarPersonas() {
+            DOM.sbList.innerHTML = ''; DOM.pList.innerHTML = '';
+            state.personas.forEach(p => {
+                const isActive = p.id === state.activePersonaId;
+                
+                // Sidebar Item
+                const sbDiv = document.createElement('div');
+                sbDiv.className = `flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${isActive ? 'bg-primary/10 border-l-4 border-primary' : 'hover:bg-slate-200 dark:hover:bg-slate-800'}`;
+                sbDiv.onclick = () => switchPersona(p.id);
+                sbDiv.innerHTML = `
+                    <div class="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 flex items-center justify-center">
+                        ${p.thumbnail ? `<img src="${p.thumbnail}" class="w-full h-full object-cover">` : `<span class="text-sm">🥭</span>`}
+                    </div>
+                    <div class="min-w-0 flex-1"><div class="font-bold text-sm truncate ${isActive?'text-primary':'text-slate-800 dark:text-slate-200'}">${p.name}</div><div class="text-[10px] text-slate-500 truncate">${p.role}</div></div>
+                `;
+                DOM.sbList.appendChild(sbDiv);
+
+                // Modal Manage Item
+                const mDiv = document.createElement('div');
+                mDiv.className = `flex justify-between items-center p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900`;
+                mDiv.innerHTML = `
+                    <div class="flex items-center gap-3 min-w-0">
+                        ${p.thumbnail ? `<img src="${p.thumbnail}" class="w-8 h-8 rounded-full object-cover">` : `<span class="text-lg">🥭</span>`}
+                        <div class="font-bold text-sm truncate dark:text-white">${p.name} <span class="text-xs font-normal text-slate-500">(${p.role})</span></div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="editPersona('${p.id}')" class="text-blue-500 hover:text-blue-700 text-sm font-bold">Edit</button>
+                        ${p.id!=='default'?`<button onclick="deletePersona('${p.id}')" class="text-red-500 hover:text-red-700 text-sm font-bold">Del</button>`:''}
+                    </div>
+                `;
+                DOM.pList.appendChild(mDiv);
+            });
+        }
+
+        window.switchPersona = function(id) {
+            stopTTS(); state.activePersonaId = id; localStorage.setItem('mango_active_persona', id);
+            const p = getActivePersona();
+            DOM.activeChatName.innerText = p.name;
+            renderSidebarPersonas(); loadHistory(); updateSTTLanguageOptions();
+            if(window.innerWidth < 768) { DOM.sidebar.classList.add('-translate-x-full'); DOM.overlay.classList.add('hidden'); }
+        };
+
+        // Persona Tabs
+        DOM.tabManage.onclick = () => { DOM.tabManage.classList.add('active'); DOM.tabAdd.classList.remove('active'); DOM.viewManage.classList.remove('hidden'); DOM.viewAdd.classList.add('hidden'); };
+        DOM.tabAdd.onclick = () => { DOM.tabAdd.classList.add('active'); DOM.tabManage.classList.remove('active'); DOM.viewAdd.classList.remove('hidden'); DOM.viewManage.classList.add('hidden'); cancelEditPersona(); };
+
+        window.editPersona = function(id) {
+            const p = state.personas.find(per => per.id === id); if(!p) return;
+            DOM.tabAdd.click(); state.editingPersonaId = id;
+            DOM.pFormTitle.classList.remove('hidden'); DOM.btnSaveP.innerText = "Update Persona"; DOM.btnCancelP.classList.remove('hidden');
+            
+            DOM.pName.value = p.name||''; DOM.pRole.value = p.role||''; DOM.pAge.value = p.age||''; DOM.pGen.value = p.gender||'';
+            DOM.pDesc.value = p.desc||''; DOM.pRefTxt.value = p.refText||''; DOM.pLang.value = p.lang||'en-US'; DOM.pLang.dispatchEvent(new Event('change'));
+            setTimeout(() => { DOM.pVoice.value = p.voiceURI||''; }, 50);
+            DOM.pPitch.value = p.pitch||1.0; DOM.pRate.value = p.rate||1.0;
+
+            state.tempThumb = p.thumbnail||null; state.tempRefFile = p.refFileBase64||null;
+            if(state.tempThumb){ DOM.pThumbPrev.src=state.tempThumb; DOM.pThumbPrev.classList.remove('hidden'); DOM.pThumbEmo.classList.add('hidden'); } 
+            else { DOM.pThumbPrev.classList.add('hidden'); DOM.pThumbEmo.classList.remove('hidden'); }
+            if(state.tempRefFile) { DOM.pRefFileName.innerText = "File Attached (Saved)"; DOM.pRefFileName.classList.remove('hidden'); } else DOM.pRefFileName.classList.add('hidden');
+        };
+
+        function cancelEditPersona() {
+            state.editingPersonaId = null; DOM.pFormTitle.classList.add('hidden'); DOM.btnSaveP.innerText = "Save Persona"; DOM.btnCancelP.classList.add('hidden');
+            DOM.pName.value=''; DOM.pRole.value=''; DOM.pAge.value=''; DOM.pGen.value=''; DOM.pDesc.value=''; DOM.pRefTxt.value=''; DOM.pRefFile.value=''; DOM.pRefFileName.classList.add('hidden');
+            state.tempThumb=null; state.tempRefFile=null; DOM.pThumbPrev.classList.add('hidden'); DOM.pThumbEmo.classList.remove('hidden');
+        }
+
+        DOM.pThumb.addEventListener('change', (e) => {
+            const file = e.target.files[0]; if(!file) return; const reader = new FileReader();
+            reader.onload = (ev) => {
+                document.getElementById('crop-image').src = ev.target.result; document.getElementById('crop-modal').classList.remove('hidden');
+                if(cropper) cropper.destroy(); cropper = new Cropper(document.getElementById('crop-image'), { aspectRatio: 1, viewMode: 1, autoCropArea: 0.9, background: false });
+            }; reader.readAsDataURL(file);
+        });
+        document.getElementById('btn-crop-cancel').onclick=()=>{document.getElementById('crop-modal').classList.add('hidden'); if(cropper) cropper.destroy();};
+        document.getElementById('btn-crop-apply').onclick=()=>{
+            if(!cropper) return;
+            state.tempThumb = cropper.getCroppedCanvas({maxWidth:200, maxHeight:200}).toDataURL('image/jpeg', 0.7);
+            DOM.pThumbPrev.src = state.tempThumb; DOM.pThumbPrev.classList.remove('hidden'); DOM.pThumbEmo.classList.add('hidden');
+            document.getElementById('crop-modal').classList.add('hidden'); cropper.destroy(); cropper = null;
+        };
+
+        // Strict 1.5MB limit for Base64 Reference File in LocalStorage
+        DOM.pRefFile.addEventListener('change', (e) => {
+            const file = e.target.files[0]; if(!file) return;
+            if (file.size > 1500000) { alert("File is too large! Please attach a file under 1.5MB to save in the browser."); e.target.value = ''; return; }
+            const reader = new FileReader();
+            reader.onload = (ev) => { state.tempRefFile = ev.target.result; DOM.pRefFileName.innerText = `Attached: ${file.name}`; DOM.pRefFileName.classList.remove('hidden'); };
+            reader.readAsDataURL(file);
+        });
+
+        DOM.btnSaveP.onclick = () => {
+            if(!DOM.pName.value || !DOM.pDesc.value) return alert("Name and Description are required.");
+            const data = {
+                id: state.editingPersonaId || 'p_' + Date.now(),
+                name: DOM.pName.value, role: DOM.pRole.value || 'Assistant', age: parseInt(DOM.pAge.value)||30, gender: DOM.pGen.value,
+                lang: DOM.pLang.value, voiceURI: DOM.pVoice.value, pitch: parseFloat(DOM.pPitch.value), rate: parseFloat(DOM.pRate.value),
+                thumbnail: state.tempThumb, desc: DOM.pDesc.value, refText: DOM.pRefTxt.value, refFileBase64: state.tempRefFile
+            };
+            if (state.editingPersonaId) { const idx = state.personas.findIndex(p => p.id === state.editingPersonaId); if(idx!==-1) state.personas[idx] = data; } 
+            else state.personas.push(data);
+            try { localStorage.setItem('mango_personas', JSON.stringify(state.personas)); } 
+            catch(e) { return alert("Storage full! Please remove the reference file or images."); }
+            renderSidebarPersonas(); DOM.tabManage.click(); if (state.activePersonaId === data.id) switchPersona(data.id);
+        };
+        DOM.btnCancelP.onclick = () => DOM.tabManage.click();
+        window.deletePersona = function(id) {
+            if(!confirm("Delete this persona?")) return; state.personas = state.personas.filter(p => p.id !== id); localStorage.removeItem(`mango_history_${id}`);
+            if(state.activePersonaId === id) switchPersona('default'); else renderSidebarPersonas();
+            localStorage.setItem('mango_personas', JSON.stringify(state.personas));
+        };
+
+        function initVoices() {
+            const loadV = () => {
+                const voices = synth.getVoices(); DOM.pVoice.innerHTML=''; DOM.sVoice.innerHTML='<option value="">Default Voice</option>';
+                const curr = DOM.pVoice.value; const currG = DOM.sVoice.value;
+                voices.forEach(v => {
+                    DOM.sVoice.add(new Option(`${v.name} (${v.lang})`, v.voiceURI));
+                    if (!DOM.pLang.value || v.lang === DOM.pLang.value) DOM.pVoice.add(new Option(`${v.name}`, v.voiceURI));
+                });
+                if(curr) DOM.pVoice.value = curr; if(currG) DOM.sVoice.value = currG;
+            };
+            if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = loadV; loadV(); DOM.pLang.addEventListener('change', loadV);
+        }
+        document.getElementById('btn-preview-voice').onclick = () => {
+            stopTTS(); const u = new SpeechSynthesisUtterance(`Hi, I am ${DOM.pName.value || 'your persona'}.`);
+            u.lang = DOM.pLang.value||'en-US'; u.pitch = parseFloat(DOM.pPitch.value)||1.0; u.rate = parseFloat(DOM.pRate.value)||1.0;
+            const v = synth.getVoices().find(v => v.voiceURI === DOM.pVoice.value); if (v) { u.voice = v; u.lang = v.lang; }
+            synth.speak(u);
+        };
+
+        // --- 4. UI LISTENERS ---
+        function setupEventListeners() {
+            const closeAll = () => document.querySelectorAll('.close-modal').forEach(b => b.parentElement.parentElement.classList.add('hidden'));
+            document.querySelectorAll('.close-modal').forEach(btn => btn.onclick = closeAll);
+            DOM.btnMModels.onclick = () => { closeAll(); DOM.modModels.classList.remove('hidden'); };
+            DOM.btnMPersonas.onclick = () => { closeAll(); DOM.modPersonas.classList.remove('hidden'); };
+            DOM.btnMSettings.onclick = () => { closeAll(); DOM.modSettings.classList.remove('hidden'); };
+            document.getElementById('btn-paste-key').onclick = async () => { try { const t = await navigator.clipboard.readText(); if(t) DOM.mKey.value = t; } catch(err){} };
+            
+            DOM.btnToggleSb.onclick = () => { DOM.sidebar.classList.remove('-translate-x-full'); DOM.overlay.classList.remove('hidden'); };
+            DOM.overlay.onclick = () => { DOM.sidebar.classList.add('-translate-x-full'); DOM.overlay.classList.add('hidden'); };
+            DOM.btnNewChat.onclick = () => switchPersona('default');
+
+            DOM.ttsToggle.onclick = () => {
+                state.ttsPaused = !state.ttsPaused; DOM.ttsIcon.innerText = state.ttsPaused ? '🔇' : '🔊';
+                if(!state.ttsPaused && state.chatHistory.length > 0) {
+                    const l = state.chatHistory[state.chatHistory.length-1]; if(l.role === 'assistant') speakText(l.content);
+                } else stopTTS();
+            };
+            document.getElementById('btn-clear').onclick = () => { if(confirm("Clear chat?")) { stopTTS(); state.chatHistory = []; localStorage.removeItem(`mango_history_${state.activePersonaId}`); loadHistory(); } };
+            document.getElementById('btn-share').onclick = async () => {
+                if (state.chatHistory.length===0) return;
+                const txt = state.chatHistory.map(m => `${m.role==='user'?state.settings.fname:getActivePersona().name}: ${m.content.replace(/\[File Attached\]/g, '')}`).join('\n\n');
+                try { if (navigator.share) await navigator.share({ text: txt }); else await navigator.clipboard.writeText(txt); alert("Shared!"); } catch (err) {}
+            };
+
+            DOM.textIn.addEventListener('input', function() { this.style.height = 'auto'; this.style.height = (this.scrollHeight) + 'px'; checkInputState(); });
+            DOM.btnSend.onclick = () => processInput(DOM.textIn.value);
+            DOM.textIn.onkeypress = (e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); processInput(DOM.textIn.value); } };
+            
+            // Smart Mic Handling
+            DOM.btnMic.onclick = () => { 
+                if (state.isProcessing || !recognition) return; 
+                if (state.isListening) {
+                    recognition.stop(); 
+                } else { 
+                    stopTTS(); 
+                    // Set language dynamically right before starting based on the quick toggle
+                    recognition.lang = DOM.activeSttLang.value;
+                    try { recognition.start(); } catch(err) { console.error("Mic error:", err); } 
+                } 
+            };
+
+            document.getElementById('file-upload').addEventListener('change', (e) => {
+                const file = e.target.files[0]; if (!file) return;
+                state.currentFileType = file.type === 'application/pdf' ? 'pdf' : 'image';
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    state.currentBase64File = ev.target.result;
+                    document.getElementById('image-preview-container').classList.remove('hidden');
+                    if(state.currentFileType === 'pdf') { document.getElementById('image-preview').classList.add('hidden'); document.getElementById('pdf-preview').classList.remove('hidden'); } 
+                    else { document.getElementById('image-preview').src = state.currentBase64File; document.getElementById('image-preview').classList.remove('hidden'); document.getElementById('pdf-preview').classList.add('hidden'); }
+                    checkInputState();
+                }; reader.readAsDataURL(file);
+            });
+            document.getElementById('btn-remove-image').onclick = () => { state.currentBase64File = null; state.currentFileType = null; document.getElementById('image-preview-container').classList.add('hidden'); document.getElementById('file-upload').value = ''; checkInputState(); };
+        }
+        function checkInputState() {
+            const h = DOM.textIn.value.trim().length > 0 || !!state.currentBase64File;
+            DOM.btnSend.disabled = !h;
+        }
+
+        // --- 5. SPEECH & CHAT ---
+        function stopTTS() { synth.cancel(); }
+        function speakText(text) {
+            if(state.ttsPaused) return; stopTTS();
+            let clean = text.replace(/[\u{1F600}-\u{1F6FF}|[\u{2600}-\u{26FF}]/gu, '').replace(/[*#`_\[\]()]/g, '').trim(); if(!clean) return;
+            const p = getActivePersona(); const u = new SpeechSynthesisUtterance(clean);
+            u.lang = p.lang || 'en-US'; u.pitch = p.pitch || 1.0; u.rate = p.rate || 1.0;
+            const targetVoice = p.voiceURI || state.settings.globalVoice;
+            if (targetVoice) { const v = synth.getVoices().find(v => v.voiceURI === targetVoice); if (v) { u.voice = v; u.lang = v.lang; } }
+            synth.speak(u);
+        }
+        
+        function initSpeechRecognition() {
+            // Support for all modern browsers and Safari WebKit
+            const SR = window.SpeechRecognition || window.webkitSpeechRecognition; 
+            if (!SR) { DOM.btnMic.style.display = 'none'; return; }
+            
+            recognition = new SR(); 
+            // iOS Safari handles continuous poorly. Standardizing to false for robust cross-platform fallback.
+            recognition.continuous = false; 
+            recognition.interimResults = false;
+            
+            recognition.onstart = () => { 
+                state.isListening = true; 
+                DOM.btnMic.classList.add('text-red-500', 'animate-pulse'); 
+                DOM.textIn.placeholder = `Listening in ${DOM.activeSttLang.options[DOM.activeSttLang.selectedIndex].text}...`; 
+                stopTTS(); 
+            };
+            
+            recognition.onresult = (e) => { 
+                const t = e.results[0][0].transcript.trim(); 
+                if(t) { DOM.textIn.value = t; processInput(t); } 
+            };
+            
+            // Robust Error and End handling (Crucial for Safari)
+            const resetMic = () => {
+                state.isListening = false; 
+                DOM.btnMic.classList.remove('text-red-500', 'animate-pulse'); 
+                if(!state.isProcessing) DOM.textIn.placeholder = "Message...";
+            };
+            
+            recognition.onend = resetMic;
+            recognition.onerror = (event) => {
+                console.warn("Speech Recognition Error:", event.error);
+                resetMic();
+            };
+            recognition.onnomatch = resetMic;
+        }
+
+        function renderMessage(role, text, fileData = null, fileType = null, index = null) {
+            const div = document.createElement('div'); const isAI = role === 'assistant'; const p = getActivePersona();
+            div.className = `w-full flex ${isAI ? 'justify-start' : 'justify-end'} mb-4`;
+            let mediaHTML = '';
+            if (fileData) { if (fileType === 'pdf') mediaHTML = `<div class="bg-red-100 text-red-600 text-xs font-bold p-2 rounded mb-2 border border-red-300">📄 PDF</div>`; else mediaHTML = `<img src="${fileData}" class="max-w-[200px] h-auto rounded-lg mb-2 border border-slate-200 dark:border-slate-700 object-cover">`; }
+            let fmtText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            
+            if (isAI) {
+                div.innerHTML = `
+                    <div class="flex gap-3 max-w-[85%] sm:max-w-[75%]">
+                        <div class="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm mt-1 flex items-center justify-center">
+                            ${p.thumbnail ? `<img src="${p.thumbnail}" class="w-full h-full object-cover">` : `<span class="text-sm">🥭</span>`}
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-xs font-bold mb-1 ml-1" style="color: ${state.settings.color}">${p.name}</span>
+                            <div class="bg-white dark:bg-sidebarDark border border-slate-200 dark:border-slate-700 px-4 py-3 rounded-2xl rounded-tl-sm text-[15px] shadow-sm leading-relaxed text-slate-800 dark:text-slate-100">${mediaHTML} <div>${fmtText}</div></div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                div.innerHTML = `
+                    <div class="flex gap-3 max-w-[85%] sm:max-w-[75%] flex-row-reverse">
+                        <div class="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-primary/20 border border-primary shadow-sm mt-1 flex items-center justify-center">
+                            ${state.settings.userImage ? `<img src="${state.settings.userImage}" class="w-full h-full object-cover">` : `<span class="text-sm">👤</span>`}
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <span class="text-xs font-bold mb-1 mr-1 text-slate-500 dark:text-slate-400">${state.settings.fname || 'You'}</span>
+                            <div class="bg-primary/10 border border-primary/30 px-4 py-3 rounded-2xl rounded-tr-sm text-[15px] shadow-sm leading-relaxed text-slate-800 dark:text-slate-100 text-right">${mediaHTML} <div>${fmtText.replace(' [File Attached]', '')}</div></div>
+                        </div>
+                    </div>
+                `;
+            }
+            DOM.inner.appendChild(div); setTimeout(() => DOM.log.scrollTo({ top: DOM.log.scrollHeight, behavior: 'smooth' }), 50);
+        }
+
+        function loadHistory() {
+            DOM.inner.innerHTML = ''; const hist = localStorage.getItem(`mango_history_${state.activePersonaId}`); const p = getActivePersona();
+            renderMessage('assistant', `Greetings ${state.settings.fname || 'Friend'}, I am ${p.name}. How can I assist you today?`, null, null, null);
+            if (hist) { try { const parsed = JSON.parse(hist); if (parsed.length > 0) { state.chatHistory = parsed; parsed.forEach((m, i) => renderMessage(m.role, m.content, m.fileData, m.fileType, i)); return; } } catch (e) {} } 
+            state.chatHistory = [];
+        }
+
+        // --- 6. SMART ROUTING & FETCH API ---
+        function getGeminiSmartModel(userText, fileData) {
+            const isComplex = /explain|analyze|decode|reason|elaborate|solve|understand|summarize|detail/i.test(userText);
+            if (fileData && isComplex) return "gemini-3.1-pro"; 
+            if (!fileData && userText.length < 60 && !isComplex) return "gemini-3.5-flash-lite";
+            return "gemini-3.5-flash"; 
+        }
+
+        async function processInput(text) {
+            if (state.isProcessing || (!text.trim() && !state.currentBase64File)) return;
+            const p = state.settings.provider;
+            if (!state.apiKeys[p]) return alert(`Enter API Key for ${p} in Models Settings.`);
+            const userText = text.trim(); const fileData = state.currentBase64File; const fileType = state.currentFileType;
+            DOM.textIn.value = ''; DOM.textIn.style.height = 'auto'; document.getElementById('btn-remove-image').click();
+            document.getElementById('status-indicator').innerText = "Thinking..."; state.isProcessing = true; checkInputState();
+
+            let msgContent = userText; if (fileData && p !== 'claude') msgContent = userText ? `${userText} [File Attached]` : "[File Attached]"; 
+            state.chatHistory.push({ role: 'user', content: msgContent, fileData, fileType });
+            renderMessage('user', userText, fileData, fileType, state.chatHistory.length - 1);
+            
+            try {
+                const response = await fetchAIResponse(userText, fileData, fileType);
+                state.chatHistory.push({ role: 'assistant', content: response });
+                renderMessage('assistant', response, null, null, state.chatHistory.length - 1);
+                localStorage.setItem(`mango_history_${state.activePersonaId}`, JSON.stringify(state.chatHistory));
+                if(!state.ttsPaused) speakText(response);
+            } catch (err) { 
+                state.chatHistory.pop(); 
+                renderMessage('assistant', `Error connecting to API. ${err.message}`); 
+                console.error(err);
+            }
+            state.isProcessing = false; document.getElementById('status-indicator').innerText = "Online"; checkInputState();
+        }
+
+        async function fetchAIResponse(userText, fileData, fileType) {
+            const p = getActivePersona();
+            let prompt = `Persona: ${p.name}, Role: ${p.role}, Age: ${p.age}, Gender: ${p.gender}. Behavior: ${p.desc}. User: ${state.settings.name} (${state.settings.fname}, ${state.settings.gender}, Age ${state.settings.age}, from ${state.settings.address}).\nCRITICAL: Do not repeat previous statements. Ensure responses are highly varied and dynamic.`;
+            if (p.refText) prompt += `\nReference Texts to Cite: ${p.refText}`;
+            if (p.refFileBase64) prompt += `\n[NOTE: A primary reference file is attached for this persona. Use it as core knowledge.]`;
+            
+            const key = state.apiKeys[state.settings.provider]; 
+            const mod = state.settings.model;
+
+            if (state.settings.provider === 'openai' || state.settings.provider === 'groq') {
+                const url = state.settings.provider === 'openai' ? 'https://api.openai.com/v1/chat/completions' : 'https://api.groq.com/openai/v1/chat/completions';
+                let msgs = [{ role: "system", content: prompt }, ...state.chatHistory.slice(-6).map(m=>({role:m.role,content:m.content}))];
+                let cur = userText || "Analyze";
+                if (fileData && fileType === 'image' && state.settings.provider === 'openai') cur = [{ type: "text", text: userText || "Analyze" }, { type: "image_url", image_url: { url: fileData } }];
+                msgs.pop(); msgs.push({ role: "user", content: cur });
+                const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` }, body: JSON.stringify({ model: mod, messages: msgs }) });
+                if(!res.ok) throw new Error("API Limit or Error"); return (await res.json()).choices[0].message.content;
+            
+            } else if (state.settings.provider === 'gemini') {
+                const geminiFallbacks = [
+                    "gemini-3.5-flash", "gemini-3.1-flash", "gemini-2.5-flash",
+                    "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash-lite"
+                ];
+                let targetModel = getGeminiSmartModel(userText, fileData);
+                let modelsToTry = [targetModel];
+                if (!modelsToTry.includes(mod)) modelsToTry.push(mod);
+                geminiFallbacks.forEach(m => { if (!modelsToTry.includes(m)) modelsToTry.push(m); });
+
+                let contents = state.chatHistory.slice(-6, -1).map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+                let parts = [{ text: userText || "Analyze file." }];
+                if (fileData) parts.push({ inline_data: { mime_type: fileData.match(/[^:]\w+\/[\w-+\d.]+(?=;|,)/)[0], data: fileData.split(',')[1] } });
+                if (p.refFileBase64) contents.push({ role: 'user', parts: [{ text: "Persona Reference File attached." }, { inline_data: { mime_type: p.refFileBase64.match(/[^:]\w+\/[\w-+\d.]+(?=;|,)/)[0], data: p.refFileBase64.split(',')[1] } }]});
+                contents.push({ role: 'user', parts });
+
+                for (let model of modelsToTry) {
+                    try {
+                        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+                        const res = await fetch(url, { 
+                            method: 'POST', 
+                            headers: { 'Content-Type': 'application/json' }, 
+                            body: JSON.stringify({ 
+                                systemInstruction: { parts: [{text: prompt}] }, 
+                                contents: contents,
+                                generationConfig: { temperature: 0.85 } 
+                            }) 
+                        });
+                        
+                        if (!res.ok) throw new Error(`Status ${res.status}`);
+                        const data = await res.json();
+                        if (data.candidates && data.candidates.length > 0) return data.candidates[0].content.parts[0].text;
+                        throw new Error(`Empty response`);
+                    } catch (e) {
+                        console.warn(`Model ${model} failed, trying fallback.`);
+                    }
+                }
+                throw new Error("All Gemini models failed. Please check your API key.");
+
+            } else if (state.settings.provider === 'claude') {
+                let parts = [];
+                if (p.refFileBase64) parts.push({ type: p.refFileBase64.includes('pdf') ? "document" : "image", source: { type: "base64", media_type: p.refFileBase64.match(/[^:]\w+\/[\w-+\d.]+(?=;|,)/)[0], data: p.refFileBase64.split(',')[1] }});
+                if (fileData) parts.push({ type: fileType === 'pdf' ? "document" : "image", source: { type: "base64", media_type: fileData.match(/[^:]\w+\/[\w-+\d.]+(?=;|,)/)[0], data: fileData.split(',')[1] }});
+                parts.push({ type: "text", text: userText || "Review file." });
+                let msgs = state.chatHistory.slice(-6).map(m=>({role:m.role,content:m.content}));
+                msgs.pop(); msgs.push({ role: "user", content: parts });
+                const res = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerously-allow-browser': 'true' },
+                    body: JSON.stringify({ model: mod, system: prompt, max_tokens: 1024, messages: msgs })
+                });
+                if(!res.ok) throw new Error("API Error"); return (await res.json()).content[0].text;
+            }
+        }
+    </script>
+</body>
+</html>
