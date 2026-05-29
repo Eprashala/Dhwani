@@ -119,18 +119,16 @@
 
         #apiStatus { text-align: center; color: var(--accent-gold); font-style: italic; margin-top: 10px; font-weight: bold; }
 
-        /* Results section */
         .results-container { display: none; flex-direction: column; gap: 30px; margin-top: 20px;}
-        
         .profile-summary { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .p-card { background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; border-left: 4px solid var(--accent-gold); display: flex; flex-direction: column; gap: 15px;}
         .p-card h3 { margin: 0; color: var(--accent-gold); }
         .p-data { font-size: 0.95rem; line-height: 1.6; }
 
-        /* KUNDLI CHART STYLES */
+        /* KUNDLI CHART STYLES - WITH EDGE PROTECTION */
         .charts-container {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 15px;
             width: 100%;
         }
@@ -140,49 +138,58 @@
             background: rgba(10, 15, 26, 0.6);
             border: 1px solid var(--border-color);
             border-radius: 6px;
-            padding: 10px;
+            padding: 15px;
             box-sizing: border-box;
         }
         .kundli-title {
             text-align: center; color: var(--accent-gold); font-weight: 700;
             margin-bottom: 8px; font-size: 1rem; text-transform: uppercase; letter-spacing: 1px;
         }
+        .bphs-legend {
+            text-align: center; font-size: 0.75rem; color: #f472b6; margin-bottom: 12px; font-style: italic;
+        }
+        
+        /* The main outer boundary */
         .kundli-box {
             position: relative; width: 100%; padding-bottom: 100%;
-            border: 2px solid var(--accent-gold); background: rgba(0,0,0,0.4);
-            border-radius: 2px; overflow: hidden;
+            background: rgba(0,0,0,0.4); border-radius: 4px; 
+            overflow: hidden; /* Prevents anything from leaving the absolute boundary */
         }
-        .kundli-lines {
+        
+        /* The Safe Zone: 8% buffer to completely stop edge-cutting of wide text */
+        .kundli-chart-area {
+            position: absolute;
+            top: 8%; left: 8%; width: 84%; height: 84%;
+        }
+        
+        .kundli-svg {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none;
         }
-        .kundli-house {
+        
+        .kundli-house-content {
             position: absolute; transform: translate(-50%, -50%);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            text-align: center; overflow: visible; z-index: 5;
+            text-align: center; overflow: visible; z-index: 5; pointer-events: none;
+            width: auto;
         }
-        .house-diamond { width: 38%; height: 38%; }
-        .house-triangle { width: 28%; height: 28%; }
         
-        .k-sign-num {
-            position: absolute; top: 0; font-size: 0.8rem; font-weight: 800; 
-            color: rgba(241, 196, 15, 0.8);
+        .k-sign-header {
+            display: flex; gap: 5px; align-items: baseline; justify-content: center;
+            margin-bottom: 4px;
         }
-        .house-diamond .k-sign-num { top: 4px; left: 8px; }
-        .house-triangle .k-sign-num { top: -2px; left: 50%; transform: translateX(-50%); }
-
-        .k-sign-name {
-            font-size: 0.65rem; color: #9ca3af; text-transform: uppercase; 
-            margin-bottom: 3px; font-weight: 600; margin-top: 10px;
-        }
+        .k-sign-num { font-size: 0.85rem; font-weight: 900; opacity: 0.7; }
+        .k-sign-name { font-size: 0.6rem; text-transform: uppercase; font-weight: 700; opacity: 0.8; letter-spacing: 0.5px; }
+        
         .k-body {
-            font-size: 0.65rem; color: #fff; white-space: nowrap; line-height: 1.2;
-            background: rgba(0,0,0,0.4); padding: 1px 4px; border-radius: 3px; margin-bottom: 1px;
+            font-size: 0.65rem; white-space: nowrap; line-height: 1.3;
+            background: rgba(0,0,0,0.65); padding: 2px 6px; border-radius: 4px; 
+            margin-bottom: 2px; backdrop-filter: blur(3px);
+            border: 1px solid rgba(255,255,255,0.05);
         }
-        .k-body strong { color: #3498db; }
-        .panel-girl .k-body strong { color: #e74c3c; }
-        .k-body span.deg { color: #a3e4d7; font-family: monospace; }
-        .k-body span.nak { color: #f1c40f; font-size: 0.55rem; text-transform: uppercase; margin-left: 2px;}
+        
+        .k-body strong { font-weight: 800; }
+        .k-body span.deg { font-family: monospace; opacity: 0.9; margin-left: 3px; font-size: 0.6rem;}
+        .k-body span.nak { font-size: 0.55rem; text-transform: uppercase; margin-left: 4px; opacity: 0.8; font-style: italic;}
 
         .summary-dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
         .score-card { background: radial-gradient(circle at top right, rgba(241, 196, 15, 0.08), transparent); border: 2px solid var(--accent-gold); text-align: center; padding: 30px 20px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
@@ -380,13 +387,22 @@
     </div>
 
     <script>
-        // Data Structures
         const rashiOrder = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"];
         const rashiLords = { "Aries": "Mars", "Taurus": "Venus", "Gemini": "Mercury", "Cancer": "Moon", "Leo": "Sun", "Virgo": "Mercury", "Libra": "Venus", "Scorpio": "Mars", "Sagittarius": "Jupiter", "Capricorn": "Saturn", "Aquarius": "Saturn", "Pisces": "Jupiter" };
         
-        const nakshatrasList = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"];
+        // Exact short names for Nakshatras 
+        const nakshatraShort = [
+            "Asw", "Bha", "Kri", "Roh", "Mrg", "Ard", "Pun", "Pus", "Asl", "Mag",
+            "P. Pha", "U. Pha", "Has", "Chi", "Swa", "Vis", "Anu", "Jye", "Mul",
+            "P. Ash", "U. Ash", "Shr", "Dha", "Sha", "P. Bha", "U. Bha", "Rev"
+        ];
+        
+        const nakshatrasList = [
+            "Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", 
+            "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", 
+            "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"
+        ];
 
-        // 9 Primary Grahas mapped to their abbreviations for standard North Indian Charts
         const validGrahas = ['Surya', 'Chandra', 'Mangal', 'Budh', 'Guru', 'Shukra', 'Shani', 'Rahu', 'Ketu', 'Sun', 'Moon', 'Mars', 'Mercury', 'Jupiter', 'Venus', 'Saturn'];
         const grahaMap = {
             'Sun': 'Su', 'Surya': 'Su',
@@ -399,6 +415,48 @@
             'Rahu': 'Ra',
             'Ketu': 'Ke'
         };
+
+        const houseColors = [
+            "#fca5a5", // H1 
+            "#fdba74", // H2
+            "#fef08a", // H3
+            "#a7f3d0", // H4
+            "#99f6e4", // H5
+            "#bae6fd", // H6
+            "#f472b6", // H7 - Highlight (Spouse)
+            "#c084fc", // H8 - Highlight (Longevity)
+            "#e879f9", // H9
+            "#f87171", // H10
+            "#38bdf8", // H11
+            "#fbbf24"  // H12
+        ];
+
+        const housePolygons = [
+            "50,0 25,25 50,50 75,25", // H1
+            "0,0 50,0 25,25",         // H2
+            "0,0 25,25 0,50",         // H3
+            "0,50 25,25 50,50 25,75", // H4 
+            "0,100 0,50 25,75",       // H5
+            "0,100 25,75 50,100",     // H6
+            "50,100 25,75 50,50 75,75",// H7
+            "100,100 50,100 75,75",   // H8
+            "100,100 75,75 100,50",   // H9
+            "100,50 75,75 50,50 75,25",// H10
+            "100,0 100,50 75,25",     // H11
+            "100,0 75,25 50,0"        // H12
+        ];
+
+        const houseCenters = [ 
+            [50, 25], [25, 8.5], [8.5, 25], [25, 50], [8.5, 75], [25, 91.5], 
+            [50, 75], [75, 91.5], [91.5, 75], [75, 50], [91.5, 25], [75, 8.5] 
+        ];
+
+        function getHouseFill(idx) {
+            if (idx === 6) return "rgba(244, 114, 182, 0.20)"; // H7
+            if (idx === 7) return "rgba(192, 132, 252, 0.20)"; // H8
+            if ([0, 1, 3, 11].includes(idx)) return "rgba(255, 255, 255, 0.03)";
+            return "rgba(0, 0, 0, 0.2)";
+        }
 
         const nakshatraProperties = {
             "Ashwini": { varna: "Kshatriya", vashya: "Chatushpad", yoni: "Horse", gana: "Deva", nadi: "Adi" },
@@ -459,7 +517,6 @@
 
         const varnaPoints = { "Brahmin": 4, "Kshatriya": 3, "Vaishya": 2, "Shudra": 1 };
 
-        // Autocomplete Geocoding
         function attachAutocomplete(inputId, suggestionsId, latId, lonId) {
             const searchInput = document.getElementById(inputId);
             const suggestionsList = document.getElementById(suggestionsId);
@@ -500,8 +557,6 @@
             attachAutocomplete('girlPlace', 'girlSuggestions', 'girlLat', 'girlLon');
         };
 
-        // --- Core Engine Architecture ---
-
         async function fetchKundliData(prefix) {
             const date = document.getElementById(prefix + 'Date').value;
             let time = document.getElementById(prefix + 'Time').value;
@@ -526,7 +581,6 @@
             const moon = allBodies.find(b => b.name === 'Chandra' || b.name === 'Moon');
             const mars = allBodies.find(b => b.name === 'Mangal' || b.name === 'Mars');
             
-            // Check for exact ascendant body to get absolute degree for D9 Lagna
             const ascBody = allBodies.find(b => b.name === 'Ascendant' || b.name === 'Lagna' || b.name.includes('Asc'));
             const ascDeg = ascBody ? ascBody.abs_deg : null;
 
@@ -549,25 +603,21 @@
             };
         }
 
-        // Engine for creating the structural Kundli HTML
         function buildKundliSVGChart(allBodies, lagnaSign, isD9, ascDeg, title) {
             let houses = Array(12).fill(null).map(() => ({ signNum: 0, signName: '', bodies: [] }));
             
             let currentLagnaSign = lagnaSign;
             if (isD9) {
-                // Determine exact D9 Lagna Sign using absolute degree
                 let absoluteAsc = ascDeg !== null ? ascDeg : ((lagnaSign - 1) * 30 + 15);
                 currentLagnaSign = (Math.floor(absoluteAsc / (10/3)) % 12) + 1;
             }
 
-            // Map house logic
             for (let i = 0; i < 12; i++) {
                 let sNum = (currentLagnaSign + i - 1) % 12 + 1;
                 houses[i].signNum = sNum;
                 houses[i].signName = rashiOrder[sNum - 1];
             }
 
-            // Map Planets
             allBodies.forEach(b => {
                 if (!validGrahas.includes(b.name)) return;
                 
@@ -575,7 +625,7 @@
                 
                 if (isD9) {
                     pSignNum = (Math.floor(b.abs_deg / (10/3)) % 12) + 1;
-                    pDegree = (b.abs_deg % (10/3)) * 9; // Divisional mapping degree within the Navamsa arc
+                    pDegree = (b.abs_deg % (10/3)) * 9; 
                 } else {
                     pSignNum = Math.floor(b.abs_deg / 30) + 1;
                     pDegree = b.abs_deg % 30;
@@ -587,51 +637,57 @@
                 let min = Math.floor((pDegree - deg) * 60);
                 let degStr = `${deg}°${min}'`;
                 
-                // Get natal nakshatra name for deep precision readability
                 let nakIdx = Math.floor(b.abs_deg / (360/27));
-                let nakName = nakshatrasList[nakIdx].substring(0, 4) + "."; 
                 
                 houses[hIndex].bodies.push({
                     abbr: grahaMap[b.name] || b.name.substring(0,2),
                     degStr: degStr,
-                    nakName: nakName
+                    nakName: nakshatraShort[nakIdx]
                 });
             });
 
-            // True Coordinate centers mapped for standard North Indian Chart proportions
-            const centers = [ 
-                [50, 23], [22, 12], [12, 22], [22, 50], [12, 78], [22, 88], 
-                [50, 77], [78, 88], [88, 78], [78, 50], [88, 22], [78, 12] 
-            ];
+            let svgContent = `<svg class="kundli-svg" viewBox="0 0 100 100" preserveAspectRatio="none">`;
+            houses.forEach((h, idx) => {
+                let pts = housePolygons[idx];
+                let strokeCol = houseColors[idx];
+                let fillCol = getHouseFill(idx);
+                svgContent += `<polygon points="${pts}" fill="${fillCol}" stroke="${strokeCol}" stroke-width="0.7" opacity="0.9"/>`;
+            });
+            svgContent += `</svg>`;
 
             let html = `
                 <div class="kundli-wrapper">
                     <div class="kundli-title">${title}</div>
+                    <div class="bphs-legend">BPHS Context: H7 (Kalatra) & H8 (Mangalya) Highlighted</div>
                     <div class="kundli-box">
-                        <svg class="kundli-lines" viewBox="0 0 100 100" preserveAspectRatio="none">
-                            <line x1="0" y1="0" x2="100" y2="100" stroke="#f1c40f" stroke-width="0.3" opacity="0.6"/>
-                            <line x1="100" y1="0" x2="0" y2="100" stroke="#f1c40f" stroke-width="0.3" opacity="0.6"/>
-                            <polygon points="50,0 100,50 50,100 0,50" fill="none" stroke="#f1c40f" stroke-width="0.5" opacity="0.9"/>
-                        </svg>
+                        <div class="kundli-chart-area">
+                            ${svgContent}
             `;
 
             houses.forEach((h, idx) => {
-                let pos = centers[idx];
-                let isDiamond = [0, 3, 6, 9].includes(idx);
-                let cType = isDiamond ? 'house-diamond' : 'house-triangle';
+                let pos = houseCenters[idx];
+                let strokeCol = houseColors[idx];
                 
-                let bodyHtml = h.bodies.map(b => `<div class="k-body"><strong>${b.abbr}</strong> <span class="deg">${b.degStr}</span><span class="nak">${b.nakName}</span></div>`).join('');
+                let bodyHtml = h.bodies.map(b => 
+                    `<div class="k-body" style="color: ${strokeCol}; border-color: ${strokeCol}40;">
+                        <strong>${b.abbr}</strong> 
+                        <span class="deg" style="color: ${strokeCol}e6">${b.degStr}</span>
+                        <span class="nak" style="color: ${strokeCol}cc">${b.nakName}</span>
+                    </div>`
+                ).join('');
                 
                 html += `
-                    <div class="kundli-house ${cType}" style="left: ${pos[0]}%; top: ${pos[1]}%;">
-                        <div class="k-sign-num">${h.signNum}</div>
-                        <div class="k-sign-name">${h.signName}</div>
+                    <div class="kundli-house-content" style="left: ${pos[0]}%; top: ${pos[1]}%;">
+                        <div class="k-sign-header" style="color: ${strokeCol}">
+                            <span class="k-sign-num">${h.signNum}</span>
+                            <span class="k-sign-name">${h.signName}</span>
+                        </div>
                         ${bodyHtml}
                     </div>
                 `;
             });
 
-            html += `</div></div>`;
+            html += `</div></div></div>`;
             return html;
         }
 
@@ -648,7 +704,6 @@
                 const bDetails = extractAstroDetails(boyRes);
                 const gDetails = extractAstroDetails(girlRes);
 
-                // Update Basic Stats
                 document.getElementById('boyAstroData').innerHTML = `
                     <strong>Moon Rashi:</strong> ${bDetails.rashiName}<br>
                     <strong>Nakshatra:</strong> ${bDetails.nakName}<br>
@@ -662,7 +717,6 @@
                     <strong>Mars:</strong> House ${gDetails.marsHouse} (in ${rashiOrder[gDetails.marsSign - 1]})
                 `;
 
-                // Render D1 and D9 Charts
                 document.getElementById('boyCharts').innerHTML = 
                     buildKundliSVGChart(bDetails.allBodies, bDetails.lagnaNum, false, bDetails.ascDeg, '♂️ Vara D1 Rasi') +
                     buildKundliSVGChart(bDetails.allBodies, bDetails.lagnaNum, true, bDetails.ascDeg, '♂️ Vara D9 Navamsa');
@@ -671,7 +725,6 @@
                     buildKundliSVGChart(gDetails.allBodies, gDetails.lagnaNum, false, gDetails.ascDeg, '♀️ Kanya D1 Rasi') +
                     buildKundliSVGChart(gDetails.allBodies, gDetails.lagnaNum, true, gDetails.ascDeg, '♀️ Kanya D9 Navamsa');
 
-                // Calculate Match
                 const ashtakootResult = calculateAshtakoot(bDetails, gDetails);
                 renderAshtakoot(ashtakootResult);
                 
@@ -698,19 +751,16 @@
             let details = [];
             let aggregate = 0;
 
-            // 1. VARNA
             let varnaScored = (varnaPoints[b.varna] >= varnaPoints[g.varna]) ? 1 : 0;
             aggregate += varnaScored;
             details.push({ name: "Varna (वर्ण)", max: 1, boy: b.varna, girl: g.varna, score: varnaScored });
 
-            // 2. VASHYA
             let vashyaScored = 0;
             if (b.vashya === g.vashya) vashyaScored = 2;
             else if ((b.vashya === "Manav" && g.vashya === "Chatushpad") || (b.vashya === "Chatushpad" && g.vashya === "Jalachar")) vashyaScored = 1;
             aggregate += vashyaScored;
             details.push({ name: "Vashya (वश्य)", max: 2, boy: b.vashya, girl: g.vashya, score: vashyaScored });
 
-            // 3. TARA
             const countBtoG = ((gDetails.nakIdx - bDetails.nakIdx + 27) % 9) || 9;
             const countGtoB = ((bDetails.nakIdx - gDetails.nakIdx + 27) % 9) || 9;
             const bad = [3, 5, 7];
@@ -718,12 +768,10 @@
             aggregate += taraScored;
             details.push({ name: "Tara (तारा)", max: 3, boy: `Rem ${countBtoG}`, girl: `Rem ${countGtoB}`, score: taraScored });
 
-            // 4. YONI
             let yoniScored = yoniMatrix[b.yoni][g.yoni];
             aggregate += yoniScored;
             details.push({ name: "Yoni (योनि)", max: 4, boy: b.yoni, girl: g.yoni, score: yoniScored });
 
-            // 5. MAITRI
             const bLord = rashiLords[bDetails.rashiName];
             const gLord = rashiLords[gDetails.rashiName];
             let maitriScored = 0;
@@ -739,7 +787,6 @@
             aggregate += maitriScored;
             details.push({ name: "Graha Maitri (मैत्री)", max: 5, boy: bLord, girl: gLord, score: maitriScored });
 
-            // 6. GANA
             let ganaScored = 0, ganaDosha = false;
             if (b.gana === g.gana) ganaScored = 6;
             else if ((b.gana === "Deva" && g.gana === "Manushya") || (b.gana === "Manushya" && g.gana === "Deva")) ganaScored = 5;
@@ -748,7 +795,6 @@
             aggregate += ganaScored;
             details.push({ name: "Gana (गण)", max: 6, boy: b.gana, girl: g.gana, score: ganaScored, dosha: ganaDosha });
 
-            // 7. BHAKOOT
             const bIdx = rashiOrder.indexOf(bDetails.rashiName);
             const gIdx = rashiOrder.indexOf(gDetails.rashiName);
             const diff = ((gIdx - bIdx + 12) % 12) + 1;
@@ -759,7 +805,6 @@
             aggregate += bhakootScored;
             details.push({ name: "Bhakoot (भकूट)", max: 7, boy: bDetails.rashiName, girl: gDetails.rashiName, score: bhakootScored, dosha: bhakootDosha });
 
-            // 8. NADI
             let nadiScored = (b.nadi === g.nadi) ? 0 : 8;
             let nadiDosha = (b.nadi === g.nadi);
             aggregate += nadiScored;
@@ -781,24 +826,21 @@
                 if ([1, 7, 8].includes(profile.marsHouse)) type = "Poorna Manglik (Strong)";
                 else type = "Anshik Manglik (Mild)";
 
-                // 1. PDF Exception: Mars in own or exalted sign (Aries=1, Scorpio=8, Capricorn=10)
                 if ([1, 8, 10].includes(profile.marsSign)) {
                     active = false; status = "Cancelled";
                     logs.push("Cancelled: Mars is in its Own (Swa) or Exalted (Ucha) Rashi.");
                 }
-                // 2. PDF Exception: Kumbh Lagna for 8th house Mars
                 else if (profile.lagnaNum === 11 && profile.marsHouse === 8) {
                     active = false; status = "Cancelled";
                     logs.push("Cancelled: Parashari Kumbh Lagna exception for 8th house Mars.");
                 }
-                // 3. PDF Exception: Jupiter / Venus aspects
                 else {
                     const jup = profile.allBodies.find(b => b.name === 'Guru' || b.name === 'Jupiter');
                     const ven = profile.allBodies.find(b => b.name === 'Shukra' || b.name === 'Venus');
                     
                     if (jup) {
                         const jupSign = Math.floor(jup.abs_deg / 30) + 1;
-                        const jupAspects = [(jupSign + 4)%12||12, (jupSign + 6)%12||12, (jupSign + 8)%12||12]; // 5, 7, 9 aspects
+                        const jupAspects = [(jupSign + 4)%12||12, (jupSign + 6)%12||12, (jupSign + 8)%12||12];
                         if (jupAspects.includes(profile.marsSign)) {
                             active = false; status = "Cancelled";
                             logs.push("Cancelled: Powerful benefic aspect of Jupiter on Mars.");
@@ -806,7 +848,7 @@
                     }
                     if (active && ven) {
                         const venSign = Math.floor(ven.abs_deg / 30) + 1;
-                        const venAspects = [(venSign + 6)%12||12]; // 7 aspect
+                        const venAspects = [(venSign + 6)%12||12]; 
                         if (venAspects.includes(profile.marsSign)) {
                             active = false; status = "Cancelled";
                             logs.push("Cancelled: Benefic aspect of Venus on Mars.");
