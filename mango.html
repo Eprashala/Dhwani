@@ -817,7 +817,7 @@
             }
             state.chatHistory.push({ role: 'user', content: msgContent });
 
-            try {
+			try {
                 const response = await fetchAIResponse(userText, fileData, fileType);
                 renderMessage('assistant', response);
                 state.chatHistory.push({ role: 'assistant', content: response });
@@ -825,6 +825,8 @@
                 speakText(response);
             } catch (err) {
                 console.error(err);
+                // FIX: Remove the user message from history if it fails so we don't send consecutive 'user' roles!
+                state.chatHistory.pop(); 
                 renderMessage('assistant', "Oops! I hit a snag. Check your API keys and internet connection.");
             }
 
@@ -864,7 +866,7 @@
                 const data = await res.json();
                 return data.choices[0].message.content;
 
-            } else if (p === 'gemini') {
+			} else if (p === 'gemini') {
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${mod}:generateContent?key=${key}`;
                 
                 let contents = state.chatHistory.slice(-8, -1).map(m => ({
@@ -883,10 +885,26 @@
                 const res = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ system_instruction: { parts: [{text: sysPrompt}] }, contents: contents })
+                    body: JSON.stringify({ 
+                        systemInstruction: { parts: [{text: sysPrompt}] }, // FIX: changed to camelCase systemInstruction
+                        contents: contents 
+                    })
                 });
-                if(!res.ok) throw new Error("API Error");
+                
+                if(!res.ok) {
+                    const errorText = await res.text();
+                    console.error("Gemini API Error:", errorText);
+                    throw new Error("API Error");
+                }
+                
                 const data = await res.json();
+                
+                // FIX: Safely handle if Gemini blocks the response due to safety filters
+                if (!data.candidates || data.candidates.length === 0 || !data.candidates[0].content) {
+                    const reason = data.candidates?.[0]?.finishReason || "Unknown";
+                    throw new Error(`Gemini refused to answer or returned empty content. Reason: ${reason}`);
+                }
+
                 return data.candidates[0].content.parts[0].text;
 
             } else if (p === 'claude') {
@@ -1010,4 +1028,4 @@ STRICT RULES:
         }
     </script>
 </body>
-</html>
+</html>    
