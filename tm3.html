@@ -489,7 +489,24 @@
     
     const sizes = { 'Earth':18, 'Chandra':6, 'Surya':35, 'Budh':8, 'Shukra':14, 'Mangal':11, 'Guru':25, 'Shani':22, 'Node':7, 'Arun':16, 'Varun':15, 'Yama':5 };
     const symbols = { 'Surya':'☉', 'Chandra':'☽', 'Mangal':'♂', 'Budh':'☿', 'Guru':'♃', 'Shukra':'♀', 'Shani':'♄', 'Rahu':'☊', 'Ketu':'☋', 'Earth':'⊕', 'Arun':'♅', 'Varun':'♆', 'Yama':'♇' };
-    const pColors = { 'Surya':'#f1c40f', 'Chandra':'#f8fafc', 'Mangal':'#ef4444', 'Budh':'#10b981', 'Guru':'#f59e0b', 'Shukra':'#fbcfe8', 'Shani':'#e2e8f0', 'Rahu':'#94a3b8', 'Ketu':'#78716c', 'Earth':'#3b82f6', 'Arun':'#38bdf8', 'Varun':'#6366f1', 'Yama':'#cbd5e1' };
+    const pColors = { 
+        // --- PRIMARY 9 GRAHAS (High-Contrast Neon/Brights for Drishti Lines) ---
+        'Surya':   '#FF6B00',   // Vibrant Copper/Orange
+        'Chandra': '#FFFFFF',   // Pure Pearl White
+        'Mangal':  '#FF2020',   // Fierce Crimson Red
+        'Budh':    '#00FF55',   // Luminous Emerald Green
+        'Guru':    '#FFD700',   // Bright Golden Yellow
+        'Shukra':  '#FF55FF',   // Brilliant Magenta/Pink
+        'Shani':   '#3388FF',   // Deep Electric Blue
+        'Rahu':    '#8A2BE2',   // Smoky Violet/Purple
+        'Ketu':    '#B8860B',   // Earthy Bronze/Goldenrod
+        
+        // --- OUTER PLANETS & EARTH ---
+        'Earth':   '#3b82f6', 
+        'Arun':    '#38bdf8', 
+        'Varun':   '#6366f1', 
+        'Yama':    '#cbd5e1' 
+    };
 
     function formatDegree(decimalDeg) { if (decimalDeg === undefined) return ""; const deg = Math.floor(decimalDeg); const mins = Math.floor((decimalDeg % 1) * 60); return `${deg}°${mins.toString().padStart(2, '0')}'`; }
     function getNakshatraLocal(deg) { return i18n[currentLang].nakshatras[Math.floor(deg / NAKSHATRA_DEG)]; }
@@ -931,23 +948,77 @@ function drawKundli() {
             }
         }
 
-        if (document.getElementById('cbDrishti') && document.getElementById('cbDrishti').checked) {
+if (document.getElementById('cbDrishti') && document.getElementById('cbDrishti').checked) {
+            // Unique curve offsets prevent lines from overlapping when multiple planets aspect the same house
+            const planetCurveOffset = { 
+                'Surya': 15, 'Chandra': -15, 'Mangal': 35, 'Budh': -35, 
+                'Guru': 55, 'Shukra': -55, 'Shani': 75, 'Rahu': 90, 'Ketu': -90 
+            };
+            
             renderBodies.forEach(b => {
                 let isE = document.getElementById('cb_'+b.name) ? document.getElementById('cb_'+b.name).checked : true;
+                
+                // Check if the planet is enabled, in an active house, and has defined Drishti angles
                 if (isE && activeHouses.has(b.house) && drishtiAngles[b.name]) {
+                    
                     drishtiAngles[b.name].forEach(off => {
+                        // Mathematically map the degree offset (e.g., 180) to the target house (e.g., 7th)
                         let tHouse = ((b.house - 1 + Math.floor(off / 30)) % 12) + 1;
+                        
                         if (tHouse !== b.house) {
-                            let x1 = ha[b.house].x; let y1 = ha[b.house].y; let x2 = ha[tHouse].x; let y2 = ha[tHouse].y;
-                            ctx.beginPath(); ctx.setLineDash([5, 5]); ctx.moveTo(x1, y1);
-                            let mx = (x1 + x2)/2; let my = (y1 + y2)/2; let dx = x2 - x1; let dy = y2 - y1; let dist = Math.sqrt(dx*dx + dy*dy);
-                            let cx = mx + (dy/dist)*20; let cy = my - (dx/dist)*20;
-                            ctx.quadraticCurveTo(cx, cy, x2, y2);
-                            ctx.strokeStyle = pColors[b.name]||"#ffffff"; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.8; ctx.stroke(); ctx.setLineDash([]);
-                            let angle = Math.atan2(y2 - cy, x2 - cx);
-                            ctx.beginPath(); let arrX = x2 - Math.cos(angle)*25; let arrY = y2 - Math.sin(angle)*25;
-                            ctx.moveTo(arrX, arrY); ctx.lineTo(arrX - 10 * Math.cos(angle - Math.PI / 6), arrY - 10 * Math.sin(angle - Math.PI / 6)); ctx.lineTo(arrX - 10 * Math.cos(angle + Math.PI / 6), arrY - 10 * Math.sin(angle + Math.PI / 6));
-                            ctx.closePath(); ctx.fillStyle = pColors[b.name]||"#ffffff"; ctx.fill(); ctx.globalAlpha = 1.0;
+                            let x1 = ha[b.house].x; 
+                            let y1 = ha[b.house].y; 
+                            let x2 = ha[tHouse].x; 
+                            let y2 = ha[tHouse].y;
+                            
+                            // Retrieve the exact color of the aspecting Graha
+                            let pColor = pColors[b.name] || "#ffffff";
+                            let curveMod = planetCurveOffset[b.name] || 20;
+
+                            // Calculate mid-point and perpendicular offset to create the arc
+                            let mx = (x1 + x2) / 2; 
+                            let my = (y1 + y2) / 2; 
+                            let dx = x2 - x1; 
+                            let dy = y2 - y1; 
+                            let dist = Math.sqrt(dx*dx + dy*dy);
+                            
+                            // Control point for the quadratic bezier curve
+                            let cx = mx + (dy / dist) * curveMod; 
+                            let cy = my - (dx / dist) * curveMod;
+
+                            // Calculate tangent angle at the destination to align the arrow head correctly
+                            let endAngle = Math.atan2(y2 - cy, x2 - cx);
+                            
+                            // Retract the arrow tip 45 pixels away from the absolute center 
+                            // so it hovers cleanly near the border of the target house
+                            let retractDist = 45; 
+                            let finalX = x2 - Math.cos(endAngle) * retractDist;
+                            let finalY = y2 - Math.sin(endAngle) * retractDist;
+
+                            // 1. Draw the Aspect Line (Dashed & Colored)
+                            ctx.beginPath(); 
+                            ctx.setLineDash([6, 4]); // Clean dash pattern for visibility
+                            ctx.moveTo(x1, y1);
+                            ctx.quadraticCurveTo(cx, cy, finalX, finalY);
+                            ctx.strokeStyle = pColor; 
+                            ctx.lineWidth = 1.8; // Slightly thicker to stand out
+                            ctx.globalAlpha = 0.85; 
+                            ctx.stroke(); 
+                            ctx.setLineDash([]); // Reset to solid for other elements
+                            
+                            // 2. Draw the Arrowhead (Solid & Pointed)
+                            ctx.beginPath(); 
+                            let headLen = 14; // Size of the arrow head
+                            
+                            // Map out the wings of the arrow mathematically
+                            ctx.moveTo(finalX, finalY); 
+                            ctx.lineTo(finalX - headLen * Math.cos(endAngle - Math.PI / 7), finalY - headLen * Math.sin(endAngle - Math.PI / 7)); 
+                            ctx.lineTo(finalX - headLen * Math.cos(endAngle + Math.PI / 7), finalY - headLen * Math.sin(endAngle + Math.PI / 7));
+                            ctx.closePath(); 
+                            
+                            ctx.fillStyle = pColor; 
+                            ctx.fill(); 
+                            ctx.globalAlpha = 1.0;
                         }
                     });
                 }
