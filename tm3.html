@@ -252,9 +252,10 @@
         <hr>
         <div>
             <h4>Quantum States</h4>
+            <div class="filter-item"><div class="checkbox-wrapper"><input type="checkbox" id="cbYogas" onchange="updateView()"><label for="cbYogas" style="color: #38bdf8; font-weight: bold;">✨ Show Yogas & Doshas</label></div><div class="lbl-container" onclick="alert('Highlights BPHS Yogas (Green/Gold) and Doshas (Red/Purple) with animated connections on the 2D Kundli.')" title="Info"><span style="font-size:12px; color: #60a5fa;">ℹ️</span></div></div>
             <div class="filter-item"><div class="checkbox-wrapper"><input type="checkbox" id="cbAsta" onchange="updateView()"><label for="cbAsta" style="color: #f87171;">🔥 Show Combustion (Asta)</label></div><div class="lbl-container" onclick="alert('Asta (Combustion): Planet darkens when near Surya.')" title="Info"><span style="font-size:12px; color: #60a5fa;">ℹ️</span></div></div>
             <div class="filter-item"><div class="checkbox-wrapper"><input type="checkbox" id="cbVakri" onchange="updateView();"><label for="cbVakri" style="color: #c084fc;">🌀 Show Retrogression (Vakri)</label></div><div class="lbl-container" onclick="alert('Vakri: Purple aura and (R) symbol.')" title="Info"><span style="font-size:12px; color: #60a5fa;">ℹ️</span></div></div>
-            <div class="filter-item"><div class="checkbox-wrapper"><input type="checkbox" id="cbUchaNeecha" onchange="updateView();"><label for="cbUchaNeecha" style="color: #fbbf24;">🌟 Show Ucha / Neecha</label></div><div class="lbl-container" onclick="alert('Ucha/Neecha: Scale shifts and ↑ ↓ arrows.')" title="Info"><span style="font-size:12px; color: #60a5fa;">ℹ️</span></div></div>
+            <div class="filter-item"><div class="checkbox-wrapper"><input type="checkbox" id="cbUchaNeecha" onchange="updateView();"><label for="cbUchaNeecha" style="color: #fbbf24;">🌟 Show Ucha / Neecha</label></div><div class="lbl-container" onclick="alert('Ucha/Neecha: Scale shifts and Exalted (E) / Debilitated (D) markers.')" title="Info"><span style="font-size:12px; color: #60a5fa;">ℹ️</span></div></div>
             <div class="filter-item"><div class="checkbox-wrapper"><input type="checkbox" id="cbMooltrikona" onchange="updateView();"><label for="cbMooltrikona" style="color: #34d399;">📐 Show Mooltrikona</label></div><div class="lbl-container" onclick="alert('Mooltrikona: Glowing geometric triangle △.')" title="Info"><span style="font-size:12px; color: #60a5fa;">ℹ️</span></div></div>
             <div class="filter-item"><div class="checkbox-wrapper"><input type="checkbox" id="cbAwastha" onchange="updateView();"><label for="cbAwastha" style="color: #60a5fa;">⏱️ Show Awastha (Age)</label></div><div class="lbl-container" onclick="alert('Awastha: Size scales and pulsates based on degree.')" title="Info"><span style="font-size:12px; color: #60a5fa;">ℹ️</span></div></div>
             <div class="filter-item"><div class="checkbox-wrapper"><input type="checkbox" id="cbDigbala" onchange="updateView();"><label for="cbDigbala" style="color: #6ee7b7;">🧭 Show Digbala (Directional)</label></div><div class="lbl-container" onclick="alert('Digbala: Downward light pillar 🎯.')" title="Info"><span style="font-size:12px; color: #60a5fa;">ℹ️</span></div></div>
@@ -488,9 +489,7 @@
     const NAKSHATRA_DEG = 360 / 27; 
     
     const R_ES = 1000; // Earth to Sun Distance
-    // Sun-Centered Orbits
     const helioRadii = { 'Budh': 500, 'Shukra': 800, 'Mangal': 1600, 'Guru': 2600, 'Shani': 3600, 'Arun': 4600, 'Varun': 5600, 'Yama': 6600 };
-    // Earth-Centered Orbits
     const geoRadii = { 'Chandra': 150, 'Rahu': 150, 'Ketu': 150 };
     const upaRadius = 900;
     
@@ -516,6 +515,7 @@
     function formatDegree(decimalDeg) { if (decimalDeg === undefined) return ""; const deg = Math.floor(decimalDeg); const mins = Math.floor((decimalDeg % 1) * 60); return `${deg}°${mins.toString().padStart(2, '0')}'`; }
     function getNakshatraLocal(deg) { return i18n[currentLang].nakshatras[Math.floor(deg / NAKSHATRA_DEG)]; }
     function get3DVector(radius, lonDeg, latDeg = 0) { const lon = lonDeg * (Math.PI / 180); const lat = latDeg * (Math.PI / 180); return new THREE.Vector3(radius * Math.cos(lat) * Math.cos(lon), radius * Math.sin(lat), -radius * Math.cos(lat) * Math.sin(lon)); }
+    function hexToRgba(hex, alpha) { let r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16); return `rgba(${r}, ${g}, ${b}, ${alpha})`; }
 
     const sacredStarsList = [{ id: 'Dhruva', lon: 88.5, lat: 66.5, col: 0xffffff, size: 10 }, { id: 'Agastya', lon: 105, lat: -76, col: 0xffddaa, size: 12 }, { id: 'Abhijit', lon: 285.3, lat: 61.7, col: 0xaaddff, size: 12 }, { id: 'Lubdhaka', lon: 104.1, lat: -39.6, col: 0xffffff, size: 14 }, { id: 'Saptarishi', lon: 150, lat: 55, col: 0xffffff, cluster: 7 }];
     const textureLoader = new THREE.TextureLoader();
@@ -850,6 +850,11 @@
             });
             drishtiGroup.children.forEach(c => { if (c.isLine && c.material.dashSize) c.material.dashOffset -= 2; });
             renderer.render(scene, camera); render2DOverlay(); 
+        } else if (currentView === 'kundli') {
+            // Hook the 2D Canvas into the animation loop when Yoga visualizer is active
+            if (document.getElementById('cbYogas') && document.getElementById('cbYogas').checked) {
+                drawKundli(); 
+            }
         }
     }
 
@@ -889,6 +894,7 @@
     // --- BPHS VARGA (DIVISIONAL) MATHEMATICS ---
     let currentChartType = "D1";
     let lagnaAbsDeg = 0; 
+    const rashiSwamis = ['Mangal', 'Shukra', 'Budh', 'Chandra', 'Surya', 'Budh', 'Shukra', 'Mangal', 'Guru', 'Shani', 'Shani', 'Guru'];
 
     function switchChartType() {
         currentChartType = document.getElementById('chartTypeSelector').value;
@@ -903,75 +909,67 @@
 
         switch(vargaType) {
             case "D1": return rashi;
-            case "D9": // Navamsha
+            case "D9": 
                 let navPart = Math.floor(degInSign / (30 / 9)); let navStart;
                 if ([1, 5, 9].includes(rashi)) navStart = 1;       
                 else if ([2, 6, 10].includes(rashi)) navStart = 10; 
                 else if ([3, 7, 11].includes(rashi)) navStart = 7;  
                 else navStart = 4;                                  
                 return ((navStart - 1 + navPart) % 12) + 1;
-            case "D10": // Dashamsha
+            case "D10": 
                 let dasPart = Math.floor(degInSign / 3);
                 let dasStart = (rashi % 2 !== 0) ? rashi : ((rashi + 8) % 12 || 12); 
                 return ((dasStart - 1 + dasPart) % 12) + 1;
-            case "D2": // Hora
+            case "D2": 
                 let isFirstHalf = degInSign < 15;
                 if (rashi % 2 !== 0) return isFirstHalf ? 5 : 4; 
                 else return isFirstHalf ? 4 : 5;                 
-            case "D3": // Drekkana
+            case "D3": 
                 let drekPart = Math.floor(degInSign / 10);
                 if (drekPart === 0) return rashi;
                 if (drekPart === 1) return ((rashi + 4 - 1) % 12) + 1; 
                 return ((rashi + 8 - 1) % 12) + 1;                     
-            case "D4": // Chaturthamsha
+            case "D4": 
                 let chatPart = Math.floor(degInSign / 7.5);
                 return ((rashi - 1 + (chatPart * 3)) % 12) + 1; 
-            case "D7": // Saptamsha
+            case "D7": 
                 let sapPart = Math.floor(degInSign / (30 / 7));
                 let sapStart = (rashi % 2 !== 0) ? rashi : ((rashi + 6) % 12 || 12); 
                 return ((sapStart - 1 + sapPart) % 12) + 1;
-            case "D12": // Dwadashamsha
+            case "D12": 
                 let dwaPart = Math.floor(degInSign / 2.5);
                 return ((rashi - 1 + dwaPart) % 12) + 1; 
-            case "D16": // Shodashamsha
+            case "D16": 
                 let d16Part = Math.floor(degInSign / 1.875);
                 let d16Start = (rashi % 3 === 1) ? 1 : (rashi % 3 === 2) ? 5 : 9;
                 return ((d16Start - 1 + d16Part) % 12) + 1;
-            case "D20": // Vimshamsha
+            case "D20": 
                 let d20Part = Math.floor(degInSign / 1.5);
                 let d20Start = (rashi % 3 === 1) ? 1 : (rashi % 3 === 2) ? 9 : 5;
                 return ((d20Start - 1 + d20Part) % 12) + 1;
-            case "D24": // Chaturvimshamsha
+            case "D24": 
                 let d24Part = Math.floor(degInSign / 1.25);
                 let d24Start = (rashi % 2 !== 0) ? 5 : 4;
                 return ((d24Start - 1 + d24Part) % 12) + 1;
-            case "D27": // Bhamsha
+            case "D27": 
                 let d27Part = Math.floor(degInSign / (30 / 27));
                 let d27Start = [1, 5, 9].includes(rashi) ? 1 : [2, 6, 10].includes(rashi) ? 4 : [3, 7, 11].includes(rashi) ? 7 : 10;
                 return ((d27Start - 1 + d27Part) % 12) + 1;
-            case "D30": // Trimshamsha
+            case "D30": 
                 if (rashi % 2 !== 0) { 
-                    if (degInSign < 5) return 1; 
-                    else if (degInSign < 10) return 11; 
-                    else if (degInSign < 18) return 9; 
-                    else if (degInSign < 25) return 3; 
-                    else return 7; 
+                    if (degInSign < 5) return 1; else if (degInSign < 10) return 11; else if (degInSign < 18) return 9; else if (degInSign < 25) return 3; else return 7; 
                 } else { 
-                    if (degInSign < 5) return 2; 
-                    else if (degInSign < 12) return 6; 
-                    else if (degInSign < 20) return 12; 
-                    else if (degInSign < 25) return 10; 
-                    else return 8; 
+                    if (degInSign < 5) return 2; else if (degInSign < 12) return 6; else if (degInSign < 20) return 12; else if (degInSign < 25) return 10; else return 8; 
                 }
-            case "D40": // Khavedamsha
+            case "D40": 
                 let d40Part = Math.floor(degInSign / 0.75);
                 let d40Start = (rashi % 2 !== 0) ? 1 : 7;
                 return ((d40Start - 1 + d40Part) % 12) + 1;
-            case "D45": // Akshavedamsha
+            case "D45": 
                 let d45Part = Math.floor(degInSign / (30 / 45));
                 let d45Start = (rashi % 3 === 1) ? 1 : (rashi % 3 === 2) ? 5 : 9;
                 return ((d45Start - 1 + d45Part) % 12) + 1;
-            case "D60": // Shashtiamsha
+            case "D60": 
                 let shashPart = Math.floor(degInSign / 0.5);
                 return ((rashi - 1 + shashPart) % 12) + 1; 
             default:
@@ -979,16 +977,90 @@
         }
     }
 
+    // --- BPHS YOGA & DOSHA DETECTION ENGINE ---
+    function evaluateYogas(vargaAscSign) {
+        let yogas = [];
+        let pMap = {};
+        
+        renderBodies.forEach(b => { 
+            if(b.name !== 'Earth' && document.getElementById('cb_'+b.name) && document.getElementById('cb_'+b.name).checked) {
+                pMap[b.name] = b; 
+            }
+        });
+        
+        let hMap = {};
+        for(let i=1; i<=12; i++) hMap[i] = [];
+        
+        Object.values(pMap).forEach(b => { 
+            let planetVargaSign = calculateVargaSign(b.abs_deg, currentChartType);
+            b.calcHouse = ((planetVargaSign - vargaAscSign + 12) % 12) + 1;
+            hMap[b.calcHouse].push(b.name);
+        });
+
+        // 1. Pancha Mahapurusha Yogas (Mars, Mercury, Jupiter, Venus, Saturn in Kendra + Own/Ucha)
+        const mpMap = {'Mangal': 'Ruchaka', 'Budh': 'Bhadra', 'Guru': 'Hamsa', 'Shukra': 'Malavya', 'Shani': 'Sasa'};
+        ['Mangal', 'Budh', 'Guru', 'Shukra', 'Shani'].forEach(p => {
+            if (pMap[p] && [1, 4, 7, 10].includes(pMap[p].calcHouse)) {
+                let pSign = calculateVargaSign(pMap[p].abs_deg, currentChartType);
+                let isOwn = rashiSwamis[pSign - 1] === p;
+                let isUcha = pMap[p].isUcha; 
+                if (isOwn || isUcha) {
+                    yogas.push({ name: `${mpMap[p]} Mahapurusha`, type: 'yoga', planets: [p], houses: [pMap[p].calcHouse], color: '#f1c40f' });
+                }
+            }
+        });
+
+        // 2. Gaja Kesari Yoga (Jupiter in Kendra from Moon)
+        if (pMap['Chandra'] && pMap['Guru']) {
+            let dist = (pMap['Guru'].calcHouse - pMap['Chandra'].calcHouse + 12) % 12;
+            if ([0, 3, 6, 9].includes(dist)) {
+                yogas.push({ name: 'Gaja Kesari Yoga', type: 'yoga', planets: ['Chandra', 'Guru'], houses: [pMap['Chandra'].calcHouse, pMap['Guru'].calcHouse], color: '#2ecc71' });
+            }
+        }
+
+        // 3. Budhaditya Yoga (Sun + Mercury)
+        if (pMap['Surya'] && pMap['Budh'] && pMap['Surya'].calcHouse === pMap['Budh'].calcHouse) {
+            yogas.push({ name: 'Budhaditya Yoga', type: 'yoga', planets: ['Surya', 'Budh'], houses: [pMap['Surya'].calcHouse], color: '#f59e0b' });
+        }
+
+        // 4. Conjunction Doshas
+        for(let h=1; h<=12; h++) {
+            let occ = hMap[h];
+            if (occ.includes('Guru') && (occ.includes('Rahu') || occ.includes('Ketu'))) {
+                yogas.push({ name: 'Guru Chandal Dosha', type: 'dosha', planets: ['Guru', occ.includes('Rahu')?'Rahu':'Ketu'], houses: [h], color: '#ef4444' });
+            }
+            if (occ.includes('Mangal') && (occ.includes('Rahu') || occ.includes('Ketu'))) {
+                yogas.push({ name: 'Angarak Dosha', type: 'dosha', planets: ['Mangal', occ.includes('Rahu')?'Rahu':'Ketu'], houses: [h], color: '#b91c1c' });
+            }
+            if ((occ.includes('Surya') || occ.includes('Chandra')) && (occ.includes('Rahu') || occ.includes('Ketu'))) {
+                let lum = occ.includes('Surya') ? 'Surya' : 'Chandra';
+                let nod = occ.includes('Rahu') ? 'Rahu' : 'Ketu';
+                yogas.push({ name: 'Grahan Dosha', type: 'dosha', planets: [lum, nod], houses: [h], color: '#8b5cf6' });
+            }
+        }
+
+        // 5. Kuja (Mangalik) Dosha
+        if (pMap['Mangal'] && [1, 4, 7, 8, 12].includes(pMap['Mangal'].calcHouse)) {
+            yogas.push({ name: 'Mangalik (Kuja) Dosha', type: 'dosha', planets: ['Mangal'], houses: [pMap['Mangal'].calcHouse], color: '#dc2626' });
+        }
+
+        return yogas;
+    }
+
     function drawKundli() {
         const cvs = document.getElementById('kundliCanvas'); 
         const ctx = cvs.getContext('2d'); 
         ctx.clearRect(0, 0, cvs.width, cvs.height);
         
+        let vargaAscSign = calculateVargaSign(lagnaAbsDeg, currentChartType);
+        
+        // 1. Fill Houses with Bhava Colors
         for(let i = 1; i <= 12; i++) {
             ctx.fillStyle = bhavaDetails[i].color;
             ctx.fill(housePaths[i]);
         }
 
+        // 2. Draw Grid Lines
         ctx.strokeStyle = "#f1c40f"; ctx.lineWidth = 2; ctx.lineJoin = "round";
         ctx.strokeRect(50, 50, 700, 700);
         ctx.beginPath(); ctx.moveTo(50, 50); ctx.lineTo(750, 750); ctx.stroke();
@@ -997,8 +1069,51 @@
 
         const ha = { 1:{x:400,y:230}, 2:{x:225,y:130}, 3:{x:130,y:225}, 4:{x:230,y:400}, 5:{x:130,y:575}, 6:{x:225,y:670}, 7:{x:400,y:570}, 8:{x:575,y:670}, 9:{x:670,y:575}, 10:{x:570,y:400}, 11:{x:670,y:225}, 12:{x:575,y:130} };
         const na = { 1:{x:400,y:100}, 2:{x:150,y:70}, 3:{x:70,y:150}, 4:{x:100,y:400}, 5:{x:70,y:650}, 6:{x:150,y:730}, 7:{x:400,y:700}, 8:{x:650,y:730}, 9:{x:730,y:650}, 10:{x:700,y:400}, 11:{x:730,y:150}, 12:{x:650,y:70} };
-        const rashiSwamis = ['Mangal', 'Shukra', 'Budh', 'Chandra', 'Surya', 'Budh', 'Shukra', 'Mangal', 'Guru', 'Shani', 'Shani', 'Guru'];
 
+        let activeYogas = [];
+        if (document.getElementById('cbYogas') && document.getElementById('cbYogas').checked) {
+            activeYogas = evaluateYogas(vargaAscSign);
+        }
+
+        // 3. Render Yoga & Dosha Animations (Placed behind text/planets)
+        if (activeYogas.length > 0) {
+            let timeOffset = -Date.now() / 30;
+            
+            activeYogas.forEach(yoga => {
+                if (yoga.houses.length === 2) {
+                    let h1 = ha[yoga.houses[0]]; let h2 = ha[yoga.houses[1]];
+                    ctx.beginPath();
+                    ctx.setLineDash([8, 8]);
+                    ctx.lineDashOffset = timeOffset;
+                    ctx.moveTo(h1.x, h1.y);
+                    let mx = (h1.x + h2.x)/2, my = (h1.y + h2.y)/2;
+                    ctx.quadraticCurveTo(mx, my - 50, h2.x, h2.y);
+                    ctx.strokeStyle = yoga.color;
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                } else if (yoga.houses.length === 1) {
+                    let h1 = ha[yoga.houses[0]];
+                    let pulse = 35 + Math.sin(Date.now() / 200) * 8;
+                    
+                    ctx.beginPath();
+                    ctx.arc(h1.x, h1.y, pulse, 0, 2*Math.PI);
+                    ctx.globalAlpha = 0.25;
+                    ctx.fillStyle = yoga.color; 
+                    ctx.fill();
+                    ctx.globalAlpha = 1.0;
+                    
+                    ctx.strokeStyle = yoga.color;
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.lineDashOffset = timeOffset;
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            });
+        }
+
+        // 4. Draw Purushartha Text
         for(let i = 1; i <= 12; i++) {
             ctx.fillStyle = "rgba(255, 255, 255, 0.15)"; 
             ctx.font = "bold 22px 'Segoe UI', sans-serif";
@@ -1010,6 +1125,7 @@
         const showRashis = document.getElementById('cbRashis') ? document.getElementById('cbRashis').checked : true;
         const showNakshatras = document.getElementById('cbNakshatras') ? document.getElementById('cbNakshatras').checked : true;
         
+        // 5. Draw Maitri Web
         if (document.getElementById('cbMaitri') && document.getElementById('cbMaitri').checked) {
             const cg = ['Surya', 'Chandra', 'Mangal', 'Budh', 'Guru', 'Shukra', 'Shani'];
             for (let i=0; i<cg.length; i++) for (let j=i+1; j<cg.length; j++) {
@@ -1032,6 +1148,7 @@
             }
         }
 
+        // 6. Draw Drishti Aspects
         if (document.getElementById('cbDrishti') && document.getElementById('cbDrishti').checked) {
             const planetCurveOffset = { 'Surya': 15, 'Chandra': -15, 'Mangal': 35, 'Budh': -35, 'Guru': 55, 'Shukra': -55, 'Shani': 75, 'Rahu': 90, 'Ketu': -90 };
             renderBodies.forEach(b => {
@@ -1060,8 +1177,7 @@
             });
         }
 
-        let vargaAscSign = calculateVargaSign(lagnaAbsDeg, currentChartType);
-
+        // 7. Draw Planets and Rashi Details
         for (let h = 1; h <= 12; h++) {
             if (showRashis) {
                 let rashiIdx = (h - 1 + vargaAscSign - 1 + 12) % 12; 
@@ -1095,21 +1211,21 @@
                 
                 let digText = ""; let digCol = "";
                 if (b.isUcha) { 
-                    digText = " (E)"; digCol = "#b8860b"; // Exalted (Dark Goldenrod)
+                    digText = " (E)"; digCol = "#b8860b"; 
                 } else if (b.isNeecha) {
-                    digText = " (D)"; digCol = "#ef4444"; // Debilitated (Red)
+                    digText = " (D)"; digCol = "#ef4444"; 
                 } else if (b.isMT) { 
-                    digText = " (M)"; digCol = "#f1c40f"; // Mooltrikona
+                    digText = " (M)"; digCol = "#f1c40f"; 
                 } else if (b.name === rLord) { 
-                    digText = " (O)"; digCol = "#3b82f6"; // Own Sign
+                    digText = " (O)"; digCol = "#3b82f6"; 
                 } else {
                     let mVal = 0;
                     if (naisargikaMaitri[b.name] && typeof naisargikaMaitri[b.name][rLord] !== 'undefined') {
                         mVal = naisargikaMaitri[b.name][rLord];
                     }
-                    if (mVal === 1) { digText = " (F)"; digCol = "#2ecc71"; }      // Friendly
-                    else if (mVal === -1) { digText = " (En)"; digCol = "#e74c3c"; } // Enemy (En instead of E)
-                    else { digText = " (N)"; digCol = "#f1c40f"; }                  // Neutral
+                    if (mVal === 1) { digText = " (F)"; digCol = "#2ecc71"; }      
+                    else if (mVal === -1) { digText = " (En)"; digCol = "#e74c3c"; } 
+                    else { digText = " (N)"; digCol = "#f1c40f"; }                  
                 }
 
                 ctx.font = "bold 14px 'Segoe UI', sans-serif";
@@ -1157,6 +1273,31 @@
                     ctx.fillStyle = "#ffffff"; 
                     ctx.fillText(nSym, nStartX + wNName, yPos + 14);
                 }
+            });
+        }
+
+        // 8. Draw Yoga HUD (Top-Left of the Inner Canvas Margin)
+        if (activeYogas.length > 0) {
+            let startY = 15;
+            let hudWidth = 220;
+            let hudHeight = 30 + (activeYogas.length * 22);
+
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+            ctx.fillRect(15, startY, hudWidth, hudHeight);
+            
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(15, startY, hudWidth, hudHeight);
+            
+            ctx.textAlign = "left";
+            ctx.font = "bold 14px 'Segoe UI', sans-serif";
+            ctx.fillStyle = "#f1c40f";
+            ctx.fillText("✨ Detected BPHS Yogas", 25, startY + 20);
+            
+            ctx.font = "bold 13px 'Segoe UI', sans-serif";
+            activeYogas.forEach((y, i) => {
+                ctx.fillStyle = y.color;
+                ctx.fillText(`• ${y.name}`, 25, startY + 45 + (i * 22));
             });
         }
     }
