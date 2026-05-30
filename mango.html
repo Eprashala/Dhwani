@@ -95,7 +95,7 @@
         }
     </style>
 </head>
-<body class="bg-bgLight dark:bg-bgDark text-slate-800 dark:text-slate-200 h-screen flex flex-col overflow-hidden transition-colors duration-300">
+<body class="bg-bgLight dark:bg-bgDark text-slate-800 dark:text-slate-200 h-[100dvh] flex flex-col overflow-hidden transition-colors duration-300">
 
     <div id="splash-screen" class="fixed inset-0 bg-yellow-400 dark:bg-yellow-600 flex flex-col items-center justify-center">
         <div class="text-9xl mango-bounce">🥭</div>
@@ -469,6 +469,19 @@
             loadHistory();
             initSpeechRecognition();
             setupEventListeners();
+			
+			// --- ANDROID KEYBOARD FIX ---
+			if (window.visualViewport) {
+				window.visualViewport.addEventListener('resize', () => {
+					// Force the body to match the strictly visible viewport height
+					document.body.style.height = window.visualViewport.height + 'px';
+					
+					// Push the chat log to the bottom so recent messages aren't obscured
+					if (DOM.log) {
+						DOM.log.scrollTop = DOM.log.scrollHeight;
+					}
+				});
+			}
         };
 
         // --- 5. AUDIO HELPER ---
@@ -903,6 +916,12 @@
                     DOM.btnSend.classList.add('hidden'); DOM.btnMic.classList.remove('hidden');
                 }
             });
+			
+						DOM.textIn.addEventListener('focus', () => {
+				setTimeout(() => {
+					DOM.log.scrollTop = DOM.log.scrollHeight;
+				}, 300); // 300ms delay allows the Android keyboard animation to finish first
+			});
 
             DOM.btnSend.onclick = () => processInput(DOM.textIn.value);
             DOM.textIn.onkeypress = (e) => { if(e.key === 'Enter') processInput(DOM.textIn.value); };
