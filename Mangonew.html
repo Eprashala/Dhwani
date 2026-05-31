@@ -731,16 +731,77 @@
         }
 
         // --- 5. SPEECH & CHAT ---
-        function stopTTS() { synth.cancel(); }
-        function speakText(text) {
-            if(state.ttsPaused) return; stopTTS();
+        let currentlyPlayingBtn = null;
+
+        function stopTTS() { 
+            synth.cancel(); 
+            if (currentlyPlayingBtn) {
+                currentlyPlayingBtn.innerHTML = '▶️ Play';
+                currentlyPlayingBtn = null;
+            }
+        }
+
+function speakText(text) {
+            if(state.ttsPaused) return; 
+            stopTTS(); // This will clear any active playback button too
+            
             let clean = text.replace(/[\u{1F600}-\u{1F6FF}|[\u{2600}-\u{26FF}]/gu, '').replace(/[*#`_\[\]()]/g, '').trim(); if(!clean) return;
             const p = getActivePersona(); const u = new SpeechSynthesisUtterance(clean);
-            u.lang = p.lang || 'en-US'; u.pitch = p.pitch || 1.0; u.rate = p.rate || 1.0;
+            
+            u.lang = p.lang || 'en-US'; 
+            u.pitch = p.pitch || 1.0; 
+            u.rate = p.rate || 1.0;
+            
             const targetVoice = p.voiceURI || state.settings.globalVoice;
-            if (targetVoice) { const v = synth.getVoices().find(v => v.voiceURI === targetVoice); if (v) { u.voice = v; u.lang = v.lang; } }
+            if (targetVoice) { 
+                const v = synth.getVoices().find(v => v.voiceURI === targetVoice); 
+                if (v) { u.voice = v; u.lang = v.lang; } 
+            }
             synth.speak(u);
         }
+
+        window.toggleMessageAudio = function(btn, encodedText) {
+            const text = decodeURIComponent(encodedText);
+            
+            // If clicking the button that is currently playing, stop it
+            if (synth.speaking && currentlyPlayingBtn === btn) {
+                stopTTS();
+                return;
+            }
+            
+            // Stop anything else that might be playing first
+            stopTTS();
+
+            // Prepare the new text
+            let clean = text.replace(/[\u{1F600}-\u{1F6FF}|[\u{2600}-\u{26FF}]/gu, '').replace(/[*#`_\[\]()]/g, '').trim(); 
+            if(!clean) return;
+
+            const p = getActivePersona(); 
+            const u = new SpeechSynthesisUtterance(clean);
+            u.lang = p.lang || 'en-US'; 
+            u.pitch = p.pitch || 1.0; 
+            u.rate = p.rate || 1.0;
+            
+            const targetVoice = p.voiceURI || state.settings.globalVoice;
+            if (targetVoice) { 
+                const v = synth.getVoices().find(v => v.voiceURI === targetVoice); 
+                if (v) { u.voice = v; u.lang = v.lang; } 
+            }
+            
+            // Reset button when speech naturally finishes or fails
+            u.onend = () => {
+                if (currentlyPlayingBtn === btn) {
+                    btn.innerHTML = '▶️ Play';
+                    currentlyPlayingBtn = null;
+                }
+            };
+            
+            u.onerror = u.onend;
+
+            synth.speak(u);
+            btn.innerHTML = '⏹️ Stop';
+            currentlyPlayingBtn = btn;
+        };
         
         function initSpeechRecognition() {
             const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR) return DOM.btnMic.style.display = 'none';
@@ -759,14 +820,21 @@
             let fmtText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             
             if (isAI) {
+                const encodedText = encodeURIComponent(text);
                 div.innerHTML = `
-                    <div class="flex gap-3 max-w-[85%] sm:max-w-[75%]">
+                    <div class="flex gap-3 max-w-[85%] sm:max-w-[75%] group">
                         <div class="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm mt-1 flex items-center justify-center">
                             ${p.thumbnail ? `<img src="${p.thumbnail}" class="w-full h-full object-cover">` : `<span class="text-sm">🥭</span>`}
                         </div>
                         <div class="flex flex-col">
                             <span class="text-xs font-bold mb-1 ml-1" style="color: ${state.settings.color}">${p.name}</span>
                             <div class="bg-white dark:bg-sidebarDark border border-slate-200 dark:border-slate-700 px-4 py-3 rounded-2xl rounded-tl-sm text-[15px] shadow-sm leading-relaxed text-slate-800 dark:text-slate-100">${mediaHTML} <div>${fmtText}</div></div>
+                            
+                            <div class="mt-1 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onclick="toggleMessageAudio(this, '${encodedText}')" class="text-[11px] font-bold text-slate-400 hover:text-primary flex items-center gap-1 bg-transparent outline-none transition-colors">
+                                    ▶️ Play
+                                </button>
+                            </div>
                         </div>
                     </div>
                 `;
