@@ -130,27 +130,7 @@
                     <h3 class="font-semibold mb-2 text-sm uppercase text-slate-500">Your Profile (User)</h3>
                     <input type="text" id="set-name" placeholder="Your Full Name" class="w-full mb-2 p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none text-sm">
                     <input type="text" id="set-fname" placeholder="Your Nickname" class="w-full mb-2 p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none text-sm">
-                    <div class="flex gap-2 w-full">
-                        <input type="number" id="set-age" placeholder="Your Age" class="w-1/3 p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none text-sm">
-                        <select id="set-user-lang" class="w-2/3 p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none text-sm text-slate-600 dark:text-slate-300">
-                            <option value="en-US">English (US)</option>
-                            <option value="en-GB">English (UK)</option>
-                            <option value="en-IN">English (India)</option>
-                            <option value="es-ES">Spanish (Spain)</option>
-                            <option value="fr-FR">French (France)</option>
-                            <option value="de-DE">German</option>
-                            <option value="hi-IN">Hindi (India)</option>
-                            <option value="ta-IN">Tamil (India)</option>
-                            <option value="te-IN">Telugu (India)</option>
-                            <option value="zh-CN">Chinese (Mandarin)</option>
-                            <option value="ar-SA">Arabic</option>
-                            <option value="ja-JP">Japanese</option>
-                            <option value="ko-KR">Korean</option>
-                            <option value="pt-BR">Portuguese (Brazil)</option>
-                            <option value="ru-RU">Russian</option>
-                            <option value="it-IT">Italian</option>
-                        </select>
-                    </div>
+                    <input type="number" id="set-age" placeholder="Your Age" class="w-full p-2 rounded-lg bg-white dark:bg-slate-900 border dark:border-slate-600 outline-none text-sm">
                 </div>
 
                 <div class="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border dark:border-slate-600">
@@ -273,10 +253,22 @@
                 </div>
                 
                 <div class="flex flex-col min-w-0">
-                    <div class="flex items-center gap-1 sm:gap-2">
-                        <h1 class="text-lg sm:text-xl font-bold tracking-wider text-primary hidden sm:block">MANGO</h1>
-                        <select id="header-persona-select" class="text-xs sm:text-sm font-semibold bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded py-1 px-1 sm:px-2 outline-none cursor-pointer border border-slate-300 dark:border-slate-600 shadow-sm max-w-[120px] sm:max-w-xs truncate"></select>
-                    </div>
+				<div class="flex items-center gap-1 sm:gap-2">
+					<h1 class="text-lg sm:text-xl font-bold tracking-wider text-primary hidden sm:block">MANGO</h1>
+					<select id="header-persona-select" class="text-xs sm:text-sm font-semibold bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded py-1 px-1 sm:px-2 outline-none cursor-pointer border border-slate-300 dark:border-slate-600 shadow-sm max-w-[120px] sm:max-w-xs truncate"></select>
+					
+					<select id="header-stt-lang" class="text-xs sm:text-sm font-semibold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 rounded py-1 px-1 sm:px-2 outline-none cursor-pointer border border-blue-200 dark:border-blue-800 shadow-sm max-w-[100px] truncate" title="Microphone Language">
+						<option value="en-IN">🗣️ English</option>
+						<option value="hi-IN">🗣️ Hindi</option>
+						<option value="mr-IN">🗣️ Marathi</option>
+						<option value="gu-IN">🗣️ Gujarati</option>
+						<option value="ta-IN">🗣️ Tamil</option>
+						<option value="te-IN">🗣️ Telugu</option>
+						<option value="bn-IN">🗣️ Bengali</option>
+						<option value="kn-IN">🗣️ Kannada</option>
+						<option value="ml-IN">🗣️ Malayalam</option>
+					</select>
+				</div>
                     <div id="status-indicator" class="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">Online & Ready</div>
                 </div>
             </div>
@@ -353,6 +345,7 @@
         let state = {
             isProcessing: false,
             isListening: false,
+			sttLang: localStorage.getItem('mango_stt_lang') || 'en-IN',
             editingPersonaId: null, 
             tempThumb: null, 
             tempBg: null,    
@@ -364,7 +357,7 @@
             personas: JSON.parse(localStorage.getItem('mango_personas')) || [defaultPersona],
             activePersonaId: localStorage.getItem('mango_active_persona') || 'default',
             settings: JSON.parse(localStorage.getItem('mango_settings')) || {
-                name: "User", fname: "Buddy", age: 25, userLang: "en-US", provider: "gemini", 
+                name: "User", fname: "Buddy", age: 25, provider: "gemini", 
                 model: "gemini-3.5-flash", customPrompt: "",
                 darkmode: false, color: "#f59e0b"
             }
@@ -396,13 +389,13 @@
             btnRemoveImg: document.getElementById('btn-remove-image'),
             
             headerPersonaSelect: document.getElementById('header-persona-select'),
+			headerSttLang: document.getElementById('header-stt-lang'),
             headerEmoji: document.getElementById('header-emoji'),
             headerThumb: document.getElementById('header-thumbnail'),
 
             sName: document.getElementById('set-name'),
             sFname: document.getElementById('set-fname'),
             sAge: document.getElementById('set-age'),
-            sUserLang: document.getElementById('set-user-lang'),
             sProv: document.getElementById('set-provider'),
             sModel: document.getElementById('set-model'),
             sKey: document.getElementById('set-apikey'),
@@ -485,6 +478,14 @@
 
             DOM.pPitch.addEventListener('input', (e) => DOM.valPitch.innerText = parseFloat(e.target.value).toFixed(1));
             DOM.pRate.addEventListener('input', (e) => DOM.valRate.innerText = parseFloat(e.target.value).toFixed(1));
+			DOM.headerSttLang.value = state.sttLang;
+            DOM.headerSttLang.addEventListener('change', (e) => {
+                state.sttLang = e.target.value;
+                localStorage.setItem('mango_stt_lang', state.sttLang);
+            });
+
+            renderPersonas();
+            loadHistory();
 
             renderPersonas();
             loadHistory();
@@ -714,7 +715,6 @@
             DOM.sName.value = state.settings.name;
             DOM.sFname.value = state.settings.fname;
             DOM.sAge.value = state.settings.age;
-            DOM.sUserLang.value = state.settings.userLang || 'en-US';
             DOM.sProv.value = state.settings.provider;
             DOM.sCust.value = state.settings.customPrompt;
             DOM.sDark.checked = state.settings.darkmode;
@@ -735,7 +735,6 @@
         function saveSettings() {
             state.settings = {
                 name: DOM.sName.value, fname: DOM.sFname.value, age: parseInt(DOM.sAge.value) || 25,
-                userLang: DOM.sUserLang.value,
                 provider: DOM.sProv.value, model: DOM.sModel.value, 
                 customPrompt: DOM.sCust.value,
                 darkmode: DOM.sDark.checked, color: DOM.sColor.value
@@ -746,9 +745,6 @@
             localStorage.setItem('mango_keys', JSON.stringify(state.apiKeys));
             applyGlobalSettings();
             applyActivePersonaContext(); 
-
-            if (recognition) recognition.lang = state.settings.userLang;
-            
             DOM.modalSettings.classList.add('hidden');
         }
 
@@ -952,14 +948,17 @@
             DOM.btnSend.onclick = () => processInput(DOM.textIn.value);
             DOM.textIn.onkeypress = (e) => { if(e.key === 'Enter') processInput(DOM.textIn.value); };
 
-            DOM.btnMic.onclick = (e) => {
+			DOM.btnMic.onclick = (e) => {
                 e.stopPropagation();
                 if (state.isProcessing || !recognition) return;
                 if (state.isListening) {
                     recognition.stop();
                 } else { 
                     stopTTS(); 
-                    try { recognition.start(); } catch(err) { console.error(err); } 
+                    try { 
+                        recognition.lang = state.sttLang; // NEW: Set the language right before listening
+                        recognition.start(); 
+                    } catch(err) { console.error(err); } 
                 }
             };
 
@@ -1005,9 +1004,6 @@
             recognition = new SpeechRec();
             recognition.continuous = false;
             recognition.interimResults = false;
-            
-            // Apply language from user settings
-            recognition.lang = state.settings.userLang || 'en-US';
 
             recognition.onstart = () => {
                 state.isListening = true;
