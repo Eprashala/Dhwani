@@ -22,7 +22,13 @@
         .dasha-container { width: 100%; overflow-x: auto; }
         .dasha-table { width: 100%; border-collapse: collapse; font-size: 13px; background: white; }
         .dasha-table th { color: white; text-align: left; padding: 10px 12px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .dasha-table td { padding: 10px 12px; border-bottom: 1px solid #ecf0f1; transition: 0.2s; vertical-align: middle; }
+ .dasha-table { 
+    width: 100%; 
+    min-width: 650px; /* Added to ensure columns remain readable before the container's horizontal scroll triggers */
+    border-collapse: collapse; 
+    font-size: 13px; 
+    background: white; 
+}
         
         .clickable-row { cursor: pointer; }
         .clickable-row:hover td { background: #f8f9fa; border-left-color: #bdc3c7; }
@@ -34,7 +40,18 @@
         
         .active-dasha > td { background: rgba(241, 196, 15, 0.1); font-weight: bold; border-left: 4px solid #f1c40f !important; }
 
-        .verdict-badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; line-height: 1.2; }
+.verdict-badge { 
+    padding: 4px 8px; 
+    border-radius: 4px; 
+    font-size: 11px; 
+    font-weight: bold; 
+    display: inline-flex; 
+    align-items: center; 
+    flex-wrap: wrap; /* Allows the icon and text to wrap nicely */
+    gap: 5px; 
+    white-space: normal; /* Changed from 'nowrap' to allow long influence text to break onto new lines */
+    line-height: 1.4; /* Increased slightly to improve readability for multi-line text */
+}
         .v-good { background: rgba(46, 204, 113, 0.15); color: #27ae60; border: 1px solid rgba(46, 204, 113, 0.3); }
         .v-neutral { background: rgba(241, 196, 15, 0.15); color: #d35400; border: 1px solid rgba(241, 196, 15, 0.3); }
         .v-evil { background: rgba(231, 76, 60, 0.15); color: #c0392b; border: 1px solid rgba(231, 76, 60, 0.3); }
@@ -120,7 +137,39 @@
             <div class="prediction-results" id="predictionResults">
                 </div>
         </div>
+<!-- AI Astrological Consultant Module -->
+<div class="panel ai-consultant" style="background: #fcf8ff; border: 2px solid var(--l0-color); border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+    <h3 style="margin: 0; color: var(--l0-color); display: flex; align-items: center; gap: 8px;">
+        🔮 Deep BPHS AI Consultant
+    </h3>
+    <p style="font-size: 13px; color: #555; margin-top: 5px;">
+        Pose a specific query. The engine will package your complete astrological identity, structural configurations, and entire Varga matrix into a payload designed for zero-bias, pure BPHS-compliant AI processing.
+    </p>
+    
+    <label style="font-size: 12px; font-weight: bold; color: #4a148c; display: block; margin-top: 15px;">YOUR QUESTION</label>
+    <input type="text" id="aiQuestion" class="event-select" style="margin-top: 5px; font-weight: normal;" placeholder="e.g., WILL I GET MARRIED IN YEAR 2026?">
 
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+        <div>
+            <label style="font-size: 12px; font-weight: bold; color: #4a148c; display: block;">SCAN PERIOD FROM</label>
+            <input type="date" id="aiDateFrom" class="event-select" style="margin-top: 5px;">
+        </div>
+        <div>
+            <label style="font-size: 12px; font-weight: bold; color: #4a148c; display: block;">SCAN PERIOD TO</label>
+            <input type="date" id="aiDateTo" class="event-select" style="margin-top: 5px;">
+        </div>
+    </div>
+
+    <button class="btn-predict" style="background: var(--l0-color);" onclick="generateAIPrompt()">Generate Incognito AI Payload</button>
+
+    <div id="aiPromptWrapper" style="display: none; margin-top: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <span style="font-size: 12px; font-weight: bold; color: #27ae60;">✅ Prompt Payload Compiled Successfully!</span>
+            <button onclick="copyAIPrompt()" style="background: #27ae60; color: white; border: none; padding: 5px 10px; font-size: 11px; font-weight: bold; border-radius: 3px; cursor: pointer;">Copy to Clipboard</button>
+        </div>
+        <textarea id="aiPromptTextArea" style="width: 100%; height: 250px; font-family: monospace; font-size: 12px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; background: #fafafa; resize: vertical;" readonly></textarea>
+    </div>
+</div>
     </div>
 
 <script>
@@ -212,6 +261,15 @@ async function initDashaEngine() {
     document.getElementById('s_tob').innerText = time;
 
     birthDateMs = new Date(`${rawDate}T${time}`).getTime();
+	// Set up default AI date filters (Current Time +/- 1 Year)
+const baseDate = new Date(); // 2026 Base Window
+const oneYearInMs = 365 * 24 * 60 * 60 * 1000;
+
+const dateFrom = new Date(baseDate.getTime() - oneYearInMs);
+const dateTo = new Date(baseDate.getTime() + oneYearInMs);
+
+document.getElementById('aiDateFrom').value = dateFrom.toISOString().split('T')[0];
+document.getElementById('aiDateTo').value = dateTo.toISOString().split('T')[0];
 
     try {
         // NOTE: Change this URL to https://eprashala.pythonanywhere.com/calculate if you deployed your backend!
@@ -623,6 +681,86 @@ function findEventTriggers() {
             </div>
         `;
     });
+}
+
+
+function generateAIPrompt() {
+    const question = document.getElementById('aiQuestion').value.trim();
+    const dateFrom = document.getElementById('aiDateFrom').value;
+    const dateTo = document.getElementById('aiDateTo').value;
+
+    if (!question) {
+        alert("Please enter a question for the AI Consultant.");
+        return;
+    }
+
+    // Capture Jataka Elements
+    const jatakaName = document.getElementById('s_name').innerText;
+    const jatakaLagna = document.getElementById('s_lagna').innerText;
+    const jatakaMoon = document.getElementById('s_moon').innerText;
+    const jatakaNak = document.getElementById('s_nak').innerText;
+
+    // Compile D1 Planetary Placements Matrix
+    let d1PositionsText = "";
+    Object.keys(grahaRegistry).forEach(pName => {
+        let pData = grahaRegistry[pName];
+        d1PositionsText += `- ${pName}: House ${pData.house} (Sign Index: ${pData.sign}, Original State: ${pData.text}, Final Score: ${pData.dignityScore})\n`;
+    });
+
+    // Compile Multi-Divisional Varga Charts Matrix
+    let vargaText = "";
+    if (typeof vargaRegistry !== 'undefined' && Object.keys(vargaRegistry).length > 0) {
+        Object.keys(vargaRegistry).forEach(vKey => {
+            vargaText += `\n[Chart ${vKey} Placements]:\n`;
+            Object.keys(vargaRegistry[vKey]).forEach(pName => {
+                let pData = vargaRegistry[vKey][pName];
+                vargaText += `  * ${pName}: House ${pData.house}\n`;
+            });
+        });
+    } else {
+        vargaText = "Divisional Chart Registry (Vargas): Calculated implicitly by backend execution maps.";
+    }
+
+    // Build the finalized System Execution Prompt Payload
+    const fullPrompt = `[INCOGNITO MODE ACTIVE - DO NOT USE PAST CHAT HISTORY OR USER PROFILE RECALL CONTEXT]
+[OPERATION MODE: STANDALONE BPHS MATHEMATICAL ASTROLOGER]
+
+DIRECTIVE: You are executing a blind, context-free Vedic Astrology consultation session. Disregard all prior external conversational identities. Analyze the target metrics strictly through the mathematical and diagnostic frameworks of the Brihat Parashara Hora Shastra (BPHS).
+
+### NATIVE JATAKA IDENTIFIER DATA
+- Identity Handle: ${jatakaName}
+- Lagna (Ascendant): ${jatakaLagna}
+- Moon Sign (Rashi): ${jatakaMoon}
+- Birth Nakshatra: ${jatakaNak}
+
+### D1 RASHI CHART STATE MATRIX
+${d1PositionsText}
+### DIVISIONAL VARGA CHARTS STATE MATRIX
+${vargaText}
+### CURRENT EVALUATION PARAMS
+- Target Windows of Scan: From ${dateFrom} to ${dateTo}
+- Specific Query: "${question.toUpperCase()}"
+
+### MANDATORY COMPLIANCE CHECKLIST FOR ASSESSMENT:
+1. Locate the specific structural Bhavas (Houses) and natural Karakas (Significators) related to the query.
+2. Cross-examine the strength and placement of those House Lords in both the D1 Chart and the relevant specialized Varga Matrix.
+3. Weigh the operational functional status of active Dasha Lords rules within the designated timelines to determine the math-backed probabilities of manifest fruit (Phala).
+4. Provide a definitive, clear structural conclusion addressing the query without ambiguous phrasing.
+
+Begin your deep BPHS structural analysis now:`;
+
+    // Expose prompt to UI
+    document.getElementById('aiPromptTextArea').value = fullPrompt;
+    document.getElementById('aiPromptWrapper').style.display = 'block';
+    document.getElementById('aiPromptTextArea').scrollIntoView({ behavior: 'smooth' });
+}
+
+function copyAIPrompt() {
+    const textArea = document.getElementById('aiPromptTextArea');
+    textArea.select();
+    textArea.setSelectionRange(0, 99999); // Mobile compatibility
+    navigator.clipboard.writeText(textArea.value);
+    alert("BPHS Data Payload copied! Paste it into your clean AI session.");
 }
 
 window.onload = initDashaEngine;
