@@ -235,9 +235,11 @@
             <div class="filter-item"><div class="checkbox-wrapper"><input type="checkbox" id="cb_Shukra" checked onchange="updateView()"><label for="cb_Shukra">♀ Shukra</label></div><label class="checkbox-wrapper lbl-container" title="Toggle Shukra Text"><span style="font-size:11px;">📝</span><input type="checkbox" id="lbl_Shukra" checked onchange="updateView()"></label></div>
             <div class="filter-item"><div class="checkbox-wrapper"><input type="checkbox" id="cb_Shani" checked onchange="updateView()"><label for="cb_Shani">♄ Shani</label></div><label class="checkbox-wrapper lbl-container" title="Toggle Shani Text"><span style="font-size:11px;">📝</span><input type="checkbox" id="lbl_Shani" checked onchange="updateView()"></label></div>
             <div class="filter-item"><div class="checkbox-wrapper"><input type="checkbox" id="cb_Earth" checked onchange="updateView()"><label for="cb_Earth">⊕ Earth</label></div><label class="checkbox-wrapper lbl-container" title="Toggle Earth Text"><span style="font-size:11px;">📝</span><input type="checkbox" id="lbl_Earth" checked onchange="updateView()"></label></div>
-        </div>
+			<div class="filter-item"><div class="checkbox-wrapper"><input type="checkbox" id="cb_Rahu" checked onchange="updateView()"><label for="cb_Rahu">☊ Rahu</label></div><label class="checkbox-wrapper lbl-container" title="Toggle Rahu Text"><span style="font-size:11px;">📝</span><input type="checkbox" id="lbl_Rahu" checked onchange="updateView()"></label></div>
+            <div class="filter-item"><div class="checkbox-wrapper"><input type="checkbox" id="cb_Ketu" checked onchange="updateView()"><label for="cb_Ketu">☋ Ketu</label></div><label class="checkbox-wrapper lbl-container" title="Toggle Ketu Text"><span style="font-size:11px;">📝</span><input type="checkbox" id="lbl_Ketu" checked onchange="updateView()"></label></div>
+		</div>
         <hr>
-        <div>
+		<div>
             <h4>Cosmic Architecture</h4>
             <div class="filter-item"><div class="checkbox-wrapper"><input type="checkbox" id="cbPlanetOrbits" checked onchange="updateView()"><label for="cbPlanetOrbits">Orbital Paths</label></div></div>
             <div class="filter-item"><div class="checkbox-wrapper"><input type="checkbox" id="cbMoonOrbit" checked onchange="updateView()"><label for="cbMoonOrbit">Lunar Orbit</label></div></div>
@@ -245,7 +247,6 @@
             <div class="filter-item"><div class="checkbox-wrapper"><input type="checkbox" id="cbNakshatras" checked onchange="updateView()"><label for="cbNakshatras">Nakshatras (13°20')</label></div><label class="checkbox-wrapper lbl-container" title="Toggle Nakshatra Text"><span style="font-size:11px;">📝</span><input type="checkbox" id="lbl_Nakshatras" checked onchange="updateView()"></label></div>
             <div class="filter-item"><div class="checkbox-wrapper"><input type="checkbox" id="cbVedicStars" checked onchange="updateView()"><label for="cbVedicStars">Sacred Stars</label></div><label class="checkbox-wrapper lbl-container" title="Toggle Stars Text"><span style="font-size:11px;">📝</span><input type="checkbox" id="lbl_VedicStars" checked onchange="updateView()"></label></div>
             <div class="filter-item"><div class="checkbox-wrapper"><input type="checkbox" id="cbOuter" checked onchange="updateView()"><label for="cbOuter">Arun, Varun, Yama</label></div><label class="checkbox-wrapper lbl-container" title="Toggle Outer Planets Text"><span style="font-size:11px;">📝</span><input type="checkbox" id="lbl_Outer" checked onchange="updateView()"></label></div>
-            <div class="filter-item"><div class="checkbox-wrapper"><input type="checkbox" id="cbNodes" checked onchange="updateView()"><label for="cbNodes">Rahu & Ketu</label></div><label class="checkbox-wrapper lbl-container" title="Toggle Nodes Text"><span style="font-size:11px;">📝</span><input type="checkbox" id="lbl_Nodes" checked onchange="updateView()"></label></div>
             <div class="filter-item"><div class="checkbox-wrapper"><input type="checkbox" id="cbUpagrahas" checked onchange="updateView()"><label for="cbUpagrahas">Upagrahas</label></div><label class="checkbox-wrapper lbl-container" title="Toggle Upagrahas Text"><span style="font-size:11px;">📝</span><input type="checkbox" id="lbl_Upagrahas" checked onchange="updateView()"></label></div>
         </div>
         
@@ -729,38 +730,6 @@
         let sunDeg = sun ? sun.abs_deg : 0;
         let sunPosAbsolute = get3DVector(R_ES, sunDeg, 0); 
         
-        renderBodies.forEach(b => {
-            let lat = b.lat || (orbitalParams[b.name] ? orbitalParams[b.name].inc * Math.sin((b.abs_deg - orbitalParams[b.name].lan) * Math.PI / 180) : 0);
-            let pos = new THREE.Vector3();
-
-            if (b.name === 'Earth') {
-                pos.set(0,0,0);
-            } else if (b.name === 'Surya') {
-                pos = get3DVector(R_ES, b.abs_deg, lat);
-            } else if (['Chandra', 'Rahu', 'Ketu'].includes(b.name)) {
-                pos = get3DVector(geoRadii['Chandra'], b.abs_deg, lat);
-            } else if (helioRadii[b.name]) {
-                let R = helioRadii[b.name];
-                let uGeo = get3DVector(1, b.abs_deg, lat);
-                let dot = uGeo.x * sunPosAbsolute.x + uGeo.y * sunPosAbsolute.y + uGeo.z * sunPosAbsolute.z;
-                let S2 = sunPosAbsolute.x**2 + sunPosAbsolute.y**2 + sunPosAbsolute.z**2;
-                let desc = dot*dot - S2 + R*R;
-                
-                let t = 1000;
-                if (desc >= 0) {
-                    let t1 = dot + Math.sqrt(desc);
-                    let t2 = dot - Math.sqrt(desc);
-                    let isVakri = checkVakri(b.name, b.abs_deg, sunDeg);
-                    if (['Budh', 'Shukra'].includes(b.name) && isVakri && t2 > 0) t = t2; else t = t1 > 0 ? t1 : t2; 
-                } else t = dot > 0 ? dot : 1000;
-                
-                pos = uGeo.multiplyScalar(t);
-            } else {
-                pos = get3DVector(upaRadius, b.abs_deg, lat);
-            }
-            b.pos3D_abs = pos;
-        });
-
         let originOffset = new THREE.Vector3(0,0,0);
         if (isHelio && sun) originOffset = new THREE.Vector3(-sunPosAbsolute.x, -sunPosAbsolute.y, -sunPosAbsolute.z);
         buildBoundaries(originOffset);
@@ -773,14 +742,39 @@
         const stDigbala = document.getElementById('cbDigbala') ? document.getElementById('cbDigbala').checked : false;
 
         renderBodies.forEach(b => {
-            b.pos3D = b.pos3D_abs.clone().add(originOffset);
-            b.isUcha = false; b.isNeecha = false; b.isVakri = false; b.isMT = false; b.isDigbala = false; b.awasthaState = null; b.isCombust = false;
-            if (stAwastha && ['Surya', 'Chandra', 'Mangal', 'Budh', 'Guru', 'Shukra', 'Shani'].includes(b.name)) b.awasthaState = getAwastha(b.abs_deg);
-            if (stUcha && dignityDegrees[b.name]) {
-                let dU = Math.abs(b.abs_deg - dignityDegrees[b.name].ucha); if(dU > 180) dU = 360 - dU;
-                let dN = Math.abs(b.abs_deg - dignityDegrees[b.name].neecha); if(dN > 180) dN = 360 - dN;
-                if (dU <= 15) b.isUcha = true; else if (dN <= 15) b.isNeecha = true;
+            // Safety fallback to calculate 3D coordinates if missing from API
+            if (!b.pos3D_abs) {
+                let r = helioRadii[b.name] || geoRadii[b.name] || upaRadius;
+                let lat = orbitalParams[b.name] ? orbitalParams[b.name].inc * Math.sin((b.abs_deg - orbitalParams[b.name].lan) * Math.PI / 180) : 0;
+                let center = (['Chandra', 'Rahu', 'Ketu', 'Earth'].includes(b.name) || aprakasha.includes(b.name)) ? new THREE.Vector3(0,0,0) : sunPosAbsolute;
+                if (b.name === 'Earth') b.pos3D_abs = new THREE.Vector3(0,0,0);
+                else b.pos3D_abs = get3DVector(r, b.abs_deg, lat).add(center);
             }
+
+            b.pos3D = b.pos3D_abs.clone().add(originOffset);
+            
+            // Reset BPHS variables for this frame
+            b.isUcha = false; b.isNeecha = false; b.isVakri = false; b.isMT = false; b.isDigbala = false; b.awasthaState = null; b.isCombust = false; b.scaleUchaNeecha = 1.0;
+            
+            // 100% BPHS Accurate Dignity: By Rashi (Sign), not just by orb
+            let pSign = Math.floor(b.abs_deg / 30) + 1;
+            if (dignityDegrees[b.name]) {
+                let uchaSign = Math.floor(dignityDegrees[b.name].ucha / 30) + 1;
+                let neechaSign = Math.floor(dignityDegrees[b.name].neecha / 30) + 1;
+                
+                if (pSign === uchaSign) b.isUcha = true;
+                if (pSign === neechaSign) b.isNeecha = true;
+                
+                // Visual scaling effect (glows brighter when near exact degree)
+                if (stUcha) {
+                    let dU = Math.abs(b.abs_deg - dignityDegrees[b.name].ucha); if(dU > 180) dU = 360 - dU;
+                    let dN = Math.abs(b.abs_deg - dignityDegrees[b.name].neecha); if(dN > 180) dN = 360 - dN;
+                    if (dU <= 15) b.scaleUchaNeecha = 1 + (0.6 * (1 - dU/15));
+                    else if (dN <= 15) b.scaleUchaNeecha = 1 - (0.5 * (1 - dN/15));
+                }
+            }
+
+            if (stAwastha && ['Surya', 'Chandra', 'Mangal', 'Budh', 'Guru', 'Shukra', 'Shani'].includes(b.name)) b.awasthaState = getAwastha(b.abs_deg);
             if (stVakri && sun && checkVakri(b.name, b.abs_deg, sun.abs_deg)) b.isVakri = true;
             if (stMT && mooltrikonaRanges[b.name] && b.abs_deg >= mooltrikonaRanges[b.name].min && b.abs_deg <= mooltrikonaRanges[b.name].max) b.isMT = true;
             if (stDigbala && b.house && digbalaHouses[b.name] === b.house) b.isDigbala = true;
@@ -790,13 +784,13 @@
             }
         });
 
-        Object.keys(planetMeshes).forEach(key => {
+			Object.keys(planetMeshes).forEach(key => {
             const mesh = planetMeshes[key]; const body = renderBodies.find(b => b.name === key);
             let isE = document.getElementById('cb_' + key) ? document.getElementById('cb_' + key).checked : true;
 
             if (body && isE && (activeHouses.has(body.house) || key === 'Earth' || (isHelio && key === 'Surya'))) {
                 const isO = ['Arun', 'Varun', 'Yama'].includes(key); const isN = ['Rahu', 'Ketu'].includes(key);
-                if ((isO && !document.getElementById('cbOuter').checked) || (isN && !document.getElementById('cbNodes').checked) || (!isO && !isN && !body.type && !document.getElementById('cbUpagrahas').checked)) {
+                if ((isO && !document.getElementById('cbOuter').checked) || (!isO && !isN && !body.type && !document.getElementById('cbUpagrahas').checked)) {
                     mesh.visible = false; return;
                 }
                 
@@ -806,10 +800,14 @@
                     mesh.material.color.setHex(pColors[key] && !mesh.material.map ? parseInt(pColors[key].replace('#', '0x')) : 0xffffff);
                     if (mesh.material.emissive) mesh.material.emissive.setHex(0x000000); 
                 }
+                
                 if (body.awasthaState) { curScale *= body.awasthaState.scale; if (body.awasthaState.name === "Mrita" && mesh.material) mesh.material.color.lerp(new THREE.Color(0x444444), 0.6); }
-                if (body.isUcha) { let dU = Math.abs(body.abs_deg - dignityDegrees[key].ucha); if(dU > 180) dU = 360 - dU; curScale *= 1 + (0.6 * (1 - dU/15)); if(mesh.material.emissive) mesh.material.emissive.setHex(0x222222); } 
-                else if (body.isNeecha) { let dN = Math.abs(body.abs_deg - dignityDegrees[key].neecha); if(dN > 180) dN = 360 - dN; curScale *= 1 - (0.5 * (1 - dN/15)); if(mesh.material) mesh.material.color.lerp(new THREE.Color(0x333333), 1 - (dN/15)); }
-                mesh.scale.set(curScale, curScale, curScale); body.baseScale = curScale; 
+                if (stUcha && body.scaleUchaNeecha !== 1.0) { 
+                    curScale *= body.scaleUchaNeecha; 
+                    if(body.scaleUchaNeecha > 1 && mesh.material.emissive) mesh.material.emissive.setHex(0x222222); 
+                    else if (body.scaleUchaNeecha < 1 && mesh.material) mesh.material.color.lerp(new THREE.Color(0x333333), 1 - body.scaleUchaNeecha); 
+                }
+                mesh.scale.set(curScale, curScale, curScale); body.baseScale = curScale;
                 if (body.isCombust && mesh.material) { mesh.material.color.setHex(0x333333); if(mesh.material.emissive) mesh.material.emissive.setHex(0x3a1000); }
                 const aM = mesh.children.find(c => c.name === "vakriAura"); if (aM) aM.visible = body.isVakri; 
                 const tM = mesh.children.find(c => c.name === "mtTriangle"); if (tM) tM.visible = body.isMT;
@@ -1049,10 +1047,19 @@
         let hMap = {};
         for(let i=1; i<=12; i++) hMap[i] = [];
         
-        Object.values(pMap).forEach(b => { 
+		Object.values(pMap).forEach(b => { 
             let planetVargaSign = calculateVargaSign(b.abs_deg, currentChartType);
             b.calcHouse = ((planetVargaSign - vargaAscSign + 12) % 12) + 1;
             hMap[b.calcHouse].push(b.name);
+
+            // BPHS Unconditional Dignity check based on current Varga Sign
+            b.isUcha = false; b.isNeecha = false;
+            if (dignityDegrees[b.name]) {
+                let uchaSign = Math.floor(dignityDegrees[b.name].ucha / 30) + 1;
+                let neechaSign = Math.floor(dignityDegrees[b.name].neecha / 30) + 1;
+                if (planetVargaSign === uchaSign) b.isUcha = true;
+                if (planetVargaSign === neechaSign) b.isNeecha = true;
+            }
         });
 
         // --- CORE HELPERS ---
@@ -1159,17 +1166,17 @@
             });
         });
 
-        Object.values(pMap).forEach(p => {
+		Object.values(pMap).forEach(p => {
             if (p.isNeecha) {
                 let rSign = calculateVargaSign(p.abs_deg, currentChartType);
                 let dispositor = rashiSwamis[rSign - 1];
-                let exaltedPlanetObj = Object.values(pMap).find(ep => dignityDegrees[ep.name]?.ucha >= (rSign-1)*30 && dignityDegrees[ep.name]?.ucha < rSign*30);
+                let exaltedPlanetObj = Object.values(pMap).find(ep => Math.floor(dignityDegrees[ep.name]?.ucha / 30) + 1 === rSign);
 
                 let isCancelled = false;
-                if (pMap[dispositor] && [1, 4, 7, 10].includes(pMap[dispositor].calcHouse)) isCancelled = true; // Rule 1
-                else if (pMap[dispositor] && pMap[dispositor].calcHouse === pMap['Chandra']?.calcHouse) isCancelled = true; // Rule 1.1
-                else if (exaltedPlanetObj && hasAspect(exaltedPlanetObj.name, p.calcHouse)) isCancelled = true; // Rule 2
-                else if (exaltedPlanetObj && [1, 4, 7, 10].includes(exaltedPlanetObj.calcHouse)) isCancelled = true; // Rule 3
+                if (pMap[dispositor] && [1, 4, 7, 10].includes(pMap[dispositor].calcHouse)) isCancelled = true; 
+                else if (pMap[dispositor] && pMap[dispositor].calcHouse === pMap['Chandra']?.calcHouse) isCancelled = true; 
+                else if (exaltedPlanetObj && hasAspect(exaltedPlanetObj.name, p.calcHouse)) isCancelled = true; 
+                else if (exaltedPlanetObj && [1, 4, 7, 10].includes(exaltedPlanetObj.calcHouse)) isCancelled = true; 
 
                 if (isCancelled && !p.isCombust && !inDusthana(p.name)) {
                     yogas.push({ name: 'Neecha Bhanga Raja', baseKey: 'NeechaBhanga', type: 'yoga', planets: [p.name], houses: [p.calcHouse], color: '#f59e0b' });
@@ -1369,7 +1376,7 @@
             ctx.fillText(bhavaDetails[i].cat, ha[i].x, ha[i].y - 30);
         }
 
-        const sO = document.getElementById('cbOuter').checked; const sN = document.getElementById('cbNodes').checked; const sU = document.getElementById('cbUpagrahas').checked; const sL = document.getElementById('cbShowLabels').checked; 
+		const sO = document.getElementById('cbOuter').checked; const sU = document.getElementById('cbUpagrahas').checked; const sL = document.getElementById('cbShowLabels').checked; 
         const showRashis = document.getElementById('cbRashis') ? document.getElementById('cbRashis').checked : true;
         const showNakshatras = document.getElementById('cbNakshatras') ? document.getElementById('cbNakshatras').checked : true;
         
@@ -1440,10 +1447,10 @@
                 ctx.fillText(`Ld: ${swamiName}`, na[h].x, na[h].y + 14);
             }
 
-            let bh = renderBodies.filter(b => b.name !== 'Earth').filter(b => {
+				let bh = renderBodies.filter(b => b.name !== 'Earth').filter(b => {
                 let cb = document.getElementById('cb_' + b.name); if(cb && !cb.checked) return false;
                 let iG = b.type === 'graha'; let iN = ['Rahu','Ketu'].includes(b.name); let iO = ['Arun','Varun','Yama'].includes(b.name);
-                if ((!sO && iO) || (!sN && iN) || (!sU && !iG && !iN)) return false;
+                if ((!sO && iO) || (!sU && !iG && !iN)) return false;
 
                 let planetVargaSign = calculateVargaSign(b.abs_deg, currentChartType);
                 let calculatedHouse = ((planetVargaSign - vargaAscSign + 12) % 12) + 1;
@@ -1452,30 +1459,47 @@
 
             ctx.textAlign = "center"; let lineSpacing = showNakshatras ? 34 : 18; let sY = ha[h].y - ((bh.length - 1) * (lineSpacing / 2));
             
-            bh.forEach((b, i) => {
+				bh.forEach((b, i) => {
+                let planetVargaSign = calculateVargaSign(b.abs_deg, currentChartType);
+                let isUchaVarga = false; let isNeechaVarga = false;
+                if (dignityDegrees[b.name]) {
+                    let uchaSign = Math.floor(dignityDegrees[b.name].ucha / 30) + 1;
+                    let neechaSign = Math.floor(dignityDegrees[b.name].neecha / 30) + 1;
+                    if (planetVargaSign === uchaSign) isUchaVarga = true;
+                    if (planetVargaSign === neechaSign) isNeechaVarga = true;
+                }
+                
                 let rashiIdx = (h - 1 + vargaAscSign - 1 + 12) % 12; 
                 let rLord = rashiSwamis[rashiIdx];
                 let sym = `${b.isVakri?" (R)":""}${b.awasthaState?` ${b.awasthaState.symbol}`:""}${b.isDigbala?" 🎯":""}`;
                 
                 let digText = ""; let digCol = "";
-                if (b.isUcha) { 
+                if (isUchaVarga) { 
                     digText = " (E)"; digCol = "#b8860b"; 
-                } else if (b.isNeecha) {
+                } else if (isNeechaVarga) {
                     digText = " (D)"; digCol = "#ef4444"; 
-                } else if (b.isMT) { 
+                } else if (b.isMT && currentChartType === "D1") { 
                     digText = " (M)"; digCol = "#f1c40f"; 
                 } else if (b.name === rLord) { 
                     digText = " (O)"; digCol = "#3b82f6"; 
-                } else {
+				} else {
+                    // Evaluate Planet's dignity based on its disposition toward the Rashi Swami (Sign Lord)
                     let mVal = 0;
                     if (naisargikaMaitri[b.name] && typeof naisargikaMaitri[b.name][rLord] !== 'undefined') {
                         mVal = naisargikaMaitri[b.name][rLord];
                     }
-                    if (mVal === 1) { digText = " (F)"; digCol = "#2ecc71"; }      
-                    else if (mVal === -1) { digText = " (En)"; digCol = "#e74c3c"; } 
-                    else { digText = " (N)"; digCol = "#f1c40f"; }                  
+                    
+                    if (mVal === 1) { 
+                        digText = " (Fr)"; // Friendly Sign
+                        digCol = "#2ecc71"; 
+                    } else if (mVal === -1) { 
+                        digText = " (En)"; // Enemy Sign
+                        digCol = "#e74c3c"; 
+                    } else { 
+                        digText = " (Ne)"; // Neutral Sign
+                        digCol = "#f1c40f"; 
+                    }                  
                 }
-
                 ctx.font = "bold 14px 'Segoe UI', sans-serif";
                 let pName = `${(i18n[currentLang].names[b.name]||b.name).substring(0,4)} ${formatDegree(b.deg)}`;
                 let wName = ctx.measureText(pName).width;
@@ -1494,12 +1518,13 @@
                 ctx.fillStyle = b.isCombust ? "#64748b" : (pColors[b.name] || "#ffffff"); 
                 ctx.fillText(sym, startX + wName + wDig, yPos);
 
-                if (showNakshatras) {
+				if (showNakshatras) {
                     ctx.font = "11px Arial"; 
                     let nakIdx = Math.floor(b.abs_deg / (360/27)); 
                     let pada = Math.floor((b.abs_deg % (360/27)) / (360/108)) + 1;
                     let nName = `${getNakshatraLocal(b.abs_deg)} - P${pada}`;
                     
+                    // BPHS Vimsottari Dasha Lord Sequence
                     const nakLords = ['Ketu', 'Shukra', 'Surya', 'Chandra', 'Mangal', 'Rahu', 'Guru', 'Shani', 'Budh'];
                     let nLord = nakLords[nakIdx % 9];
                     
@@ -1508,6 +1533,7 @@
                         nVal = naisargikaMaitri[b.name][nLord];
                     }
                     
+                    // Nakshatra Lord Relationship Display
                     let nSym = " ➖"; 
                     if (nVal === 1) nSym = " 💚";    
                     else if (nVal === -1) nSym = " 💔"; 
@@ -1737,7 +1763,7 @@
         renderBodies.forEach(b => {
             if ((activeHouses.has(b.house) || ['Earth','Surya'].includes(b.name)) && (!document.getElementById('cb_'+b.name) || document.getElementById('cb_'+b.name).checked)) {
                 let iG = b.type === 'graha'; let iN = ['Rahu','Ketu'].includes(b.name); let iO = ['Arun','Varun','Yama'].includes(b.name);
-                if ((!document.getElementById('cbOuter').checked && iO) || (!document.getElementById('cbNodes').checked && iN) || (!document.getElementById('cbUpagrahas').checked && !iG && !iN)) return;
+                if ((!document.getElementById('cbOuter').checked && iO) || (!document.getElementById('cbUpagrahas').checked && !iG && !iN)) return;
                 
                 let p2D = toScreenXY(b.pos3D.clone().applyMatrix4(celestialGroup.matrixWorld)); if(p2D.z > 1) return;
                 if (!iG) { ctx2D.fillStyle = aprakasha.includes(b.name) ? "rgba(241, 196, 15, 0.8)" : "rgba(168, 85, 247, 0.8)"; ctx2D.fillRect(p2D.x - 2, p2D.y - 2, 4, 4); }
