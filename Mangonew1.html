@@ -97,10 +97,17 @@
         </div>
     </div>
 
-    <div class="fixed right-1 sm:right-4 top-1/2 -translate-y-1/2 flex flex-col gap-2 sm:gap-4 bg-white/80 dark:bg-sidebarDark/80 backdrop-blur-lg p-1.5 sm:p-2.5 rounded-full border border-slate-200 dark:border-slate-700 shadow-2xl z-50">
-        <button id="btn-open-models" class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-primary hover:text-white transition-all flex items-center justify-center text-sm sm:text-xl shadow" title="AI Models">🤖</button>
-        <button id="btn-open-personas" class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-primary hover:text-white transition-all flex items-center justify-center text-sm sm:text-xl shadow" title="Personas">👥</button>
-        <button id="btn-open-settings" class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-primary hover:text-white transition-all flex items-center justify-center text-sm sm:text-xl shadow" title="Settings">⚙️</button>
+	<div id="right-panel-container" class="fixed right-0 top-1/2 -translate-y-1/2 flex items-center z-50 transition-transform duration-300 translate-x-[calc(100%-24px)]">
+        <button id="btn-toggle-right" class="w-6 h-16 bg-white/90 dark:bg-sidebarDark/90 backdrop-blur-lg border border-r-0 border-slate-200 dark:border-slate-700 rounded-l-xl shadow-[[-4px_0_15px_rgba(0,0,0,0.1)]] flex flex-col items-center justify-center text-slate-500 hover:text-primary outline-none focus:outline-none cursor-pointer">
+            <div class="w-1 h-1 bg-slate-400 dark:bg-slate-500 rounded-full mb-1"></div>
+            <div class="w-1 h-1 bg-slate-400 dark:bg-slate-500 rounded-full mb-1"></div>
+            <div class="w-1 h-1 bg-slate-400 dark:bg-slate-500 rounded-full"></div>
+        </button>
+        <div class="flex flex-col gap-3 bg-white/90 dark:bg-sidebarDark/90 backdrop-blur-lg p-2 border border-l-0 border-slate-200 dark:border-slate-700 shadow-2xl pl-3 pr-3 rounded-l-none">
+            <button id="btn-open-models" class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-primary hover:text-white transition-all flex items-center justify-center text-xl shadow outline-none" title="AI Models">🤖</button>
+            <button id="btn-open-personas" class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-primary hover:text-white transition-all flex items-center justify-center text-xl shadow outline-none" title="Personas">👥</button>
+            <button id="btn-open-settings" class="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-primary hover:text-white transition-all flex items-center justify-center text-xl shadow outline-none" title="Settings">⚙️</button>
+        </div>
     </div>
 
     <div id="new-chat-modal" class="hidden fixed inset-0 bg-black/60 z-[120] flex items-center justify-center p-4 backdrop-blur-sm overflow-y-auto">
@@ -372,6 +379,11 @@
 
     <div id="sidebar-overlay" class="hidden fixed inset-0 bg-black/50 z-30 md:hidden"></div>
 
+	<button id="btn-toggle-left-handle" class="md:hidden fixed left-0 top-1/2 -translate-y-1/2 w-6 h-16 bg-white/90 dark:bg-sidebarDark/90 backdrop-blur-lg border border-l-0 border-slate-200 dark:border-slate-700 rounded-r-xl shadow-[4px_0_15px_rgba(0,0,0,0.1)] flex flex-col items-center justify-center text-slate-500 hover:text-primary outline-none focus:outline-none z-[35] transition-opacity duration-300">
+        <div class="w-1 h-1 bg-slate-400 dark:bg-slate-500 rounded-full mb-1"></div>
+        <div class="w-1 h-1 bg-slate-400 dark:bg-slate-500 rounded-full mb-1"></div>
+        <div class="w-1 h-1 bg-slate-400 dark:bg-slate-500 rounded-full"></div>
+    </button>
     <main class="flex-1 flex flex-col relative h-full w-full min-w-0 bg-transparent">
         
         <header class="grid grid-cols-[1fr_auto] md:grid-cols-[1fr_auto_1fr] items-center px-3 sm:px-4 py-2 sm:py-3 bg-white/80 dark:bg-sidebarDark/80 glass-panel z-20 border-b border-slate-200 dark:border-slate-800 shadow-sm relative w-full">
@@ -545,7 +557,11 @@
             pDob: document.getElementById('p-dob'), pTob: document.getElementById('p-tob'), pPob: document.getElementById('p-pob'),
             pLat: document.getElementById('p-lat'), pLon: document.getElementById('p-lon'),
             pobSuggestions: document.getElementById('pob-suggestions'), btnAutoPersona: document.getElementById('btn-auto-persona'),
-            astroStatus: document.getElementById('astro-status')
+            astroStatus: document.getElementById('astro-status'),
+			// Add these to the end of your DOM object:
+            rightPanel: document.getElementById('right-panel-container'),
+            btnToggleRight: document.getElementById('btn-toggle-right'),
+            btnToggleLeftHndl: document.getElementById('btn-toggle-left-handle')
         };
 
         window.onload = () => {
@@ -1197,16 +1213,82 @@
             checkInputState();
         };
 
+async function requestAppPermissions() {
+            // 1. Force Fullscreen
+            if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+                try { await document.documentElement.requestFullscreen(); } catch (err) {}
+            }
+            // 2. Request Wake Lock to prevent screen sleep
+            if ('wakeLock' in navigator && wakeLock === null) {
+                try { 
+                    wakeLock = await navigator.wakeLock.request('screen'); 
+                    wakeLock.addEventListener('release', () => { wakeLock = null; });
+                } catch (err) {}
+            }
+        }
+
+        // Re-acquire Wake Lock if the user switches tabs and comes back
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock === null && document.visibilityState === 'visible' && 'wakeLock' in navigator) {
+                try { wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
+            }
+        });
+
         function setupEventListeners() {
+            // Master Click Handler: App Initialization & Auto-Closing Panels
             document.body.addEventListener('click', (e) => {
+                // Initialize fullscreen and wake lock on any tap
+                requestAppPermissions();
+
                 const tag = e.target.tagName;
                 const isInteractive = ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'LABEL'].includes(tag);
-                if (window.innerWidth <= 768 && !isInteractive) {
-                    if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-                        document.documentElement.requestFullscreen().catch(err => console.log("Fullscreen ignored: ", err));
-                    }
+                
+                // Auto-collapse right panel if tapping outside of it
+                if (!DOM.rightPanel.contains(e.target) && DOM.rightPanel.classList.contains('translate-x-0')) {
+                    DOM.rightPanel.classList.replace('translate-x-0', 'translate-x-[calc(100%-24px)]');
                 }
             });
+
+            // Toggle Right Panel
+            DOM.btnToggleRight.onclick = (e) => {
+                e.stopPropagation();
+                if (DOM.rightPanel.classList.contains('translate-x-[calc(100%-24px)]')) {
+                    DOM.rightPanel.classList.replace('translate-x-[calc(100%-24px)]', 'translate-x-0');
+                } else {
+                    DOM.rightPanel.classList.replace('translate-x-0', 'translate-x-[calc(100%-24px)]');
+                }
+            };
+
+            // Toggle Left Sidebar via floating handle
+            DOM.btnToggleLeftHndl.onclick = () => {
+                DOM.sidebar.classList.remove('-translate-x-full'); 
+                DOM.overlay.classList.remove('hidden');
+                DOM.btnToggleLeftHndl.classList.add('opacity-0', 'pointer-events-none');
+            };
+
+            // Ensure Left Handle reappears when sidebar closes
+            const closeSidebar = () => { 
+                DOM.sidebar.classList.add('-translate-x-full'); 
+                DOM.overlay.classList.add('hidden'); 
+                DOM.btnToggleLeftHndl.classList.remove('opacity-0', 'pointer-events-none');
+            };
+            
+            DOM.btnToggleSb.onclick = () => { 
+                DOM.sidebar.classList.remove('-translate-x-full'); 
+                DOM.overlay.classList.remove('hidden'); 
+                DOM.btnToggleLeftHndl.classList.add('opacity-0', 'pointer-events-none');
+            };
+            DOM.overlay.onclick = closeSidebar;
+            
+            // Allow clicking a chat item to also bring back the left handle
+            const originalSwitchChat = window.switchChat;
+            window.switchChat = function(id) {
+                originalSwitchChat(id);
+                if(window.innerWidth < 768) {
+                    DOM.btnToggleLeftHndl.classList.remove('opacity-0', 'pointer-events-none');
+                }
+            };
+			
             const closeAll = () => document.querySelectorAll('.close-modal').forEach(b => b.parentElement.parentElement.classList.add('hidden'));
             document.querySelectorAll('.close-modal').forEach(btn => btn.onclick = closeAll);
             DOM.btnMModels.onclick = () => { closeAll(); DOM.modModels.classList.remove('hidden'); };
