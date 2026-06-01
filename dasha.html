@@ -34,13 +34,24 @@
         
         .active-dasha > td { background: rgba(241, 196, 15, 0.1); font-weight: bold; border-left: 4px solid #f1c40f !important; }
 
-        /* BPHS Verdict Badges */
-        .verdict-badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+        .verdict-badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; line-height: 1.2; }
         .v-good { background: rgba(46, 204, 113, 0.15); color: #27ae60; border: 1px solid rgba(46, 204, 113, 0.3); }
         .v-neutral { background: rgba(241, 196, 15, 0.15); color: #d35400; border: 1px solid rgba(241, 196, 15, 0.3); }
         .v-evil { background: rgba(231, 76, 60, 0.15); color: #c0392b; border: 1px solid rgba(231, 76, 60, 0.3); }
         
-        .ai-prompt-box { background: #1e293b; color: #e2e8f0; padding: 20px; border-radius: 8px; margin-top: 20px; font-family: monospace; }
+        /* Event Predictor CSS */
+        .event-predictor { background: #fffcf5; border: 2px solid #f1c40f; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .event-select { width: 100%; padding: 12px; font-size: 15px; border: 1px solid #bdc3c7; border-radius: 5px; margin-top: 10px; margin-bottom: 15px; background: white; color: #2c3e50; font-weight: bold; }
+        .btn-predict { background: #e67e22; color: white; border: none; padding: 12px 20px; font-size: 15px; font-weight: bold; border-radius: 5px; cursor: pointer; width: 100%; transition: 0.3s; }
+        .btn-predict:hover { background: #d35400; }
+        
+        .prediction-results { margin-top: 15px; max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .trigger-card { background: white; border: 1px solid #e2e8f0; border-left: 5px solid #2ecc71; padding: 15px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .trigger-card h4 { margin: 0 0 5px 0; color: #2c3e50; display: flex; justify-content: space-between; }
+        .trigger-card p { margin: 0; font-size: 13px; color: #7f8c8d; }
+        .trigger-reason { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #ecf0f1; font-size: 12px; color: #34495e; background: #f8f9fa; padding: 8px; border-radius: 4px; }
+
+        .ai-prompt-box { background: #1e293b; color: #e2e8f0; padding: 20px; border-radius: 8px; font-family: monospace; }
         .ai-prompt-box button { background: #27ae60; border: none; color: white; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; float: right; transition: 0.2s; }
         .ai-prompt-box button:hover { background: #219a52; }
     </style>
@@ -73,9 +84,50 @@
             <div class="dasha-container" id="rootDashaContainer"></div>
         </div>
 
+        <div class="panel event-predictor">
+            <h3 style="margin: 0; color: #d35400; display: flex; align-items: center; gap: 8px;">
+                🎯 Cosmic Event Predictor
+            </h3>
+            <p style="font-size: 13px; color: #555; margin-top: 5px;">Select a major life event. The engine will scan your 120-year Dasha timeline, cross-reference your specific Bhavas (Houses) and Karakas (Significators), and reveal the exact periods mathematically aligned for this event to manifest.</p>
+            
+            <select class="event-select" id="eventSelector">
+                <option value="" disabled selected>-- Select a Life Event to Predict --</option>
+                
+                <optgroup label="Family, Love & Personal Life">
+                    <option value="marriage">Engagement / Marriage / Wedding Anniversary</option>
+                    <option value="childbirth">Birth / Adoption of a Child / Grandparent</option>
+                    <option value="family_grief">Death of Spouse / Parents / Family Member</option>
+                </optgroup>
+
+                <optgroup label="Education & Career">
+                    <option value="education">School / College Admission / Graduation</option>
+                    <option value="career_rise">First Job / Promotion / Business Start / Awards</option>
+                    <option value="career_end">Retirement / Business Closure / Loss of Employment</option>
+                </optgroup>
+
+                <optgroup label="Wealth & Assets">
+                    <option value="wealth_gain">Major Investment / Inheritance / Significant Financial Gain</option>
+                    <option value="property">Buying Vehicle / Buying Home / Housewarming (Griha Pravesh)</option>
+                    <option value="wealth_loss">Significant Financial Loss / Bankruptcy</option>
+                </optgroup>
+
+                <optgroup label="Health, Legal & Travel">
+                    <option value="health_crisis">Major Illness / Surgery / Accident / Hospitalization</option>
+                    <option value="litigation">Court Cases / Divorce / Legal Settlements</option>
+                    <option value="travel_foreign">International Travel / Migration / Settlement Abroad</option>
+                    <option value="spiritual">Spiritual Awakening / Pilgrimage / Initiation</option>
+                </optgroup>
+            </select>
+
+            <button class="btn-predict" onclick="findEventTriggers()">Calculate Timeline Triggers</button>
+
+            <div class="prediction-results" id="predictionResults">
+                </div>
+        </div>
+
         <div class="panel">
             <h3 style="color: #2c3e50; margin-top:0;">Real-Time AI Analysis (Gemini 3.1)</h3>
-            <p style="font-size: 13px; color: #7f8c8d;">This dynamic prompt incorporates the exact BPHS dignity and mutual angular relationships of the currently active timeline to generate a highly specific predictive reading.</p>
+            <p style="font-size: 13px; color: #7f8c8d;">This dynamic prompt incorporates the exact BPHS dignity, functional lordship, and mutual angular relationships of the currently active timeline.</p>
             <div class="ai-prompt-box">
                 <button onclick="copyAIPrompt()">✨ Copy Prompt</button>
                 <div id="aiPromptText" style="white-space: pre-wrap; font-size: 12px; margin-top: 10px; line-height: 1.5;">
@@ -86,9 +138,26 @@
     </div>
 
 <script>
-// --- ASTROLOGICAL REFERENCE ARRAYS ---
+// --- ASTROLOGICAL REFERENCE ARRAYS & LOGIC ---
 const rashis = ['Mesha (Aries)', 'Vrishabha (Taurus)', 'Mithuna (Gemini)', 'Karka (Cancer)', 'Simha (Leo)', 'Kanya (Virgo)', 'Tula (Libra)', 'Vrishchika (Scorpio)', 'Dhanu (Sagittarius)', 'Makara (Capricorn)', 'Kumbha (Aquarius)', 'Meena (Pisces)'];
 const nakshatras = ['Ashwini', 'Bharani', 'Krittika', 'Rohini', 'Mrigashira', 'Ardra', 'Punarvasu', 'Pushya', 'Ashlesha', 'Magha', 'Purva Phalguni', 'Uttara Phalguni', 'Hasta', 'Chitra', 'Swati', 'Vishakha', 'Anuradha', 'Jyeshtha', 'Mula', 'Purva Ashadha', 'Uttara Ashadha', 'Shravana', 'Dhanishta', 'Shatabhisha', 'Purva Bhadrapada', 'Uttara Bhadrapada', 'Revati'];
+
+const signLords = { 1:'Mangal', 2:'Shukra', 3:'Budh', 4:'Chandra', 5:'Surya', 6:'Budh', 7:'Shukra', 8:'Mangal', 9:'Guru', 10:'Shani', 11:'Shani', 12:'Guru' };
+
+const functionalStatus = {
+    1: { benefics: ['Surya', 'Chandra', 'Mangal', 'Guru'], malefics: ['Budh', 'Shukra', 'Shani'] },
+    2: { benefics: ['Surya', 'Budh', 'Shukra', 'Shani'], malefics: ['Chandra', 'Mangal', 'Guru'] },
+    3: { benefics: ['Shukra', 'Shani'], malefics: ['Surya', 'Mangal', 'Guru'] },
+    4: { benefics: ['Chandra', 'Mangal', 'Guru'], malefics: ['Budh', 'Shukra', 'Shani'] },
+    5: { benefics: ['Surya', 'Mangal', 'Guru'], malefics: ['Budh', 'Shukra', 'Shani'] },
+    6: { benefics: ['Budh', 'Shukra'], malefics: ['Chandra', 'Mangal', 'Guru'] },
+    7: { benefics: ['Budh', 'Shukra', 'Shani'], malefics: ['Surya', 'Mangal', 'Guru'] },
+    8: { benefics: ['Surya', 'Chandra', 'Guru'], malefics: ['Budh', 'Shukra', 'Shani'] },
+    9: { benefics: ['Surya', 'Mangal', 'Guru'], malefics: ['Budh', 'Shukra', 'Shani'] },
+    10: { benefics: ['Budh', 'Shukra', 'Shani'], malefics: ['Chandra', 'Mangal', 'Guru'] },
+    11: { benefics: ['Shukra', 'Shani'], malefics: ['Chandra', 'Mangal', 'Guru'] },
+    12: { benefics: ['Chandra', 'Mangal', 'Guru'], malefics: ['Surya', 'Budh', 'Shukra', 'Shani'] }
+};
 
 const DASHA_CYCLE_YEARS = 120;
 const YEAR_IN_MS = 365.2425 * 24 * 60 * 60 * 1000; 
@@ -102,15 +171,34 @@ const dashaSequence = [
 const levelNames = ["Maha Dasha", "Antar Dasha", "Pratyantar Dasha", "Sookshma Dasha", "Prana Dasha"];
 const NAKSHATRA_DEG = 13.333333; 
 
+// --- GLOBALS ---
 let birthDateMs = 0;
 let currentNowMs = Date.now();
 let activeHierarchy = []; 
 let grahaRegistry = {}; 
 let lagnaSignGlobal = 1;
+let globalMDADTimeline = []; // Stores the flat 120-year timeline for the event scanner
+
+// --- BPHS EVENT ARCHETYPES (HOUSES & KARAKAS) ---
+const eventArchetypes = {
+    "marriage": { houses: [7, 2, 11], karakas: ['Shukra', 'Guru'] },
+    "childbirth": { houses: [5, 9, 11], karakas: ['Guru'] },
+    "family_grief": { houses: [2, 7, 8], karakas: ['Shani', 'Mangal'] }, // Maraka & Ayus houses
+    "education": { houses: [4, 5, 9], karakas: ['Budh', 'Guru'] },
+    "career_rise": { houses: [10, 11, 2], karakas: ['Surya', 'Budh', 'Shani'] },
+    "career_end": { houses: [8, 12], karakas: ['Shani', 'Ketu'] },
+    "wealth_gain": { houses: [2, 11, 9], karakas: ['Guru', 'Shukra'] },
+    "wealth_loss": { houses: [12, 8, 6], karakas: ['Rahu', 'Shani'] },
+    "property": { houses: [4, 11], karakas: ['Mangal', 'Shukra'] },
+    "health_crisis": { houses: [6, 8, 12], karakas: ['Shani', 'Rahu', 'Mangal', 'Ketu'] },
+    "litigation": { houses: [6, 7, 12], karakas: ['Rahu', 'Mangal', 'Shani'] },
+    "travel_foreign": { houses: [9, 12, 3], karakas: ['Rahu', 'Chandra'] },
+    "spiritual": { houses: [9, 5, 12], karakas: ['Guru', 'Ketu'] }
+};
 
 // --- INITIALIZATION ---
 async function initDashaEngine() {
-    const name = localStorage.getItem('dashaName') || 'Pramod';
+    const name = localStorage.getItem('dashaName') || 'Native';
     const rawDate = localStorage.getItem('dashaDate') || '1982-02-11';
     const time = localStorage.getItem('dashaTime') || '11:51:00';
     const lat = localStorage.getItem('dashaLat') || '19.3654';
@@ -137,11 +225,16 @@ async function initDashaEngine() {
             lagnaSignGlobal = data.asc_sign;
             document.getElementById('s_lagna').innerText = `${rashis[lagnaSignGlobal - 1]} (${lagnaSignGlobal})`;
             processBaseDasha(data.houses);
-        } else { document.getElementById('calcStatus').innerText = "API Error: " + data.message; }
+        } else { document.getElementById('calcStatus').innerText = "API Error."; }
     } catch (err) { document.getElementById('calcStatus').innerText = "Network Error."; }
 }
 
-// --- BPHS DIGNITY & VERDICT ENGINE ---
+// --- DIGNITY & LORDSHIP LOGIC ---
+function getLordOfHouse(houseNum) {
+    let signOfHouse = (lagnaSignGlobal + houseNum - 2) % 12 + 1;
+    return signLords[signOfHouse];
+}
+
 function evaluateBPHSDignity(pName, sign, degInSign) {
     if (pName === 'Surya') { if (sign === 1 && degInSign <= 10) return { score: 3, text: "Exalted" }; if (sign === 7 && degInSign <= 10) return { score: -3, text: "Debilitated" }; if (sign === 5) return { score: 2, text: "Own Sign" }; }
     if (pName === 'Chandra') { if (sign === 2 && degInSign <= 3) return { score: 3, text: "Exalted" }; if (sign === 8 && degInSign <= 3) return { score: -3, text: "Debilitated" }; if (sign === 4) return { score: 2, text: "Own Sign" }; }
@@ -160,40 +253,47 @@ function calculateDashaVerdict(lordName, parentLordName, level) {
     if(!planetData) return { class: 'v-neutral', icon: '🟡', text: 'Mixed / Average' };
 
     let totalScore = planetData.dignityScore;
+    let lagnaMap = functionalStatus[lagnaSignGlobal];
+    let functionalText = "";
+    if (lagnaMap) {
+        if (lagnaMap.benefics.includes(lordName)) { totalScore += 2; functionalText = " (Functional Benefic)"; }
+        else if (lagnaMap.malefics.includes(lordName)) { totalScore -= 2; functionalText = " (Functional Malefic)"; }
+    }
     
-    // House Placement Logic (Kendra/Trikona vs Dusthana)
     if ([1, 4, 5, 7, 9, 10].includes(planetData.house)) totalScore += 2;
-    else if ([2, 3, 11].includes(planetData.house)) totalScore += 1;
-    else if ([6, 8, 12].includes(planetData.house)) totalScore -= 2;
+    else if ([3, 6, 8, 12].includes(planetData.house)) totalScore -= 2;
+    else if ([2, 11].includes(planetData.house)) totalScore += 1;
 
-    // Relative Placement for Sub-Dashas (Crucial BPHS Principle)
     let relativeText = "";
     if (level > 0 && parentLordName && grahaRegistry[parentLordName]) {
         let parentSign = grahaRegistry[parentLordName].sign;
         let relativeHouse = (planetData.sign - parentSign + 12) % 12 + 1;
         
-        if ([6, 8, 12].includes(relativeHouse)) {
-            totalScore -= 3; // Shadashtaka or Dwirdwadasha - highly challenging
-            relativeText = `(Placed ${relativeHouse}th from ${parentLordName})`;
-        } else if ([1, 4, 5, 7, 9, 10].includes(relativeHouse)) {
-            totalScore += 2; // Trikona or Kendra from MD - excellent
-            relativeText = `(Placed ${relativeHouse}th from ${parentLordName})`;
-        }
+        if ([6, 8].includes(relativeHouse)) { totalScore -= 4; relativeText = `<br>(Shadashtaka: 6/8 axis from ${parentLordName})`; } 
+        else if (relativeHouse === 12) { totalScore -= 2; relativeText = `<br>(Dwirdwadasha: 12th from ${parentLordName})`; } 
+        else if ([1, 4, 5, 7, 9, 10].includes(relativeHouse)) { totalScore += 3; relativeText = `<br>(Auspicious: ${relativeHouse}th from ${parentLordName})`; } 
+        else if ([3, 11].includes(relativeHouse)) { totalScore += 1; relativeText = `<br>(Upachaya: ${relativeHouse}th from ${parentLordName})`; }
     }
 
-    if (totalScore >= 2) return { class: 'v-good', icon: '🟢', text: `Auspicious ${relativeText}` };
-    if (totalScore <= -2) return { class: 'v-evil', icon: '🔴', text: `Challenging ${relativeText}` };
-    return { class: 'v-neutral', icon: '🟡', text: `Mixed ${relativeText}` };
+    if (totalScore >= 3) return { class: 'v-good', icon: '🟢', text: `Highly Auspicious${functionalText}${relativeText}` };
+    if (totalScore >= 1) return { class: 'v-good', icon: '🟢', text: `Favorable${functionalText}${relativeText}` };
+    if (totalScore <= -3) return { class: 'v-evil', icon: '🔴', text: `Severe Challenge${functionalText}${relativeText}` };
+    if (totalScore <= -1) return { class: 'v-evil', icon: '🔴', text: `Obstacles / Friction${functionalText}${relativeText}` };
+    return { class: 'v-neutral', icon: '🟡', text: `Mixed Results${functionalText}${relativeText}` };
 }
 
-// --- MATH & FORMATTING HELPERS ---
+// --- UTILS ---
 function formatDateTime(ms) {
     const d = new Date(ms);
     return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()} ${d.toTimeString().split(' ')[0]}`;
 }
-function calculateAge(dateMs) { return ((dateMs - birthDateMs) / YEAR_IN_MS).toFixed(1) + "y"; }
+function formatDateShort(ms) {
+    const d = new Date(ms);
+    return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+}
+function calculateAge(dateMs) { return ((dateMs - birthDateMs) / YEAR_IN_MS).toFixed(1); }
 
-// --- CORE RECURSIVE BUILDER ---
+// --- UI RENDER BUILDER ---
 function generateDashaTableHTML(level, parentStartMs, parentDurationMs, startLordIndex, parentLordName = null, isRoot = false) {
     if (level > 4) return ""; 
 
@@ -201,9 +301,9 @@ function generateDashaTableHTML(level, parentStartMs, parentDurationMs, startLor
     if (isRoot || level > 0) {
         html += `<thead><tr>
             <th width="15%">${levelNames[level]}</th>
-            <th width="35%">BPHS Parashari Verdict</th>
-            <th width="20%">Start Date</th>
-            <th width="20%">End Date</th>
+            <th width="45%">BPHS Parashari Verdict</th>
+            <th width="15%">Start Date</th>
+            <th width="15%">End Date</th>
             <th width="10%">Age</th>
         </tr></thead>`;
     }
@@ -214,18 +314,17 @@ function generateDashaTableHTML(level, parentStartMs, parentDurationMs, startLor
     for (let i = 0; i < 9; i++) {
         let index = (startLordIndex + i) % 9;
         let lordData = dashaSequence[index];
-        
         let fraction = lordData.years / DASHA_CYCLE_YEARS;
         let periodDurationMs = parentDurationMs * fraction;
         let periodEndMs = currentPeriodStartMs + periodDurationMs;
 
         let isActive = (currentNowMs >= currentPeriodStartMs && currentNowMs <= periodEndMs);
+        let verdictObj = calculateDashaVerdict(lordData.lord, parentLordName, level);
+
         if (isActive && level <= 2) {
-            let verdict = calculateDashaVerdict(lordData.lord, parentLordName, level);
-            activeHierarchy[level] = { lord: lordData.lord, verdict: verdict.text }; 
+            activeHierarchy[level] = { lord: lordData.lord, verdict: verdictObj.text.replace(/<br>/g, " ") }; 
         }
 
-        let verdictObj = calculateDashaVerdict(lordData.lord, parentLordName, level);
         let rowClass = isActive ? "clickable-row active-dasha" : "clickable-row";
 
         html += `<tr class="${rowClass}" onclick="toggleChild(this, ${level + 1}, ${currentPeriodStartMs}, ${periodDurationMs}, ${index}, '${lordData.lord}')">
@@ -233,7 +332,7 @@ function generateDashaTableHTML(level, parentStartMs, parentDurationMs, startLor
             <td><span class="verdict-badge ${verdictObj.class}">${verdictObj.icon} ${verdictObj.text}</span></td>
             <td>${formatDateTime(currentPeriodStartMs)}</td>
             <td>${formatDateTime(periodEndMs)}</td>
-            <td>${calculateAge(periodEndMs)}</td>
+            <td>${calculateAge(periodEndMs)}y</td>
         </tr>`;
         
         html += `<tr class="child-row"><td colspan="5" class="child-container"></td></tr>`;
@@ -243,7 +342,6 @@ function generateDashaTableHTML(level, parentStartMs, parentDurationMs, startLor
     return html;
 }
 
-// --- INTERACTION LOGIC ---
 function toggleChild(rowElement, nextLevel, startMs, durationMs, lordIndex, parentLordName) {
     if (nextLevel > 4) return; 
     const childRow = rowElement.nextElementSibling;
@@ -258,17 +356,15 @@ function toggleChild(rowElement, nextLevel, startMs, durationMs, lordIndex, pare
     }
 }
 
-// --- INITIAL DATA PROCESSING ---
+// --- DATA PROCESSING & TIMELINE GENERATION ---
 function processBaseDasha(houses) {
     let allBodies = [];
     houses.forEach(h => h.forEach(b => { if (b.abs_deg !== undefined) allBodies.push(b); }));
     
-    // Build Graha Registry for BPHS Grading
     allBodies.forEach(b => {
         let sign = Math.floor(b.abs_deg / 30) + 1;
         let house = (sign - lagnaSignGlobal + 12) % 12 + 1;
         let dignityInfo = evaluateBPHSDignity(b.name, sign, b.deg);
-        
         grahaRegistry[b.name] = { sign: sign, house: house, dignityScore: dignityInfo.score, text: dignityInfo.text };
     });
 
@@ -288,7 +384,6 @@ function processBaseDasha(houses) {
     
     const balanceYearsTotal = fractionRemaining * startLordData.years;
     const balanceMs = balanceYearsTotal * YEAR_IN_MS;
-
     const bY = Math.floor(balanceYearsTotal);
     const bM = Math.floor((balanceYearsTotal - bY) * 12);
     const bD = Math.floor((((balanceYearsTotal - bY) * 12) - bM) * 30);
@@ -297,22 +392,160 @@ function processBaseDasha(houses) {
 
     const theoreticalFirstMDStartMs = birthDateMs - ((startLordData.years * YEAR_IN_MS) - balanceMs);
 
+    // Render visual UI
     const rootHtml = generateDashaTableHTML(0, theoreticalFirstMDStartMs, DASHA_CYCLE_YEARS * YEAR_IN_MS, startLordIndex, null, true);
     document.getElementById('rootDashaContainer').innerHTML = rootHtml;
+
+    // Build Flat MD/AD Timeline for the Event Scanner
+    buildGlobalTimeline(theoreticalFirstMDStartMs, startLordIndex);
 
     generatePrompt();
 }
 
+function buildGlobalTimeline(mdStartMs, startLordIndex) {
+    globalMDADTimeline = [];
+    let currentMDStart = mdStartMs;
+    
+    for (let i = 0; i < 9; i++) {
+        let mdIndex = (startLordIndex + i) % 9;
+        let mdLord = dashaSequence[mdIndex];
+        let mdDuration = (mdLord.years / 120) * (120 * YEAR_IN_MS);
+
+        let currentADStart = currentMDStart;
+        for (let j = 0; j < 9; j++) {
+            let adIndex = (mdIndex + j) % 9;
+            let adLord = dashaSequence[adIndex];
+            let adDuration = (adLord.years / 120) * mdDuration;
+
+            globalMDADTimeline.push({
+                md: mdLord.lord,
+                ad: adLord.lord,
+                startMs: currentADStart,
+                endMs: currentADStart + adDuration
+            });
+            currentADStart += adDuration;
+        }
+        currentMDStart += mdDuration;
+    }
+}
+
+// --- COSMIC EVENT PREDICTOR LOGIC ---
+function findEventTriggers() {
+    const eventKey = document.getElementById('eventSelector').value;
+    const resultsContainer = document.getElementById('predictionResults');
+    
+    if (!eventKey) { alert("Please select an event from the dropdown."); return; }
+    if (globalMDADTimeline.length === 0) { alert("Calculating timeline, please wait."); return; }
+
+    const archetype = eventArchetypes[eventKey];
+    resultsContainer.innerHTML = "<p style='text-align:center; color:#7f8c8d;'>Scanning planetary configurations...</p>";
+
+    // Score all planets as 'Activators' for this specific event
+    let planetScores = {};
+    Object.keys(grahaRegistry).forEach(pName => {
+        let pData = grahaRegistry[pName];
+        let score = 0;
+        let reason = [];
+
+        // Is the planet sitting in a primary/secondary house?
+        if (archetype.houses.includes(pData.house)) {
+            score += 2;
+            reason.push(`Sits in House ${pData.house}`);
+        }
+        // Is the planet the LORD of a primary/secondary house?
+        archetype.houses.forEach(h => {
+            if (getLordOfHouse(h) === pName) {
+                score += 3;
+                reason.push(`Lord of House ${h}`);
+            }
+        });
+        // Is the planet the natural Karaka (significator) for this event?
+        if (archetype.karakas.includes(pName)) {
+            score += 2;
+            reason.push(`Natural Karaka`);
+        }
+
+        if (score > 0) planetScores[pName] = { score: score, reason: reason.join(", ") };
+    });
+
+    // Scan Timeline for High-Scoring MD/AD Overlaps
+    let triggerPeriods = [];
+    
+    globalMDADTimeline.forEach(period => {
+        // Skip periods that ended before the person turned 5 years old (to filter out infant noise for most adult events)
+        let ageAtEnd = parseFloat(calculateAge(period.endMs));
+        let ageAtStart = parseFloat(calculateAge(period.startMs));
+        
+        // Contextual Age filtering
+        if (eventKey === 'marriage' && ageAtEnd < 18) return;
+        if (eventKey === 'career_end' && ageAtStart < 50) return;
+        if (eventKey === 'childbirth' && ageAtEnd < 18) return;
+
+        let mdScore = planetScores[period.md] ? planetScores[period.md].score : 0;
+        let adScore = planetScores[period.ad] ? planetScores[period.ad].score : 0;
+        
+        let totalPower = mdScore + adScore;
+
+        // Mutual Geometry Ruin Check (Avoid predicting marriage in a 6/8 AD)
+        let isDestructive = false;
+        let relativeHouse = 1;
+        if (grahaRegistry[period.md] && grahaRegistry[period.ad]) {
+            let mdSign = grahaRegistry[period.md].sign;
+            relativeHouse = (grahaRegistry[period.ad].sign - mdSign + 12) % 12 + 1;
+            if (relativeHouse === 6 || relativeHouse === 8) isDestructive = true;
+        }
+
+        // Only keep highly activated periods. If it's a destructive event (death/illness/loss), 6/8 is a PLUS. If it's auspicious, 6/8 ruins it.
+        const isNegativeEvent = ['health_crisis', 'litigation', 'wealth_loss', 'family_grief', 'career_end'].includes(eventKey);
+        
+        if (totalPower >= 4) {
+            if (!isNegativeEvent && isDestructive) return; // Auspicious event blocked by 6/8 axis
+            
+            triggerPeriods.push({
+                ...period,
+                power: totalPower,
+                mdReason: planetScores[period.md] ? planetScores[period.md].reason : "No direct link",
+                adReason: planetScores[period.ad] ? planetScores[period.ad].reason : "No direct link",
+                geometry: isNegativeEvent && isDestructive ? "6/8 Mutual Friction triggers crisis" : `${relativeHouse}th from MD Lord`
+            });
+        }
+    });
+
+    // Sort by power descending, limit to top 5
+    triggerPeriods.sort((a, b) => b.power - a.power);
+    let topTriggers = triggerPeriods.slice(0, 6);
+
+    // Render
+    resultsContainer.innerHTML = "";
+    if (topTriggers.length === 0) {
+        resultsContainer.innerHTML = "<p style='color:#e74c3c; font-weight:bold;'>No dominant primary triggers found. Check transit (Gochar) charts for this event.</p>";
+        return;
+    }
+
+    topTriggers.forEach(t => {
+        let isActive = (currentNowMs >= t.startMs && currentNowMs <= t.endMs) ? "<span style='background:#f1c40f; color:#000; padding:2px 6px; border-radius:4px; font-size:10px; margin-left:10px;'>ACTIVE NOW</span>" : "";
+        
+        resultsContainer.innerHTML += `
+            <div class="trigger-card">
+                <h4>🪐 ${t.md} MD &nbsp;➔&nbsp; ${t.ad} AD ${isActive}</h4>
+                <p>📅 <strong>${formatDateShort(t.startMs)}</strong> to <strong>${formatDateShort(t.endMs)}</strong> (Age: ${calculateAge(t.startMs)} - ${calculateAge(t.endMs)})</p>
+                <div class="trigger-reason">
+                    <strong>Why this period?</strong><br>
+                    • <strong>${t.md}</strong> (MD): ${t.mdReason}<br>
+                    • <strong>${t.ad}</strong> (AD): ${t.adReason}<br>
+                    • <strong>Axis:</strong> ${t.geometry}
+                </div>
+            </div>
+        `;
+    });
+}
+
 // --- AI PROMPT GENERATOR ---
 function generatePrompt() {
-    const name = localStorage.getItem('dashaName') || 'Pramod';
-    
+    const name = localStorage.getItem('dashaName') || 'Native';
     let activeString = "Unknown/Future";
     if (activeHierarchy.length > 0) {
-        activeString = `
-1. Mahadasha: ${activeHierarchy[0]?.lord || ''} (${activeHierarchy[0]?.verdict || ''})
-2. Antardasha: ${activeHierarchy[1]?.lord || ''} (${activeHierarchy[1]?.verdict || ''})
-3. Pratyantardasha: ${activeHierarchy[2]?.lord || ''} (${activeHierarchy[2]?.verdict || ''})`;
+        activeString = `\n1. Mahadasha: ${activeHierarchy[0]?.lord || ''} - ${activeHierarchy[0]?.verdict || ''}\n2. Antardasha: ${activeHierarchy[1]?.lord || ''} - ${activeHierarchy[1]?.verdict || ''}\n3. Pratyantardasha: ${activeHierarchy[2]?.lord || ''} - ${activeHierarchy[2]?.verdict || ''}`;
     }
 
     const promptText = `SYSTEM PROTOCOL: Initialize Gemini 3.1 Engine. Expert BPHS Predictive Consultation Mode.
@@ -321,14 +554,13 @@ Client: ${name}
 Lagna: ${rashis[lagnaSignGlobal - 1]}
 Active Dasha Timeline & Mathematical BPHS Verdicts:${activeString}
 
-Act as Maharishi Parashara. The system has already calculated the Sthana Bala (Dignity), Bhava placement, and the mutual geometric relationship (e.g., Shadashtaka, Trikona) between the lords. Based on these calculated verdicts, provide a highly specific, predictive analysis of the real-world events manifesting in the native's life over the next 4 to 8 weeks. Do not provide generic horoscopes; detail specific avenues of growth or exact remedies needed for the challenging placements.`;
+Act as Maharishi Parashara. The system has already calculated the Sthana Bala, Functional Lordship, Bhava placement, and the mutual geometric relationship between the lords. Based on these calculated verdicts, provide a highly specific, predictive analysis of the real-world events manifesting in the native's life over the next 4 to 8 weeks. Detail specific avenues of growth or exact remedies needed for challenging placements.`;
 
     document.getElementById('aiPromptText').innerText = promptText;
 }
 
 function copyAIPrompt() {
-    const text = document.getElementById('aiPromptText').innerText;
-    navigator.clipboard.writeText(text).then(() => { alert('Gemini 3.1 Prompt Copied Successfully!'); });
+    navigator.clipboard.writeText(document.getElementById('aiPromptText').innerText).then(() => { alert('Gemini 3.1 Prompt Copied Successfully!'); });
 }
 
 window.onload = initDashaEngine;
