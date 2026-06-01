@@ -125,16 +125,6 @@
                 </div>
         </div>
 
-        <div class="panel">
-            <h3 style="color: #2c3e50; margin-top:0;">Real-Time AI Analysis (Gemini 3.1)</h3>
-            <p style="font-size: 13px; color: #7f8c8d;">This dynamic prompt incorporates the exact BPHS dignity, functional lordship, and mutual angular relationships of the currently active timeline.</p>
-            <div class="ai-prompt-box">
-                <button onclick="copyAIPrompt()">✨ Copy Prompt</button>
-                <div id="aiPromptText" style="white-space: pre-wrap; font-size: 12px; margin-top: 10px; line-height: 1.5;">
-                    Awaiting generation...
-                </div>
-            </div>
-        </div>
     </div>
 
 <script>
@@ -159,6 +149,18 @@ const functionalStatus = {
     12: { benefics: ['Chandra', 'Mangal', 'Guru'], malefics: ['Surya', 'Budh', 'Shukra', 'Shani'] }
 };
 
+// --- DRISHTI & YUTI REFERENCE ARRAYS ---
+const naturalBenefics = ['Guru', 'Shukra', 'Budh', 'Chandra']; 
+const naturalMalefics = ['Shani', 'Mangal', 'Rahu', 'Ketu', 'Surya'];
+
+const specialAspects = {
+    'Mangal': [4, 7, 8],
+    'Guru': [5, 7, 9],
+    'Shani': [3, 7, 10],
+    'Rahu': [5, 7, 9], 
+    'Ketu': [5, 7, 9]
+};
+
 const DASHA_CYCLE_YEARS = 120;
 const YEAR_IN_MS = 365.2425 * 24 * 60 * 60 * 1000; 
 
@@ -177,23 +179,24 @@ let currentNowMs = Date.now();
 let activeHierarchy = []; 
 let grahaRegistry = {}; 
 let lagnaSignGlobal = 1;
-let globalMDADTimeline = []; // Stores the flat 120-year timeline for the event scanner
+let globalMDADTimeline = []; 
 
-// --- BPHS EVENT ARCHETYPES (HOUSES & KARAKAS) ---
+
+// --- BPHS EVENT ARCHETYPES (HOUSES, KARAKAS, VARGAS & AGE LOGIC) ---
 const eventArchetypes = {
-    "marriage": { houses: [7, 2, 11], karakas: ['Shukra', 'Guru'] },
-    "childbirth": { houses: [5, 9, 11], karakas: ['Guru'] },
-    "family_grief": { houses: [2, 7, 8], karakas: ['Shani', 'Mangal'] }, // Maraka & Ayus houses
-    "education": { houses: [4, 5, 9], karakas: ['Budh', 'Guru'] },
-    "career_rise": { houses: [10, 11, 2], karakas: ['Surya', 'Budh', 'Shani'] },
-    "career_end": { houses: [8, 12], karakas: ['Shani', 'Ketu'] },
-    "wealth_gain": { houses: [2, 11, 9], karakas: ['Guru', 'Shukra'] },
-    "wealth_loss": { houses: [12, 8, 6], karakas: ['Rahu', 'Shani'] },
-    "property": { houses: [4, 11], karakas: ['Mangal', 'Shukra'] },
-    "health_crisis": { houses: [6, 8, 12], karakas: ['Shani', 'Rahu', 'Mangal', 'Ketu'] },
-    "litigation": { houses: [6, 7, 12], karakas: ['Rahu', 'Mangal', 'Shani'] },
-    "travel_foreign": { houses: [9, 12, 3], karakas: ['Rahu', 'Chandra'] },
-    "spiritual": { houses: [9, 5, 12], karakas: ['Guru', 'Ketu'] }
+    "marriage": { houses: [7, 2, 11], karakas: ['Shukra', 'Guru'], varga: 'D9', minAge: 20, maxAge: 55 },
+    "childbirth": { houses: [5, 9, 11], karakas: ['Guru'], varga: 'D7', minAge: 21, maxAge: 48 },
+    "family_grief": { houses: [2, 7, 8], karakas: ['Shani', 'Mangal'], varga: 'D12', minAge: 10, maxAge: 120 }, 
+    "education": { houses: [4, 5, 9], karakas: ['Budh', 'Guru'], varga: 'D24', minAge: 4, maxAge: 30 },
+    "career_rise": { houses: [10, 11, 2], karakas: ['Surya', 'Budh', 'Shani'], varga: 'D10', minAge: 21, maxAge: 65 },
+    "career_end": { houses: [8, 12], karakas: ['Shani', 'Ketu'], varga: 'D10', minAge: 55, maxAge: 75 },
+    "wealth_gain": { houses: [2, 11, 9], karakas: ['Guru', 'Shukra'], varga: 'D2', minAge: 21, maxAge: 80 },
+    "wealth_loss": { houses: [12, 8, 6], karakas: ['Rahu', 'Shani'], varga: 'D2', minAge: 21, maxAge: 80 },
+    "property": { houses: [4, 11], karakas: ['Mangal', 'Shukra'], varga: 'D4', minAge: 25, maxAge: 75 },
+    "health_crisis": { houses: [6, 8, 12], karakas: ['Shani', 'Rahu', 'Mangal', 'Ketu'], varga: 'D3', minAge: 0, maxAge: 120 },
+    "litigation": { houses: [6, 7, 12], karakas: ['Rahu', 'Mangal', 'Shani'], varga: 'D30', minAge: 18, maxAge: 90 },
+    "travel_foreign": { houses: [9, 12, 3], karakas: ['Rahu', 'Chandra'], varga: 'D9', minAge: 15, maxAge: 75 },
+    "spiritual": { houses: [9, 5, 12], karakas: ['Guru', 'Ketu'], varga: 'D20', minAge: 30, maxAge: 120 }
 };
 
 // --- INITIALIZATION ---
@@ -248,6 +251,66 @@ function evaluateBPHSDignity(pName, sign, degInSign) {
     return { score: 0, text: "Neutral State" };
 }
 
+// --- DRISHTI & YUTI CORE ENGINE ---
+function getGeometricRelationship(sourceName, sourceSign, targetSign) {
+    if (sourceSign === targetSign) return 'Conjunction';
+
+    let relativeDistance = (targetSign - sourceSign + 12) % 12 + 1;
+
+    if (specialAspects[sourceName] && specialAspects[sourceName].includes(relativeDistance)) {
+        return 'Aspect';
+    } 
+    else if (relativeDistance === 7) {
+        return 'Aspect';
+    }
+
+    return null;
+}
+
+function applyDrishtiAndYutiModifiers() {
+    let planetNames = Object.keys(grahaRegistry);
+
+    planetNames.forEach(targetName => {
+        let targetData = grahaRegistry[targetName];
+        let aspectModifiers = [];
+        let conjunctionModifiers = [];
+
+        planetNames.forEach(sourceName => {
+            if (targetName === sourceName) return; 
+
+            let sourceData = grahaRegistry[sourceName];
+            let relationship = getGeometricRelationship(sourceName, sourceData.sign, targetData.sign);
+
+            if (relationship) {
+                let influenceScore = 0;
+                let influenceText = "";
+
+                if (naturalBenefics.includes(sourceName)) {
+                    influenceScore = 1;
+                    influenceText = `Benefic ${relationship} from ${sourceName}`;
+                } else if (naturalMalefics.includes(sourceName)) {
+                    influenceScore = -1;
+                    influenceText = `Malefic ${relationship} from ${sourceName}`;
+                }
+
+                targetData.dignityScore += influenceScore;
+
+                if (relationship === 'Conjunction') conjunctionModifiers.push(influenceText);
+                if (relationship === 'Aspect') aspectModifiers.push(influenceText);
+            }
+        });
+
+        let modifierStrings = [];
+        if (conjunctionModifiers.length > 0) modifierStrings.push(conjunctionModifiers.join(', '));
+        if (aspectModifiers.length > 0) modifierStrings.push(aspectModifiers.join(', '));
+        
+        targetData.influenceText = modifierStrings.length > 0 ? `<br><b>Influences:</b> ${modifierStrings.join(' | ')}` : "";
+        
+        if (targetData.dignityScore > 4) targetData.dignityScore = 4;
+        if (targetData.dignityScore < -4) targetData.dignityScore = -4;
+    });
+}
+
 function calculateDashaVerdict(lordName, parentLordName, level) {
     let planetData = grahaRegistry[lordName];
     if(!planetData) return { class: 'v-neutral', icon: '🟡', text: 'Mixed / Average' };
@@ -275,11 +338,13 @@ function calculateDashaVerdict(lordName, parentLordName, level) {
         else if ([3, 11].includes(relativeHouse)) { totalScore += 1; relativeText = `<br>(Upachaya: ${relativeHouse}th from ${parentLordName})`; }
     }
 
-    if (totalScore >= 3) return { class: 'v-good', icon: '🟢', text: `Highly Auspicious${functionalText}${relativeText}` };
-    if (totalScore >= 1) return { class: 'v-good', icon: '🟢', text: `Favorable${functionalText}${relativeText}` };
-    if (totalScore <= -3) return { class: 'v-evil', icon: '🔴', text: `Severe Challenge${functionalText}${relativeText}` };
-    if (totalScore <= -1) return { class: 'v-evil', icon: '🔴', text: `Obstacles / Friction${functionalText}${relativeText}` };
-    return { class: 'v-neutral', icon: '🟡', text: `Mixed Results${functionalText}${relativeText}` };
+    let infText = planetData.influenceText || "";
+
+    if (totalScore >= 3) return { class: 'v-good', icon: '🟢', text: `Highly Auspicious${functionalText}${relativeText}${infText}` };
+    if (totalScore >= 1) return { class: 'v-good', icon: '🟢', text: `Favorable${functionalText}${relativeText}${infText}` };
+    if (totalScore <= -3) return { class: 'v-evil', icon: '🔴', text: `Severe Challenge${functionalText}${relativeText}${infText}` };
+    if (totalScore <= -1) return { class: 'v-evil', icon: '🔴', text: `Obstacles / Friction${functionalText}${relativeText}${infText}` };
+    return { class: 'v-neutral', icon: '🟡', text: `Mixed Results${functionalText}${relativeText}${infText}` };
 }
 
 // --- UTILS ---
@@ -368,6 +433,9 @@ function processBaseDasha(houses) {
         grahaRegistry[b.name] = { sign: sign, house: house, dignityScore: dignityInfo.score, text: dignityInfo.text };
     });
 
+    // Run the Drishti & Yuti Engine
+    applyDrishtiAndYutiModifiers();
+
     const moon = allBodies.find(b => b.name === 'Chandra');
     if (!moon) return;
 
@@ -429,7 +497,6 @@ function buildGlobalTimeline(mdStartMs, startLordIndex) {
     }
 }
 
-// --- COSMIC EVENT PREDICTOR LOGIC ---
 function findEventTriggers() {
     const eventKey = document.getElementById('eventSelector').value;
     const resultsContainer = document.getElementById('predictionResults');
@@ -438,55 +505,67 @@ function findEventTriggers() {
     if (globalMDADTimeline.length === 0) { alert("Calculating timeline, please wait."); return; }
 
     const archetype = eventArchetypes[eventKey];
-    resultsContainer.innerHTML = "<p style='text-align:center; color:#7f8c8d;'>Scanning planetary configurations...</p>";
+    resultsContainer.innerHTML = "<p style='text-align:center; color:#7f8c8d;'>Scanning multidimensional planetary configurations...</p>";
 
-    // Score all planets as 'Activators' for this specific event
+    // --- PHASE 1: COMPOSITE SCORING (D1 + VARGA) ---
     let planetScores = {};
     Object.keys(grahaRegistry).forEach(pName => {
         let pData = grahaRegistry[pName];
         let score = 0;
         let reason = [];
 
-        // Is the planet sitting in a primary/secondary house?
+        // 1. Evaluate D1 (Physical Promise)
         if (archetype.houses.includes(pData.house)) {
             score += 2;
-            reason.push(`Sits in House ${pData.house}`);
+            reason.push(`Sits in D1 House ${pData.house}`);
         }
-        // Is the planet the LORD of a primary/secondary house?
         archetype.houses.forEach(h => {
             if (getLordOfHouse(h) === pName) {
                 score += 3;
-                reason.push(`Lord of House ${h}`);
+                reason.push(`Lord of D1 House ${h}`);
             }
         });
-        // Is the planet the natural Karaka (significator) for this event?
         if (archetype.karakas.includes(pName)) {
             score += 2;
             reason.push(`Natural Karaka`);
         }
 
+        // 2. Evaluate Varga (The Delivery - e.g., D9 for Marriage)
+        // Note: This assumes you have stored varga data in a global 'vargaRegistry' from your Python API
+        if (typeof vargaRegistry !== 'undefined' && vargaRegistry[archetype.varga] && vargaRegistry[archetype.varga][pName]) {
+            let vargaHouse = vargaRegistry[archetype.varga][pName].house;
+            
+            // If the planet sits in a Kendra/Trikona or the target houses in the relevant Varga, boost the score heavily
+            if ([1, 4, 5, 7, 9, 10].includes(vargaHouse) || archetype.houses.includes(vargaHouse)) {
+                score += 3; 
+                reason.push(`Excellent placement in ${archetype.varga}`);
+            } else if ([6, 8, 12].includes(vargaHouse)) {
+                score -= 2; // Penalty: Promises in D1, but denied in Varga
+                reason.push(`Frictional placement in ${archetype.varga}`);
+            }
+        } else {
+            // Fallback if API hasn't sent Varga data yet
+            reason.push(`(${archetype.varga} pending verification)`);
+        }
+
         if (score > 0) planetScores[pName] = { score: score, reason: reason.join(", ") };
     });
 
-    // Scan Timeline for High-Scoring MD/AD Overlaps
+    // --- PHASE 2: TIMELINE SCANNING & AGE GATING (KAAL) ---
     let triggerPeriods = [];
     
     globalMDADTimeline.forEach(period => {
-        // Skip periods that ended before the person turned 5 years old (to filter out infant noise for most adult events)
         let ageAtEnd = parseFloat(calculateAge(period.endMs));
         let ageAtStart = parseFloat(calculateAge(period.startMs));
         
-        // Contextual Age filtering
-        if (eventKey === 'marriage' && ageAtEnd < 18) return;
-        if (eventKey === 'career_end' && ageAtStart < 50) return;
-        if (eventKey === 'childbirth' && ageAtEnd < 18) return;
+        // STRICT AGE GATING: If the period happens entirely outside the logical life window, ignore it.
+        if (ageAtEnd < archetype.minAge || ageAtStart > archetype.maxAge) return;
 
         let mdScore = planetScores[period.md] ? planetScores[period.md].score : 0;
         let adScore = planetScores[period.ad] ? planetScores[period.ad].score : 0;
         
         let totalPower = mdScore + adScore;
 
-        // Mutual Geometry Ruin Check (Avoid predicting marriage in a 6/8 AD)
         let isDestructive = false;
         let relativeHouse = 1;
         if (grahaRegistry[period.md] && grahaRegistry[period.ad]) {
@@ -495,30 +574,27 @@ function findEventTriggers() {
             if (relativeHouse === 6 || relativeHouse === 8) isDestructive = true;
         }
 
-        // Only keep highly activated periods. If it's a destructive event (death/illness/loss), 6/8 is a PLUS. If it's auspicious, 6/8 ruins it.
         const isNegativeEvent = ['health_crisis', 'litigation', 'wealth_loss', 'family_grief', 'career_end'].includes(eventKey);
         
         if (totalPower >= 4) {
-            if (!isNegativeEvent && isDestructive) return; // Auspicious event blocked by 6/8 axis
+            if (!isNegativeEvent && isDestructive) return; 
             
             triggerPeriods.push({
                 ...period,
                 power: totalPower,
-                mdReason: planetScores[period.md] ? planetScores[period.md].reason : "No direct link",
-                adReason: planetScores[period.ad] ? planetScores[period.ad].reason : "No direct link",
+                mdReason: planetScores[period.md] ? planetScores[period.md].reason : "No direct D1 link",
+                adReason: planetScores[period.ad] ? planetScores[period.ad].reason : "No direct D1 link",
                 geometry: isNegativeEvent && isDestructive ? "6/8 Mutual Friction triggers crisis" : `${relativeHouse}th from MD Lord`
             });
         }
     });
 
-    // Sort by power descending, limit to top 5
     triggerPeriods.sort((a, b) => b.power - a.power);
-    let topTriggers = triggerPeriods.slice(0, 6);
+    let topTriggers = triggerPeriods.slice(0, 5);
 
-    // Render
     resultsContainer.innerHTML = "";
     if (topTriggers.length === 0) {
-        resultsContainer.innerHTML = "<p style='color:#e74c3c; font-weight:bold;'>No dominant primary triggers found. Check transit (Gochar) charts for this event.</p>";
+        resultsContainer.innerHTML = `<p style='color:#e74c3c; font-weight:bold;'>No dominant primary triggers found between ages ${archetype.minAge}-${archetype.maxAge}. Check transit (Gochar) charts.</p>`;
         return;
     }
 
