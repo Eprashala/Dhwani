@@ -8,7 +8,9 @@
     
     <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/3.4.1/tailwind.min.js"></script> <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nosleep/0.12.0/NoSleep.min.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -449,7 +451,8 @@
 
     <script>
         // --- 1. GLOBALS & INIT ---
-        let wakeLock = null;
+		let noSleep = new NoSleep();
+        let isAwake = false;
         let cropper = null;
         let recognition = null;
         let synth = window.speechSynthesis;
@@ -1261,11 +1264,22 @@ async function requestAppPermissions() {
             }
         });
 
-        function setupEventListeners() {
+
+			function setupEventListeners() {
             // Master Click Handler: App Initialization & Auto-Closing Panels
             document.body.addEventListener('click', (e) => {
-                // Initialize fullscreen and wake lock on any tap
-                requestAppPermissions();
+                
+                // 1. Force Fullscreen
+                if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+                    try { document.documentElement.requestFullscreen(); } catch (err) {}
+                }
+                
+                // 2. Bulletproof Wake Lock (NoSleep.js)
+                if (!isAwake) {
+                    noSleep.enable();
+                    isAwake = true;
+                    console.log("NoSleep enabled.");
+                }
 
                 const tag = e.target.tagName;
                 const isInteractive = ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'LABEL'].includes(tag);
