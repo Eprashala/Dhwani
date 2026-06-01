@@ -50,10 +50,6 @@
         .trigger-card h4 { margin: 0 0 5px 0; color: #2c3e50; display: flex; justify-content: space-between; }
         .trigger-card p { margin: 0; font-size: 13px; color: #7f8c8d; }
         .trigger-reason { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #ecf0f1; font-size: 12px; color: #34495e; background: #f8f9fa; padding: 8px; border-radius: 4px; }
-
-        .ai-prompt-box { background: #1e293b; color: #e2e8f0; padding: 20px; border-radius: 8px; font-family: monospace; }
-        .ai-prompt-box button { background: #27ae60; border: none; color: white; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; float: right; transition: 0.2s; }
-        .ai-prompt-box button:hover { background: #219a52; }
     </style>
 </head>
 <body>
@@ -88,7 +84,7 @@
             <h3 style="margin: 0; color: #d35400; display: flex; align-items: center; gap: 8px;">
                 🎯 Cosmic Event Predictor
             </h3>
-            <p style="font-size: 13px; color: #555; margin-top: 5px;">Select a major life event. The engine will scan your 120-year Dasha timeline, cross-reference your specific Bhavas (Houses) and Karakas (Significators), and reveal the exact periods mathematically aligned for this event to manifest.</p>
+            <p style="font-size: 13px; color: #555; margin-top: 5px;">Select a major life event. The engine will scan your 120-year Dasha timeline, cross-reference your specific Bhavas (Houses), Karakas (Significators), and Divisional Charts (Vargas) to reveal the exact periods mathematically aligned for this event to manifest.</p>
             
             <select class="event-select" id="eventSelector">
                 <option value="" disabled selected>-- Select a Life Event to Predict --</option>
@@ -178,6 +174,7 @@ let birthDateMs = 0;
 let currentNowMs = Date.now();
 let activeHierarchy = []; 
 let grahaRegistry = {}; 
+let vargaRegistry = {}; // Explicitly added to store D9/D10 calculations
 let lagnaSignGlobal = 1;
 let globalMDADTimeline = []; 
 
@@ -217,19 +214,34 @@ async function initDashaEngine() {
     birthDateMs = new Date(`${rawDate}T${time}`).getTime();
 
     try {
-        const response = await fetch('https://eprashala.pythonanywhere.com/calculate', { 
+        // NOTE: Change this URL to https://eprashala.pythonanywhere.com/calculate if you deployed your backend!
+		const response = await fetch('https://eprashala.pythonanywhere.com/calculate', { 
             method: 'POST', headers: { 'Content-Type': 'application/json' }, 
             body: JSON.stringify({ date: rawDate, time: time, lat: lat, lon: lon }) 
         });
         
+        // --- NEW: CATCH PYTHON 500 HTML CRASHES ---
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`Server Error ${response.status}. Check Python Terminal!`);
+        }
+
         const data = await response.json();
+        
         if (data.status === 'success') {
             document.getElementById('calcStatus').innerText = "Vedic Core Initialized.";
             lagnaSignGlobal = data.asc_sign;
+            vargaRegistry = data.vargas || {}; 
             document.getElementById('s_lagna').innerText = `${rashis[lagnaSignGlobal - 1]} (${lagnaSignGlobal})`;
             processBaseDasha(data.houses);
-        } else { document.getElementById('calcStatus').innerText = "API Error."; }
-    } catch (err) { document.getElementById('calcStatus').innerText = "Network Error."; }
+        } else { 
+            document.getElementById('calcStatus').innerText = "API Error: " + data.message; 
+        }
+    } catch (err) { 
+        // --- NEW: PRINT THE EXACT ERROR TO THE SCREEN ---
+        console.error("Vedic Engine Calculation Error:", err);
+        document.getElementById('calcStatus').innerHTML = `<span style="color: red; font-weight: bold;">CRASH: ${err.message}</span>`; 
+    }
 }
 
 // --- DIGNITY & LORDSHIP LOGIC ---
@@ -466,8 +478,6 @@ function processBaseDasha(houses) {
 
     // Build Flat MD/AD Timeline for the Event Scanner
     buildGlobalTimeline(theoreticalFirstMDStartMs, startLordIndex);
-
-    generatePrompt();
 }
 
 function buildGlobalTimeline(mdStartMs, startLordIndex) {
@@ -531,7 +541,6 @@ function findEventTriggers() {
         }
 
         // 2. Evaluate Varga (The Delivery - e.g., D9 for Marriage)
-        // Note: This assumes you have stored varga data in a global 'vargaRegistry' from your Python API
         if (typeof vargaRegistry !== 'undefined' && vargaRegistry[archetype.varga] && vargaRegistry[archetype.varga][pName]) {
             let vargaHouse = vargaRegistry[archetype.varga][pName].house;
             
@@ -614,29 +623,6 @@ function findEventTriggers() {
             </div>
         `;
     });
-}
-
-// --- AI PROMPT GENERATOR ---
-function generatePrompt() {
-    const name = localStorage.getItem('dashaName') || 'Native';
-    let activeString = "Unknown/Future";
-    if (activeHierarchy.length > 0) {
-        activeString = `\n1. Mahadasha: ${activeHierarchy[0]?.lord || ''} - ${activeHierarchy[0]?.verdict || ''}\n2. Antardasha: ${activeHierarchy[1]?.lord || ''} - ${activeHierarchy[1]?.verdict || ''}\n3. Pratyantardasha: ${activeHierarchy[2]?.lord || ''} - ${activeHierarchy[2]?.verdict || ''}`;
-    }
-
-    const promptText = `SYSTEM PROTOCOL: Initialize Gemini 3.1 Engine. Expert BPHS Predictive Consultation Mode.
-
-Client: ${name}
-Lagna: ${rashis[lagnaSignGlobal - 1]}
-Active Dasha Timeline & Mathematical BPHS Verdicts:${activeString}
-
-Act as Maharishi Parashara. The system has already calculated the Sthana Bala, Functional Lordship, Bhava placement, and the mutual geometric relationship between the lords. Based on these calculated verdicts, provide a highly specific, predictive analysis of the real-world events manifesting in the native's life over the next 4 to 8 weeks. Detail specific avenues of growth or exact remedies needed for challenging placements.`;
-
-    document.getElementById('aiPromptText').innerText = promptText;
-}
-
-function copyAIPrompt() {
-    navigator.clipboard.writeText(document.getElementById('aiPromptText').innerText).then(() => { alert('Gemini 3.1 Prompt Copied Successfully!'); });
 }
 
 window.onload = initDashaEngine;
