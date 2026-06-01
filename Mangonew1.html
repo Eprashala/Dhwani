@@ -74,7 +74,7 @@
         }
     </style>
 </head>
-<body class="text-slate-800 dark:text-slate-200 h-screen overflow-hidden flex relative">
+<body class="text-slate-800 dark:text-slate-200 h-[100dvh] overflow-hidden flex relative" id="app-body">
 
     <div id="splash-screen" class="fixed inset-0 bg-yellow-400 dark:bg-yellow-600 flex flex-col items-center justify-center z-[9999]">
         <div class="text-9xl mango-bounce">🥭</div>
@@ -564,7 +564,7 @@
             btnToggleLeftHndl: document.getElementById('btn-toggle-left-handle')
         };
 
-        window.onload = () => {
+window.onload = () => {
             setTimeout(() => { document.getElementById('splash-screen').style.display = 'none'; }, 800);
             
             LANGUAGES.forEach(l => {
@@ -587,8 +587,35 @@
             switchChat(state.activeChatId);
             initSpeechRecognition();
             setupEventListeners();
-        };
 
+            // --- MOBILE KEYBOARD OVERLAP FIX ---
+            const appBody = document.getElementById('app-body');
+            const adjustHeight = () => {
+                // Calculate actual visible height
+                const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+                appBody.style.height = `${vh}px`;
+                
+                // Scroll the chat log to the bottom so the latest message isn't hidden by the keyboard jump
+                if (DOM.log) {
+                    setTimeout(() => { DOM.log.scrollTop = DOM.log.scrollHeight; }, 50);
+                }
+            };
+
+            // Listen for keyboard popping up or hiding
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', adjustHeight);
+            } else {
+                window.addEventListener('resize', adjustHeight);
+            }
+            
+            // Backup trigger: when they actually tap the input box
+            DOM.textIn.addEventListener('focus', () => {
+                setTimeout(adjustHeight, 300); // 300ms allows the Android keyboard animation to finish
+            });
+            
+            adjustHeight(); // Run once to set initial state
+            // -----------------------------------
+        };
         function getActiveChat() { return state.chats.find(c => c.id === state.activeChatId) || state.chats[0]; }
         function getActivePersona() { 
             const chat = getActiveChat(); 
