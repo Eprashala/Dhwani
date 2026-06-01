@@ -986,6 +986,7 @@
         let yogas = [];
         let pMap = {};
         
+        // Filter out non-planets and disabled planets
         renderBodies.forEach(b => { 
             if(b.name !== 'Earth' && document.getElementById('cb_'+b.name) && document.getElementById('cb_'+b.name).checked) {
                 pMap[b.name] = b; 
@@ -995,13 +996,22 @@
         let hMap = {};
         for(let i=1; i<=12; i++) hMap[i] = [];
         
+        // Map planets to their calculated houses for the current divisional chart
         Object.values(pMap).forEach(b => { 
             let planetVargaSign = calculateVargaSign(b.abs_deg, currentChartType);
             b.calcHouse = ((planetVargaSign - vargaAscSign + 12) % 12) + 1;
             hMap[b.calcHouse].push(b.name);
         });
 
-        // 1. Pancha Mahapurusha Yogas (Mars, Mercury, Jupiter, Venus, Saturn in Kendra + Own/Ucha)
+        // Helper function to find the lord of a specific house
+        function getLordOfHouse(houseNum) {
+            let sign = (vargaAscSign + houseNum - 2) % 12;
+            return rashiSwamis[sign];
+        }
+
+        // --- 1. MAJOR YOGAS (AUSPICIOUS) ---
+
+        // Pancha Mahapurusha Yogas (Mars, Mercury, Jupiter, Venus, Saturn in Kendra + Own/Ucha)
         const mpMap = {'Mangal': 'Ruchaka', 'Budh': 'Bhadra', 'Guru': 'Hamsa', 'Shukra': 'Malavya', 'Shani': 'Sasa'};
         ['Mangal', 'Budh', 'Guru', 'Shukra', 'Shani'].forEach(p => {
             if (pMap[p] && [1, 4, 7, 10].includes(pMap[p].calcHouse)) {
@@ -1014,7 +1024,7 @@
             }
         });
 
-        // 2. Gaja Kesari Yoga (Jupiter in Kendra from Moon)
+        // Gaja Kesari Yoga (Jupiter in Kendra from Moon)
         if (pMap['Chandra'] && pMap['Guru']) {
             let dist = (pMap['Guru'].calcHouse - pMap['Chandra'].calcHouse + 12) % 12;
             if ([0, 3, 6, 9].includes(dist)) {
@@ -1022,12 +1032,61 @@
             }
         }
 
-        // 3. Budhaditya Yoga (Sun + Mercury)
+        // Budhaditya Yoga (Sun + Mercury)
         if (pMap['Surya'] && pMap['Budh'] && pMap['Surya'].calcHouse === pMap['Budh'].calcHouse) {
             yogas.push({ name: 'Budhaditya Yoga', type: 'yoga', planets: ['Surya', 'Budh'], houses: [pMap['Surya'].calcHouse], color: '#f59e0b' });
         }
 
-        // 4. Conjunction Doshas
+        // Chandra-Mangala Yoga (Moon + Mars)
+        if (pMap['Chandra'] && pMap['Mangal'] && pMap['Chandra'].calcHouse === pMap['Mangal'].calcHouse) {
+            yogas.push({ name: 'Chandra-Mangala Yoga', type: 'yoga', planets: ['Chandra', 'Mangal'], houses: [pMap['Chandra'].calcHouse], color: '#38bdf8' });
+        }
+
+        // Dharma Karmadhipati Yoga (9th Lord + 10th Lord Conjunct)
+        let lord9 = getLordOfHouse(9);
+        let lord10 = getLordOfHouse(10);
+        if (pMap[lord9] && pMap[lord10] && pMap[lord9].calcHouse === pMap[lord10].calcHouse) {
+             yogas.push({ name: 'Dharma Karmadhipati Yoga', type: 'yoga', planets: [lord9, lord10], houses: [pMap[lord9].calcHouse], color: '#fcd34d' });
+        }
+
+        // Maha Dhana Yoga (2nd Lord + 11th Lord Conjunct)
+        let lord2 = getLordOfHouse(2);
+        let lord11 = getLordOfHouse(11);
+        if (pMap[lord2] && pMap[lord11] && pMap[lord2].calcHouse === pMap[lord11].calcHouse) {
+            yogas.push({ name: 'Maha Dhana Yoga', type: 'yoga', planets: [lord2, lord11], houses: [pMap[lord2].calcHouse], color: '#10b981' });
+        }
+
+        // Vipreet Raja Yoga (Dusthana Lords placed in Dusthana Houses)
+        [6, 8, 12].forEach(dusthana => {
+            let lord = getLordOfHouse(dusthana);
+            if (pMap[lord] && [6, 8, 12].includes(pMap[lord].calcHouse)) {
+                yogas.push({ name: 'Vipreet Raja Yoga', type: 'yoga', planets: [lord], houses: [pMap[lord].calcHouse], color: '#4ade80' });
+            }
+        });
+
+        // Lunar Yogas: Sunapha, Anapha, Durdhura, and Kemadruma
+        if (pMap['Chandra']) {
+            let moonH = pMap['Chandra'].calcHouse;
+            let h2 = (moonH % 12) + 1;
+            let h12 = (moonH + 10) % 12 + 1;
+            
+            let pIn2 = hMap[h2].filter(p => !['Surya', 'Rahu', 'Ketu'].includes(p));
+            let pIn12 = hMap[h12].filter(p => !['Surya', 'Rahu', 'Ketu'].includes(p));
+            
+            if (pIn2.length > 0 && pIn12.length > 0) {
+                yogas.push({ name: 'Durdhura Yoga', type: 'yoga', planets: ['Chandra'], houses: [moonH], color: '#a78bfa' });
+            } else if (pIn2.length > 0) {
+                yogas.push({ name: 'Sunapha Yoga', type: 'yoga', planets: ['Chandra'], houses: [moonH], color: '#818cf8' });
+            } else if (pIn12.length > 0) {
+                yogas.push({ name: 'Anapha Yoga', type: 'yoga', planets: ['Chandra'], houses: [moonH], color: '#818cf8' });
+            } else {
+                yogas.push({ name: 'Kemadruma Dosha', type: 'dosha', planets: ['Chandra'], houses: [moonH], color: '#94a3b8' });
+            }
+        }
+
+        // --- 2. MAJOR DOSHAS (CHALLENGING) ---
+
+        // Conjunction Doshas
         for(let h=1; h<=12; h++) {
             let occ = hMap[h];
             if (occ.includes('Guru') && (occ.includes('Rahu') || occ.includes('Ketu'))) {
@@ -1041,11 +1100,52 @@
                 let nod = occ.includes('Rahu') ? 'Rahu' : 'Ketu';
                 yogas.push({ name: 'Grahan Dosha', type: 'dosha', planets: [lum, nod], houses: [h], color: '#8b5cf6' });
             }
+            if (occ.includes('Shani') && occ.includes('Rahu')) {
+                yogas.push({ name: 'Shrapit Dosha', type: 'dosha', planets: ['Shani', 'Rahu'], houses: [h], color: '#7c2d12' });
+            }
         }
 
-        // 5. Kuja (Mangalik) Dosha
+        // Pitra Dosha (Sun or 9th Lord afflicted by Nodes)
+        if (pMap['Surya'] && (hMap[pMap['Surya'].calcHouse].includes('Rahu') || hMap[pMap['Surya'].calcHouse].includes('Ketu'))) {
+            yogas.push({ name: 'Pitra Dosha (Surya)', type: 'dosha', planets: ['Surya'], houses: [pMap['Surya'].calcHouse], color: '#991b1b' });
+        } else if (pMap[lord9] && (hMap[pMap[lord9].calcHouse].includes('Rahu') || hMap[pMap[lord9].calcHouse].includes('Ketu'))) {
+            yogas.push({ name: 'Pitra Dosha (9th Lord)', type: 'dosha', planets: [lord9], houses: [pMap[lord9].calcHouse], color: '#991b1b' });
+        }
+
+        // Mangalik (Kuja) Dosha
         if (pMap['Mangal'] && [1, 4, 7, 8, 12].includes(pMap['Mangal'].calcHouse)) {
             yogas.push({ name: 'Mangalik (Kuja) Dosha', type: 'dosha', planets: ['Mangal'], houses: [pMap['Mangal'].calcHouse], color: '#dc2626' });
+        }
+
+        // Gandmool Dosha (Moon in Mercury or Ketu ruled Nakshatras)
+        if (pMap['Chandra']) {
+            let nakIdx = Math.floor(pMap['Chandra'].abs_deg / (360/27));
+            if ([0, 8, 9, 17, 18, 26].includes(nakIdx)) {
+                yogas.push({ name: 'Gandmool Dosha', type: 'dosha', planets: ['Chandra'], houses: [pMap['Chandra'].calcHouse], color: '#be123c' });
+            }
+        }
+
+        // Kaal Sarp Dosha (All 7 primary planets hemmed between Rahu and Ketu axis)
+        if (pMap['Rahu'] && pMap['Ketu']) {
+            let rDeg = pMap['Rahu'].abs_deg;
+            let kDeg = pMap['Ketu'].abs_deg;
+            let checkSide1 = true; 
+            let checkSide2 = true; 
+            
+            ['Surya', 'Chandra', 'Mangal', 'Budh', 'Guru', 'Shukra', 'Shani'].forEach(p => {
+                if(pMap[p]) {
+                    let deg = pMap[p].abs_deg;
+                    let minDeg = Math.min(rDeg, kDeg);
+                    let maxDeg = Math.max(rDeg, kDeg);
+                    
+                    if (deg > minDeg && deg < maxDeg) checkSide2 = false;
+                    else checkSide1 = false;
+                }
+            });
+            
+            if (checkSide1 || checkSide2) {
+                yogas.push({ name: 'Kaal Sarp Dosha', type: 'dosha', planets: ['Rahu', 'Ketu'], houses: [pMap['Rahu'].calcHouse, pMap['Ketu'].calcHouse], color: '#4c1d95' });
+            }
         }
 
         return yogas;
