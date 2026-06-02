@@ -176,10 +176,14 @@
                             <option value="D40">D40 - Khavedamsha (Maternal Ancestry)</option>
                             <option value="D45">D45 - Akshavedamsha (Paternal Ancestry)</option>
                             <option value="D60">D60 - Shashtiamsha (Past Life Karma)</option>
-							<option value="D60">D60 - Shashtiamsha (Past Life Karma)</option>
 							<option disabled>──────────</option>
 							<option value="PRASHNA">Prashna Kundali (Current Time/Loc)</option>
 							<option value="GOCHAR">Gochar Kundali (Mapped to natal lagna)</option>
+							<option disabled>──────────</option>
+							<option value="DS">DS - Surya Kundali (Sun Chart)</option>
+							<option value="DM">DM - Chandra Kundali (Moon Chart)</option>
+							<option value="CC">CC - Bhava Chalit (Equal House)</option>
+							<option disabled>──────────</option>
 			
                         </select>
                     </div>
@@ -380,9 +384,9 @@ function switchChart(type) {
     } else if (type === 'GOCHAR') {
         document.getElementById('gocharModalOverlay').classList.add('active');
         return; 
-    } else if (type === 'D1' && natalSkyData) {
-        // If returning to D1, restore the original Natal Data from cache!
-        skyData = JSON.parse(JSON.stringify(natalSkyData));
+	} else if (['D1', 'DS', 'DM', 'CC'].includes(type) && natalSkyData) {
+    // If returning to D1 variants, restore the original Natal Data from cache!
+    skyData = JSON.parse(JSON.stringify(natalSkyData));
         asc_sign_global = natalAscSign;
         asc_degree_global = natalAscDegree;
         globalScores = natalScores;
@@ -401,12 +405,15 @@ function updateLedgerView() {
     const listDiv = document.getElementById('rankingList');
     const ledgerHeader = document.querySelector('.ledger-panel .ledger-header');
 
-    if (currentChartType === 'D1' || currentChartType === 'PRASHNA' || currentChartType === 'GOCHAR') {
-        ledgerHeader.style.display = 'flex';
-        
-        let title = "Parashari Sthana & Dig Bala Ledger";
-        if (currentChartType === 'PRASHNA') title = "Prashna (Horary) Sthana & Dig Bala Ledger";
-        if (currentChartType === 'GOCHAR') title = "Gochar (Transit) Sthana & Dig Bala Ledger";
+	if (['D1', 'PRASHNA', 'GOCHAR', 'DS', 'DM', 'CC'].includes(currentChartType)) {
+    ledgerHeader.style.display = 'flex';
+    
+    let title = "Parashari Sthana & Dig Bala Ledger";
+    if (currentChartType === 'PRASHNA') title = "Prashna (Horary) Sthana & Dig Bala Ledger";
+    if (currentChartType === 'GOCHAR') title = "Gochar (Transit) Sthana & Dig Bala Ledger";
+    if (currentChartType === 'DS') title = "Surya Kundali (Sun Chart) Ledger";
+    if (currentChartType === 'DM') title = "Chandra Kundali (Moon Chart) Ledger";
+    if (currentChartType === 'CC') title = "Bhava Chalit (Equal House) Ledger";
         
         document.querySelector('.ledger-panel .ledger-header h3').innerText = title;
         listDiv.style.display = 'grid'; 
@@ -449,7 +456,7 @@ function getDivisionalSign(absoluteDegree, chartType) {
         case 'D12': part = Math.floor(degInRashi / 2.5); return ((rashi + part - 1) % 12) + 1;
         case 'D16': part = Math.floor(degInRashi / (30 / 16)); startSign = modality === 1 ? 1 : (modality === 2 ? 5 : 9); return ((startSign + part - 1) % 12) + 1;
         case 'D20': part = Math.floor(degInRashi / 1.5); startSign = modality === 1 ? 1 : (modality === 2 ? 9 : 5); return ((startSign + part - 1) % 12) + 1;
-        case 'D24': part = Math.floor(degInRashi / 1.25); startSign = isOdd ? 1 : 4; return ((startSign + part - 1) % 12) + 1;
+		case 'D24': part = Math.floor(degInRashi / 1.25); startSign = isOdd ? 5 : 4; return ((startSign + part - 1) % 12) + 1;
         case 'D27': part = Math.floor(degInRashi / (30 / 27)); startSign = element === 1 ? 1 : (element === 2 ? 4 : (element === 3 ? 7 : 10)); return ((startSign + part - 1) % 12) + 1;
         case 'D30':
             if (isOdd) {
@@ -611,40 +618,87 @@ function populateKundali(houses, ascSign) {
     houses.forEach(h => h.forEach(b => { if (b.abs_deg !== undefined) allBodies.push(b); }));
 
     let karakaMap = calculateJaiminiKarakas(allBodies);
-    let effectiveAscSign = getDivisionalSign(asc_degree_global, currentChartType) || ascSign;
+		let effectiveAscSign = getDivisionalSign(asc_degree_global, currentChartType) || ascSign;
 
-    let displayHouses = [[],[],[],[],[],[],[],[],[],[],[],[]];
-    allBodies.forEach(b => {
-        let placedSign = getDivisionalSign(b.abs_deg, currentChartType);
-        let house_idx = (placedSign - effectiveAscSign + 12) % 12;
-        displayHouses[house_idx].push(b);
-    });
+		// --- Ascendant Overrides for Sun & Moon Charts ---
+		if (currentChartType === 'DM') {
+			let moon = allBodies.find(b => b.name === 'Chandra');
+			if (moon) effectiveAscSign = Math.floor(moon.abs_deg / 30) + 1;
+		} else if (currentChartType === 'DS') {
+			let sun = allBodies.find(b => b.name === 'Surya');
+			if (sun) effectiveAscSign = Math.floor(sun.abs_deg / 30) + 1;
+		} else if (currentChartType === 'CC') {
+			effectiveAscSign = asc_sign_global; // Chalit keeps the physical Lagna sign
+		}
 
-    // --- PASS 1: DRAW RASHI BACKGROUNDS (Lower Layer) ---
+		let displayHouses = [[],[],[],[],[],[],[],[],[],[],[],[]];
+		allBodies.forEach(b => {
+			let house_idx;
+			if (currentChartType === 'CC') {
+				// Equal House Bhava Chalit logic (+/- 15 degrees from exact Lagna degree)
+				house_idx = Math.floor(((b.abs_deg - asc_degree_global + 15 + 360) % 360) / 30);
+			} else {
+				// Standard Sign-based house distribution
+				let placedSign = getDivisionalSign(b.abs_deg, currentChartType);
+				house_idx = (placedSign - effectiveAscSign + 12) % 12;
+			}
+			displayHouses[house_idx].push(b);
+		});
+
+// --- PASS 1: DRAW RASHI BACKGROUNDS (Lower Layer) ---
+    // Universal Lord Mapping (Index 0 = Aries / 1st House Kaal Purusha)
+    const lordMapping = ['Mangal', 'Shukra', 'Budh', 'Chandra', 'Surya', 'Budh', 'Shukra', 'Mangal', 'Guru', 'Shani', 'Shani', 'Guru'];
+
     displayHouses.forEach((bodies, idx) => {
         const cx = coords[idx].x; const cy = coords[idx].y;
         
         if (showRashis) {
-            const rashiIdx = (effectiveAscSign + idx - 1) % 12;
+            // Force math to evaluate as integers to prevent JS string concatenation bugs
+            const safeAsc = Number(effectiveAscSign);
+            // Dynamic Rashi calculation (Shifts with Ascendant)
+            const rashiIdx = (safeAsc + idx - 1 + 12) % 12; 
             const rashiNum = rashiIdx + 1;
+            
             const rashiNameFull = i18n[currentLang] && i18n[currentLang].rashis ? i18n[currentLang].rashis[rashiIdx] : i18n['en'].rashis[rashiIdx];
             const rashiSymbol = rashiNameFull.split(' ')[0]; 
             const rashiText = rashiNameFull.substring(rashiNameFull.indexOf(' ') + 1); 
+
+            // 1. Calculate the true DYNAMIC Lord for this specific house based on the sitting Rashi
+            const rawDynamicLord = lordMapping[rashiIdx];
+            const localDynamicLord = (i18n[currentLang] && i18n[currentLang].names[rawDynamicLord]) ? i18n[currentLang].names[rawDynamicLord] : rawDynamicLord;
+
+            // 2. Calculate the FIXED Sthir Lord based strictly on the physical house position (idx)
+            const rawFixedLord = lordMapping[idx];
+            const localFixedLord = (i18n[currentLang] && i18n[currentLang].names[rawFixedLord]) ? i18n[currentLang].names[rawFixedLord] : rawFixedLord;
 
             kCtx.save();
             kCtx.shadowColor = currentChartType === 'D1' ? "rgba(211, 84, 0, 0.3)" : "rgba(41, 128, 185, 0.3)"; 
             kCtx.shadowBlur = 4;
             kCtx.textAlign = "center";
+            
+            // Draw Rashi Number & Symbol
             kCtx.fillStyle = currentChartType === 'D1' ? "#d35400" : "#2980b9";   
             kCtx.font = "bold 16px Arial"; 
-            kCtx.fillText(rashiNum + " " + rashiSymbol, cx, cy + 35);
+            kCtx.fillText(rashiNum + " " + rashiSymbol, cx, cy + 24); 
+            
+            // Draw Rashi Name
             kCtx.font = "11px Arial";
             kCtx.fillStyle = currentChartType === 'D1' ? "rgba(211, 84, 0, 0.8)" : "rgba(41, 128, 185, 0.8)";
-            kCtx.fillText(rashiText, cx, cy + 48);
+            kCtx.fillText(rashiText, cx, cy + 36);
+            
+            // Draw Dynamic House/Rashi Lord
+            kCtx.font = "bold 10px Arial";
+            kCtx.fillStyle = currentChartType === 'D1' ? "#b33939" : "#227093"; 
+            kCtx.fillText("Lord: " + localDynamicLord, cx, cy + 48);
+
+            // Draw Permanent Sthir House Lord
+            kCtx.font = "italic 9.5px Arial";
+            kCtx.fillStyle = "#7f8c8d"; // Slate grey for visual distinction
+            kCtx.fillText("H" + (idx + 1) + " Sthir: " + localFixedLord, cx, cy + 60);
+
             kCtx.restore();
         }
     });
-
     // --- PASS 2: DRAW PLANETS (Topmost Layer with Visibility Halos) ---
     displayHouses.forEach((bodies, idx) => {
         const houseNum = idx + 1;
@@ -875,11 +929,17 @@ function renderLagneshAnalysis(flatBodies, ascSign, scores) {
     let lagnaType = currentChartType === 'D1' ? "D1 (Physical Lagna)" : `${currentChartType} Lagna`;
     let rulerTitle = currentChartType === 'D1' ? "Pilot of the Physical Body" : `Pilot of ${chartNameObj.options[chartNameObj.selectedIndex].text.split('(')[1].replace(')','')}`;
     
-    if (currentChartType !== 'D1') {
-        if (typeof asc_degree_global !== 'undefined' && asc_degree_global !== null) {
-            activeAscSign = getDivisionalSign(asc_degree_global, currentChartType);
-        }
-    }
+	if (currentChartType === 'DM') {
+		let m = flatBodies.find(b => b.name === 'Chandra');
+		if (m) activeAscSign = Math.floor(m.abs_deg / 30) + 1;
+	} else if (currentChartType === 'DS') {
+		let s = flatBodies.find(b => b.name === 'Surya');
+		if (s) activeAscSign = Math.floor(s.abs_deg / 30) + 1;
+	} else if (currentChartType !== 'D1' && currentChartType !== 'CC') {
+		if (typeof asc_degree_global !== 'undefined' && asc_degree_global !== null) {
+			activeAscSign = getDivisionalSign(asc_degree_global, currentChartType);
+		}
+	}
 
     const lagneshName = signLords[activeAscSign];
     const lagnesh = flatBodies.find(b => b.name === lagneshName);
