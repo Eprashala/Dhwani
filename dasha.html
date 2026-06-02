@@ -226,21 +226,52 @@ let lagnaSignGlobal = 1;
 let globalMDADTimeline = []; 
 let lastAPIResponseBodies = []; // Cache to prevent re-fetching when toggling Savana
 
+// --- DEEP BPHS EVENT ARCHETYPES (UPGRADED WITH JAIMINI) ---
+let charaKarakas = {}; // Will hold AK, AmK, BK, MK, PiK, PK, GK, DK
+
 const eventArchetypes = {
-    "marriage": { houses: [7, 2, 11], karakas: ['Shukra', 'Guru'], varga: 'D9', minAge: 20, maxAge: 55, type: 'auspicious' },
-    "childbirth": { houses: [5, 9, 11], karakas: ['Guru'], varga: 'D7', minAge: 21, maxAge: 45, type: 'auspicious' },
-    "divorce_separation": { houses: [6, 8, 12], karakas: ['Rahu', 'Ketu', 'Mangal', 'Shani'], varga: 'D9', minAge: 20, maxAge: 70, type: 'crisis' },
-    "education": { houses: [4, 5, 9], karakas: ['Budh', 'Guru'], varga: 'D24', minAge: 5, maxAge: 30, type: 'auspicious' },
-    "career_rise": { houses: [10, 11, 2], karakas: ['Surya', 'Budh', 'Mangal'], varga: 'D10', minAge: 21, maxAge: 65, type: 'auspicious' },
-    "career_change": { houses: [8, 12, 3], karakas: ['Shani', 'Rahu'], varga: 'D10', minAge: 21, maxAge: 65, type: 'neutral' },
-    "wealth_gain": { houses: [2, 11, 9, 5], karakas: ['Guru', 'Shukra'], varga: 'D2', minAge: 21, maxAge: 80, type: 'auspicious' },
-    "wealth_loss": { houses: [12, 8, 6], karakas: ['Rahu', 'Shani'], varga: 'D2', minAge: 21, maxAge: 80, type: 'crisis' },
-    "property": { houses: [4, 11], karakas: ['Mangal', 'Shukra', 'Shani'], varga: 'D4', minAge: 25, maxAge: 70, type: 'auspicious' },
-    "foreign_travel": { houses: [9, 12, 3, 7], karakas: ['Rahu', 'Chandra'], varga: 'D9', minAge: 18, maxAge: 75, type: 'neutral' },
-    "health_crisis": { houses: [6, 8, 12], karakas: ['Shani', 'Rahu', 'Mangal', 'Ketu'], varga: 'D3', minAge: 0, maxAge: 120, type: 'crisis' },
-    "litigation": { houses: [6, 7, 12], karakas: ['Rahu', 'Mangal', 'Shani'], varga: 'D30', minAge: 18, maxAge: 90, type: 'crisis' },
-    "spiritual": { houses: [9, 5, 12], karakas: ['Guru', 'Ketu', 'Shani'], varga: 'D20', minAge: 30, maxAge: 120, type: 'auspicious' }
+    "marriage": { houses: [7, 2, 11], dynamicKarakas: ['DK'], staticKarakas: ['Shukra'], varga: 'D9', minAge: 20, maxAge: 55, type: 'auspicious' },
+    "childbirth": { houses: [5, 9, 11], dynamicKarakas: ['PK'], staticKarakas: ['Guru'], varga: 'D7', minAge: 21, maxAge: 48, type: 'auspicious' },
+    "divorce_separation": { houses: [6, 8, 12], dynamicKarakas: ['GK', 'DK'], staticKarakas: ['Rahu', 'Ketu', 'Mangal', 'Shani'], varga: 'D9', minAge: 20, maxAge: 70, type: 'crisis' },
+    "education": { houses: [4, 5, 9], dynamicKarakas: ['AmK', 'MK'], staticKarakas: ['Budh', 'Guru'], varga: 'D24', minAge: 5, maxAge: 30, type: 'auspicious' },
+    "career_rise": { houses: [10, 11, 2], dynamicKarakas: ['AmK', 'AK'], staticKarakas: ['Surya', 'Budh', 'Mangal'], varga: 'D10', minAge: 21, maxAge: 65, type: 'auspicious' },
+    "career_change": { houses: [8, 12, 3], dynamicKarakas: ['AmK'], staticKarakas: ['Shani', 'Rahu'], varga: 'D10', minAge: 21, maxAge: 65, type: 'neutral' },
+    "wealth_gain": { houses: [2, 11, 9, 5], dynamicKarakas: ['AK', 'AmK'], staticKarakas: ['Guru', 'Shukra'], varga: 'D2', minAge: 21, maxAge: 80, type: 'auspicious' },
+    "wealth_loss": { houses: [12, 8, 6], dynamicKarakas: ['GK'], staticKarakas: ['Rahu', 'Shani'], varga: 'D2', minAge: 21, maxAge: 80, type: 'crisis' },
+    "property": { houses: [4, 11], dynamicKarakas: ['MK'], staticKarakas: ['Mangal', 'Shukra', 'Shani'], varga: 'D4', minAge: 25, maxAge: 70, type: 'auspicious' },
+    "foreign_travel": { houses: [9, 12, 3, 7], dynamicKarakas: ['AmK'], staticKarakas: ['Rahu', 'Chandra'], varga: 'D9', minAge: 18, maxAge: 75, type: 'neutral' },
+    "health_crisis": { houses: [6, 8, 12], dynamicKarakas: ['GK'], staticKarakas: ['Shani', 'Rahu', 'Mangal', 'Ketu'], varga: 'D3', minAge: 0, maxAge: 120, type: 'crisis' },
+    "litigation": { houses: [6, 7, 12], dynamicKarakas: ['GK'], staticKarakas: ['Rahu', 'Mangal', 'Shani'], varga: 'D30', minAge: 18, maxAge: 90, type: 'crisis' },
+    "spiritual": { houses: [9, 5, 12], dynamicKarakas: ['AK'], staticKarakas: ['Guru', 'Ketu', 'Shani'], varga: 'D20', minAge: 30, maxAge: 120, type: 'auspicious' }
 };
+
+// --- THE JAIMINI CHARA KARAKA ENGINE ---
+function calculateJaiminiKarakas() {
+    let eligiblePlanets = ['Surya', 'Chandra', 'Mangal', 'Budh', 'Guru', 'Shukra', 'Shani', 'Rahu'];
+    let degArray = [];
+
+    eligiblePlanets.forEach(pName => {
+        if(grahaRegistry[pName]) {
+            let rawDeg = grahaRegistry[pName].abs_deg % 30;
+            // BPHS dictates Rahu's degrees are calculated in reverse (30 - degree)
+            let finalDeg = (pName === 'Rahu') ? (30 - rawDeg) : rawDeg; 
+            degArray.push({ name: pName, deg: finalDeg });
+        }
+    });
+
+    // Sort descending by degree inside the sign
+    degArray.sort((a, b) => b.deg - a.deg); 
+
+    const karakaLabels = ['AK', 'AmK', 'BK', 'MK', 'PiK', 'PK', 'GK', 'DK'];
+    charaKarakas = {};
+    
+    degArray.forEach((p, index) => {
+        if (index < karakaLabels.length) {
+            charaKarakas[karakaLabels[index]] = p.name;
+            grahaRegistry[p.name].charaKaraka = karakaLabels[index];
+        }
+    });
+}
 
 // --- INITIALIZATION ---
 async function initDashaEngine() {
@@ -440,6 +471,8 @@ function applyDrishtiAndYutiModifiers() {
     });
 }
 
+// --- BPHS BASE VERDICT (UPGRADED WITH D-9 NAVAMSHA CHECK) ---
+// --- BPHS BASE VERDICT (100% PARASHARI COMPLIANT) ---
 function calculateDashaVerdict(lordName, parentLordName, level) {
     let planetData = grahaRegistry[lordName];
     if(!planetData) return { class: 'v-neutral', icon: '🟡', text: 'Mixed / Average' };
@@ -447,6 +480,7 @@ function calculateDashaVerdict(lordName, parentLordName, level) {
     let totalScore = planetData.dignityScore;
     let lagnaMap = functionalStatus[lagnaSignGlobal];
     let functionalText = "";
+    
     if (lagnaMap) {
         if (lagnaMap.benefics.includes(lordName)) { totalScore += 2; functionalText = " (Functional Benefic)"; }
         else if (lagnaMap.malefics.includes(lordName)) { totalScore -= 2; functionalText = " (Functional Malefic)"; }
@@ -456,24 +490,46 @@ function calculateDashaVerdict(lordName, parentLordName, level) {
     else if ([3, 6, 8, 12].includes(planetData.house)) totalScore -= 2;
     else if ([2, 11].includes(planetData.house)) totalScore += 1;
 
+    // THE DEEP NAVAMSHA (D-9) CHECK
+    let vargaText = "";
+    if (vargaRegistry && vargaRegistry['D9'] && vargaRegistry['D9'][lordName]) {
+        let d9Sign = vargaRegistry['D9'][lordName].sign;
+        
+        if (planetData.sign === d9Sign) {
+            totalScore += 4; 
+            vargaText = "<br><span style='color:#8e44ad; font-weight:bold;'>Vargottama (Supreme D9 Strength)</span>";
+        } else {
+            // Evaluate D9 Exaltation/Debilitation using a dummy deep degree (5)
+            let d9Dignity = evaluateBPHSDignity(lordName, d9Sign, 5); 
+            if (d9Dignity.text === "Exalted") {
+                totalScore += 3;
+                vargaText = "<br><span style='color:#27ae60; font-weight:bold;'>Exalted in Navamsha (D9)</span>";
+            } else if (d9Dignity.text === "Debilitated") {
+                totalScore -= 4; // Severe penalty for D9 Debilitation
+                vargaText = "<br><span style='color:#c0392b; font-weight:bold;'>Debilitated in Navamsha (D9)</span>";
+            }
+        }
+    }
+
     let relativeText = "";
     if (level > 0 && parentLordName && grahaRegistry[parentLordName]) {
         let parentSign = grahaRegistry[parentLordName].sign;
         let relativeHouse = (planetData.sign - parentSign + 12) % 12 + 1;
         
         if ([6, 8].includes(relativeHouse)) { totalScore -= 4; relativeText = `<br>(Shadashtaka: 6/8 axis from ${parentLordName})`; } 
-        else if (relativeHouse === 12) { totalScore -= 2; relativeText = `<br>(Dwirdwadasha: 12th from ${parentLordName})`; } 
+        else if (relativeHouse === 12) { totalScore -= 2; relativeText = `<br>(Vyaya: 12th from ${parentLordName})`; } 
+        else if (relativeHouse === 2) { totalScore -= 2; relativeText = `<br>(Maraka: 2nd from ${parentLordName})`; } // FIX: 2nd House added
         else if ([1, 4, 5, 7, 9, 10].includes(relativeHouse)) { totalScore += 3; relativeText = `<br>(Auspicious: ${relativeHouse}th from ${parentLordName})`; } 
         else if ([3, 11].includes(relativeHouse)) { totalScore += 1; relativeText = `<br>(Upachaya: ${relativeHouse}th from ${parentLordName})`; }
     }
 
     let infText = planetData.influenceText || "";
 
-    if (totalScore >= 3) return { class: 'v-good', icon: '🟢', text: `Highly Auspicious${functionalText}${relativeText}${infText}` };
-    if (totalScore >= 1) return { class: 'v-good', icon: '🟢', text: `Favorable${functionalText}${relativeText}${infText}` };
-    if (totalScore <= -3) return { class: 'v-evil', icon: '🔴', text: `Severe Challenge${functionalText}${relativeText}${infText}` };
-    if (totalScore <= -1) return { class: 'v-evil', icon: '🔴', text: `Obstacles / Friction${functionalText}${relativeText}${infText}` };
-    return { class: 'v-neutral', icon: '🟡', text: `Mixed Results${functionalText}${relativeText}${infText}` };
+    if (totalScore >= 3) return { class: 'v-good', icon: '🟢', text: `Highly Auspicious${functionalText}${vargaText}${relativeText}${infText}` };
+    if (totalScore >= 1) return { class: 'v-good', icon: '🟢', text: `Favorable${functionalText}${vargaText}${relativeText}${infText}` };
+    if (totalScore <= -3) return { class: 'v-evil', icon: '🔴', text: `Severe Challenge${functionalText}${vargaText}${relativeText}${infText}` };
+    if (totalScore <= -1) return { class: 'v-evil', icon: '🔴', text: `Obstacles / Friction${functionalText}${vargaText}${relativeText}${infText}` };
+    return { class: 'v-neutral', icon: '🟡', text: `Mixed Results${functionalText}${vargaText}${relativeText}${infText}` };
 }
 
 // --- UTILS ---
@@ -567,7 +623,7 @@ function processBaseDasha() {
     });
 
     applyDrishtiAndYutiModifiers();
-
+	calculateJaiminiKarakas();
     const moon = lastAPIResponseBodies.find(b => b.name === 'Chandra');
     if (!moon) return;
 
@@ -637,7 +693,8 @@ function buildGlobalTimeline(mdStartMs, startLordIndex) {
     }
 }
 
-function findEventTriggers() {
+// --- BPHS MASTER EVENT PREDICTOR (CHANDRA LAGNA + GOCHAR VETO) ---
+async function findEventTriggers() {
     const eventKey = document.getElementById('eventSelector').value;
     const resultsContainer = document.getElementById('predictionResults');
     
@@ -645,149 +702,206 @@ function findEventTriggers() {
     if (globalMDADTimeline.length === 0) { alert("Calculating multi-level timeline, please wait."); return; }
 
     const archetype = eventArchetypes[eventKey];
-    resultsContainer.innerHTML = "<p style='text-align:center; color:#7f8c8d; font-style:italic;'>Scanning 729 Pratyantar Dasha vectors for Parashari confluence...</p>";
+    resultsContainer.innerHTML = "<p style='text-align:center; color:#7f8c8d; font-style:italic;'>Scanning 729 Pratyantar Dashas from Lagna and Chandra Lagna...</p>";
 
-// PHASE 1: GENERATE BPHS CAPABILITY SCORES FOR EACH PLANET (UPGRADED DISPOSITOR ENGINE)
+    // IDENTIFY MOON'S SIGN FOR CHANDRA LAGNA
+    const moonSign = grahaRegistry['Chandra'].sign;
+
+// =================================================================================
+    // PHASE 1: GENERATE BPHS CAPABILITY SCORES (Physical + Moon + Nakshatra + Jaimini)
+    // =================================================================================
     let planetProfiles = {};
     Object.keys(grahaRegistry).forEach(pName => {
         let pData = grahaRegistry[pName];
         let eventScore = 0;
         let reasons = [];
 
-        // --- A. PRIMARY PLACEMENT & LORDSHIP ---
+        let chandraHouse = (pData.sign - moonSign + 12) % 12 + 1;
+
+        // A. PRIMARY PLACEMENT
         if (pData.house === archetype.houses[0]) { eventScore += 4; reasons.push(`Sits in Primary ${pData.house}H`); }
-        else if (archetype.houses.includes(pData.house)) { eventScore += 2; reasons.push(`Sits in Supporter ${pData.house}H`); }
+        else if (chandraHouse === archetype.houses[0]) { eventScore += 3; reasons.push(`Sits in ${chandraHouse}H from Moon`); }
 
+        // B. LORDSHIP
         let primaryLord = getLordOfHouse(archetype.houses[0]);
-        if (primaryLord === pName) { eventScore += 5; reasons.push(`Lord of Primary ${archetype.houses[0]}H`); }
+        let chandraPrimaryLord = signLords[(moonSign + archetype.houses[0] - 2) % 12 + 1];
         
-        archetype.houses.slice(1).forEach(h => {
-            if (getLordOfHouse(h) === pName) { eventScore += 3; reasons.push(`Lord of Supporter ${h}H`); }
-        });
+        if (primaryLord === pName) { eventScore += 5; reasons.push(`Lord of Primary ${archetype.houses[0]}H`); }
+        if (chandraPrimaryLord === pName) { eventScore += 4; reasons.push(`Lord of ${archetype.houses[0]}H from Moon`); }
 
-        // --- B. THE DISPOSITOR (LANDLORD) PROTOCOL ---
+        // C. RASHI DISPOSITOR & PROXY
         let dispositorName = signLords[pData.sign];
         if (dispositorName && grahaRegistry[dispositorName]) {
-            let dispData = grahaRegistry[dispositorName];
-            
-            // If the planet's landlord rules the target house, this planet can trigger the event!
-            if (getLordOfHouse(archetype.houses[0]) === dispositorName) {
-                eventScore += 3; 
-                reasons.push(`Dispositor (${dispositorName}) rules Primary ${archetype.houses[0]}H`);
-            }
-            // If the landlord is severely afflicted, penalize the tenant planet
-            if (dispData.dignityScore <= -3) {
-                eventScore -= 2;
-                reasons.push(`Weakened by afflicted Dispositor (${dispositorName})`);
-            }
+            if (getLordOfHouse(archetype.houses[0]) === dispositorName) { eventScore += 3; reasons.push(`Rashi Dispositor rules Target`); }
         }
-
-        // --- C. RAHU & KETU PROXY LOGIC ---
         if (pName === 'Rahu' || pName === 'Ketu') {
-            let nodeDispositor = signLords[pData.sign];
-            if (getLordOfHouse(archetype.houses[0]) === nodeDispositor) {
-                eventScore += 4; // Nodes powerfully steal their lord's ability to give events
-                reasons.push(`Acts as proxy for ${nodeDispositor} (Primary Lord)`);
+            if (getLordOfHouse(archetype.houses[0]) === dispositorName) { eventScore += 4; reasons.push(`Proxy for Target Lord`); }
+        }
+
+        // D. NAKSHATRA DISPOSITOR (STAR LORD) - CORE VIMSHOTTARI FIX
+        let nakshatraIndex = Math.floor(pData.abs_deg / 13.333333);
+        let starLordName = dashaSequence[nakshatraIndex % 9].lord;
+        if (getLordOfHouse(archetype.houses[0]) === starLordName) { 
+            eventScore += 4; // High weight because Vimshottari relies on Nakshatras
+            reasons.push(`<span style='color:#2980b9; font-weight:bold;'>Star Lord (${starLordName}) rules Target</span>`); 
+        }
+
+        // E. KARAKAS (JAIMINI + STATIC)
+        archetype.dynamicKarakas.forEach(kLabel => {
+            if (charaKarakas[kLabel] === pName) {
+                eventScore += 5; 
+                reasons.push(`<span style='color:#8e44ad; font-weight:bold;'>Chara ${kLabel} (Soul Significator)</span>`);
             }
-        }
+        });
 
-        // --- D. KARAKA & VARGA ---
-        if (archetype.karakas.includes(pName)) { eventScore += 3; reasons.push(`Natural Karaka`); }
-
-        if (typeof vargaRegistry !== 'undefined' && vargaRegistry[archetype.varga] && vargaRegistry[archetype.varga][pName]) {
-            let vHouse = vargaRegistry[archetype.varga][pName].house;
-            if ([1, 4, 5, 7, 9, 10].includes(vHouse)) { eventScore += 3; reasons.push(`Strong in ${archetype.varga}`); }
-            else if (archetype.houses.includes(vHouse)) { eventScore += 4; reasons.push(`Activates target house in ${archetype.varga}`); }
-        }
-
-        // --- E. DIGNITY VETOES ---
-        if (pData.dignityScore <= -4) { eventScore -= 4; reasons.push(`<span style="color:#c0392b;">Severely Afflicted/Combust</span>`); }
-        if (pData.is_retro && archetype.type === 'auspicious' && naturalBenefics.includes(pName)) {
-            eventScore += 2; reasons.push(`Retrograde Benefic (Chesta Bala)`);
-        }
-
-        planetProfiles[pName] = { score: eventScore, reasonStr: reasons.length > 0 ? reasons.join(' + ') : "Secondary Influencer" };
+        if (archetype.staticKarakas.includes(pName)) { eventScore += 3; reasons.push(`Natural Karaka`); }
+        if (pData.dignityScore <= -4) { eventScore -= 4; reasons.push(`<span style="color:#c0392b;">Severely Afflicted</span>`); }
+        
+        planetProfiles[pName] = { score: eventScore, reasonStr: reasons.length > 0 ? reasons.join(' + ') : "Secondary Influencer", sign: pData.sign };
     });
-
-    // PHASE 2: TIMELINE SCANNING & GEOMETRIC VETOES
+	
+    // PHASE 2: TIMELINE SCANNING
     let validTriggers = [];
-    
     globalMDADTimeline.forEach(period => {
         let ageAtEnd = parseFloat(calculateAge(period.endMs));
         let ageAtStart = parseFloat(calculateAge(period.startMs));
         
-        // Strict Age Gating
         if (ageAtEnd < archetype.minAge || ageAtStart > archetype.maxAge) return;
 
         let mdScore = planetProfiles[period.md].score;
         let adScore = planetProfiles[period.ad].score;
         let pdScore = planetProfiles[period.pd].score;
         
-        // The Confluence Score: MD sets capability, AD executes, PD triggers. All must have some connection.
-        if (mdScore === 0 && adScore === 0) return; // Dead period for this event
+        if (mdScore === 0 && adScore === 0) return; 
         
-        let totalPower = mdScore + (adScore * 1.5) + (pdScore * 2); // Weighting the micro-periods heavily
+        let totalPower = mdScore + (adScore * 1.5) + (pdScore * 2); 
 
-        // Geometric Relationship Check (MD to AD)
         let mdSign = grahaRegistry[period.md].sign;
         let adSign = grahaRegistry[period.ad].sign;
         let mdAdRelativeHouse = (adSign - mdSign + 12) % 12 + 1;
-        let geometryText = `${mdAdRelativeHouse}th from MD`;
-        
         let isDestructiveGeometry = (mdAdRelativeHouse === 6 || mdAdRelativeHouse === 8 || mdAdRelativeHouse === 12);
 
-        // Veto / Amplification Logic
         if (archetype.type === 'auspicious') {
-            if (isDestructiveGeometry) totalPower -= 10; // A 6/8 relationship destroys auspicious events
-            if (mdAdRelativeHouse === 5 || mdAdRelativeHouse === 9) totalPower += 5; // Trinal blessings
+            if (isDestructiveGeometry) totalPower -= 10; 
         } else if (archetype.type === 'crisis') {
-            if (isDestructiveGeometry) totalPower += 10; // A 6/8 or 2/12 relationship TRIGGERS crisis
+            if (isDestructiveGeometry) totalPower += 10; 
         }
 
-        if (totalPower >= 15) {
+        if (totalPower >= 8) {
             validTriggers.push({
                 ...period,
                 power: totalPower,
                 mdR: planetProfiles[period.md].reasonStr,
                 adR: planetProfiles[period.ad].reasonStr,
                 pdR: planetProfiles[period.pd].reasonStr,
-                geoText: isDestructiveGeometry && archetype.type === 'crisis' 
-                    ? `<span style="color:#c0392b; font-weight:bold;">Triggered by friction (${mdAdRelativeHouse}th from MD)</span>` 
-                    : `${mdAdRelativeHouse}th from MD`
+                geoText: isDestructiveGeometry && archetype.type === 'crisis' ? `Triggered by friction (${mdAdRelativeHouse}th from MD)` : `${mdAdRelativeHouse}th from MD`
             });
         }
     });
 
-    // PHASE 3: RENDER THE TOP 5 HIGHEST PROBABILITY TRIGGERS
     validTriggers.sort((a, b) => b.power - a.power);
-    let topTriggers = validTriggers.slice(0, 5);
+    let topTriggers = validTriggers.slice(0, 15); // Take only the top 5 for the Transit Veto
 
-    resultsContainer.innerHTML = "";
     if (topTriggers.length === 0) {
-        resultsContainer.innerHTML = `<p style='color:#e74c3c; font-weight:bold; padding: 15px; border: 1px dashed #e74c3c;'>No dominant Parashari structural promises found for this event between ages ${archetype.minAge}-${archetype.maxAge} in the Dasha sequence alone. Current Gochar (Transits) may act as a substitute trigger.</p>`;
+        resultsContainer.innerHTML = `<p style='color:#e74c3c; font-weight:bold; padding: 15px;'>No structural promises found for this event in this age window.</p>`;
         return;
     }
 
-    topTriggers.forEach(t => {
-        let isActive = (currentNowMs >= t.startMs && currentNowMs <= t.endMs) ? "<span style='background:#f1c40f; color:#000; padding:3px 8px; border-radius:4px; font-size:10px; margin-left:10px; font-weight:900;'>ACTIVE NOW</span>" : "";
-        
+    // PHASE 3: FETCH GOCHAR (TRANSIT) DATA FOR TOP 5 TRIGGERS
+    resultsContainer.innerHTML = "<p style='text-align:center; color:#2980b9; font-weight:bold;'>Fetching Gochar (Transits) to verify delivery dates...</p>";
+    
+    let datesToFetch = topTriggers.map(t => new Date(t.startMs + ((t.endMs - t.startMs)/2)).toISOString());
+    let transitData = {};
+
+    try {
+        const response = await fetch('https://eprashala.pythonanywhere.com/api/gochar', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dates: datesToFetch, lat: 19.3654, lon: 73.3685 })
+        });
+        const data = await response.json();
+        if (data.status === 'success') transitData = data.transits;
+    } catch (err) {
+        console.error("Transit Fetch Error", err);
+    }
+
+// =================================================================================
+    // PHASE 4: RENDER FINAL VERIFIED TRIGGERS (CORRECTED PARASHARI ASPECT MATH)
+    // =================================================================================
+    resultsContainer.innerHTML = "";
+    
+    // Target Coordinates
+    let lagnaTargetSign = (lagnaSignGlobal + archetype.houses[0] - 2) % 12 + 1;
+    let moonTargetSign = (moonSign + archetype.houses[0] - 2) % 12 + 1;
+    
+    let primaryLordSign = grahaRegistry[getLordOfHouse(archetype.houses[0])].sign;
+    let primaryKarakaLabel = archetype.dynamicKarakas[0]; 
+    let karakaSign = charaKarakas[primaryKarakaLabel] && grahaRegistry[charaKarakas[primaryKarakaLabel]] ? grahaRegistry[charaKarakas[primaryKarakaLabel]].sign : null;
+
+    topTriggers.forEach((t, index) => {
+        let dateKey = datesToFetch[index];
+        let tSky = transitData[dateKey];
+        let transitVerdict = "<span style='color:#7f8c8d; font-size: 11px;'>Transit data unavailable</span>";
+
+        if (tSky) {
+            // FIXED 1-INDEXED ASPECT FORMULAS: (X + (House_Offset - 1) - 1) % 12 + 1
+            // Jupiter Aspects: 1st, 5th (+4 houses), 7th (+6 houses), 9th (+8 houses)
+            let guruAspects = [
+                tSky.Guru, 
+                (tSky.Guru + 3) % 12 + 1, 
+                (tSky.Guru + 5) % 12 + 1, 
+                (tSky.Guru + 7) % 12 + 1
+            ];
+            
+            let isGuruBlessing = guruAspects.includes(lagnaTargetSign) || 
+                                 guruAspects.includes(moonTargetSign) || 
+                                 guruAspects.includes(primaryLordSign) || 
+                                 (karakaSign !== null && guruAspects.includes(karakaSign));
+
+            // Saturn Aspects: 1st, 3rd (+2 houses), 7th (+6 houses), 10th (+9 houses)
+            let shaniAspects = [
+                tSky.Shani, 
+                (tSky.Shani + 1) % 12 + 1, 
+                (tSky.Shani + 5) % 12 + 1, 
+                (tSky.Shani + 8) % 12 + 1
+            ];
+            
+            let isShaniBlessing = shaniAspects.includes(lagnaTargetSign) || 
+                                  shaniAspects.includes(moonTargetSign) || 
+                                  shaniAspects.includes(primaryLordSign) || 
+                                  (karakaSign !== null && shaniAspects.includes(karakaSign));
+            
+            let isDoubleTransit = isGuruBlessing && isShaniBlessing;
+            
+            if (isDoubleTransit && archetype.type === 'auspicious') {
+                transitVerdict = `<span style='color:#27ae60; font-weight:bold; font-size:11px;'>✅ Verified by Double Transit (Guru & Shani Aspecting Target Matrix)</span>`;
+                t.power += 15; 
+            } else if (isGuruBlessing && !isShaniBlessing && archetype.type === 'auspicious') {
+                transitVerdict = `<span style='color:#2980b9; font-weight:bold; font-size:11px;'>⏳ Partial Gochar (Guru Blesses, Awaiting Shani Karmic Reality)</span>`;
+                t.power += 5; 
+            } else if (!isGuruBlessing && archetype.type === 'auspicious') {
+                transitVerdict = "<span style='color:#e67e22; font-weight:bold; font-size:11px;'>⚠️ Gochar Veto (Awaiting Jupiter Expansion Aspect)</span>";
+            } else {
+                transitVerdict = `<span style='color:#34495e; font-size:11px;'>Transit Sky: Guru in Sign ${tSky.Guru} | Shani in Sign ${tSky.Shani}</span>`;
+            }
+        }
+
         let borderColor = archetype.type === 'crisis' ? '#e74c3c' : '#2ecc71';
         let bgStyle = archetype.type === 'crisis' ? 'background: #fdf3f2;' : 'background: white;';
-
+        
         resultsContainer.innerHTML += `
             <div class="trigger-card" style="border-left: 5px solid ${borderColor}; ${bgStyle}">
-                <h4 style="font-size: 15px;">🪐 ${t.md} MD ➔ ${t.ad} AD ➔ <span style="color:${borderColor}; text-decoration: underline;">${t.pd} PD</span> ${isActive}</h4>
+                <h4 style="font-size: 15px;">🪐 ${t.md} ➔ ${t.ad} ➔ <span style="color:${borderColor}; text-decoration: underline;">${t.pd}</span></h4>
                 <p style="color: #34495e; margin-bottom: 8px;">
                     📅 <strong>${formatDateShort(t.startMs)}</strong> to <strong>${formatDateShort(t.endMs)}</strong> <br>
-                    <span style="font-size: 11px;">(Native Age: ${calculateAge(t.startMs)} to ${calculateAge(t.endMs)} years)</span>
+                    <span style="font-size: 11px;">(Native Age: ${calculateAge(t.startMs)} to ${calculateAge(t.endMs)} years)</span><br>
+                    ${transitVerdict}
                 </p>
                 <div class="trigger-reason" style="background: rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.05);">
-                    <strong style="color: #2c3e50; font-size: 13px;">Deep BPHS Reasoning:</strong><br>
                     <ul style="margin: 5px 0 0 0; padding-left: 20px; font-size: 12px; color: #555; line-height: 1.5;">
-                        <li><strong>Mahadasha (${t.md}):</strong> Sets the era. ${t.mdR}</li>
-                        <li><strong>Antardasha (${t.ad}):</strong> Builds the environment. ${t.adR}</li>
-                        <li><strong>Pratyantar (${t.pd}):</strong> The execution trigger. ${t.pdR}</li>
-                        <li><strong>Axis Geometry:</strong> AD is ${t.geoText}</li>
+                        <li><strong>Mahadasha (${t.md}):</strong> ${t.mdR}</li>
+                        <li><strong>Antardasha (${t.ad}):</strong> ${t.adR}</li>
+                        <li><strong>Pratyantar (${t.pd}):</strong> ${t.pdR}</li>
+                        <li><strong>Geometry:</strong> AD is ${t.geoText}</li>
                     </ul>
                 </div>
             </div>
