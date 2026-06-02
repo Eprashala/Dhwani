@@ -101,6 +101,29 @@
         .rank-desc { font-size: 12px; color: #555; margin-top: 8px; padding-top: 8px; border-top: 1px solid #ecf0f1; z-index: 2; line-height: 1.4; font-style: italic;}
         .rank-reasons { font-size: 11px; color: #27ae60; margin-top: 8px; background: rgba(39, 174, 96, 0.1); padding: 6px; border-radius: 4px; font-family: monospace; z-index: 2; }
 
+        /* --- GRAHA POPUP CSS --- */
+		.graha-popup .close-btn {
+            position: absolute; top: 5px; right: 8px; color: #94a3b8; 
+            cursor: pointer; font-size: 16px; font-weight: bold;
+            transition: 0.2s;
+        }
+        .graha-popup .close-btn:hover { color: #ef4444; }
+        .graha-popup {
+            position: absolute; display: none; background: rgba(15, 23, 42, 0.95);
+            border: 1px solid #f1c40f; border-radius: 8px; padding: 12px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.7); z-index: 3000;
+            color: #e2e8f0; font-size: 12px; width: 220px; pointer-events: none;
+            backdrop-filter: blur(5px); transform: translate(-50%, -100%);
+            margin-top: -10px; transition: opacity 0.2s;
+        }
+        .graha-popup h4 { margin: 0 0 8px 0; color: #f1c40f; font-size: 15px; border-bottom: 1px solid rgba(241,196,15,0.3); padding-bottom: 4px; text-align: center;}
+        .graha-popup .data-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .graha-popup .data-row span:first-child { color: #94a3b8; }
+        .graha-popup .data-row span:last-child { font-weight: bold; text-align: right;}
+        .text-good { color: #2ecc71; }
+        .text-bad { color: #e74c3c; }
+        .text-neutral { color: #f39c12; }
+
         body.mobile-mode { padding: 5px; }
         body.mobile-mode .top-row { flex-direction: column; align-items: center; }
         body.mobile-mode .input-panel { width: 100%; box-sizing: border-box; }
@@ -183,8 +206,6 @@
 							<option value="DS">DS - Surya Kundali (Sun Chart)</option>
 							<option value="DM">DM - Chandra Kundali (Moon Chart)</option>
 							<option value="CC">CC - Bhava Chalit (Equal House)</option>
-							<option disabled>──────────</option>
-			
                         </select>
                     </div>
 
@@ -199,6 +220,8 @@
                 </div>
                 
                 <canvas id="kundaliCanvas" width="550" height="550" style="max-width: 100%; height: auto;"></canvas>
+                
+                <div id="grahaPopup" class="graha-popup"></div>
 
                 <div style="width: 100%; max-width: 550px; margin-top: 20px; background: #ecf0f1; padding: 15px; border-radius: 8px; border: 1px solid #bdc3c7; box-sizing: border-box;">
                     <label style="margin-top: 0; margin-bottom: 8px; color: #2c3e50; display: block; font-size: 14px;">Please ask your question here:</label>
@@ -273,12 +296,11 @@
     </div>
 </div>
 	
-	<div id="google_translate_element" style="display:none;"></div>
+<div id="google_translate_element" style="display:none;"></div>
 
 <script>
 // ==========================================
 // 1. GLOBAL VARIABLES & STATE 
-// (Moved to absolute top to prevent initialization ghost errors)
 // ==========================================
 let skyData = []; 
 let asc_sign_global = 1;
@@ -292,11 +314,45 @@ let natalAscSign = null;
 let natalAscDegree = null;
 let natalScores = null;
 
+let activeGrahaHitboxes = []; 
+const popupObj = document.getElementById('grahaPopup');
+
 // Initialize Canvas
 const kCanvas = document.getElementById('kundaliCanvas'); 
 const kCtx = kCanvas.getContext('2d');
 const placeSearchObj = document.getElementById('placeSearch');
 const suggestionsObj = document.getElementById('suggestions');
+
+// Deep BPHS Nakshatra Attributes Table
+const nakshatraMaster = [
+    { name: 'Ashwini', lord: 'Ketu', nature: 'Good (Swift)', nType: 'text-good' },
+    { name: 'Bharani', lord: 'Shukra', nature: 'Evil (Fierce)', nType: 'text-bad' },
+    { name: 'Krittika', lord: 'Surya', nature: 'Mixed (Sharp)', nType: 'text-neutral' },
+    { name: 'Rohini', lord: 'Chandra', nature: 'Good (Fixed)', nType: 'text-good' },
+    { name: 'Mrigashira', lord: 'Mangal', nature: 'Good (Tender)', nType: 'text-good' },
+    { name: 'Ardra', lord: 'Rahu', nature: 'Evil (Dreadful)', nType: 'text-bad' },
+    { name: 'Punarvasu', lord: 'Guru', nature: 'Good (Movable)', nType: 'text-good' },
+    { name: 'Pushya', lord: 'Shani', nature: 'Good (Light)', nType: 'text-good' },
+    { name: 'Ashlesha', lord: 'Budh', nature: 'Evil (Dreadful)', nType: 'text-bad' },
+    { name: 'Magha', lord: 'Ketu', nature: 'Evil (Fierce)', nType: 'text-bad' },
+    { name: 'P.Phalguni', lord: 'Shukra', nature: 'Evil (Fierce)', nType: 'text-bad' },
+    { name: 'U.Phalguni', lord: 'Surya', nature: 'Good (Fixed)', nType: 'text-good' },
+    { name: 'Hasta', lord: 'Chandra', nature: 'Good (Swift)', nType: 'text-good' },
+    { name: 'Chitra', lord: 'Mangal', nature: 'Good (Tender)', nType: 'text-good' },
+    { name: 'Swati', lord: 'Rahu', nature: 'Good (Movable)', nType: 'text-good' },
+    { name: 'Vishakha', lord: 'Guru', nature: 'Mixed (Sharp)', nType: 'text-neutral' },
+    { name: 'Anuradha', lord: 'Shani', nature: 'Good (Tender)', nType: 'text-good' },
+    { name: 'Jyeshtha', lord: 'Budh', nature: 'Evil (Dreadful)', nType: 'text-bad' },
+    { name: 'Mula', lord: 'Ketu', nature: 'Evil (Dreadful)', nType: 'text-bad' },
+    { name: 'P.Ashadha', lord: 'Shukra', nature: 'Evil (Fierce)', nType: 'text-bad' },
+    { name: 'U.Ashadha', lord: 'Surya', nature: 'Good (Fixed)', nType: 'text-good' },
+    { name: 'Shravana', lord: 'Chandra', nature: 'Good (Movable)', nType: 'text-good' },
+    { name: 'Dhanishta', lord: 'Mangal', nature: 'Good (Movable)', nType: 'text-good' },
+    { name: 'Shatabhisha', lord: 'Rahu', nature: 'Good (Movable)', nType: 'text-good' },
+    { name: 'P.Bhadrapada', lord: 'Guru', nature: 'Evil (Fierce)', nType: 'text-bad' },
+    { name: 'U.Bhadrapada', lord: 'Shani', nature: 'Good (Fixed)', nType: 'text-good' },
+    { name: 'Revati', lord: 'Budh', nature: 'Good (Tender)', nType: 'text-good' }
+];
 
 // ==========================================
 // 2. CONSTANTS & METADATA
@@ -377,6 +433,7 @@ function togglePill(checkbox) {
 
 function switchChart(type) {
     currentChartType = type;
+    popupObj.style.display = 'none'; // Close popup on switch
     
     if (type === 'PRASHNA') {
         generatePrashna();
@@ -385,8 +442,7 @@ function switchChart(type) {
         document.getElementById('gocharModalOverlay').classList.add('active');
         return; 
 	} else if (['D1', 'DS', 'DM', 'CC'].includes(type) && natalSkyData) {
-    // If returning to D1 variants, restore the original Natal Data from cache!
-    skyData = JSON.parse(JSON.stringify(natalSkyData));
+        skyData = JSON.parse(JSON.stringify(natalSkyData));
         asc_sign_global = natalAscSign;
         asc_degree_global = natalAscDegree;
         globalScores = natalScores;
@@ -401,38 +457,20 @@ function switchChart(type) {
     }
 }
 
-function updateLedgerView() {
-    const listDiv = document.getElementById('rankingList');
-    const ledgerHeader = document.querySelector('.ledger-panel .ledger-header');
-
-	if (['D1', 'PRASHNA', 'GOCHAR', 'DS', 'DM', 'CC'].includes(currentChartType)) {
-    ledgerHeader.style.display = 'flex';
-    
-    let title = "Parashari Sthana & Dig Bala Ledger";
-    if (currentChartType === 'PRASHNA') title = "Prashna (Horary) Sthana & Dig Bala Ledger";
-    if (currentChartType === 'GOCHAR') title = "Gochar (Transit) Sthana & Dig Bala Ledger";
-    if (currentChartType === 'DS') title = "Surya Kundali (Sun Chart) Ledger";
-    if (currentChartType === 'DM') title = "Chandra Kundali (Moon Chart) Ledger";
-    if (currentChartType === 'CC') title = "Bhava Chalit (Equal House) Ledger";
-        
-        document.querySelector('.ledger-panel .ledger-header h3').innerText = title;
-        listDiv.style.display = 'grid'; 
-        if (typeof globalScores !== 'undefined' && globalScores.length > 0) renderRanking(globalScores);
-    } else if (currentChartType === 'D9') {
-        ledgerHeader.style.display = 'flex';
-        document.querySelector('.ledger-panel .ledger-header h3').innerText = "Jaimini Chara Karaka Ledger (Soul Hierarchy)";
-        listDiv.style.display = 'grid';
-        renderJaiminiLedger();
-    } else {
-        ledgerHeader.style.display = 'none';
-        listDiv.style.display = 'none';
-        listDiv.innerHTML = ''; 
-    }
-}
-
 // ==========================================
 // 5. ASTROLOGICAL MATH ENGINES
 // ==========================================
+function getAwastha(deg, signIndex) {
+    let isOddSign = (signIndex + 1) % 2 !== 0; 
+    let part = Math.floor(deg / 6); 
+    if (part > 4) part = 4;
+    
+    const statesOdd = ['Baala (Infant)', 'Kumara (Boy)', 'Yuva (Youth)', 'Vriddha (Old)', 'Mrita (Dead)'];
+    const statesEven = [...statesOdd].reverse();
+    
+    return isOddSign ? statesOdd[part] : statesEven[part];
+}
+
 function getDivisionalSign(absoluteDegree, chartType) {
     if (absoluteDegree === undefined || absoluteDegree === null) return null;
     const rashi = Math.floor(absoluteDegree / 30) + 1; 
@@ -456,7 +494,7 @@ function getDivisionalSign(absoluteDegree, chartType) {
         case 'D12': part = Math.floor(degInRashi / 2.5); return ((rashi + part - 1) % 12) + 1;
         case 'D16': part = Math.floor(degInRashi / (30 / 16)); startSign = modality === 1 ? 1 : (modality === 2 ? 5 : 9); return ((startSign + part - 1) % 12) + 1;
         case 'D20': part = Math.floor(degInRashi / 1.5); startSign = modality === 1 ? 1 : (modality === 2 ? 9 : 5); return ((startSign + part - 1) % 12) + 1;
-		case 'D24': part = Math.floor(degInRashi / 1.25); startSign = isOdd ? 5 : 4; return ((startSign + part - 1) % 12) + 1;
+        case 'D24': part = Math.floor(degInRashi / 1.25); startSign = isOdd ? 5 : 4; return ((startSign + part - 1) % 12) + 1; // CORRECTED D24 MATH
         case 'D27': part = Math.floor(degInRashi / (30 / 27)); startSign = element === 1 ? 1 : (element === 2 ? 4 : (element === 3 ? 7 : 10)); return ((startSign + part - 1) % 12) + 1;
         case 'D30':
             if (isOdd) {
@@ -470,8 +508,6 @@ function getDivisionalSign(absoluteDegree, chartType) {
         default: return rashi;
     }
 }
-
-function getD9Sign(absoluteDegree) { return getDivisionalSign(absoluteDegree, 'D9'); }
 
 function evaluateExactDignity(pName, sign, degInSign) {
     if (pName === 'Surya') {
@@ -510,7 +546,7 @@ function evaluateExactDignity(pName, sign, degInSign) {
         if (sign === 11 && degInSign <= 20) return { val: 4, text: "Mooltrikona" };
         if (sign === 10 || sign === 11) return { val: 3, text: "Swa-Rashi (Own Sign)" };
     }
-    return { val: 2, text: "Ordinary (Check Maitri)" };
+    return { val: 2, text: "Ordinary" };
 }
 
 function calculateDrishtiOnSign(targetSign, flatBodies) {
@@ -572,31 +608,8 @@ function calculateIshtaDevata(allBodies) {
 // ==========================================
 // 6. DRAWING AND RENDERING
 // ==========================================
-function checkOverlap(rect, drawnRects) {
-    for (let r of drawnRects) { if (rect.x < r.x + r.w + 6 && rect.x + rect.w + 6 > r.x && rect.y < r.y + r.h + 6 && rect.y + rect.h + 6 > r.y) return true; }
-    return false;
-}
-
-function drawWrappedText(ctx, text, x, y, maxWidth, lineHeight) {
-    let words = text.split(' ');
-    let line = '';
-    let testY = y;
-    
-    for (let n = 0; n < words.length; n++) {
-        let testLine = line + words[n] + ' ';
-        let metrics = ctx.measureText(testLine);
-        if (metrics.width > maxWidth && n > 0) {
-            ctx.fillText(line, x, testY);
-            line = words[n] + ' ';
-            testY += lineHeight;
-        } else {
-            line = testLine;
-        }
-    }
-    ctx.fillText(line, x, testY);
-}
-
 function populateKundali(houses, ascSign) {
+	activeGrahaHitboxes = [];
     const w = kCanvas.width; const pad = 30;
     kCtx.clearRect(0, 0, w, w); kCtx.strokeStyle = '#e67e22'; kCtx.lineWidth = 2.5;
     kCtx.beginPath(); kCtx.rect(pad, pad, w - 2*pad, w - 2*pad);
@@ -618,34 +631,31 @@ function populateKundali(houses, ascSign) {
     houses.forEach(h => h.forEach(b => { if (b.abs_deg !== undefined) allBodies.push(b); }));
 
     let karakaMap = calculateJaiminiKarakas(allBodies);
-		let effectiveAscSign = getDivisionalSign(asc_degree_global, currentChartType) || ascSign;
+	let effectiveAscSign = getDivisionalSign(asc_degree_global, currentChartType) || ascSign;
 
-		// --- Ascendant Overrides for Sun & Moon Charts ---
-		if (currentChartType === 'DM') {
-			let moon = allBodies.find(b => b.name === 'Chandra');
-			if (moon) effectiveAscSign = Math.floor(moon.abs_deg / 30) + 1;
-		} else if (currentChartType === 'DS') {
-			let sun = allBodies.find(b => b.name === 'Surya');
-			if (sun) effectiveAscSign = Math.floor(sun.abs_deg / 30) + 1;
-		} else if (currentChartType === 'CC') {
-			effectiveAscSign = asc_sign_global; // Chalit keeps the physical Lagna sign
+	if (currentChartType === 'DM') {
+		let moon = allBodies.find(b => b.name === 'Chandra');
+		if (moon) effectiveAscSign = Math.floor(moon.abs_deg / 30) + 1;
+	} else if (currentChartType === 'DS') {
+		let sun = allBodies.find(b => b.name === 'Surya');
+		if (sun) effectiveAscSign = Math.floor(sun.abs_deg / 30) + 1;
+	} else if (currentChartType === 'CC') {
+		effectiveAscSign = asc_sign_global; 
+	}
+
+	let displayHouses = [[],[],[],[],[],[],[],[],[],[],[],[]];
+	allBodies.forEach(b => {
+		let house_idx;
+		if (currentChartType === 'CC') {
+			house_idx = Math.floor(((b.abs_deg - asc_degree_global + 15 + 360) % 360) / 30);
+		} else {
+			let placedSign = getDivisionalSign(b.abs_deg, currentChartType);
+			house_idx = (placedSign - effectiveAscSign + 12) % 12;
 		}
+		displayHouses[house_idx].push(b);
+	});
 
-		let displayHouses = [[],[],[],[],[],[],[],[],[],[],[],[]];
-		allBodies.forEach(b => {
-			let house_idx;
-			if (currentChartType === 'CC') {
-				// Equal House Bhava Chalit logic (+/- 15 degrees from exact Lagna degree)
-				house_idx = Math.floor(((b.abs_deg - asc_degree_global + 15 + 360) % 360) / 30);
-			} else {
-				// Standard Sign-based house distribution
-				let placedSign = getDivisionalSign(b.abs_deg, currentChartType);
-				house_idx = (placedSign - effectiveAscSign + 12) % 12;
-			}
-			displayHouses[house_idx].push(b);
-		});
-
-// --- PASS 1: DRAW RASHI BACKGROUNDS (Lower Layer) ---
+    // --- PASS 1: DRAW RASHI BACKGROUNDS (Lower Layer) ---
     // Universal Lord Mapping (Index 0 = Aries / 1st House Kaal Purusha)
     const lordMapping = ['Mangal', 'Shukra', 'Budh', 'Chandra', 'Surya', 'Budh', 'Shukra', 'Mangal', 'Guru', 'Shani', 'Shani', 'Guru'];
 
@@ -653,9 +663,7 @@ function populateKundali(houses, ascSign) {
         const cx = coords[idx].x; const cy = coords[idx].y;
         
         if (showRashis) {
-            // Force math to evaluate as integers to prevent JS string concatenation bugs
             const safeAsc = Number(effectiveAscSign);
-            // Dynamic Rashi calculation (Shifts with Ascendant)
             const rashiIdx = (safeAsc + idx - 1 + 12) % 12; 
             const rashiNum = rashiIdx + 1;
             
@@ -663,11 +671,8 @@ function populateKundali(houses, ascSign) {
             const rashiSymbol = rashiNameFull.split(' ')[0]; 
             const rashiText = rashiNameFull.substring(rashiNameFull.indexOf(' ') + 1); 
 
-            // 1. Calculate the true DYNAMIC Lord for this specific house based on the sitting Rashi
             const rawDynamicLord = lordMapping[rashiIdx];
             const localDynamicLord = (i18n[currentLang] && i18n[currentLang].names[rawDynamicLord]) ? i18n[currentLang].names[rawDynamicLord] : rawDynamicLord;
-
-            // 2. Calculate the FIXED Sthir Lord based strictly on the physical house position (idx)
             const rawFixedLord = lordMapping[idx];
             const localFixedLord = (i18n[currentLang] && i18n[currentLang].names[rawFixedLord]) ? i18n[currentLang].names[rawFixedLord] : rawFixedLord;
 
@@ -676,30 +681,27 @@ function populateKundali(houses, ascSign) {
             kCtx.shadowBlur = 4;
             kCtx.textAlign = "center";
             
-            // Draw Rashi Number & Symbol
             kCtx.fillStyle = currentChartType === 'D1' ? "#d35400" : "#2980b9";   
             kCtx.font = "bold 16px Arial"; 
             kCtx.fillText(rashiNum + " " + rashiSymbol, cx, cy + 24); 
             
-            // Draw Rashi Name
             kCtx.font = "11px Arial";
             kCtx.fillStyle = currentChartType === 'D1' ? "rgba(211, 84, 0, 0.8)" : "rgba(41, 128, 185, 0.8)";
             kCtx.fillText(rashiText, cx, cy + 36);
             
-            // Draw Dynamic House/Rashi Lord
             kCtx.font = "bold 10px Arial";
             kCtx.fillStyle = currentChartType === 'D1' ? "#b33939" : "#227093"; 
             kCtx.fillText("Lord: " + localDynamicLord, cx, cy + 48);
 
-            // Draw Permanent Sthir House Lord
             kCtx.font = "italic 9.5px Arial";
-            kCtx.fillStyle = "#7f8c8d"; // Slate grey for visual distinction
+            kCtx.fillStyle = "#7f8c8d"; 
             kCtx.fillText("H" + (idx + 1) + " Sthir: " + localFixedLord, cx, cy + 60);
 
             kCtx.restore();
         }
     });
-    // --- PASS 2: DRAW PLANETS (Topmost Layer with Visibility Halos) ---
+
+    // --- PASS 2: DRAW PLANETS & HITBOXES ---
     displayHouses.forEach((bodies, idx) => {
         const houseNum = idx + 1;
         const cx = coords[idx].x; const cy = coords[idx].y;
@@ -731,32 +733,36 @@ function populateKundali(houses, ascSign) {
                 nakShort = ` [${nakFullName.substring(nakFullName.indexOf(' ') + 1)}]`;
             }
             
-            // Text Stroke (Halo) settings to cut through grid lines
-            kCtx.strokeStyle = "rgba(255, 255, 255, 0.95)"; // Strong white outline
+            kCtx.strokeStyle = "rgba(255, 255, 255, 0.95)"; 
             kCtx.lineJoin = "round";
             
+              
             if (b.type === 'graha') {
-                kCtx.font = "bold 12px Arial"; // Slightly bumped up to 12px for better readability
+                kCtx.font = "bold 12px Arial";
                 kCtx.lineWidth = 3.5;
                 
                 let karakaLabel = "";
-                if (currentChartType !== 'D1' && karakaMap[b.name]) {
-                    karakaLabel = ` {${karakaMap[b.name]}}`;
-                }
+                if (currentChartType !== 'D1' && karakaMap[b.name]) karakaLabel = ` {${karakaMap[b.name]}}`;
+                
                 let textObj = `${symbols[b.name]||''} ${localName} ${formatDegree(b.deg)}${nakShort}${karakaLabel}`;
                 
-                kCtx.strokeText(textObj, cx, textY); // Draw Halo First
-                kCtx.fillStyle = "#c0392b";          // Then draw Text
+                let tMetrics = kCtx.measureText(textObj);
+                activeGrahaHitboxes.push({
+                    name: b.name, localName: localName,
+                    x: cx - tMetrics.width/2 - 5, y: textY - 12, 
+                    w: tMetrics.width + 10, h: 16, body: b
+                });
+
+                kCtx.strokeText(textObj, cx, textY); 
+                kCtx.fillStyle = "#c0392b";          
                 kCtx.fillText(textObj, cx, textY);
                 
             } else {
                 kCtx.font = "italic 10px Arial";
                 kCtx.lineWidth = 2.5;
-                
                 let textObj = `•${localName}${nakShort}`;
-                
-                kCtx.strokeText(textObj, cx, textY); // Draw Halo First
-                kCtx.fillStyle = "#8e44ad";          // Then draw Text
+                kCtx.strokeText(textObj, cx, textY); 
+                kCtx.fillStyle = "#8e44ad";          
                 kCtx.fillText(textObj, cx, textY);
             }
         });
@@ -829,9 +835,16 @@ function updateLedgerView() {
     const listDiv = document.getElementById('rankingList');
     const ledgerHeader = document.querySelector('.ledger-panel .ledger-header');
 
-    if (currentChartType === 'D1') {
+    if (['D1', 'PRASHNA', 'GOCHAR', 'DS', 'DM', 'CC'].includes(currentChartType)) {
         ledgerHeader.style.display = 'flex';
-        document.querySelector('.ledger-panel .ledger-header h3').innerText = "Parashari Sthana & Dig Bala Ledger";
+        let title = "Parashari Sthana & Dig Bala Ledger";
+        if (currentChartType === 'PRASHNA') title = "Prashna (Horary) Sthana & Dig Bala Ledger";
+        if (currentChartType === 'GOCHAR') title = "Gochar (Transit) Sthana & Dig Bala Ledger";
+        if (currentChartType === 'DS') title = "Surya Kundali (Sun Chart) Ledger";
+        if (currentChartType === 'DM') title = "Chandra Kundali (Moon Chart) Ledger";
+        if (currentChartType === 'CC') title = "Bhava Chalit (Equal House) Ledger";
+        
+        document.querySelector('.ledger-panel .ledger-header h3').innerText = title;
         listDiv.style.display = 'grid'; 
         if (typeof globalScores !== 'undefined' && globalScores.length > 0) renderRanking(globalScores);
     } else if (currentChartType === 'D9') {
@@ -1042,7 +1055,6 @@ async function generateChart() {
             asc_sign_global = data.asc_sign;
             asc_degree_global = data.asc_degree; 
             
-            // CACHE NATAL DATA
             natalSkyData = JSON.parse(JSON.stringify(data.houses));
             natalAscSign = data.asc_sign;
             natalAscDegree = data.asc_degree; 
@@ -1063,7 +1075,6 @@ async function generateChart() {
 }
 
 function generatePrashna() {
-    // Show Loading State on Canvas
     kCtx.clearRect(0, 0, kCanvas.width, kCanvas.height);
     kCtx.fillStyle = "#e67e22";
     kCtx.font = "bold 18px Arial";
@@ -1131,27 +1142,22 @@ async function executeSecondaryChart(payload, successMsg) {
         
         if (data.status === 'success') {
             if (currentChartType === 'GOCHAR') {
-                // TRUE GOCHAR: Map transit planets onto the NATAL chart frame
                 if (!natalSkyData || !natalAscSign) {
                     alert("Please 'Calculate Cosmic Map' (Natal Chart) first before casting Gochar.");
                     return;
                 }
                 
-                // 1. Lock the Ascendant to the Native's Natal Ascendant
                 asc_sign_global = natalAscSign;
                 asc_degree_global = natalAscDegree;
                 
-                // 2. Flatten the transiting sky from the backend
                 let transitBodies = [];
                 data.houses.forEach(h => h.forEach(b => { 
                     if (b.abs_deg !== undefined) transitBodies.push(b); 
                 }));
                 
-                // 3. Re-bin transiting planets into the native's Natal Houses
                 skyData = [[],[],[],[],[],[],[],[],[],[],[],[]];
                 transitBodies.forEach(b => {
                     let tSign = Math.floor(b.abs_deg / 30) + 1;
-                    // Calculate the house relative to the NATAL Ascendant
                     let house_idx = (tSign - natalAscSign + 12) % 12;
                     
                     b.sign = tSign;
@@ -1168,7 +1174,6 @@ async function executeSecondaryChart(payload, successMsg) {
                 alert("Gochar Mapped! The transiting planets are now placed in your Natal Houses.");
                 
             } else {
-                // PRASHNA: Standalone chart for the current moment (uses Transit Ascendant)
                 skyData = data.houses; 
                 asc_sign_global = data.asc_sign;
                 asc_degree_global = data.asc_degree; 
@@ -1250,7 +1255,6 @@ function goToLifeJourney() {
 }
 
 function goToDasha() {
-    // Store current Jataka details for the Dasha engine to pull automatically
     localStorage.setItem('dashaName', document.getElementById('name').value);
     localStorage.setItem('dashaDate', document.getElementById('date').value);
     localStorage.setItem('dashaTime', document.getElementById('time').value);
@@ -1316,7 +1320,6 @@ placeSearchObj.addEventListener('input', function() {
     }, 600); 
 });
 
-// --- ADD THIS TO SECTION 9 ---
 let g_geoTimeout = null;
 const g_placeSearchObj = document.getElementById('g_placeSearch');
 const g_suggestionsObj = document.getElementById('g_suggestions');
@@ -1350,7 +1353,79 @@ g_placeSearchObj.addEventListener('input', function() {
     }, 600); 
 });
 
-document.addEventListener('click', function(e) { if (e.target !== placeSearchObj && e.target !== suggestionsObj) suggestionsObj.style.display = 'none'; });
+document.addEventListener('click', function(e) {
+    if (e.target !== kCanvas && !popupObj.contains(e.target)) {
+        popupObj.style.display = 'none';
+    }
+});
+
+// --- INTERACTIVE KUNDALI CLICK LISTENER ---
+kCanvas.addEventListener('click', function(e) {
+    const rect = kCanvas.getBoundingClientRect();
+    const scaleX = kCanvas.width / rect.width;
+    const scaleY = kCanvas.height / rect.height;
+    
+    // Exact click coordinates inside the canvas
+    const clickX = (e.clientX - rect.left) * scaleX;
+    const clickY = (e.clientY - rect.top) * scaleY;
+
+    let hit = false;
+    for (let box of activeGrahaHitboxes) {
+        if (clickX >= box.x && clickX <= box.x + box.w && clickY >= box.y && clickY <= box.y + box.h) {
+            hit = true;
+            let b = box.body;
+            
+            let nakIndex = Math.floor(b.abs_deg / (360/27));
+            let nakData = nakshatraMaster[nakIndex];
+            
+            let isRetro = (b.speed < 0 && !['Rahu', 'Ketu', 'Surya', 'Chandra'].includes(b.name)) ? '<span class="text-bad">Yes (Vakri)</span>' : '<span class="text-neutral">No (Margi)</span>';
+            if (['Rahu', 'Ketu'].includes(b.name)) isRetro = "Always Vakri";
+            
+            let isCombust = '<span class="text-good">No</span>';
+            let sunObj = skyData.flat().find(p => p.name === 'Surya');
+            if (sunObj && !['Rahu', 'Ketu', 'Surya'].includes(b.name)) {
+                let dist = Math.abs(b.abs_deg - sunObj.abs_deg);
+                if (dist > 180) dist = 360 - dist;
+                if (dist <= 12) isCombust = '<span class="text-bad">Yes (Asta)</span>';
+            }
+
+            let awastha = getAwastha(b.deg, b.sign - 1);
+            let dignity = evaluateExactDignity(b.name, b.sign, b.deg).text;
+
+            // Added the Close Button (X) at the top of the popup HTML
+            popupObj.innerHTML = `
+                <span class="close-btn" onclick="document.getElementById('grahaPopup').style.display='none'">&times;</span>
+                <h4>${symbols[b.name]||''} ${box.localName} Details</h4>
+                <div class="data-row"><span>State (Awastha)</span><span>${awastha}</span></div>
+                <div class="data-row"><span>Dignity</span><span>${dignity}</span></div>
+                <div class="data-row"><span>Retrograde</span><span>${isRetro}</span></div>
+                <div class="data-row"><span>Combust</span><span>${isCombust}</span></div>
+                <hr style="border:0; border-top:1px solid rgba(255,255,255,0.1); margin: 6px 0;">
+                <div class="data-row"><span>Nakshatra</span><span>${nakData.name}</span></div>
+                <div class="data-row"><span>Nak. Lord</span><span>${nakData.lord}</span></div>
+                <div class="data-row"><span>Nak. Nature</span><span class="${nakData.nType}">${nakData.nature}</span></div>
+            `;
+            
+            // Calculate absolute position perfectly synced to the Canvas boundary
+            const canvasOffsetX = kCanvas.offsetLeft;
+            const canvasOffsetY = kCanvas.offsetTop;
+            const unscaledClickX = e.clientX - rect.left;
+            const unscaledClickY = e.clientY - rect.top;
+
+            popupObj.style.display = 'block';
+            popupObj.style.left = (canvasOffsetX + unscaledClickX) + 'px';
+            popupObj.style.top = (canvasOffsetY + unscaledClickY - 15) + 'px';
+            break;
+        }
+    }
+    
+    // If the user clicked empty space inside the canvas, close the popup
+    if (!hit) popupObj.style.display = 'none'; 
+});
+
+document.addEventListener('click', function(e) {
+    if (e.target !== kCanvas) popupObj.style.display = 'none';
+});
 
 // INITIALIZE APP
 window.onload = () => { 
