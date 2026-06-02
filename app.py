@@ -644,7 +644,7 @@ def calculate_chart():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
-SERVER_PAID_API_KEY = "AIzaSyAk0kuWJCuuWEY1IMcQJVEZGlv2U-6z1Ag"
+SERVER_PAID_API_KEY = "your api key"
 
 # 1. COST-SAVING WATERFALL: Ordered from cheapest/fastest to most expensive.
 # Over 95% of traffic will be absorbed by the Flash-Lite models at a fraction of a cent.
