@@ -927,6 +927,9 @@ async function findEventTriggers() {
     });
 }
 
+// =================================================================================
+// BPHS AI CONSULTANT PAYLOAD GENERATOR (ULTIMATE DATA INJECTION)
+// =================================================================================
 function generateAIPrompt() {
     const question = document.getElementById('aiQuestion').value.trim();
     const dateFrom = document.getElementById('aiDateFrom').value;
@@ -935,37 +938,83 @@ function generateAIPrompt() {
     if (!question) { alert("Please enter a question."); return; }
 
     const jatakaName = document.getElementById('s_name').innerText;
+    const lagnaName = document.getElementById('s_lagna').innerText;
+    const moonName = document.getElementById('s_moon').innerText;
+
+    // 1. D1 STATE MATRIX (INCLUDING DISPOSITORS, AVASTHAS, AND JAIMINI)
     let d1PositionsText = "";
     Object.keys(grahaRegistry).forEach(pName => {
         let pData = grahaRegistry[pName];
         let retroFlag = pData.is_retro ? "[RETROGRADE]" : "";
-        d1PositionsText += `- ${pName} ${retroFlag}: House ${pData.house} (Absolute Degree: ${pData.abs_deg.toFixed(2)}, Final Net Score: ${pData.dignityScore})\n`;
+        let charaTag = pData.charaKaraka ? `[Jaimini Chara: ${pData.charaKaraka}]` : "";
+        
+        // Clean the HTML tags out of the Avastha/Influence text so the AI can read it plainly
+        let avasthaText = pData.influenceText ? pData.influenceText.replace(/<[^>]*>?/gm, '').replace(/State:/g, '').trim() : "Neutral";
+        let signLord = signLords[pData.sign];
+
+        d1PositionsText += `- ${pName} ${retroFlag} ${charaTag}: Sign ${pData.sign} (Dispositor: ${signLord}), House ${pData.house}, Abs Deg: ${pData.abs_deg.toFixed(2)} | Net Score: ${pData.dignityScore} | Modifiers: ${avasthaText}\n`;
     });
 
-    // explicitly tailored for Gemini 3.1 optimization requirements
+    // 2. DIVISIONAL VARGA MATRIX (D9, D10, D7)
+    let vargaText = "";
+    if (vargaRegistry && vargaRegistry['D9']) {
+        vargaText += "\n[D9 Navamsha - Marriage/Inner Strength]\n";
+        Object.keys(vargaRegistry['D9']).forEach(pName => { vargaText += `- ${pName}: House ${vargaRegistry['D9'][pName].house}\n`; });
+    }
+    if (vargaRegistry && vargaRegistry['D10']) {
+        vargaText += "\n[D10 Dashamsha - Career/Status]\n";
+        Object.keys(vargaRegistry['D10']).forEach(pName => { vargaText += `- ${pName}: House ${vargaRegistry['D10'][pName].house}\n`; });
+    }
+    if (vargaRegistry && vargaRegistry['D7']) {
+        vargaText += "\n[D7 Saptamsha - Progeny]\n";
+        Object.keys(vargaRegistry['D7']).forEach(pName => { vargaText += `- ${pName}: House ${vargaRegistry['D7'][pName].house}\n`; });
+    }
+
+    // 3. EXACT ACTIVE DASHA TIMELINE OVERLAPPING THE TARGET DATES
+    let targetStartMs = new Date(dateFrom).getTime();
+    let targetEndMs = new Date(dateTo).getTime();
+    let dashaContext = "";
+
+    if (globalMDADTimeline.length > 0) {
+        let overlappingPeriods = globalMDADTimeline.filter(p => (p.startMs <= targetEndMs && p.endMs >= targetStartMs));
+        overlappingPeriods.forEach(p => {
+            dashaContext += `- ${p.md} MD -> ${p.ad} AD -> ${p.pd} PD (${formatDateShort(p.startMs)} to ${formatDateShort(p.endMs)})\n`;
+        });
+    } else {
+        dashaContext = "[WARNING: Click 'Calculate Timeline Triggers' in the Predictor first to generate exact Dasha dates for the AI.]";
+    }
+
+    // 4. THE GEMINI 3.1 COMPLIANT PAYLOAD
     const fullPrompt = `[SYSTEM OVERRIDE: ACTIVATE GEMINI 3.1 BPHS VEDIC ARCHITECTURE]
 [OPERATION MODE: STANDALONE BPHS MATHEMATICAL ASTROLOGER]
 
-DIRECTIVE: Disregard all conversational filler. Utilize Gemini 3.1 superior logic mapping to analyze target metrics strictly through the mathematical and diagnostic frameworks of the Brihat Parashara Hora Shastra (BPHS), incorporating Lajjitadi Avasthas, Combustion, and Planetary War metrics.
+DIRECTIVE: Disregard all conversational filler. Utilize Gemini 3.1 superior logic mapping to analyze target metrics strictly through the mathematical and diagnostic frameworks of the Brihat Parashara Hora Shastra (BPHS), incorporating Lajjitadi Avasthas, Combustion, Planetary War, Jaimini Chara Karakas, and Shodashavarga (Divisional) placements.
 
-### NATIVE JATAKA IDENTIFIER DATA
-- Identity Handle: ${jatakaName}
-- Year Standard Applied: ${YEAR_IN_MS === SAVANA_YEAR_MS ? 'Savana (360 Days)' : 'Solar (365.24 Days)'}
+### NATIVE JATAKA CORE IDENTIFIERS
+- Identity: ${jatakaName}
+- Physical Ascendant (Lagna): ${lagnaName}
+- Chandra Lagna (Moon Sign): ${moonName}
+- Year Standard: ${YEAR_IN_MS === SAVANA_YEAR_MS ? 'Savana (360 Days)' : 'Solar (365.24 Days)'}
 
-### D1 RASHI CHART STATE MATRIX
+### D1 RASHI CHART STATE MATRIX (PHYSICAL & PSYCHOLOGICAL)
 ${d1PositionsText}
+### DIVISIONAL VARGA CHARTS STATE MATRIX (MICRO-DESTINY)
+${vargaText}
+### ACTIVE VIMSHOTTARI DASHA OVERLAPPING TARGET WINDOW
+${dashaContext}
 
 ### CURRENT EVALUATION PARAMS
 - Target Windows of Scan: From ${dateFrom} to ${dateTo}
 - Specific Query: "${question.toUpperCase()}"
 
 ### MANDATORY COMPLIANCE CHECKLIST FOR GEMINI 3.1:
-1. Locate the specific structural Bhavas and natural Karakas related to the query.
-2. Cross-examine the strength considering Retrograde Chesta Bala and Avasthas.
-3. Weigh the operational functional status of active Dasha Lords.
-4. Output a high-confidence structural conclusion.
+1. Locate the specific structural Bhavas and natural/Chara Karakas related to the query.
+2. Cross-examine the strength considering Retrograde Chesta Bala, Lajjitadi Avasthas, and D9 Navamsha Vargottama/dignity.
+3. Weigh the operational functional status of the active Dasha Lords listed in the timeline.
+4. Account for Dispositor strength and mutual friendship (Naisargika Maitri) of Dasha lords.
+5. Output a high-confidence structural conclusion based purely on these provided mathematical vectors.
 
-Begin structural analysis:`;
+Begin BPHS deep structural analysis:`;
 
     document.getElementById('aiPromptTextArea').value = fullPrompt;
     document.getElementById('aiPromptWrapper').style.display = 'block';
