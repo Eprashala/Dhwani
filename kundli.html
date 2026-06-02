@@ -706,11 +706,13 @@ function populateKundali(houses, ascSign) {
         const houseNum = idx + 1;
         const cx = coords[idx].x; const cy = coords[idx].y;
 
-        // --- NEW: DRAW ASCENDANT (LAGNA) POINT IN 1ST HOUSE ---
+        // --- DRAW ASCENDANT (LAGNA) POINT IN 1ST HOUSE ---
         if (idx === 0 && asc_degree_global !== null) {
             kCtx.font = "bold 11.5px Arial";
             let lagnaText = "🎯 Lagna " + formatDegree(asc_degree_global % 30);
-            let textY = cy - 25; // Positioned near the top tip of the 1st house diamond
+            
+            // Anchored strictly to the absolute top tip of the 1st house to avoid clashing with crowded planets
+            let textY = cy - 45; 
             
             // Register Lagna Hitbox
             let tMetrics = kCtx.measureText(lagnaText);
@@ -721,7 +723,6 @@ function populateKundali(houses, ascSign) {
                 body: { type: 'lagna', abs_deg: asc_degree_global, deg: asc_degree_global % 30, sign: effectiveAscSign }
             });
 
-            // Draw text with white halo for visibility
             kCtx.strokeStyle = "rgba(255, 255, 255, 0.95)"; kCtx.lineWidth = 3.5; kCtx.lineJoin = "round";
             kCtx.strokeText(lagnaText, cx, textY);
             kCtx.fillStyle = "#c0392b";
@@ -730,7 +731,7 @@ function populateKundali(houses, ascSign) {
 
         const sortedBodies = bodies.sort((a, b) => { if (a.type === 'graha' && b.type !== 'graha') return -1; if (a.type !== 'graha' && b.type === 'graha') return 1; return 0; });
         
-		let displayBodies = sortedBodies.filter(b => {
+        let displayBodies = sortedBodies.filter(b => {
             if (!activeHouses.has(houseNum) || b.name === 'Earth') return false;
             const isGraha = b.type === 'graha'; 
             const isNode = b.name === 'Rahu' || b.name === 'Ketu'; 
@@ -743,36 +744,64 @@ function populateKundali(houses, ascSign) {
             return true;
         });
         
-        let startY = cy - ((displayBodies.length * 15) / 2) + 5;
-        
+        // --- DYNAMIC FONT & ANTI-OVERLAP SPACING ---
+        let count = displayBodies.length;
+        let lineSpacing = 15;
+        let gFontSize = 12;
+        let uFontSize = 10;
+        let haloWidth = 3.5;
+
+        // Progressively shrink fonts and tighten spacing if the house becomes heavily crowded
+        if (count >= 6) {
+            lineSpacing = 10; gFontSize = 9.5; uFontSize = 8.5; haloWidth = 2;
+        } else if (count === 5) {
+            lineSpacing = 11.5; gFontSize = 10.5; uFontSize = 9.5; haloWidth = 2.5;
+        } else if (count === 4) {
+            lineSpacing = 13; gFontSize = 11.5; uFontSize = 10; haloWidth = 3;
+        }
+
+        // Anchor the bottom of the list safely above the Rashi background text (which starts at cy + 24)
+        // If it's a small list, center it normally. If it's a huge list, stack it upwards.
+        let anchorBottomY = cy + 6; 
+        let startY = count <= 2 
+            ? cy - (count * lineSpacing) / 2 
+            : anchorBottomY - ((count - 1) * lineSpacing);
+
         displayBodies.forEach((b, i) => {
             const localName = (i18n[currentLang] && i18n[currentLang].names[b.name]) ? i18n[currentLang].names[b.name] : b.name;
-            const textY = startY + (i * 15);
+            const textY = startY + (i * lineSpacing);
             
             let nakShort = "";
             if (showNak) {
                 let nakFullName = getNakshatraLocal(b.abs_deg);
-                nakShort = ` [${nakFullName.substring(nakFullName.indexOf(' ') + 1)}]`;
+                let nakNameOnly = nakFullName.substring(nakFullName.indexOf(' ') + 1);
+                
+                // Truncate to just the first 4 letters if extremely crowded to prevent horizontal bleeding
+                if (count >= 5) nakNameOnly = nakNameOnly.substring(0, 4) + '.';
+                nakShort = ` [${nakNameOnly}]`;
             }
             
             kCtx.strokeStyle = "rgba(255, 255, 255, 0.95)"; 
             kCtx.lineJoin = "round";
             
-              
             if (b.type === 'graha') {
-                kCtx.font = "bold 12px Arial";
-                kCtx.lineWidth = 3.5;
+                kCtx.font = `bold ${gFontSize}px Arial`;
+                kCtx.lineWidth = haloWidth;
                 
                 let karakaLabel = "";
-                if (currentChartType !== 'D1' && karakaMap[b.name]) karakaLabel = ` {${karakaMap[b.name]}}`;
+                // Hide Jaimini Karaka label '{AK}' if crowded to save horizontal space
+                if (currentChartType !== 'D1' && karakaMap[b.name] && count <= 4) {
+                    karakaLabel = ` {${karakaMap[b.name]}}`;
+                }
                 
                 let textObj = `${symbols[b.name]||''} ${localName} ${formatDegree(b.deg)}${nakShort}${karakaLabel}`;
                 
+                // Sync the interactive hitboxes to the new dynamic font sizes
                 let tMetrics = kCtx.measureText(textObj);
                 activeGrahaHitboxes.push({
                     name: b.name, localName: localName,
-                    x: cx - tMetrics.width/2 - 5, y: textY - 12, 
-                    w: tMetrics.width + 10, h: 16, body: b
+                    x: cx - tMetrics.width/2 - 5, y: textY - gFontSize, 
+                    w: tMetrics.width + 10, h: gFontSize + 4, body: b
                 });
 
                 kCtx.strokeText(textObj, cx, textY); 
@@ -780,8 +809,8 @@ function populateKundali(houses, ascSign) {
                 kCtx.fillText(textObj, cx, textY);
                 
             } else {
-                kCtx.font = "italic 10px Arial";
-                kCtx.lineWidth = 2.5;
+                kCtx.font = `italic ${uFontSize}px Arial`;
+                kCtx.lineWidth = haloWidth;
                 let textObj = `•${localName}${nakShort}`;
                 kCtx.strokeText(textObj, cx, textY); 
                 kCtx.fillStyle = "#8e44ad";          
