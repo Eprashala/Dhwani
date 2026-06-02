@@ -72,8 +72,24 @@
                 </div>
         </div>
     </div>
+	
+	<div class="panel" style="grid-column: 1 / -1; margin-top: 10px; border-left: 4px solid #27ae60;">
+            <h3 style="margin-bottom: 5px; color: #27ae60;">🤖 AI Consultation Prompt Builder</h3>
+            <p style="font-size: 13px; color: #7f8c8d; margin-top: 0; margin-bottom: 15px;">Ask a specific question about these scores (e.g., "How will Saturn's upcoming Gochar through Pisces affect my career given its BAV bindus?").</p>
+            
+            <div style="display: flex; gap: 15px; align-items: stretch; flex-wrap: wrap;">
+                <textarea id="aiQuestion" placeholder="Enter your specific question regarding transits or Ashtakavarga..." style="flex: 1; min-width: 300px; padding: 12px; border: 1px solid #bdc3c7; border-radius: 6px; font-family: inherit; font-size: 14px; resize: vertical; min-height: 50px; outline: none;"></textarea>
+                <button onclick="generateAshtakavargaPrompt()" style="background: #27ae60; color: white; border: none; padding: 0 25px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; transition: 0.3s; white-space: nowrap; box-shadow: 0 4px 6px rgba(39, 174, 96, 0.2);">✨ Copy Prompt for Gemini 3.1</button>
+            </div>
+        </div>
 
 <script>
+
+// --- Add these variables near the top of your script ---
+let globalSavArray = [];
+let globalBavResults = {};
+let globalAscSign = 1;
+
 // ==========================================
 // 1. CLASSICAL BPHS BINDU TABLES (Total: 337)
 // ==========================================
@@ -184,6 +200,11 @@ function processAshtakavarga(housesData, ascSign) {
         
         bavResults[targetPlanet] = bavArray;
     });
+	
+	// --- Add this block inside processAshtakavarga ---
+    globalSavArray = savArray;
+    globalBavResults = bavResults;
+    globalAscSign = ascSign;
 
     document.getElementById('loading').style.display = 'none';
     document.getElementById('mainDashboard').style.display = 'grid';
@@ -280,6 +301,67 @@ function drawDiamondChart(canvasId, title, rashiBindusArray, ascSign, isSav) {
         ctx.fillText(`[${rashiInHouse}]`, rX, rY);
     }
 }
+
+// ==========================================
+// 5. AI PROMPT GENERATOR
+// ==========================================
+function generateAshtakavargaPrompt() {
+    if (!globalSavArray || globalSavArray.length === 0) {
+        alert("Please wait for the chart to finish calculating.");
+        return;
+    }
+
+    const question = document.getElementById('aiQuestion').value.trim();
+    const name = localStorage.getItem('ashName') || 'Native';
+    const date = localStorage.getItem('ashDate') || 'Unknown Date';
+    const time = localStorage.getItem('ashTime') || 'Unknown Time';
+
+    const rashis = ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'];
+    const ascName = rashis[globalAscSign - 1];
+
+    let prompt = `SYSTEM PROTOCOL: INCOGNITO MODE. Act as Maharishi Parashara and an expert in Vedic Jyotish Ashtakavarga evaluation.\n\n`;
+    prompt += `I am presenting the high-precision Ashtakavarga data for ${name} (Born: ${date} at ${time}).\n\n`;
+
+    if (question) {
+        prompt += `### THE CLIENT'S PRIMARY QUESTION:\n"${question}"\n\nPlease structure your analysis to directly answer this question using the astrological data below.\n\n`;
+    }
+
+    prompt += `### ASHTAKAVARGA DATA (Calculated via 337-Bindu BPHS Matrix)\n`;
+    prompt += `Ascendant (Lagna): Sign ${globalAscSign} (${ascName})\n\n`;
+
+    prompt += `SARVASHTAKAVARGA (SAV) TOTAL BINDUS PER RASHI:\n`;
+    for (let i = 0; i < 12; i++) {
+        // Displaying in House order (from Ascendant onwards)
+        const rashiNum = (globalAscSign + i - 1) % 12 + 1;
+        prompt += `House ${i + 1} (Sign ${rashiNum} - ${rashis[rashiNum-1]}): ${globalSavArray[rashiNum-1]} Bindus\n`;
+    }
+
+    prompt += `\nBHINNASHTAKAVARGA (BAV) BINDUS (Format -> Sign Number: Bindus):\n`;
+    const planets = ['Surya', 'Chandra', 'Mangal', 'Budh', 'Guru', 'Shukra', 'Shani'];
+    
+    planets.forEach(p => {
+        let bindusList = [];
+        // Map 1-12 signs
+        for(let i = 1; i <= 12; i++) {
+            bindusList.push(`S${i}:${globalBavResults[p][i-1]}`);
+        }
+        prompt += `- ${p}: ${bindusList.join(' | ')}\n`;
+    });
+
+    prompt += `\nINSTRUCTIONS FOR ANALYSIS:
+1. Evaluate the SAV strength for relevant transits or natal houses related to the question.
+2. Identify where specific planets (BAV) are thriving (5+ bindus) or starved (0-3 bindus) and how that impacts the Gochar.
+3. Conclude with a definitive, actionable answer based strictly on these mathematical weights.`;
+
+    navigator.clipboard.writeText(prompt).then(() => {
+        alert("Prompt copied to clipboard! Paste this into Gemini 3.1 for your expert reading.");
+    }).catch(err => {
+        console.error("Clipboard write failed", err);
+        alert("Failed to copy prompt. Please check your browser permissions.");
+    });
+}
+
+
 </script>
 </body>
 </html>
