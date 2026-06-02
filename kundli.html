@@ -701,14 +701,36 @@ function populateKundali(houses, ascSign) {
         }
     });
 
-    // --- PASS 2: DRAW PLANETS & HITBOXES ---
+// --- PASS 2: DRAW PLANETS & HITBOXES ---
     displayHouses.forEach((bodies, idx) => {
         const houseNum = idx + 1;
         const cx = coords[idx].x; const cy = coords[idx].y;
 
+        // --- NEW: DRAW ASCENDANT (LAGNA) POINT IN 1ST HOUSE ---
+        if (idx === 0 && asc_degree_global !== null) {
+            kCtx.font = "bold 11.5px Arial";
+            let lagnaText = "🎯 Lagna " + formatDegree(asc_degree_global % 30);
+            let textY = cy - 25; // Positioned near the top tip of the 1st house diamond
+            
+            // Register Lagna Hitbox
+            let tMetrics = kCtx.measureText(lagnaText);
+            activeGrahaHitboxes.push({
+                name: 'Lagna', localName: 'Ascendant',
+                x: cx - tMetrics.width/2 - 5, y: textY - 12, 
+                w: tMetrics.width + 10, h: 16, 
+                body: { type: 'lagna', abs_deg: asc_degree_global, deg: asc_degree_global % 30, sign: effectiveAscSign }
+            });
+
+            // Draw text with white halo for visibility
+            kCtx.strokeStyle = "rgba(255, 255, 255, 0.95)"; kCtx.lineWidth = 3.5; kCtx.lineJoin = "round";
+            kCtx.strokeText(lagnaText, cx, textY);
+            kCtx.fillStyle = "#c0392b";
+            kCtx.fillText(lagnaText, cx, textY);
+        }
+
         const sortedBodies = bodies.sort((a, b) => { if (a.type === 'graha' && b.type !== 'graha') return -1; if (a.type !== 'graha' && b.type === 'graha') return 1; return 0; });
         
-        let displayBodies = sortedBodies.filter(b => {
+		let displayBodies = sortedBodies.filter(b => {
             if (!activeHouses.has(houseNum) || b.name === 'Earth') return false;
             const isGraha = b.type === 'graha'; 
             const isNode = b.name === 'Rahu' || b.name === 'Ketu'; 
