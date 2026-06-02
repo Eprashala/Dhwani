@@ -619,8 +619,8 @@ function populateKundali(houses, ascSign) {
         displayHouses[house_idx].push(b);
     });
 
+    // --- PASS 1: DRAW RASHI BACKGROUNDS (Lower Layer) ---
     displayHouses.forEach((bodies, idx) => {
-        const houseNum = idx + 1;
         const cx = coords[idx].x; const cy = coords[idx].y;
         
         if (showRashis) {
@@ -642,6 +642,12 @@ function populateKundali(houses, ascSign) {
             kCtx.fillText(rashiText, cx, cy + 48);
             kCtx.restore();
         }
+    });
+
+    // --- PASS 2: DRAW PLANETS (Topmost Layer with Visibility Halos) ---
+    displayHouses.forEach((bodies, idx) => {
+        const houseNum = idx + 1;
+        const cx = coords[idx].x; const cy = coords[idx].y;
 
         const sortedBodies = bodies.sort((a, b) => { if (a.type === 'graha' && b.type !== 'graha') return -1; if (a.type !== 'graha' && b.type === 'graha') return 1; return 0; });
         
@@ -670,17 +676,33 @@ function populateKundali(houses, ascSign) {
                 nakShort = ` [${nakFullName.substring(nakFullName.indexOf(' ') + 1)}]`;
             }
             
+            // Text Stroke (Halo) settings to cut through grid lines
+            kCtx.strokeStyle = "rgba(255, 255, 255, 0.95)"; // Strong white outline
+            kCtx.lineJoin = "round";
+            
             if (b.type === 'graha') {
-                kCtx.fillStyle = "#c0392b"; kCtx.font = "bold 11px Arial";
+                kCtx.font = "bold 12px Arial"; // Slightly bumped up to 12px for better readability
+                kCtx.lineWidth = 3.5;
+                
                 let karakaLabel = "";
                 if (currentChartType !== 'D1' && karakaMap[b.name]) {
                     karakaLabel = ` {${karakaMap[b.name]}}`;
                 }
                 let textObj = `${symbols[b.name]||''} ${localName} ${formatDegree(b.deg)}${nakShort}${karakaLabel}`;
+                
+                kCtx.strokeText(textObj, cx, textY); // Draw Halo First
+                kCtx.fillStyle = "#c0392b";          // Then draw Text
                 kCtx.fillText(textObj, cx, textY);
+                
             } else {
-                kCtx.fillStyle = "#8e44ad"; kCtx.font = "italic 9px Arial";
-                kCtx.fillText(`•${localName}${nakShort}`, cx, textY);
+                kCtx.font = "italic 10px Arial";
+                kCtx.lineWidth = 2.5;
+                
+                let textObj = `•${localName}${nakShort}`;
+                
+                kCtx.strokeText(textObj, cx, textY); // Draw Halo First
+                kCtx.fillStyle = "#8e44ad";          // Then draw Text
+                kCtx.fillText(textObj, cx, textY);
             }
         });
     });
