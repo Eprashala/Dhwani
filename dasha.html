@@ -511,16 +511,34 @@ function calculateDashaVerdict(lordName, parentLordName, level) {
         }
     }
 
+// 4. SUB-PERIOD EVALUATION (FRIENDSHIP + GEOMETRY)
     let relativeText = "";
     if (level > 0 && parentLordName && grahaRegistry[parentLordName]) {
+        
+        // A. Mutual Friendship Check (Naisargika Maitri) - YOU WERE MISSING THIS!
+        let parentFriends = naturalRelationships[parentLordName].friends;
+        let parentEnemies = naturalRelationships[parentLordName].enemies;
+        let friendshipText = "";
+        
+        if (parentFriends.includes(lordName)) {
+            totalScore += 2;
+            friendshipText = `Mitra (Friend) to MD`;
+        } else if (parentEnemies.includes(lordName)) {
+            totalScore -= 2;
+            friendshipText = `Shatru (Enemy) to MD`;
+        } else {
+            friendshipText = `Sama (Neutral) to MD`;
+        }
+
+        // B. Geometric Axis Check from MD Lord
         let parentSign = grahaRegistry[parentLordName].sign;
         let relativeHouse = (planetData.sign - parentSign + 12) % 12 + 1;
         
-        if ([6, 8].includes(relativeHouse)) { totalScore -= 4; relativeText = `<br>(Shadashtaka: 6/8 axis from ${parentLordName})`; } 
-        else if (relativeHouse === 12) { totalScore -= 2; relativeText = `<br>(Vyaya: 12th from ${parentLordName})`; } 
-        else if (relativeHouse === 2) { totalScore -= 2; relativeText = `<br>(Maraka: 2nd from ${parentLordName})`; } // FIX: 2nd House added
-        else if ([1, 4, 5, 7, 9, 10].includes(relativeHouse)) { totalScore += 3; relativeText = `<br>(Auspicious: ${relativeHouse}th from ${parentLordName})`; } 
-        else if ([3, 11].includes(relativeHouse)) { totalScore += 1; relativeText = `<br>(Upachaya: ${relativeHouse}th from ${parentLordName})`; }
+        if ([6, 8].includes(relativeHouse)) { totalScore -= 4; relativeText = `<br>(${friendshipText} + Shadashtaka 6/8 axis)`; } 
+        else if (relativeHouse === 12) { totalScore -= 2; relativeText = `<br>(${friendshipText} + Vyaya 12th position)`; } 
+        else if (relativeHouse === 2) { totalScore -= 2; relativeText = `<br>(${friendshipText} + Maraka 2nd position)`; }
+        else if ([1, 4, 5, 7, 9, 10].includes(relativeHouse)) { totalScore += 3; relativeText = `<br>(${friendshipText} + Auspicious ${relativeHouse}th position)`; } 
+        else if ([3, 11].includes(relativeHouse)) { totalScore += 1; relativeText = `<br>(${friendshipText} + Upachaya ${relativeHouse}th position)`; }
     }
 
     let infText = planetData.influenceText || "";
