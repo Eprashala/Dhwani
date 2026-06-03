@@ -1217,75 +1217,74 @@
             if (btnId) { const b = document.getElementById(btnId); if(b) { b.innerHTML = state === 'playing' ? '⏸️ Pause' : '▶️ Play'; currentlyPlayingBtnId = state === 'playing' ? btnId : null; } }
         }
 
-		async function speakText(text, btnId = null, overrideOptions = null) {
-    stopTTS(); 
-    let clean = text.replace(/[\u{1F600}-\u{1F6FF}|[\u{2600}-\u{26FF}]/gu, '').replace(/[*#`_\[\]()]/g, '').trim(); 
-    if(!clean) return;
+			async function speakText(text, btnId = null, overrideOptions = null) {
+				stopTTS(); 
+				let clean = text.replace(/[\u{1F600}-\u{1F6FF}|[\u{2600}-\u{26FF}]/gu, '').replace(/[*#`_\[\]()]/g, '').trim(); 
+				if(!clean) return;
 
-    const p = getActivePersona(); 
-    const hasCustomVoice = (overrideOptions && overrideOptions.customVoicePath) || (p && p.customVoicePath);
-    const customVoiceBase64 = (overrideOptions && overrideOptions.customVoicePath) || p.customVoicePath;
-    const targetLang = (overrideOptions && overrideOptions.lang) || p.lang || 'en-US';
+				const p = getActivePersona(); 
+				const hasCustomVoice = (overrideOptions && overrideOptions.customVoicePath) || (p && p.customVoicePath);
+				const customVoiceBase64 = (overrideOptions && overrideOptions.customVoicePath) || p.customVoicePath;
+				const targetLang = (overrideOptions && overrideOptions.lang) || p.lang || 'en-US';
 
-    if (hasCustomVoice) {
-        updateBtnState(btnId, 'playing');
-        try {
-            // Using a highly stable, public server endpoint for Coqui XTTS v2
-            const response = await fetch("https://coqui-xtts.hf.space/api/predict", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    data: [
-                        clean, // Text to speak
-                        targetLang.split('-')[0], // Primary language format (e.g. "en")
-                        { name: "audio.wav", data: customVoiceBase64 }, // Your cloned baseline
-                        null, 
-                        false, 
-                        false 
-                    ]
-                })
-            });
+				if (hasCustomVoice) {
+					updateBtnState(btnId, 'playing');
+					try {
+						// 1. Dynamically import the official Gradio Client
+						const { client } = await import("https://cdn.jsdelivr.net/npm/@gradio/client@0.1.4/dist/index.min.js");
+						
+						// 2. Connect to the public Hugging Face space
+						const app = await client("coqui/xtts");
+						
+						// 3. Convert your saved base64 string back into a Blob that Gradio can process
+						const audioResponse = await fetch(customVoiceBase64);
+						const audioBlob = await audioResponse.blob();
+						
+						// 4. Send the request through the official client (which handles queues and file uploads automatically)
+						const result = await app.predict("/predict", [
+							clean, 
+							targetLang.split('-')[0], 
+							audioBlob, 
+							null, 
+							false, 
+							false
+						]);
+						
+						// 5. The client returns the final accessible audio URL
+						if (result && result.data && result.data[0]) {
+							const audio = new Audio(result.data[0].url);
+							window.currentCustomAudioSource = audio;
+							audio.onended = () => { stopTTS(); }; 
+							audio.onerror = () => { throw new Error("Audio playback broken"); };
+							await audio.play();
+							return; // Exit here if successful!
+						}
+					} catch (err) { 
+						console.warn("Cloud voice failed, jumping to native speech engine:", err); 
+						updateBtnState(btnId, 'idle'); 
+					}
+				}
 
-            if (!response.ok) throw new Error("Cloud voice generation failed.");
-            const resData = await response.json();
-            
-            if (resData && resData.data && resData.data[0]) {
-                const audioFilename = resData.data[0].name;
-                const remoteAudioUrl = "https://coqui-xtts.hf.space/file=" + audioFilename;
-                
-                const audio = new Audio(remoteAudioUrl);
-                window.currentCustomAudioSource = audio;
-                audio.onended = () => { stopTTS(); }; 
-                audio.onerror = () => { throw new Error("Audio playback broken"); };
-                await audio.play();
-                return; // Exit completely if cloning succeeds
-            }
-        } catch (err) { 
-            console.warn("Cloud voice failed, jumping to native speech engine:", err); 
-            updateBtnState(btnId, 'idle'); 
-        }
-    }
-
-    // --- FALLBACK NATIVE ENGINE ---
-    const u = new SpeechSynthesisUtterance(clean); 
-    window.currentTTSUtterance = u; 
-    u.lang = targetLang; 
-    u.pitch = p.pitch || 1.0; 
-    u.rate = p.rate || 1.0;
-    
-    const targetVoice = p.voiceURI || state.settings.globalVoice;
-    if (targetVoice) { 
-        const v = synth.getVoices().find(v => v.voiceURI === targetVoice); 
-        if (v) { u.voice = v; u.lang = v.lang; } 
-    }
-    
-    u.onstart = () => { updateBtnState(btnId, 'playing'); }; 
-    u.onend = () => { stopTTS(); }; 
-    u.onerror = () => { stopTTS(); };
-    
-    setTimeout(() => { synth.speak(u); }, 50); 
-    updateBtnState(btnId, 'playing');
-}
+				// --- FALLBACK NATIVE ENGINE ---
+				const u = new SpeechSynthesisUtterance(clean); 
+				window.currentTTSUtterance = u; 
+				u.lang = targetLang; 
+				u.pitch = p.pitch || 1.0; 
+				u.rate = p.rate || 1.0;
+				
+				const targetVoice = p.voiceURI || state.settings.globalVoice;
+				if (targetVoice) { 
+					const v = synth.getVoices().find(v => v.voiceURI === targetVoice); 
+					if (v) { u.voice = v; u.lang = v.lang; } 
+				}
+				
+				u.onstart = () => { updateBtnState(btnId, 'playing'); }; 
+				u.onend = () => { stopTTS(); }; 
+				u.onerror = () => { stopTTS(); };
+				
+				setTimeout(() => { synth.speak(u); }, 50); 
+				updateBtnState(btnId, 'playing');
+			}
 
         window.toggleMessageAudio = function(btnId, encodedText) {
             const text = decodeURIComponent(encodedText); const btn = document.getElementById(btnId);
