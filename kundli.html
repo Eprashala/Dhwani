@@ -959,10 +959,10 @@ function getDivisionalSign(absoluteDegree, chartType) {
         case 'D3': part = Math.floor(degInRashi / 10); return ((rashi + part * 4 - 1) % 12) + 1;
         case 'D4': part = Math.floor(degInRashi / 7.5); return ((rashi + part * 3 - 1) % 12) + 1;
         case 'D5': part = Math.floor(degInRashi / 6); return isOdd ? [1, 11, 9, 3, 7][part] : [2, 6, 12, 10, 8][part];
-        case 'D7': part = Math.floor(degInRashi / (30 / 7)); return isOdd ? ((rashi + part - 1) % 12) + 1 : ((rashi + 6 + part) % 12) + 1;
+		case 'D7': part = Math.floor(degInRashi / (30 / 7)); return isOdd ? ((rashi + part - 1) % 12) + 1 : ((rashi - 1 + 6 + part) % 12) + 1;
         case 'D8': part = Math.floor(degInRashi / 3.75); startSign = modality === 1 ? 1 : (modality === 2 ? 9 : 5); return ((startSign + part - 1) % 12) + 1;
         case 'D9': part = Math.floor(degInRashi / (30 / 9)); startSign = element === 1 ? 1 : (element === 2 ? 10 : (element === 3 ? 7 : 4)); return ((startSign + part - 1) % 12) + 1;
-        case 'D10': part = Math.floor(degInRashi / 3); return isOdd ? ((rashi + part - 1) % 12) + 1 : ((rashi + 8 + part) % 12) + 1;
+        case 'D10': part = Math.floor(degInRashi / 3); return isOdd ? ((rashi + part - 1) % 12) + 1 : ((rashi - 1 + 8 + part) % 12) + 1;
         case 'D12': part = Math.floor(degInRashi / 2.5); return ((rashi + part - 1) % 12) + 1;
         case 'D16': part = Math.floor(degInRashi / (30 / 16)); startSign = modality === 1 ? 1 : (modality === 2 ? 5 : 9); return ((startSign + part - 1) % 12) + 1;
         case 'D20': part = Math.floor(degInRashi / 1.5); startSign = modality === 1 ? 1 : (modality === 2 ? 9 : 5); return ((startSign + part - 1) % 12) + 1;
@@ -1392,17 +1392,25 @@ function populateKundali(houses, ascSign) {
             kCtx.strokeStyle = "rgba(255, 255, 255, 0.95)"; 
             kCtx.lineJoin = "round";
             
-            if (b.type === 'graha') {
-                kCtx.font = `bold ${gFontSize}px Arial`;
-                kCtx.lineWidth = haloWidth;
-                
-                let karakaLabel = "";
-                // Hide Jaimini Karaka label '{AK}' if crowded to save horizontal space
-                if (currentChartType !== 'D1' && karakaMap[b.name] && count <= 4) {
-                    karakaLabel = ` {${karakaMap[b.name]}}`;
-                }
-                
-                let textObj = `${symbols[b.name]||''} ${localName} ${formatDegree(b.deg)}${nakShort}${karakaLabel}`;
+			if (b.type === 'graha') {
+            kCtx.font = `bold ${gFontSize}px Arial`;
+            kCtx.lineWidth = haloWidth;
+            
+            let karakaLabel = "";
+            // Jaimini Karakas strictly belong to the D9 Navamsha analysis (Karakamsha)
+            if (currentChartType === 'D9' && karakaMap[b.name] && count <= 4) {
+                karakaLabel = ` {${karakaMap[b.name]}}`;
+            }
+
+            // Spatial Degrees are only valid for absolute-degree charts (D1, Chalit, Gochar, Sun/Moon)
+            let degreeLabel = "";
+            let coreCharts = ['D1', 'DS', 'DM', 'CC', 'PRASHNA', 'GOCHAR'];
+            if (coreCharts.includes(currentChartType)) {
+                degreeLabel = ` ${formatDegree(b.deg)}`;
+            }
+            
+            // Build the text object without applying D1 degrees to Vargas
+            let textObj = `${symbols[b.name]||''} ${localName}${degreeLabel}${nakShort}${karakaLabel}`;
                 
                 // Sync the interactive hitboxes to the new dynamic font sizes
                 let tMetrics = kCtx.measureText(textObj);
