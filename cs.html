@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C-Section Muhurta & Local BPHS Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.8.0/suncalc.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Baloo+Bhai+2:wght@400;600;700&family=Mukta:wght@300;400;600;700&display=swap');
+        
+        body { 
+            font-family: 'Mukta', sans-serif; 
+            background-color: #f8fafc; 
+            background-image: url('https://www.transparenttextures.com/patterns/cream-paper.png');
+        }
+        h1, h2, h3, h4, .title-font { font-family: 'Baloo Bhai 2', sans-serif; line-height: 1.4; }
+        
+        .royal-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #312e81 100%); }
+        
+        .card {
+            background: white; 
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.15); }
+
+        .loader {
+            border: 4px solid #e0e7ff; border-top: 4px solid #4338ca; border-radius: 50%;
+            width: 40px; height: 40px; animation: spin 1s linear infinite; display: none; margin: 0 auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .suggestions-box {
+            position: absolute; top: 100%; left: 0; right: 0; background: white;
+            border: 1px solid #c7d2fe; border-radius: 0.5rem; z-index: 50; max-height: 200px;
+            overflow-y: auto; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); display: none;
+        }
+        .suggestion-item { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #e0e7ff; }
+        .suggestion-item:hover { background-color: #eef2ff; color: #3730a3; font-weight: bold; }
+
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="text-gray-800 min-h-screen pb-10 relative">
+
+    <header class="royal-gradient text-white py-8 shadow-xl mb-8 text-center relative overflow-hidden">
+        <div class="absolute top-4 right-4 bg-green-500/20 border border-green-400 text-green-100 px-3 py-1.5 rounded-lg text-xs font-bold tracking-wide">
+            <i class="fas fa-bolt text-yellow-300 mr-1"></i> 100% Local BPHS Engine
+        </div>
+
+        <div class="container mx-auto px-4 relative z-10 mt-6 sm:mt-0">
+            <p class="text-indigo-200 text-lg font-bold mb-2 tracking-widest drop-shadow-md">।। ॐ जीवं रक्ष ।।</p>
+            <h1 class="text-4xl md:text-5xl font-bold mb-3 drop-shadow-lg">C-Section Cosmic Optimizer</h1>
+            <p class="text-indigo-100 text-lg">Instant Deterministic Vedic Analysis (No AI)</p>
+        </div>
+        <div class="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]"></div>
+    </header>
+
+    <div class="container mx-auto px-4 max-w-6xl">
+        <div class="card rounded-2xl p-6 md:p-8 mb-8 border-t-4 border-indigo-600">
+            <p class="mb-5 text-gray-600 font-medium text-lg text-center">Select the tentative date and hospital location</p>
+            <div class="flex flex-col md:flex-row gap-4 justify-center items-center w-full md:w-10/12 mx-auto">
+                <input type="date" id="dateInput" class="w-full md:w-1/3 px-4 py-3 border border-indigo-300 rounded-xl focus:ring-2 focus:ring-indigo-500 bg-indigo-50 font-semibold outline-none text-gray-700">
+                
+                <div class="relative w-full md:w-1/3 text-left">
+                    <input type="text" id="cityInput" placeholder="Hospital City..." autocomplete="off" class="w-full px-4 py-3 border border-indigo-300 rounded-xl focus:ring-2 focus:ring-indigo-500 bg-indigo-50 font-semibold outline-none text-gray-700">
+                    <div id="suggestions" class="suggestions-box"></div>
+                </div>
+
+                <button onclick="calculateBirthMuhurtas()" class="w-full md:w-1/3 bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold shadow-md transition-all hover:shadow-lg">
+                    <i class="fas fa-search-location mr-2"></i> Find Cosmic Windows
+                </button>
+            </div>
+            <div id="loading" class="mt-6"><div class="loader"></div></div>
+            <p id="error-msg" class="text-red-500 mt-4 font-bold text-center hidden"></p>
+        </div>
+
+        <div id="daily-summary" class="hidden mb-6 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-wrap justify-between items-center gap-4">
+            <div>
+                <h3 class="text-indigo-900 font-bold text-xl"><span id="sum-date"></span></h3>
+                <p class="text-gray-600 text-sm">Sunrise: <span id="sum-sunrise" class="font-bold"></span> | Sunset: <span id="sum-sunset" class="font-bold"></span></p>
+            </div>
+            <div class="flex gap-3 text-sm">
+                <span class="bg-indigo-50 text-indigo-800 px-3 py-1.5 rounded-lg font-semibold border border-indigo-200">Moon Sign: <span id="sum-moon"></span></span>
+                <span class="bg-indigo-50 text-indigo-800 px-3 py-1.5 rounded-lg font-semibold border border-indigo-200">Nakshatra: <span id="sum-nak"></span></span>
+            </div>
+        </div>
+
+        <div id="muhurta-timeline" class="hidden space-y-6">
+            <h2 class="text-2xl font-bold text-gray-800 border-b-2 border-indigo-100 pb-2 mb-4 title-font">
+                <i class="fas fa-list-ol text-indigo-600 mr-2"></i> Analyzed Time Slots (Chronological)
+            </h2>
+            <div id="timeline-container" class="space-y-4"></div>
+        </div>
+    </div>
+
+    <div id="report-modal" class="fixed inset-0 bg-black/80 hidden justify-center items-center z-[100] backdrop-blur-sm p-4" onclick="if(event.target === this) closeModal()">
+        <div class="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border-t-8 border-indigo-600">
+            
+            <div class="bg-indigo-50 p-5 border-b border-indigo-100 flex justify-between items-start">
+                <div>
+                    <h2 class="text-2xl font-bold text-indigo-900 title-font mb-1"><i class="fas fa-chart-pie mr-2 text-indigo-600"></i> BPHS Deterministic Profile</h2>
+                    <p id="modal-subtitle" class="text-sm font-semibold text-gray-600 bg-white inline-block px-3 py-1 rounded-full border border-gray-200"></p>
+                </div>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-red-500 text-2xl transition-colors"><i class="fas fa-times-circle"></i></button>
+            </div>
+
+            <div id="report-content-area" class="p-6 overflow-y-auto custom-scrollbar flex-grow bg-gray-50/50">
+                </div>
+            
+            <div class="bg-gray-50 p-4 border-t border-gray-200 flex justify-end">
+                <button onclick="closeModal()" class="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-lg transition-colors">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const PYTHON_SERVER_URL = "https://eprashala.pythonanywhere.com/calculate";
+        
+        let currentLat = 19.2183;
+        let currentLon = 72.9781;
+        let rawPanchangData = null; 
+
+        const HORA_LORDS = ["Surya", "Shukra", "Budh", "Chandra", "Shani", "Guru", "Mangal"];
+        const RASHIS = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"];
+        const SIGN_LORDS = { 0: 'Mangal', 1: 'Shukra', 2: 'Budh', 3: 'Chandra', 4: 'Surya', 5: 'Budh', 6: 'Shukra', 7: 'Mangal', 8: 'Guru', 9: 'Shani', 10: 'Shani', 11: 'Guru' };
+        
+        const HORA_NATURE = {
+            "Guru": { grade: "Excellent", color: "bg-green-50 border-green-400", text: "text-green-800", icon: "🌟", desc: "Grants wisdom, health, and a righteous nature." },
+            "Shukra": { grade: "Excellent", color: "bg-green-50 border-green-400", text: "text-green-800", icon: "✨", desc: "Grants beauty, creativity, wealth, and harmony." },
+            "Chandra": { grade: "Good", color: "bg-blue-50 border-blue-400", text: "text-blue-800", icon: "🌙", desc: "Grants emotional intelligence and adaptability." },
+            "Budh": { grade: "Good", color: "bg-blue-50 border-blue-400", text: "text-blue-800", icon: "🧠", desc: "Grants sharp intellect and business acumen." },
+            "Surya": { grade: "Neutral", color: "bg-yellow-50 border-yellow-400", text: "text-yellow-800", icon: "☀️", desc: "Grants leadership, but can bring ego struggles." },
+            "Mangal": { grade: "Bad", color: "bg-orange-50 border-orange-400", text: "text-orange-800", icon: "⚔️", desc: "Grants courage, but prone to anger and accidents." },
+            "Shani": { grade: "Evil", color: "bg-red-50 border-red-400", text: "text-red-800", icon: "⚠️", desc: "Brings delays, hardships, and a life of struggle." }
+        };
+
+        function getApproxLagnaForTime(targetDate, lat, lon) {
+            const times = SunCalc.getTimes(targetDate, lat, lon);
+            let hoursSinceSunrise = (targetDate.getTime() - times.sunrise.getTime()) / 3600000;
+            if (hoursSinceSunrise < 0) hoursSinceSunrise += 24; 
+            
+            const sunGraha = rawPanchangData.grahas_data.find(g => g.name === 'Surya');
+            let sunDegree = sunGraha ? sunGraha.abs_deg : 0;
+            
+            let ascendantDegree = (sunDegree + (hoursSinceSunrise * 15)) % 360;
+            let ascendantIndex = Math.floor(ascendantDegree / 30);
+            return RASHIS[ascendantIndex];
+        }
+
+        document.getElementById('dateInput').valueAsDate = new Date();
+        
+        let searchTimeout = null;
+        const cityInput = document.getElementById('cityInput');
+        const suggestionsBox = document.getElementById('suggestions');
+
+        cityInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            const query = this.value.trim();
+            if(query.length < 3) { suggestionsBox.style.display = 'none'; return; }
+            
+            searchTimeout = setTimeout(async () => {
+                try {
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=5`);
+                    const data = await res.json();
+                    suggestionsBox.innerHTML = '';
+                    if(data.length > 0) {
+                        data.forEach(item => {
+                            const div = document.createElement('div');
+                            div.className = 'suggestion-item';
+                            div.innerText = item.display_name;
+                            div.onclick = () => {
+                                cityInput.value = item.display_name.split(',')[0];
+                                currentLat = parseFloat(item.lat);
+                                currentLon = parseFloat(item.lon);
+                                suggestionsBox.style.display = 'none';
+                            };
+                            suggestionsBox.appendChild(div);
+                        });
+                        suggestionsBox.style.display = 'block';
+                    }
+                } catch(e) {}
+            }, 600);
+        });
+
+        async function calculateBirthMuhurtas() {
+            const dateVal = document.getElementById('dateInput').value;
+            if(!dateVal) return;
+
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('muhurta-timeline').classList.add('hidden');
+            document.getElementById('timeline-container').innerHTML = '';
+
+            try {
+                const apiResponse = await fetch(PYTHON_SERVER_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ date: dateVal, time: "12:00:00", lat: currentLat, lon: currentLon })
+                });
+                
+                rawPanchangData = await apiResponse.json();
+                if(rawPanchangData.status !== 'success') throw new Error("Backend Calculation Failed");
+
+                const targetDate = new Date(`${dateVal}T12:00:00`);
+                const times = SunCalc.getTimes(targetDate, currentLat, currentLon);
+                
+                const moonGraha = rawPanchangData.grahas_data.find(g => g.name === 'Chandra');
+                const nakshatraIndex = Math.floor(moonGraha.abs_deg / (360/27));
+                const nakshatras = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purvashadha", "Uttarashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"];
+                
+                document.getElementById('sum-date').innerText = new Date(dateVal).toLocaleDateString('en-IN', {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'});
+                document.getElementById('sum-sunrise').innerText = times.sunrise.toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'});
+                document.getElementById('sum-sunset').innerText = times.sunset.toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'});
+                document.getElementById('sum-moon').innerText = RASHIS[moonGraha.sign];
+                document.getElementById('sum-nak').innerText = nakshatras[nakshatraIndex];
+                document.getElementById('daily-summary').classList.remove('hidden');
+
+                const segments = generateHoraSegments(times.sunrise, times.sunset, targetDate.getDay());
+                renderTimeline(segments);
+                
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('muhurta-timeline').classList.remove('hidden');
+
+            } catch (error) {
+                console.error(error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error-msg').innerText = "Error calculating cosmic data from Ephemeris server.";
+                document.getElementById('error-msg').classList.remove('hidden');
+            }
+        }
+
+        function generateHoraSegments(sunrise, sunset, dayOfWeek) {
+            let segments = [];
+            let startLordIndex = [0, 3, 6, 2, 5, 1, 4][dayOfWeek]; 
+            
+            let dayDuration = sunset.getTime() - sunrise.getTime();
+            let shiftDuration = dayDuration / 8;
+            let rahuSegIndex = [8, 2, 7, 5, 6, 4, 3][dayOfWeek]; 
+            let rahuStart = new Date(sunrise.getTime() + ((rahuSegIndex-1) * shiftDuration));
+            let rahuEnd = new Date(sunrise.getTime() + (rahuSegIndex * shiftDuration));
+
+            for(let i = 0; i < 24; i++) {
+                let sTime = new Date(sunrise.getTime() + (i * 3600000));
+                let eTime = new Date(sTime.getTime() + 3600000);
+                
+                let currentLord = HORA_LORDS[(startLordIndex + i) % 7];
+                let isDay = i < (dayDuration / 3600000);
+                let shiftIndex = Math.floor((sTime.getTime() - sunrise.getTime()) / shiftDuration);
+                
+                let isRahuKaal = (sTime < rahuEnd && eTime > rahuStart);
+                let isNirishwar = (shiftIndex === 7 && isDay); 
+                let dynamicLagna = getApproxLagnaForTime(sTime, currentLat, currentLon);
+
+                let horaData = HORA_NATURE[currentLord];
+                let finalGrade = horaData.grade;
+                
+                if (isRahuKaal) finalGrade = "Evil";
+                else if (isNirishwar) finalGrade = "Bad";
+
+                segments.push({
+                    start: sTime,
+                    end: eTime,
+                    horaLord: currentLord,
+                    lagna: dynamicLagna,
+                    grade: finalGrade,
+                    isRahu: isRahuKaal,
+                    uiData: horaData
+                });
+            }
+            return segments;
+        }
+
+// Add this tiny helper function to make numbers look nice (1st, 2nd, 3rd)
+        function getOrdinalSuffix(i) {
+            let j = i % 10, k = i % 100;
+            if (j == 1 && k != 11) return i + "st";
+            if (j == 2 && k != 12) return i + "nd";
+            if (j == 3 && k != 13) return i + "rd";
+            return i + "th";
+        }
+
+        // REPLACEMENT 1: Updated renderTimeline to show planetary houses on the main screen
+        function renderTimeline(segments) {
+            const container = document.getElementById('timeline-container');
+            let html = '';
+
+            segments.forEach((seg) => {
+                let timeStr = `${seg.start.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'})} - ${seg.end.toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'})}`;
+                
+                let gradeBadge = "";
+                if(seg.grade === "Excellent") gradeBadge = `<span class="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">EXCELLENT</span>`;
+                else if(seg.grade === "Evil") gradeBadge = `<span class="bg-red-600 text-white px-2 py-1 rounded text-xs font-bold">EVIL</span>`;
+                else if(seg.grade === "Good") gradeBadge = `<span class="bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">GOOD</span>`;
+                else gradeBadge = `<span class="bg-gray-500 text-white px-2 py-1 rounded text-xs font-bold">${seg.grade.toUpperCase()}</span>`;
+
+                // Calculate where key planets sit for this specific Lagna
+                const ascSignIdx = RASHIS.indexOf(seg.lagna);
+                let keyGrahasText = "";
+                ['Surya', 'Chandra', 'Guru'].forEach(pName => {
+                    let g = rawPanchangData.grahas_data.find(x => x.name === pName);
+                    if(g) {
+                        let houseNum = (g.sign - ascSignIdx + 12) % 12 + 1;
+                        keyGrahasText += `<span class="bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded text-[10px] mr-1 inline-block mt-1 font-semibold">${pName} in ${getOrdinalSuffix(houseNum)}</span>`;
+                    }
+                });
+
+                const segPayload = encodeURIComponent(JSON.stringify({
+                    timeStr: timeStr, horaLord: seg.horaLord, lagna: seg.lagna, grade: seg.grade, isRahu: seg.isRahu
+                }));
+
+                html += `
+                <div class="card p-5 rounded-2xl border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4 ${seg.grade === 'Evil' ? 'opacity-80' : ''}">
+                    <div class="flex-grow w-full">
+                        <div class="flex items-center gap-3 mb-2">
+                            <span class="text-lg font-bold text-gray-800">${timeStr}</span>
+                            ${gradeBadge}
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                            <div class="${seg.uiData.color} p-3 rounded-xl border">
+                                <p class="text-sm font-bold ${seg.uiData.text}">${seg.uiData.icon} Hora: ${seg.horaLord}</p>
+                                <p class="text-xs ${seg.uiData.text} opacity-90">${seg.uiData.desc}</p>
+                            </div>
+                            <div class="bg-indigo-50 p-3 rounded-xl border border-indigo-200">
+                                <p class="text-sm font-bold text-indigo-900">Ascendant forms in ${seg.lagna}</p>
+                                <div>${keyGrahasText}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button onclick="generateLocalBPHSReport('${segPayload}')" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-xl font-bold shadow-sm transition-all whitespace-nowrap">
+                        <i class="fas fa-bolt mr-1"></i> Instant Local Report
+                    </button>
+                </div>`;
+            });
+            container.innerHTML = html;
+        }
+		
+ // REPLACEMENT 2: Updated generateLocalBPHSReport to include Edu, Career, Marriage, Wellbeing
+        function generateLocalBPHSReport(encodedPayload) {
+            const seg = JSON.parse(decodeURIComponent(encodedPayload));
+            const modal = document.getElementById('report-modal');
+            const contentArea = document.getElementById('report-content-area');
+            
+            document.getElementById('modal-subtitle').innerText = `Time: ${seg.timeStr} | Lagna: ${seg.lagna}`;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            const ascSignIdx = RASHIS.indexOf(seg.lagna);
+            const lagnesh = SIGN_LORDS[ascSignIdx];
+
+            let planetsByHouse = {};
+            for(let i=1; i<=12; i++) planetsByHouse[i] = [];
+            
+            let grahaMap = {};
+            rawPanchangData.grahas_data.forEach(g => {
+                if (g.type === "graha" || g.type === "upagraha") {
+                    let houseNum = (g.sign - ascSignIdx + 12) % 12 + 1;
+                    g.dynamic_house = houseNum;
+                    planetsByHouse[houseNum].push(g.name);
+                    grahaMap[g.name] = g;
+                }
+            });
+
+            // Aspects
+            let aspects = [];
+            const addAspect = (source, targetHouse, type) => {
+                if(planetsByHouse[targetHouse].length > 0) {
+                    planetsByHouse[targetHouse].forEach(target => {
+                        if(target !== source && !['Rahu', 'Ketu', 'Arun', 'Varun', 'Yama'].includes(target) && !['Rahu', 'Ketu'].includes(source)) {
+                            aspects.push(`<strong>${source}</strong> aspects <strong>${target}</strong> in House ${targetHouse} <em>(${type})</em>`);
+                        }
+                    });
+                }
+            };
+
+            ['Surya', 'Chandra', 'Mangal', 'Budh', 'Guru', 'Shukra', 'Shani'].forEach(p => {
+                if(grahaMap[p]) {
+                    let h = grahaMap[p].dynamic_house;
+                    addAspect(p, (h + 7 - 1) % 12 || 12, "7th aspect");
+                    if(p === 'Mangal') { addAspect(p, (h + 4 - 1) % 12 || 12, "4th aspect"); addAspect(p, (h + 8 - 1) % 12 || 12, "8th aspect"); }
+                    if(p === 'Guru') { addAspect(p, (h + 5 - 1) % 12 || 12, "5th aspect"); addAspect(p, (h + 9 - 1) % 12 || 12, "9th aspect"); }
+                    if(p === 'Shani') { addAspect(p, (h + 3 - 1) % 12 || 12, "3rd aspect"); addAspect(p, (h + 10 - 1) % 12 || 12, "10th aspect"); }
+                }
+            });
+
+            // Yogas & Doshas
+            let yogas = [];
+            let doshas = [];
+
+            const checkPMP = (p, ownSigns, exSign, yogaName) => {
+                if(grahaMap[p] && [1,4,7,10].includes(grahaMap[p].dynamic_house)) {
+                    if(ownSigns.includes(grahaMap[p].sign) || grahaMap[p].sign === exSign) {
+                        yogas.push(`<strong>${yogaName} Mahapurusha Yoga:</strong> ${p} is exalted/own sign in a Kendra. Grants massive success and expertise.`);
+                    }
+                }
+            };
+            checkPMP('Mangal', [0, 7], 9, "Ruchaka");
+            checkPMP('Budh', [2, 5], 5, "Bhadra");
+            checkPMP('Guru', [8, 11], 3, "Hamsa");
+            checkPMP('Shukra', [1, 6], 11, "Malavya");
+            checkPMP('Shani', [9, 10], 6, "Shasha");
+
+            if(grahaMap['Guru'] && grahaMap['Chandra']) {
+                let dist = Math.abs(grahaMap['Guru'].dynamic_house - grahaMap['Chandra'].dynamic_house);
+                if(dist === 0 || dist === 3 || dist === 6 || dist === 9) yogas.push("<strong>Gajakesari Yoga:</strong> Jupiter and Moon are in Kendra. Grants lasting fame and virtue.");
+            }
+
+            if(grahaMap['Surya'] && grahaMap['Chandra'] && grahaMap['Surya'].sign === grahaMap['Chandra'].sign) {
+                doshas.push("<strong>Amavasya Dosha:</strong> Sun and Moon are conjunct. Can cause mental anxiety.");
+            }
+
+            if(grahaMap['Mangal'] && [1,4,7,8,12].includes(grahaMap['Mangal'].dynamic_house)) {
+                doshas.push(`<strong>Manglik Dosha:</strong> Mars is placed in house ${grahaMap['Mangal'].dynamic_house}. Requires Kundali matching for marriage.`);
+            }
+
+            // 1. Core Nature & Wellbeing (Lagnesh)
+            let lagneshData = grahaMap[lagnesh];
+            let healthText = `The Ascendant Lord (Lagnesh) is <strong>${lagnesh}</strong>. `;
+            if(lagneshData) {
+                if([6,8,12].includes(lagneshData.dynamic_house)) healthText += `Placed in House ${lagneshData.dynamic_house} (Dusthana), indicating early childhood health needs monitoring, but resilience will build. `;
+                else healthText += `Favorably placed in House ${lagneshData.dynamic_house}, ensuring a strong physical constitution and overall well-being. `;
+                if(lagneshData.shadbala > 400) healthText += `Exceptional Shadbala (${lagneshData.shadbala}V) guarantees strong natural immunity.`;
+            }
+
+            let moonSign = RASHIS[grahaMap['Chandra'].sign];
+            let natureText = `With the Moon resting in <strong>${moonSign}</strong>, the child's mind will be `;
+            if(['Cancer', 'Scorpio', 'Pisces'].includes(moonSign)) natureText += `deeply intuitive, emotional, empathetic, and spiritually inclined.`;
+            else if(['Aries', 'Leo', 'Sagittarius'].includes(moonSign)) natureText += `dynamic, action-oriented, fiercely independent, and courageous.`;
+            else if(['Taurus', 'Virgo', 'Capricorn'].includes(moonSign)) natureText += `highly practical, grounded, dependable, and structurally focused.`;
+            else natureText += `intellectual, highly communicative, adaptable, and quick-witted.`;
+
+            // 2. Education & Intellect (4th and 5th House)
+            let fourthLord = SIGN_LORDS[(ascSignIdx + 3) % 12];
+            let fifthLord = SIGN_LORDS[(ascSignIdx + 4) % 12];
+            let eduText = `Primary education (4th House) is governed by <strong>${fourthLord}</strong>, while higher intellect (5th House) is ruled by <strong>${fifthLord}</strong>. `;
+            if (planetsByHouse[4].length > 0) eduText += `Planets in the 4th (${planetsByHouse[4].join(', ')}) will influence early learning environments. `;
+            if (planetsByHouse[5].length > 0) eduText += `Planets in the 5th (${planetsByHouse[5].join(', ')}) bring dynamic intelligence and academic merits. `;
+            if (grahaMap['Budh'] && grahaMap['Budh'].shadbala > 350) eduText += `A strong Mercury ensures excellent grasping power and memory.`;
+
+            // 3. Marriage & Partnerships (7th House)
+            let seventhLord = SIGN_LORDS[(ascSignIdx + 6) % 12];
+            let marriageText = `The 7th House of marriage is ruled by <strong>${seventhLord}</strong>. `;
+            if (planetsByHouse[7].length > 0) marriageText += `Planets placed here (${planetsByHouse[7].join(', ')}) indicate a dynamic and highly eventful marital life. `;
+            else marriageText += `An empty 7th house directs focus entirely to ${seventhLord} for relationship stability. `;
+            if (grahaMap['Shukra']) {
+                 if ([6, 8, 12].includes(grahaMap['Shukra'].dynamic_house)) marriageText += ` Venus is in a Dusthana, advising careful future partner selection.`;
+                 else marriageText += ` Venus is favorably placed, bringing harmony and deep affection in partnerships.`;
+            }
+
+            // 4. Profession Matrix (10th House Logic)
+            let tenthLord = SIGN_LORDS[(ascSignIdx + 9) % 12];
+            let planetsIn10 = planetsByHouse[10].filter(p => !['Rahu', 'Ketu', 'Arun', 'Varun', 'Yama'].includes(p));
+            let careerText = `The 10th house of Career is ruled by <strong>${tenthLord}</strong>. `;
+            let profIndicators = [...planetsIn10, tenthLord];
+            let careers = new Set();
+            
+            if(profIndicators.includes('Surya')) careers.add("Government, Medicine, Leadership");
+            if(profIndicators.includes('Chandra')) careers.add("Public Relations, Marine, Caregiving");
+            if(profIndicators.includes('Mangal')) careers.add("Engineering, Real Estate, Surgery, Military");
+            if(profIndicators.includes('Budh')) careers.add("Software Tech, Writing, Business Analytics");
+            if(profIndicators.includes('Guru')) careers.add("Teaching, Law, Finance, Consulting");
+            if(profIndicators.includes('Shukra')) careers.add("Arts, Design, Entertainment, Luxury");
+            if(profIndicators.includes('Shani')) careers.add("Manufacturing, Heavy Industry, Judiciary");
+            
+            if(careers.size > 0) careerText += `Indicators point towards massive success in: <strong>${Array.from(careers).join(" | ")}</strong>.`;
+
+            // Verdict
+            let finalVerdict = "";
+            let score = 0;
+            if(yogas.length > 0) score += 2;
+            if(doshas.length > 0) score -= 2;
+            if(['Excellent', 'Good'].includes(seg.grade)) score += 2;
+            if(seg.isRahu) score -= 5;
+            
+            if(score >= 2 && !seg.isRahu) {
+                finalVerdict = `<span class='text-green-700 font-extrabold flex items-center justify-center gap-2'><i class="fas fa-check-circle"></i> EXCELLENT MUHURTA: Auspicious Yogas and favorable placements strongly support this window for childbirth.</span>`;
+            } else if(score >= 0 && !seg.isRahu) {
+                finalVerdict = `<span class='text-blue-700 font-extrabold flex items-center justify-center gap-2'><i class="fas fa-info-circle"></i> GOOD MUHURTA: This is a favorable window with balanced, stable cosmic energies.</span>`;
+            } else {
+                finalVerdict = `<span class='text-red-700 font-extrabold flex items-center justify-center gap-2'><i class="fas fa-exclamation-triangle"></i> AVOID MUHURTA: Malefic influences (like Rahu Kaal or Arishta Doshas) outweigh the benefits.</span>`;
+            }
+
+            contentArea.innerHTML = `
+                <div class="space-y-5">
+                    <div>
+                        <h3 class="text-lg font-bold text-indigo-900 border-b pb-1 mb-2"><i class="fas fa-star mr-2 text-yellow-500"></i>1. Yogas, Doshas & Aspects</h3>
+                        <div class="bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+                            <p class="font-bold text-indigo-800 text-sm mb-1">Formed Yogas:</p>
+                            <ul class="list-disc pl-5 text-sm text-gray-700 mb-2">${yogas.length > 0 ? yogas.map(y => `<li>${y}</li>`).join('') : "<li>No major Parashari Yogas formed.</li>"}</ul>
+                            <p class="font-bold text-red-800 text-sm mb-1">Active Doshas:</p>
+                            <ul class="list-disc pl-5 text-sm text-gray-700 mb-2">${doshas.length > 0 ? doshas.map(d => `<li class="text-red-700">${d}</li>`).join('') : "<li>No major Arishta Doshas detected.</li>"}</ul>
+                            <p class="font-bold text-blue-800 text-sm mb-1">Key Drishti (Aspects):</p>
+                            <ul class="list-disc pl-5 text-sm text-gray-700">${aspects.length > 0 ? aspects.map(a => `<li>${a}</li>`).join('') : "<li>No significant mutual planetary aspects active.</li>"}</ul>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-lg font-bold text-indigo-900 border-b pb-1 mb-2"><i class="fas fa-heartbeat mr-2 text-red-500"></i>2. Core Nature & Wellbeing</h3>
+                        <div class="bg-green-50 p-3 rounded-lg border border-green-100 text-sm text-gray-800 space-y-1">
+                            <p><strong>Mind & Behavior:</strong> ${natureText}</p>
+                            <p><strong>Physical Constitution:</strong> ${healthText}</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-lg font-bold text-indigo-900 border-b pb-1 mb-2"><i class="fas fa-book-open mr-2 text-orange-500"></i>3. Education & Intellect</h3>
+                        <div class="bg-orange-50 p-3 rounded-lg border border-orange-100 text-sm text-gray-800">
+                            <p>${eduText}</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-lg font-bold text-indigo-900 border-b pb-1 mb-2"><i class="fas fa-briefcase mr-2 text-blue-500"></i>4. Career & Profession</h3>
+                        <div class="bg-blue-50 p-3 rounded-lg border border-blue-100 text-sm text-gray-800">
+                            <p>${careerText}</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-lg font-bold text-indigo-900 border-b pb-1 mb-2"><i class="fas fa-ring mr-2 text-pink-500"></i>5. Marriage & Partnerships</h3>
+                        <div class="bg-pink-50 p-3 rounded-lg border border-pink-100 text-sm text-gray-800">
+                            <p>${marriageText}</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 bg-gray-100 p-4 rounded-lg border border-gray-300 text-lg text-center shadow-inner">
+                        ${finalVerdict}
+                    </div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
