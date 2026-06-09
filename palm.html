@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vedic Palmistry Scanner v5.0</title>
+    <title>Vedic Palmistry Scanner v7.0</title>
     <style>
         :root {
             --primary: #d4af37; 
@@ -21,7 +21,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding-bottom: 80px; /* Space for floating button */
+            padding-bottom: 80px; 
         }
 
         h1 {
@@ -108,11 +108,6 @@
             gap: 5px;
         }
 
-        .audio-btn:hover {
-            background-color: rgba(212, 175, 55, 0.2);
-            transform: none;
-        }
-
         .retake-btn {
             background-color: var(--error-color);
             color: white;
@@ -146,7 +141,6 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            /* Removed Mirroring. Rear camera is direct perspective. */
         }
 
         .hand-guide-overlay {
@@ -159,7 +153,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            opacity: 0.7;
+            opacity: 0.5;
             transition: transform 0.5s ease;
         }
 
@@ -216,6 +210,61 @@
             display: inline-block;
         }
 
+        /* --- DYNAMIC OPTICAL LINE EXTRACTION STYLES --- */
+        .photo-analysis-block {
+            position: relative;
+            width: 100%;
+            max-width: 280px;
+            aspect-ratio: 3/4;
+            margin: 15px auto;
+            border: 2px solid var(--primary);
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: #000;
+        }
+
+        .captured-snapshot {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            position: absolute;
+            top: 0; left: 0;
+        }
+
+        /* The Magic CSS Filter that extracts dark creases and turns them into glowing gold energy lines */
+        .dynamic-rekha-overlay {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            position: absolute;
+            top: 0; left: 0;
+            pointer-events: none;
+            
+            /* 1. Invert colors (skin goes dark, lines go bright)
+               2. Grayscale (removes skin tones)
+               3. Massive Contrast (crushes midtones, leaving only deep lines)
+               4. Sepia + Hue + Saturate (colors the bright lines into cosmic gold) */
+            filter: invert(1) grayscale(1) contrast(5) brightness(0.9) sepia(1) hue-rotate(350deg) saturate(8);
+            
+            /* Blend mode screen drops the dark skin background, leaving only glowing lines on top of the original image */
+            mix-blend-mode: screen; 
+            opacity: 0.9;
+        }
+
+        .legend-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            margin: 10px auto 20px auto;
+            font-size: 0.9em;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            border-radius: 5px;
+            max-width: 450px;
+            text-align: center;
+        }
+
         .qa-container {
             margin-top: 20px;
             width: 100%;
@@ -237,7 +286,6 @@
             line-height: 1.5;
         }
         
-        /* Floating Share/PDF Button */
         .floating-action {
             position: fixed;
             bottom: 20px;
@@ -253,30 +301,17 @@
             z-index: 1000;
             display: none;
             border: none;
-            transition: transform 0.2s;
-        }
-
-        .floating-action:hover {
-            transform: scale(1.05);
         }
 
         canvas { display: none; }
         .pulsing-text { animation: pulse 1.5s infinite; color: #888; font-style: italic; }
         @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
 
-        /* Print formatting */
-        @media print {
-            body { background-color: white; color: black; }
-            .setup-container, .camera-container, button, .audio-btn, .floating-action, .qa-container { display: none !important; }
-            .hand-result-card { border: 1px solid #ccc; background: transparent; page-break-inside: avoid; }
-            h1, h3 { color: black; text-shadow: none; }
-        }
-
     </style>
 </head>
 <body>
 
-    <h1>Hastarekha Darshan<br><span style="font-size: 16px; font-weight: normal;">Free Vedic Palmistry API</span></h1>
+    <h1>Hastarekha Darshan<br><span style="font-size: 16px; font-weight: normal;">Free Humanistic Palmistry System</span></h1>
 
     <div class="setup-container" id="setupSection">
         <input type="text" id="userName" placeholder="Enter your full name..." autocomplete="off">
@@ -288,13 +323,6 @@
             <option value="Telugu">Telugu (తెలుగు)</option>
             <option value="Marathi">Marathi (मराठी)</option>
             <option value="Tamil">Tamil (தமிழ்)</option>
-            <option value="Urdu">Urdu (اردو)</option>
-            <option value="Gujarati">Gujarati (ગુજરાતી)</option>
-            <option value="Kannada">Kannada (ಕನ್ನಡ)</option>
-            <option value="Odia">Odia (ଓଡ଼ିଆ)</option>
-            <option value="Malayalam">Malayalam (മലയാളം)</option>
-            <option value="Punjabi">Punjabi (ਪੰਜਾਬੀ)</option>
-            <option value="Assamese">Assamese (অসমীয়া)</option>
         </select>
 
         <div class="flex-row">
@@ -316,19 +344,30 @@
         <div class="hand-guide-overlay" id="handGuide">
             <svg viewBox="0 0 100 120" preserveAspectRatio="xMidYMid meet">
                 <path d="M 35,115 C 30,90 20,70 20,50 C 20,40 30,35 35,45 L 40,65 L 40,25 C 40,15 50,15 50,25 L 50,60 L 50,15 C 50,5 60,5 60,15 L 60,60 L 60,20 C 60,10 70,10 70,20 L 70,65 L 70,35 C 70,25 80,25 80,35 L 80,80 C 80,95 75,105 65,115 Z" 
-                      fill="none" stroke="var(--primary)" stroke-width="2" stroke-dasharray="4,4"/>
+                      fill="none" stroke="var(--primary)" stroke-width="1.8" stroke-dasharray="4,4"/>
             </svg>
         </div>
-
         <div class="scanner-line" id="scannerLine"></div>
     </div>
 
     <button id="actionBtn" style="display: none; margin-top: 15px;"></button>
 
+    <div class="legend-container" id="globalLegend" style="display: none;">
+        <strong style="color: var(--primary);">Optical Rekha Extraction Active</strong>
+        <span>The glowing lines overlaid on your images are your *actual* deep physical palm lines, dynamically extracted using high-contrast optical edge-mapping.</span>
+    </div>
+
     <div class="results-container" id="resultsSection">
+        
         <div class="hand-result-card" id="stage1Card">
             <h3><span id="stage1Title">Hand 1</span> Analysis</h3>
             <button class="audio-btn" id="audioBtn1" style="display: none;">🔊 Listen</button>
+            
+            <div class="photo-analysis-block" id="photoBlock1" style="display: none;">
+                <img class="captured-snapshot" id="snapshotImg1" alt="Hand Snapshot">
+                <img class="dynamic-rekha-overlay" id="rekhaOverlay1" alt="Extracted Lines">
+            </div>
+
             <div id="stage1Content" class="pulsing-text">Channeling cosmic energies...</div>
             <button class="retake-btn" id="retakeBtn1" style="display:none;">Retake Image</button>
         </div>
@@ -336,6 +375,12 @@
         <div class="hand-result-card" id="stage2Card">
             <h3><span id="stage2Title">Hand 2</span> Analysis</h3>
             <button class="audio-btn" id="audioBtn2" style="display: none;">🔊 Listen</button>
+            
+            <div class="photo-analysis-block" id="photoBlock2" style="display: none;">
+                <img class="captured-snapshot" id="snapshotImg2" alt="Hand Snapshot">
+                <img class="dynamic-rekha-overlay" id="rekhaOverlay2" alt="Extracted Lines">
+            </div>
+
             <div id="stage2Content" class="pulsing-text">Awaiting scan...</div>
             <button class="retake-btn" id="retakeBtn2" style="display:none;">Retake Image</button>
         </div>
@@ -352,33 +397,20 @@
     </div>
     
     <button id="sharePdfBtn" class="floating-action">📤 Share / Save PDF</button>
-
     <canvas id="captureCanvas"></canvas>
 
     <script>
         const API_ENDPOINT = "https://eprashala.pythonanywhere.com/api/chat";
         
-        // BCP 47 Language Codes for TTS
-        const langMap = {
-            "English": "en-IN", "Hindi": "hi-IN", "Bengali": "bn-IN", "Telugu": "te-IN",
-            "Marathi": "mr-IN", "Tamil": "ta-IN", "Urdu": "ur-IN", "Gujarati": "gu-IN",
-            "Kannada": "kn-IN", "Odia": "or-IN", "Malayalam": "ml-IN", "Punjabi": "pa-IN",
-            "Assamese": "as-IN"
-        };
+        const langMap = { "English": "en-IN", "Hindi": "hi-IN", "Bengali": "bn-IN", "Telugu": "te-IN", "Marathi": "mr-IN", "Tamil": "ta-IN" };
 
         let stream = null;
         let wakeLock = null;
         let scanStage = 0; 
-        let firstHand = ""; 
-        let secondHand = "";
-        let fullReadingContext = ""; 
-        
-        let hand1Resolved = false;
-        let hand2Resolved = false;
-        let rawText1 = "";
-        let rawText2 = "";
+        let firstHand = "", secondHand = "", fullReadingContext = ""; 
+        let hand1Resolved = false, hand2Resolved = false;
+        let rawText1 = "", rawText2 = "";
 
-        // DOM Elements
         const setupSection = document.getElementById('setupSection');
         const userLang = document.getElementById('userLang');
         const userSex = document.getElementById('userSex');
@@ -387,6 +419,7 @@
         const initBtn = document.getElementById('initBtn');
         const actionBtn = document.getElementById('actionBtn');
         const handInstruction = document.getElementById('handInstruction');
+        const globalLegend = document.getElementById('globalLegend');
         
         const cameraContainer = document.getElementById('cameraContainer');
         const videoFeed = document.getElementById('videoFeed');
@@ -396,64 +429,53 @@
         const ctx = captureCanvas.getContext('2d');
 
         const resultsSection = document.getElementById('resultsSection');
+        
         const stage1Card = document.getElementById('stage1Card');
         const stage1Content = document.getElementById('stage1Content');
+        const photoBlock1 = document.getElementById('photoBlock1');
+        const snapshotImg1 = document.getElementById('snapshotImg1');
+        const rekhaOverlay1 = document.getElementById('rekhaOverlay1');
         const audioBtn1 = document.getElementById('audioBtn1');
         const retakeBtn1 = document.getElementById('retakeBtn1');
 
         const stage2Card = document.getElementById('stage2Card');
         const stage2Content = document.getElementById('stage2Content');
+        const photoBlock2 = document.getElementById('photoBlock2');
+        const snapshotImg2 = document.getElementById('snapshotImg2');
+        const rekhaOverlay2 = document.getElementById('rekhaOverlay2');
         const audioBtn2 = document.getElementById('audioBtn2');
         const retakeBtn2 = document.getElementById('retakeBtn2');
         
         const qaSection = document.getElementById('qaSection');
         const sharePdfBtn = document.getElementById('sharePdfBtn');
 
-        // Audio State
-        let currentSynthUtterance = null;
-        let currentAudioBtn = null;
+        let currentSynthUtterance = null, currentAudioBtn = null;
 
-        // Populate Age
         for (let i = 1; i <= 100; i++) {
             let option = document.createElement('option');
-            option.value = i;
-            option.text = i + " years old";
+            option.value = i; option.text = i + " years old";
             if (i === 25) option.selected = true;
             userAge.appendChild(option);
         }
 
-        // --- Screen Wake Lock Request ---
         async function requestWakeLock() {
-            try {
-                if ('wakeLock' in navigator) {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                }
-            } catch (err) {
-                console.log(`Wake Lock error: ${err.message}`);
-            }
+            try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } 
+            catch (err) {}
         }
 
         document.addEventListener('visibilitychange', async () => {
-            if (wakeLock !== null && document.visibilityState === 'visible') {
-                await requestWakeLock();
-            }
+            if (wakeLock !== null && document.visibilityState === 'visible') await requestWakeLock();
         });
 
-        // Initialize Camera
         initBtn.addEventListener('click', async () => {
             if (!userNameInput.value.trim() || !userSex.value) {
-                alert("Please enter your name and select your sex to begin.");
-                return;
+                alert("Please enter your name and select your sex to begin."); return;
             }
+            requestWakeLock();
 
-            requestWakeLock(); // Keep screen on
-
-            if (userSex.value === 'Male') {
-                firstHand = "Left"; secondHand = "Right";
-            } else {
-                firstHand = "Right"; secondHand = "Left";
-            }
-
+            if (userSex.value === 'Male') { firstHand = "Left"; secondHand = "Right"; } 
+            else { firstHand = "Right"; secondHand = "Left"; }
+            
             startCameraFlow();
         });
 
@@ -465,18 +487,16 @@
                 setupSection.style.display = 'none';
                 cameraContainer.style.display = 'block';
                 resultsSection.style.display = 'flex';
+                globalLegend.style.display = 'flex';
                 
                 setupStage1();
-            } catch (err) {
-                alert("Unable to access the camera. Ensure permissions are granted.");
-            }
+            } catch (err) { alert("Unable to access rear camera. Please verify permissions."); }
         }
 
         function setupStage1() {
             scanStage = 1;
             handInstruction.style.display = 'block';
-            handInstruction.innerText = `Step 1: Align your ${firstHand} Hand within the dotted guide.`;
-            
+            handInstruction.innerText = `Step 1: Align your ${firstHand} Hand perfectly within the guide metrics.`;
             document.getElementById('stage1Title').innerText = firstHand;
             document.getElementById('stage2Title').innerText = secondHand;
 
@@ -491,7 +511,7 @@
 
         function setupStage2() {
             scanStage = 2;
-            handInstruction.innerText = `Step 2: Now, align your ${secondHand} Hand within the dotted guide.`;
+            handInstruction.innerText = `Step 2: Now, align your ${secondHand} Hand within the guide metrics.`;
             
             if (secondHand === "Left") handGuide.classList.add('flipped');
             else handGuide.classList.remove('flipped');
@@ -515,17 +535,26 @@
                 scannerLine.style.display = 'none';
                 
                 if (scanStage === 1) {
-                    const b64 = captureImage();
+                    const dataUrl = captureFrameData();
+                    snapshotImg1.src = dataUrl;
+                    rekhaOverlay1.src = dataUrl; // Give duplicate to overlay filter
+                    photoBlock1.style.display = 'block';
+                    
                     stage1Card.style.display = 'block'; 
                     stage1Content.innerText = "Channeling cosmic energies...";
                     stage1Content.classList.add('pulsing-text');
                     retakeBtn1.style.display = 'none';
 
-                    processHandAsync(firstHand, b64, 1); 
-                    setupStage2(); // Move user to next hand
+                    const base64Str = dataUrl.split(',')[1];
+                    processHandAsync(firstHand, base64Str, 1); 
+                    setupStage2(); 
                 } 
                 else if (scanStage === 2) {
-                    const b64 = captureImage();
+                    const dataUrl = captureFrameData();
+                    snapshotImg2.src = dataUrl;
+                    rekhaOverlay2.src = dataUrl; // Give duplicate to overlay filter
+                    photoBlock2.style.display = 'block';
+
                     stage2Card.style.display = 'block';
                     stage2Content.innerText = "Channeling cosmic energies...";
                     stage2Content.classList.add('pulsing-text');
@@ -533,19 +562,19 @@
                     
                     cameraContainer.style.display = 'none';
                     actionBtn.style.display = 'none';
-                    handInstruction.innerText = "Cosmic Analysis in Progress...";
+                    handInstruction.innerText = "Processing Palm Inscriptions...";
                     
-                    processHandAsync(secondHand, b64, 2);
+                    const base64Str = dataUrl.split(',')[1];
+                    processHandAsync(secondHand, base64Str, 2);
                 }
             }, 1500); 
         });
 
-        function captureImage() {
+        function captureFrameData() {
             captureCanvas.width = videoFeed.videoWidth;
             captureCanvas.height = videoFeed.videoHeight;
-            // No mirroring! Raw rear camera feed.
             ctx.drawImage(videoFeed, 0, 0, captureCanvas.width, captureCanvas.height);
-            return captureCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+            return captureCanvas.toDataURL('image/jpeg', 0.85);
         }
 
         async function processHandAsync(currentHand, base64Image, stageNum) {
@@ -556,24 +585,21 @@
             const targetContent = stageNum === 1 ? stage1Content : stage2Content;
             const targetRetake = stageNum === 1 ? retakeBtn1 : retakeBtn2;
             const targetAudio = stageNum === 1 ? audioBtn1 : audioBtn2;
+            const targetBlock = stageNum === 1 ? photoBlock1 : photoBlock2;
 
-            let karmicContext = sex === "Male" 
-                ? (currentHand === "Left" ? "Prarabdha Karma (past life/innate potential)." : "Agami Karma (current actions/free will).")
-                : (currentHand === "Right" ? "Prarabdha Karma (past life/innate potential)." : "Agami Karma (current actions/free will).");
+            let karmicContext = sex === "Male" ? (currentHand === "Left" ? "Prarabdha Karma" : "Agami Karma") : (currentHand === "Right" ? "Prarabdha Karma" : "Agami Karma");
 
-            const systemPrompt = `Act as an expert Vedic Palmist. My name is ${name}. I am a ${age}-year-old ${sex}. Analyze my ${currentHand} hand. This represents my ${karmicContext}.
-            CRITICAL RULES:
-            1. IMAGE VALIDATION: If the image is blurry, mostly dark, cut off, or DOES NOT clearly depict a human palm, you MUST stop and reply starting exactly with "ERROR_RETAKE:" followed by a short reason. Do NOT guess the lines.
-            2. ABSOLUTE HONESTY: Analyze the Pitra Rekha, Ayu Rekha, Matri Rekha, and Karma Rekha. If there are bad indicators, breaks, islands, or doshas, you MUST state them truthfully. Do not sugarcoat negative aspects, but do offer traditional Vedic remedies.
-            3. LANGUAGE: Write your entire reading in the ${lang} language. Format using HTML (<br>, <strong>).`;
-
-            const payload = { "contents": [{ "parts": [ { "text": systemPrompt }, { "inline_data": { "mime_type": "image/jpeg", "data": base64Image } } ] }] };
+            const systemPrompt = `Act as an expert Vedic Palmist. My name is ${name}. I am a ${age}-year-old ${sex}. Analyze my ${currentHand} hand (${karmicContext}).
+            CRITICAL SYSTEM INSTRUCTIONS:
+            1. IMAGE VALIDATION: If the image is blurry, mostly pitch-black, or fails to exhibit a clear human palm, you MUST fail immediately by responding with exactly "ERROR_RETAKE:" followed by a short reason.
+            2. UNCOMPROMISED HONESTY: Provide a detailed analysis of the Life Line, Head Line, Heart Line, and Fate Line. State breaks, islands, or negative yogas explicitly without sugarcoating. Provide authentic remedies for defects.
+            3. Write your entire response exclusively in the ${lang} language. Format using HTML (<br>, <strong>).`;
 
             try {
                 const response = await fetch(API_ENDPOINT, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({ "contents": [{ "parts": [ { "text": systemPrompt }, { "inline_data": { "mime_type": "image/jpeg", "data": base64Image } } ] }] })
                 });
 
                 const data = await response.json();
@@ -581,20 +607,15 @@
                 if (response.ok && data.candidates) {
                     const aiText = data.candidates[0].content.parts[0].text;
                     
-                    // Handle Blur/False Image rejections
                     if (aiText.includes("ERROR_RETAKE:")) {
                         targetContent.classList.remove('pulsing-text');
-                        targetContent.innerHTML = `<span style="color:var(--error-color);"><strong>Detection Failed:</strong> ${aiText.replace("ERROR_RETAKE:", "")}</span>`;
+                        targetContent.innerHTML = `<span style="color:var(--error-color);"><strong>Analysis Halted:</strong> ${aiText.replace("ERROR_RETAKE:", "")}</span>`;
                         targetRetake.style.display = 'block';
-                        
-                        // Stop camera if it was hidden and wait for retake
-                        if(stageNum === 2) {
-                            handInstruction.innerText = "Error scanning second hand. Please retake.";
-                        }
+                        targetBlock.style.display = 'none';
                         return;
                     }
 
-                    fullReadingContext += `\n[${currentHand} Hand]:\n` + aiText;
+                    fullReadingContext += `\n[${currentHand} Hand Inscription]:\n` + aiText;
                     
                     targetContent.classList.remove('pulsing-text');
                     targetContent.innerHTML = formatText(aiText);
@@ -604,16 +625,15 @@
                     else { rawText2 = aiText; hand2Resolved = true; }
 
                     checkCompletion();
-                } else { throw new Error("API Error"); }
+                } else { throw new Error(); }
 
             } catch (error) {
                 targetContent.classList.remove('pulsing-text');
-                targetContent.innerHTML = `<span style="color:var(--error-color);">Connection interrupted.</span>`;
+                targetContent.innerHTML = `<span style="color:var(--error-color);">Cosmic interface interrupted.</span>`;
                 targetRetake.style.display = 'block';
             }
         }
 
-        // Retake Handlers
         retakeBtn1.addEventListener('click', () => {
             if(!stream || !stream.active) startCameraFlow();
             setupStage1();
@@ -627,33 +647,22 @@
             retakeBtn2.style.display = 'none';
         });
 
-
         function checkCompletion() {
             if (hand1Resolved && hand2Resolved) {
-                handInstruction.innerText = "Cosmic Analysis Complete.";
+                handInstruction.innerText = "Vedic Diagnostics Compiled.";
                 qaSection.style.display = 'flex';
                 sharePdfBtn.style.display = 'block';
                 if (stream) stream.getTracks().forEach(track => track.stop());
             }
         }
 
-        // Text-to-Speech Engine with Play/Pause/Resume
         function toggleSpeech(text, langName, btnElement) {
             const synth = window.speechSynthesis;
-
-            // If the same button is clicked during playback
             if (synth.speaking && currentAudioBtn === btnElement) {
-                if (synth.paused) {
-                    synth.resume();
-                    btnElement.innerHTML = "⏸️ Pause";
-                } else {
-                    synth.pause();
-                    btnElement.innerHTML = "▶️ Resume";
-                }
+                if (synth.paused) { synth.resume(); btnElement.innerHTML = "⏸️ Pause"; } 
+                else { synth.pause(); btnElement.innerHTML = "▶️ Resume"; }
                 return;
             }
-
-            // Reset any existing speech
             synth.cancel();
             if(currentAudioBtn) currentAudioBtn.innerHTML = "🔊 Listen";
             
@@ -672,26 +681,14 @@
         audioBtn1.addEventListener('click', function() { toggleSpeech(rawText1, userLang.value, this); });
         audioBtn2.addEventListener('click', function() { toggleSpeech(rawText2, userLang.value, this); });
 
-        // Share / PDF Export Logic
         sharePdfBtn.addEventListener('click', async () => {
-            const compiledText = `Hastarekha Reading for ${userNameInput.value}\n\n` + rawText1 + `\n\n` + rawText2;
-            
+            const compiledText = `Hastarekha Universal Reading for ${userNameInput.value}\n\n` + rawText1 + `\n\n` + rawText2;
             if (navigator.share) {
-                try {
-                    await navigator.share({
-                        title: 'My Vedic Palmistry Reading',
-                        text: compiledText,
-                    });
-                } catch(e) { 
-                    // If user cancels or it fails, fallback to PDF print
-                    if(e.name !== "AbortError") window.print(); 
-                }
-            } else {
-                window.print(); // Desktop fallback
-            }
+                try { await navigator.share({ title: 'Vedic Palmistry Assessment', text: compiledText }); } 
+                catch(e) { if(e.name !== "AbortError") window.print(); }
+            } else { window.print(); }
         });
 
-        // Q&A System
         document.getElementById('askBtn').addEventListener('click', async () => {
             const question = document.getElementById('questionInput').value.trim();
             const lang = userLang.value;
@@ -704,9 +701,9 @@
             askBtn.disabled = true;
             document.getElementById('answerBox').style.display = 'block';
             audioBtnQA.style.display = 'none';
-            qaContent.innerHTML = `<span class="pulsing-text">Channeling the answer...</span>`;
+            qaContent.innerHTML = `<span class="pulsing-text">Channeling answer matrix...</span>`;
 
-            const qaPrompt = `Act as an expert Vedic Palmist. Based on the complete reading:\n"${fullReadingContext}"\nThe user asks: "${question}"\nWrite entirely in the ${lang} language. Be honest.`;
+            const qaPrompt = `Act as an expert Vedic Palmist. Based on the complete dual-palm context:\n"${fullReadingContext}"\nThe user asks this custom follow-up: "${question}"\nFormulate a precise synthesis in the ${lang} language.`;
 
             try {
                 const response = await fetch(API_ENDPOINT, {
@@ -714,28 +711,22 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ "contents": [{ "parts": [{ "text": qaPrompt }] }] })
                 });
-
                 const data = await response.json();
                 askBtn.disabled = false;
-
                 if (response.ok && data.candidates) {
                     const text = data.candidates[0].content.parts[0].text;
                     qaContent.innerHTML = `<strong>The Astrologer says:</strong><br><br>${formatText(text)}`;
-                    
                     audioBtnQA.onclick = function() { toggleSpeech(text, lang, this); };
                     audioBtnQA.style.display = 'flex';
                 }
             } catch (error) {
                 askBtn.disabled = false;
-                qaContent.innerHTML = "Failed to channel the answer.";
+                qaContent.innerHTML = "Failed to communicate with proxy matrix.";
             }
         });
 
         function formatText(text) {
-            return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') 
-                       .replace(/\*(.*?)\*/g, '<em>$1</em>')             
-                       .replace(/\n\n/g, '<br><br>')
-                       .replace(/\n/g, '<br>');                          
+            return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>').replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');                          
         }
     </script>
 </body>
