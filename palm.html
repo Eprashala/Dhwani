@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vedic Palmistry Scanner</title>
+    <style>
+        :root {
+            --primary: #d4af37; /* Mystic Gold */
+            --bg-color: #1a0b2e; /* Deep Cosmic Purple */
+            --text-color: #f4e8c1;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            color: var(--primary);
+            text-align: center;
+            text-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
+        }
+
+        .setup-container {
+            margin-bottom: 20px;
+            text-align: center;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        input[type="text"] {
+            width: 80%;
+            padding: 10px;
+            border: 2px solid var(--primary);
+            background: transparent;
+            color: white;
+            font-size: 16px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            box-shadow: 0 0 10px var(--primary);
+        }
+
+        button {
+            background-color: var(--primary);
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            width: 80%;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px var(--primary);
+        }
+
+        button:disabled {
+            background-color: #555;
+            color: #888;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        .camera-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            aspect-ratio: 3/4;
+            background-color: #000;
+            border: 3px solid var(--primary);
+            border-radius: 10px;
+            overflow: hidden;
+            display: none; /* Hidden until name is entered */
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* The Red Scanning Line */
+        .scanner-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background-color: red;
+            box-shadow: 0 0 15px red, 0 0 30px red;
+            display: none;
+            animation: scanAnimation 2s linear infinite;
+        }
+
+        @keyframes scanAnimation {
+            0% { top: 0; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+
+        .loading-text {
+            color: var(--primary);
+            margin-top: 15px;
+            font-style: italic;
+            display: none;
+        }
+
+        .results-container {
+            margin-top: 20px;
+            width: 100%;
+            max-width: 600px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--primary);
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+        
+        canvas {
+            display: none; /* Hidden canvas to capture the frame */
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Hastarekha Darshan<br><span style="font-size: 16px; font-weight: normal;">Vedic Palmistry AI</span></h1>
+
+    <div class="setup-container" id="setupSection">
+        <input type="text" id="userName" placeholder="Enter your full name..." autocomplete="off">
+        <button id="initBtn">Initiate Camera</button>
+    </div>
+
+    <div class="camera-container" id="cameraContainer">
+        <video id="videoFeed" autoplay playsinline></video>
+        <div class="scanner-line" id="scannerLine"></div>
+    </div>
+
+    <button id="scanBtn" style="display: none; margin-top: 15px;">Analyze Palm</button>
+    
+    <div class="loading-text" id="loadingText">Consulting the cosmic energies... Please hold your palm still.</div>
+
+    <div class="results-container" id="resultsSection"></div>
+    
+    <canvas id="captureCanvas"></canvas>
+
+    <script>
+        const API_ENDPOINT = "https://eprashala.pythonanywhere.com/api/chat";
+        
+        // DOM Elements
+        const userNameInput = document.getElementById('userName');
+        const initBtn = document.getElementById('initBtn');
+        const cameraContainer = document.getElementById('cameraContainer');
+        const videoFeed = document.getElementById('videoFeed');
+        const scanBtn = document.getElementById('scanBtn');
+        const scannerLine = document.getElementById('scannerLine');
+        const loadingText = document.getElementById('loadingText');
+        const resultsSection = document.getElementById('resultsSection');
+        const captureCanvas = document.getElementById('captureCanvas');
+        const ctx = captureCanvas.getContext('2d');
+
+        let stream = null;
+
+        // Step 1: Initialize Camera
+        initBtn.addEventListener('click', async () => {
+            const name = userNameInput.value.trim();
+            if (!name) {
+                alert("Please enter your name to begin the reading.");
+                return;
+            }
+
+            try {
+                // Request rear camera specifically
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "environment" },
+                    audio: false
+                });
+                
+                videoFeed.srcObject = stream;
+                
+                // Update UI
+                document.getElementById('setupSection').style.display = 'none';
+                cameraContainer.style.display = 'block';
+                scanBtn.style.display = 'block';
+                
+            } catch (err) {
+                console.error("Camera access denied or unavailable: ", err);
+                alert("Unable to access the camera. Please ensure permissions are granted and you are on a secure (HTTPS) connection.");
+            }
+        });
+
+        // Step 2: Capture and Send to API
+        scanBtn.addEventListener('click', async () => {
+            const name = userNameInput.value.trim();
+            
+            // UI Updates
+            scanBtn.disabled = true;
+            scannerLine.style.display = 'block';
+            loadingText.style.display = 'block';
+            resultsSection.style.display = 'none';
+
+            // Wait a brief moment to simulate the "scanning" process visually
+            setTimeout(() => {
+                captureAndAnalyze(name);
+            }, 2000); 
+        });
+
+        async function captureAndAnalyze(name) {
+            // Set canvas size to video frame size
+            captureCanvas.width = videoFeed.videoWidth;
+            captureCanvas.height = videoFeed.videoHeight;
+            
+            // Draw current video frame to canvas
+            ctx.drawImage(videoFeed, 0, 0, captureCanvas.width, captureCanvas.height);
+            
+            // Convert to Base64 (remove the data:image/jpeg;base64, prefix for Gemini API)
+            const base64Image = captureCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+
+            // Construct the prompt for the Vedic Astrologer persona
+            const systemPrompt = `Act as an expert Vedic Palmist (Hastarekha Shastra expert). My name is ${name}. Carefully analyze the provided image of my palm. Look for and detail the following aspects:
+            1. The Life Line (Pitra Rekha)
+            2. The Heart Line (Ayu Rekha)
+            3. The Head Line (Matri Rekha)
+            4. The Fate Line (Karma Rekha)
+            5. The Planetary Mounts (Guru, Shani, Surya, Budh, Shukra, Chandra, Mangal)
+            Provide a detailed, respectful, and deeply insightful reading based strictly on Vedic traditions. Structure your response with clear headings.`;
+
+            // Standard Gemini API payload structure expected by your proxy
+            const payload = {
+                "contents": [
+                    {
+                        "parts": [
+                            { "text": systemPrompt },
+                            {
+                                "inline_data": {
+                                    "mime_type": "image/jpeg",
+                                    "data": base64Image
+                                }
+                            }
+                        ]
+                    }
+                ]
+            };
+
+            try {
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                        // If you require a user key later, add: 'X-Custom-Api-Key': 'user_key_here'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                // Stop scanner animation
+                scannerLine.style.display = 'none';
+                loadingText.style.display = 'none';
+                scanBtn.disabled = false;
+                scanBtn.innerText = "Scan Again";
+
+                if (response.ok && data.candidates && data.candidates.length > 0) {
+                    const aiText = data.candidates[0].content.parts[0].text;
+                    resultsSection.innerHTML = `<h3>Reading for ${name}</h3><p>${formatText(aiText)}</p>`;
+                    resultsSection.style.display = 'block';
+                } else {
+                    throw new Error("Invalid response from the cosmic servers.");
+                }
+
+            } catch (error) {
+                console.error("API Error:", error);
+                scannerLine.style.display = 'none';
+                loadingText.style.display = 'none';
+                scanBtn.disabled = false;
+                alert("The cosmic connection was interrupted. Please try scanning again.");
+            }
+        }
+
+        // Helper function to turn basic markdown from Gemini into HTML formatting
+        function formatText(text) {
+            return text
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')             // Italics
+                .replace(/\n/g, '<br>');                          // Line breaks
+        }
+    </script>
+</body>
+</html>
