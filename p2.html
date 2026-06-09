@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vedic Palmistry Scanner v6.0</title>
+    <style>
+        :root {
+            --primary: #d4af37; 
+            --bg-color: #1a0b2e; 
+            --text-color: #f4e8c1;
+            --error-color: #ff4c4c;
+            --life-color: #ff4c4c;
+            --head-color: #4cff4c;
+            --heart-color: #4cd2ff;
+            --fate-color: #e5b822;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-bottom: 80px; 
+        }
+
+        h1 {
+            color: var(--primary);
+            text-align: center;
+            text-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
+            margin-bottom: 5px;
+        }
+
+        .setup-container {
+            margin-top: 20px;
+            text-align: center;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        input[type="text"], select, textarea {
+            width: 80%;
+            padding: 10px;
+            border: 2px solid var(--primary);
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            font-size: 16px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .flex-row { 
+            display: flex; 
+            justify-content: space-evenly; 
+            width: 85%; 
+            margin: 0 auto 15px auto; 
+            gap: 10px;
+        }
+        
+        .flex-row select { width: 100%; margin-bottom: 0; }
+
+        textarea {
+            width: 100%;
+            text-align: left;
+            resize: vertical;
+            min-height: 80px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            width: 80%;
+            margin-top: 10px;
+        }
+
+        button:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px var(--primary);
+        }
+
+        button:disabled {
+            background-color: #555;
+            color: #888;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .audio-btn {
+            background-color: transparent;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            width: auto;
+            padding: 5px 15px;
+            font-size: 14px;
+            margin-top: 0;
+            float: right;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .audio-btn:hover {
+            background-color: rgba(212, 175, 55, 0.2);
+            transform: none;
+        }
+
+        .retake-btn {
+            background-color: var(--error-color);
+            color: white;
+            font-size: 14px;
+            padding: 8px 16px;
+            width: auto;
+            margin-top: 10px;
+        }
+
+        #handInstruction {
+            font-weight: bold;
+            color: var(--primary);
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            text-align: center;
+        }
+
+        .camera-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            aspect-ratio: 3/4;
+            background-color: #000;
+            border: 3px solid var(--primary);
+            border-radius: 10px;
+            overflow: hidden;
+            display: none; 
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .hand-guide-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0.7;
+            transition: transform 0.5s ease;
+        }
+
+        .hand-guide-overlay.flipped, .lines-overlay.flipped {
+            transform: scaleX(-1);
+        }
+
+        .hand-guide-overlay svg {
+            width: 95%; 
+            height: 95%;
+            filter: drop-shadow(0px 0px 5px rgba(212, 175, 55, 1));
+        }
+
+        .scanner-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background-color: red;
+            box-shadow: 0 0 15px red, 0 0 30px red;
+            display: none;
+            animation: scanAnimation 1.5s linear;
+        }
+
+        @keyframes scanAnimation {
+            0% { top: 0; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+
+        .results-container {
+            margin-top: 20px;
+            width: 100%;
+            max-width: 600px;
+            display: none;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .hand-result-card {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--primary);
+            padding: 20px;
+            border-radius: 10px;
+            line-height: 1.6;
+            display: none; 
+        }
+
+        .hand-result-card h3 {
+            margin-top: 0;
+            color: var(--primary);
+            display: inline-block;
+        }
+
+        /* --- NEW: Result Layout for Photo + Colored Mapping Lines --- */
+        .photo-analysis-block {
+            position: relative;
+            width: 100%;
+            max-width: 280px;
+            aspect-ratio: 3/4;
+            margin: 15px auto;
+            border: 2px solid var(--primary);
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: #000;
+        }
+
+        .captured-snapshot {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .lines-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .lines-overlay svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .legend-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            margin: 10px auto 20px auto;
+            font-size: 0.85em;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            border-radius: 5px;
+            max-width: 450px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .line-life { background-color: var(--life-color); box-shadow: 0 0 5px var(--life-color); }
+        .line-head { background-color: var(--head-color); box-shadow: 0 0 5px var(--head-color); }
+        .line-heart { background-color: var(--heart-color); box-shadow: 0 0 5px var(--heart-color); }
+        .line-fate { background-color: var(--fate-color); box-shadow: 0 0 5px var(--fate-color); }
+
+        .qa-container {
+            margin-top: 20px;
+            width: 100%;
+            max-width: 600px;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .answer-box {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(212, 175, 55, 0.1);
+            border-left: 4px solid var(--primary);
+            border-radius: 5px;
+            display: none;
+            width: 100%;
+            box-sizing: border-box;
+            line-height: 1.5;
+        }
+        
+        .floating-action {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: var(--primary);
+            color: black;
+            border-radius: 50px;
+            padding: 15px 25px;
+            font-size: 16px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            cursor: pointer;
+            z-index: 1000;
+            display: none;
+            border: none;
+            transition: transform 0.2s;
+        }
+
+        .floating-action:hover { transform: scale(1.05); }
+        canvas { display: none; }
+        .pulsing-text { animation: pulse 1.5s infinite; color: #888; font-style: italic; }
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+
+        @media print {
+            body { background-color: white; color: black; }
+            .setup-container, .camera-container, button, .audio-btn, .floating-action, .qa-container { display: none !important; }
+            .hand-result-card { border: 1px solid #ccc; background: transparent; page-break-inside: avoid; display: block !important; }
+            h1, h3 { color: black; text-shadow: none; }
+            .photo-analysis-block { border: 1px solid #000; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Hastarekha Darshan<br><span style="font-size: 16px; font-weight: normal;">Free Humanistic Palmistry System</span></h1>
+
+    <div class="setup-container" id="setupSection">
+        <input type="text" id="userName" placeholder="Enter your full name..." autocomplete="off">
+        
+        <select id="userLang" style="width: 85%; margin-bottom: 15px;">
+            <option value="English">English</option>
+            <option value="Hindi">Hindi (हिन्दी)</option>
+            <option value="Bengali">Bengali (বাংলা)</option>
+            <option value="Telugu">Telugu (తెలుగు)</option>
+            <option value="Marathi">Marathi (मराठी)</option>
+            <option value="Tamil">Tamil (தமிழ்)</option>
+            <option value="Urdu">Urdu (اردو)</option>
+            <option value="Gujarati">Gujarati (ગુજરાતી)</option>
+            <option value="Kannada">Kannada (ಕನ್ನಡ)</option>
+            <option value="Odia">Odia (ଓଡ଼ିଆ)</option>
+            <option value="Malayalam">Malayalam (മലയാളം)</option>
+            <option value="Punjabi">Punjabi (ਪੰਜਾਬੀ)</option>
+            <option value="Assamese">Assamese (অসমীয়া)</option>
+        </select>
+
+        <div class="flex-row">
+            <select id="userSex">
+                <option value="" disabled selected>Select Sex</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+            </select>
+            <select id="userAge"></select>
+        </div>
+        <button id="initBtn">Begin Reading</button>
+    </div>
+
+    <div id="handInstruction" style="display: none;"></div>
+
+    <div class="camera-container" id="cameraContainer">
+        <video id="videoFeed" autoplay playsinline></video>
+        
+        <div class="hand-guide-overlay" id="handGuide">
+            <svg viewBox="0 0 100 120" preserveAspectRatio="xMidYMid meet">
+                <path d="M 35,115 C 30,90 20,70 20,50 C 20,40 30,35 35,45 L 40,65 L 40,25 C 40,15 50,15 50,25 L 50,60 L 50,15 C 50,5 60,5 60,15 L 60,60 L 60,20 C 60,10 70,10 70,20 L 70,65 L 70,35 C 70,25 80,25 80,35 L 80,80 C 80,95 75,105 65,115 Z" 
+                      fill="none" stroke="var(--primary)" stroke-width="1.8" stroke-dasharray="4,4"/>
+            </svg>
+        </div>
+        <div class="scanner-line" id="scannerLine"></div>
+    </div>
+
+    <button id="actionBtn" style="display: none; margin-top: 15px;"></button>
+
+    <div class="legend-container" id="globalLegend" style="display: none;">
+        <div class="legend-item"><span class="dot line-life"></span> Pitra Rekha (Life Line)</div>
+        <div class="legend-item"><span class="dot line-head"></span> Matri Rekha (Head Line)</div>
+        <div class="legend-item"><span class="dot line-heart"></span> Ayu Rekha (Heart Line)</div>
+        <div class="legend-item"><span class="dot line-fate"></span> Karma Rekha (Fate Line)</div>
+    </div>
+
+    <div class="results-container" id="resultsSection">
+        
+        <div class="hand-result-card" id="stage1Card">
+            <h3><span id="stage1Title">Hand 1</span> Analysis</h3>
+            <button class="audio-btn" id="audioBtn1" style="display: none;">🔊 Listen</button>
+            
+            <div class="photo-analysis-block" id="photoBlock1" style="display: none;">
+                <img class="captured-snapshot" id="snapshotImg1" alt="Hand Snapshot">
+                <div class="lines-overlay" id="overlaySVG1">
+                    <svg viewBox="0 0 100 120">
+                        <path d="M 41,65 C 34,72 32,88 38,105" stroke="var(--life-color)" stroke-width="2.5" fill="none" stroke-linecap="round" filter="drop-shadow(0 0 3px var(--life-color))"/>
+                        <path d="M 41,65 C 55,70 68,74 76,74" stroke="var(--head-color)" stroke-width="2.5" fill="none" stroke-linecap="round" filter="drop-shadow(0 0 3px var(--head-color))"/>
+                        <path d="M 78,55 C 65,50 52,52 45,40" stroke="var(--heart-color)" stroke-width="2.5" fill="none" stroke-linecap="round" filter="drop-shadow(0 0 3px var(--heart-color))"/>
+                        <path d="M 52,110 L 53,55" stroke="var(--fate-color)" stroke-width="2.5" fill="none" stroke-linecap="round" filter="drop-shadow(0 0 3px var(--fate-color))"/>
+                    </svg>
+                </div>
+            </div>
+
+            <div id="stage1Content" class="pulsing-text">Channeling cosmic energies...</div>
+            <button class="retake-btn" id="retakeBtn1" style="display:none;">Retake Image</button>
+        </div>
+
+        <div class="hand-result-card" id="stage2Card">
+            <h3><span id="stage2Title">Hand 2</span> Analysis</h3>
+            <button class="audio-btn" id="audioBtn2" style="display: none;">🔊 Listen</button>
+            
+            <div class="photo-analysis-block" id="photoBlock2" style="display: none;">
+                <img class="captured-snapshot" id="snapshotImg2" alt="Hand Snapshot">
+                <div class="lines-overlay" id="overlaySVG2">
+                    <svg viewBox="0 0 100 120">
+                        <path d="M 41,65 C 34,72 32,88 38,105" stroke="var(--life-color)" stroke-width="2.5" fill="none" stroke-linecap="round" filter="drop-shadow(0 0 3px var(--life-color))"/>
+                        <path d="M 41,65 C 55,70 68,74 76,74" stroke="var(--head-color)" stroke-width="2.5" fill="none" stroke-linecap="round" filter="drop-shadow(0 0 3px var(--head-color))"/>
+                        <path d="M 78,55 C 65,50 52,52 45,40" stroke="var(--heart-color)" stroke-width="2.5" fill="none" stroke-linecap="round" filter="drop-shadow(0 0 3px var(--heart-color))"/>
+                        <path d="M 52,110 L 53,55" stroke="var(--fate-color)" stroke-width="2.5" fill="none" stroke-linecap="round" filter="drop-shadow(0 0 3px var(--fate-color))"/>
+                    </svg>
+                </div>
+            </div>
+
+            <div id="stage2Content" class="pulsing-text">Awaiting scan...</div>
+            <button class="retake-btn" id="retakeBtn2" style="display:none;">Retake Image</button>
+        </div>
+    </div>
+
+    <div class="qa-container" id="qaSection">
+        <h3 style="color: var(--primary); margin-bottom: 10px; width: 100%;">Seek Further Wisdom</h3>
+        <textarea id="questionInput" placeholder="Ask a question based on your full reading..."></textarea>
+        <button id="askBtn">Consult the Astrologer</button>
+        <div class="answer-box" id="answerBox">
+            <button class="audio-btn" id="audioBtnQA" style="display: none;">🔊 Listen</button>
+            <div id="qaContent"></div>
+        </div>
+    </div>
+    
+    <button id="sharePdfBtn" class="floating-action">📤 Share / Save PDF</button>
+    <canvas id="captureCanvas"></canvas>
+
+    <script>
+        const API_ENDPOINT = "https://eprashala.pythonanywhere.com/api/chat";
+        
+        const langMap = {
+            "English": "en-IN", "Hindi": "hi-IN", "Bengali": "bn-IN", "Telugu": "te-IN",
+            "Marathi": "mr-IN", "Tamil": "ta-IN", "Urdu": "ur-IN", "Gujarati": "gu-IN",
+            "Kannada": "kn-IN", "Odia": "or-IN", "Malayalam": "ml-IN", "Punjabi": "pa-IN",
+            "Assamese": "as-IN"
+        };
+
+        let stream = null;
+        let wakeLock = null;
+        let scanStage = 0; 
+        let firstHand = ""; 
+        let secondHand = "";
+        let fullReadingContext = ""; 
+        
+        let hand1Resolved = false;
+        let hand2Resolved = false;
+        let rawText1 = "";
+        let rawText2 = "";
+
+        // UI Core DOM
+        const setupSection = document.getElementById('setupSection');
+        const userLang = document.getElementById('userLang');
+        const userSex = document.getElementById('userSex');
+        const userAge = document.getElementById('userAge');
+        const userNameInput = document.getElementById('userName');
+        const initBtn = document.getElementById('initBtn');
+        const actionBtn = document.getElementById('actionBtn');
+        const handInstruction = document.getElementById('handInstruction');
+        const globalLegend = document.getElementById('globalLegend');
+        
+        const cameraContainer = document.getElementById('cameraContainer');
+        const videoFeed = document.getElementById('videoFeed');
+        const handGuide = document.getElementById('handGuide');
+        const scannerLine = document.getElementById('scannerLine');
+        const captureCanvas = document.getElementById('captureCanvas');
+        const ctx = captureCanvas.getContext('2d');
+
+        const resultsSection = document.getElementById('resultsSection');
+        
+        const stage1Card = document.getElementById('stage1Card');
+        const stage1Content = document.getElementById('stage1Content');
+        const photoBlock1 = document.getElementById('photoBlock1');
+        const snapshotImg1 = document.getElementById('snapshotImg1');
+        const overlaySVG1 = document.getElementById('overlaySVG1');
+        const audioBtn1 = document.getElementById('audioBtn1');
+        const retakeBtn1 = document.getElementById('retakeBtn1');
+
+        const stage2Card = document.getElementById('stage2Card');
+        const stage2Content = document.getElementById('stage2Content');
+        const photoBlock2 = document.getElementById('photoBlock2');
+        const snapshotImg2 = document.getElementById('snapshotImg2');
+        const overlaySVG2 = document.getElementById('overlaySVG2');
+        const audioBtn2 = document.getElementById('audioBtn2');
+        const retakeBtn2 = document.getElementById('retakeBtn2');
+        
+        const qaSection = document.getElementById('qaSection');
+        const sharePdfBtn = document.getElementById('sharePdfBtn');
+
+        let currentSynthUtterance = null;
+        let currentAudioBtn = null;
+
+        // Populate Age System
+        for (let i = 1; i <= 100; i++) {
+            let option = document.createElement('option');
+            option.value = i;
+            option.text = i + " years old";
+            if (i === 25) option.selected = true;
+            userAge.appendChild(option);
+        }
+
+        // Keep Screen Active using Web Wake Lock API
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) { console.log(`Wake Lock info: ${err.message}`); }
+        }
+
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+                await requestWakeLock();
+            }
+        });
+
+        initBtn.addEventListener('click', async () => {
+            if (!userNameInput.value.trim() || !userSex.value) {
+                alert("Please enter your name and select your sex to begin.");
+                return;
+            }
+            requestWakeLock();
+
+            if (userSex.value === 'Male') {
+                firstHand = "Left"; secondHand = "Right";
+            } else {
+                firstHand = "Right"; secondHand = "Left";
+            }
+            startCameraFlow();
+        });
+
+        async function startCameraFlow() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+                videoFeed.srcObject = stream;
+                
+                setupSection.style.display = 'none';
+                cameraContainer.style.display = 'block';
+                resultsSection.style.display = 'flex';
+                globalLegend.style.display = 'flex';
+                
+                setupStage1();
+            } catch (err) {
+                alert("Unable to access rear camera. Please verify permissions.");
+            }
+        }
+
+        function setupStage1() {
+            scanStage = 1;
+            handInstruction.style.display = 'block';
+            handInstruction.innerText = `Step 1: Align your ${firstHand} Hand perfectly within the guide metrics.`;
+            
+            document.getElementById('stage1Title').innerText = firstHand;
+            document.getElementById('stage2Title').innerText = secondHand;
+
+            // Update guidelines to match physical palm orientations
+            if (firstHand === "Left") {
+                handGuide.classList.add('flipped');
+                overlaySVG1.classList.add('flipped');
+            } else {
+                handGuide.classList.remove('flipped');
+                overlaySVG1.classList.remove('flipped');
+            }
+
+            actionBtn.style.display = 'block';
+            actionBtn.disabled = false;
+            actionBtn.innerText = `Scan ${firstHand} Hand`;
+            cameraContainer.style.display = 'block';
+        }
+
+        function setupStage2() {
+            scanStage = 2;
+            handInstruction.innerText = `Step 2: Now, align your ${secondHand} Hand within the guide metrics.`;
+            
+            if (secondHand === "Left") {
+                handGuide.classList.add('flipped');
+                overlaySVG2.classList.add('flipped');
+            } else {
+                handGuide.classList.remove('flipped');
+                overlaySVG2.classList.remove('flipped');
+            }
+
+            actionBtn.style.display = 'block';
+            actionBtn.disabled = false;
+            actionBtn.innerText = `Scan ${secondHand} Hand`;
+            stage2Content.innerText = "Awaiting scan...";
+            cameraContainer.style.display = 'block';
+        }
+
+        actionBtn.addEventListener('click', () => {
+            actionBtn.disabled = true;
+            
+            scannerLine.style.display = 'block';
+            scannerLine.style.animation = 'none';
+            void scannerLine.offsetWidth; 
+            scannerLine.style.animation = 'scanAnimation 1.5s linear';
+
+            setTimeout(() => {
+                scannerLine.style.display = 'none';
+                
+                if (scanStage === 1) {
+                    const dataUrl = captureFrameData();
+                    snapshotImg1.src = dataUrl;
+                    photoBlock1.style.display = 'block';
+                    
+                    stage1Card.style.display = 'block'; 
+                    stage1Content.innerText = "Channeling cosmic energies...";
+                    stage1Content.classList.add('pulsing-text');
+                    retakeBtn1.style.display = 'none';
+
+                    const base64Str = dataUrl.split(',')[1];
+                    processHandAsync(firstHand, base64Str, 1); 
+                    setupStage2(); 
+                } 
+                else if (scanStage === 2) {
+                    const dataUrl = captureFrameData();
+                    snapshotImg2.src = dataUrl;
+                    photoBlock2.style.display = 'block';
+
+                    stage2Card.style.display = 'block';
+                    stage2Content.innerText = "Channeling cosmic energies...";
+                    stage2Content.classList.add('pulsing-text');
+                    retakeBtn2.style.display = 'none';
+                    
+                    cameraContainer.style.display = 'none';
+                    actionBtn.style.display = 'none';
+                    handInstruction.innerText = "Processing Palm Inscriptions...";
+                    
+                    const base64Str = dataUrl.split(',')[1];
+                    processHandAsync(secondHand, base64Str, 2);
+                }
+            }, 1500); 
+        });
+
+        function captureFrameData() {
+            captureCanvas.width = videoFeed.videoWidth;
+            captureCanvas.height = videoFeed.videoHeight;
+            // Native unmirrored canvas capturing logic mapping directly over rear camera
+            ctx.drawImage(videoFeed, 0, 0, captureCanvas.width, captureCanvas.height);
+            return captureCanvas.toDataURL('image/jpeg', 0.85);
+        }
+
+        async function processHandAsync(currentHand, base64Image, stageNum) {
+            const name = userNameInput.value.trim();
+            const sex = userSex.value;
+            const age = userAge.value;
+            const lang = userLang.value;
+            const targetContent = stageNum === 1 ? stage1Content : stage2Content;
+            const targetRetake = stageNum === 1 ? retakeBtn1 : retakeBtn2;
+            const targetAudio = stageNum === 1 ? audioBtn1 : audioBtn2;
+            const targetBlock = stageNum === 1 ? photoBlock1 : photoBlock2;
+
+            let karmicContext = sex === "Male" 
+                ? (currentHand === "Left" ? "Prarabdha Karma (past life/innate potential)." : "Agami Karma (current actions/free will).")
+                : (currentHand === "Right" ? "Prarabdha Karma (past life/innate potential)." : "Agami Karma (current actions/free will).");
+
+            const systemPrompt = `Act as an expert Vedic Palmist. My name is ${name}. I am a ${age}-year-old ${sex}. Analyze my ${currentHand} hand (${karmicContext}).
+            CRITICAL SYSTEM INSTRUCTIONS:
+            1. IMAGE VALIDATION: If the captured hand image is blurred, unreadable, mostly pitch-black, or fails to exhibit a human palm surface, you MUST fail immediately by responding with exactly "ERROR_RETAKE:" followed by a quick reason. Do not attempt a reading.
+            2. UNCOMPROMISED HONESTY: Analyze the lines mapped to the user metrics: Pitra Rekha (Life Line highlighted in Red), Matri Rekha (Head Line highlighted in Green), Ayu Rekha (Heart Line highlighted in Blue), and Karma Rekha (Fate Line highlighted in Gold). If there are bad indicators, islands, breaks, or doshas, state them explicitly and honestly. Provide authentic traditional remedies for any defects found.
+            3. LANGUAGE COMPLIANCE: Write your entire response exclusively in the ${lang} language. Format using clean HTML structures (<br>, <strong>).`;
+
+            try {
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ "contents": [{ "parts": [ { "text": systemPrompt }, { "inline_data": { "mime_type": "image/jpeg", "data": base64Image } } ] }] })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.candidates) {
+                    const aiText = data.candidates[0].content.parts[0].text;
+                    
+                    if (aiText.includes("ERROR_RETAKE:")) {
+                        targetContent.classList.remove('pulsing-text');
+                        targetContent.innerHTML = `<span style="color:var(--error-color);"><strong>Analysis Halted:</strong> ${aiText.replace("ERROR_RETAKE:", "")}</span>`;
+                        targetRetake.style.display = 'block';
+                        targetBlock.style.display = 'none';
+                        return;
+                    }
+
+                    fullReadingContext += `\n[${currentHand} Hand Inscription]:\n` + aiText;
+                    
+                    targetContent.classList.remove('pulsing-text');
+                    targetContent.innerHTML = formatText(aiText);
+                    targetAudio.style.display = 'flex';
+
+                    if (stageNum === 1) { rawText1 = aiText; hand1Resolved = true; } 
+                    else { rawText2 = aiText; hand2Resolved = true; }
+
+                    checkCompletion();
+                } else { throw new Error(); }
+
+            } catch (error) {
+                targetContent.classList.remove('pulsing-text');
+                targetContent.innerHTML = `<span style="color:var(--error-color);">Cosmic interface interrupted.</span>`;
+                targetRetake.style.display = 'block';
+            }
+        }
+
+        retakeBtn1.addEventListener('click', () => {
+            if(!stream || !stream.active) startCameraFlow();
+            setupStage1();
+            stage1Content.innerText = "Awaiting scan...";
+            retakeBtn1.style.display = 'none';
+        });
+
+        retakeBtn2.addEventListener('click', () => {
+            if(!stream || !stream.active) startCameraFlow();
+            setupStage2();
+            retakeBtn2.style.display = 'none';
+        });
+
+        function checkCompletion() {
+            if (hand1Resolved && hand2Resolved) {
+                handInstruction.innerText = "Vedic Diagnostics Compiled.";
+                qaSection.style.display = 'flex';
+                sharePdfBtn.style.display = 'block';
+                if (stream) stream.getTracks().forEach(track => track.stop());
+            }
+        }
+
+        // State-driven Play / Pause / Resume Audio System
+        function toggleSpeech(text, langName, btnElement) {
+            const synth = window.speechSynthesis;
+
+            if (synth.speaking && currentAudioBtn === btnElement) {
+                if (synth.paused) {
+                    synth.resume();
+                    btnElement.innerHTML = "⏸️ Pause";
+                } else {
+                    synth.pause();
+                    btnElement.innerHTML = "▶️ Resume";
+                }
+                return;
+            }
+
+            synth.cancel();
+            if(currentAudioBtn) currentAudioBtn.innerHTML = "🔊 Listen";
+            
+            currentAudioBtn = btnElement;
+            const plainText = text.replace(/<[^>]*>?/gm, ''); 
+            currentSynthUtterance = new SpeechSynthesisUtterance(plainText);
+            currentSynthUtterance.lang = langMap[langName] || 'en-IN';
+            
+            currentSynthUtterance.onstart = () => btnElement.innerHTML = "⏸️ Pause";
+            currentSynthUtterance.onend = () => { btnElement.innerHTML = "🔊 Listen"; currentAudioBtn = null; };
+            currentSynthUtterance.onerror = () => { btnElement.innerHTML = "🔊 Listen"; currentAudioBtn = null; };
+            
+            synth.speak(currentSynthUtterance);
+        }
+
+        audioBtn1.addEventListener('click', function() { toggleSpeech(rawText1, userLang.value, this); });
+        audioBtn2.addEventListener('click', function() { toggleSpeech(rawText2, userLang.value, this); });
+
+        // Document Export Engine
+        sharePdfBtn.addEventListener('click', async () => {
+            const compiledText = `Hastarekha Universal Reading for ${userNameInput.value}\n\n` + rawText1 + `\n\n` + rawText2;
+            if (navigator.share) {
+                try {
+                    await navigator.share({ title: 'Vedic Palmistry Assessment', text: compiledText });
+                } catch(e) { if(e.name !== "AbortError") window.print(); }
+            } else { window.print(); }
+        });
+
+        // Advanced Follow-up System
+        document.getElementById('askBtn').addEventListener('click', async () => {
+            const question = document.getElementById('questionInput').value.trim();
+            const lang = userLang.value;
+            const askBtn = document.getElementById('askBtn');
+            const qaContent = document.getElementById('qaContent');
+            const audioBtnQA = document.getElementById('audioBtnQA');
+
+            if (!question) return;
+
+            askBtn.disabled = true;
+            document.getElementById('answerBox').style.display = 'block';
+            audioBtnQA.style.display = 'none';
+            qaContent.innerHTML = `<span class="pulsing-text">Channeling answer matrix...</span>`;
+
+            const qaPrompt = `Act as an expert Vedic Palmist. Based on the complete dual-palm context:\n"${fullReadingContext}"\nThe user asks this custom follow-up: "${question}"\nFormulate a precise synthesis in the ${lang} language. Remain honest about negative doshas, and preserve HTML rendering.`;
+
+            try {
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ "contents": [{ "parts": [{ "text": qaPrompt }] }] })
+                });
+
+                const data = await response.json();
+                askBtn.disabled = false;
+
+                if (response.ok && data.candidates) {
+                    const text = data.candidates[0].content.parts[0].text;
+                    qaContent.innerHTML = `<strong>The Astrologer says:</strong><br><br>${formatText(text)}`;
+                    audioBtnQA.onclick = function() { toggleSpeech(text, lang, this); };
+                    audioBtnQA.style.display = 'flex';
+                }
+            } catch (error) {
+                askBtn.disabled = false;
+                qaContent.innerHTML = "Failed to communicate with proxy matrix.";
+            }
+        });
+
+        function formatText(text) {
+            return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') 
+                       .replace(/\*(.*?)\*/g, '<em>$1</em>')             
+                       .replace(/\n\n/g, '<br><br>')
+                       .replace(/\n/g, '<br>');                          
+        }
+    </script>
+</body>
+</html>
