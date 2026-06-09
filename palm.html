@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vedic Palmistry Scanner v3.0</title>
+    <title>Vedic Palmistry Scanner v4.0</title>
     <style>
         :root {
             --primary: #d4af37; 
@@ -48,20 +48,22 @@
             text-align: center;
         }
 
-        select { width: 45%; }
-        .flex-row { display: flex; justify-content: space-evenly; width: 85%; margin: 0 auto; }
+        .flex-row { 
+            display: flex; 
+            justify-content: space-evenly; 
+            width: 85%; 
+            margin: 0 auto 15px auto; 
+            gap: 10px;
+        }
         
+        .flex-row select { width: 100%; margin-bottom: 0; }
+
         textarea {
             width: 100%;
             text-align: left;
             resize: vertical;
             min-height: 80px;
             box-sizing: border-box;
-        }
-
-        input[type="text"]:focus, select:focus, textarea:focus {
-            outline: none;
-            box-shadow: 0 0 10px var(--primary);
         }
 
         button {
@@ -90,6 +92,25 @@
             box-shadow: none;
         }
 
+        .audio-btn {
+            background-color: transparent;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            width: auto;
+            padding: 5px 15px;
+            font-size: 14px;
+            margin-top: 0;
+            float: right;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .audio-btn:hover {
+            background-color: rgba(212, 175, 55, 0.2);
+            transform: none;
+        }
+
         #handInstruction {
             font-weight: bold;
             color: var(--primary);
@@ -114,32 +135,32 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
+            transform: scaleX(-1); /* Mirror video for better user experience */
         }
 
-        /* --- NEW: SVG Hand Outline Guide --- */
         .hand-guide-overlay {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            pointer-events: none; /* Let clicks pass through to video */
+            pointer-events: none; 
             display: flex;
             justify-content: center;
             align-items: center;
-            opacity: 0.6;
+            opacity: 0.7;
             transition: transform 0.5s ease;
         }
 
-        /* Flipped state for the other hand */
         .hand-guide-overlay.flipped {
             transform: scaleX(-1);
         }
 
+        /* Increased SVG Size */
         .hand-guide-overlay svg {
-            width: 80%;
-            height: 80%;
-            filter: drop-shadow(0px 0px 5px rgba(212, 175, 55, 0.8));
+            width: 95%; 
+            height: 95%;
+            filter: drop-shadow(0px 0px 5px rgba(212, 175, 55, 1));
         }
 
         .scanner-line {
@@ -151,7 +172,7 @@
             background-color: red;
             box-shadow: 0 0 15px red, 0 0 30px red;
             display: none;
-            animation: scanAnimation 2s linear infinite;
+            animation: scanAnimation 1.5s linear;
         }
 
         @keyframes scanAnimation {
@@ -159,14 +180,6 @@
             10% { opacity: 1; }
             90% { opacity: 1; }
             100% { top: 100%; opacity: 0; }
-        }
-
-        .loading-text {
-            color: var(--primary);
-            margin-top: 15px;
-            font-style: italic;
-            display: none;
-            text-align: center;
         }
 
         .results-container {
@@ -184,6 +197,13 @@
             padding: 20px;
             border-radius: 10px;
             line-height: 1.6;
+            display: none; /* Hidden until processing starts */
+        }
+
+        .hand-result-card h3 {
+            margin-top: 0;
+            color: var(--primary);
+            display: inline-block;
         }
 
         .qa-container {
@@ -208,6 +228,9 @@
         }
         
         canvas { display: none; }
+        .pulsing-text { animation: pulse 1.5s infinite; color: #888; font-style: italic; }
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+
     </style>
 </head>
 <body>
@@ -216,6 +239,23 @@
 
     <div class="setup-container" id="setupSection">
         <input type="text" id="userName" placeholder="Enter your full name..." autocomplete="off">
+        
+        <select id="userLang" style="width: 85%; margin-bottom: 15px;">
+            <option value="English">English</option>
+            <option value="Hindi">Hindi (हिन्दी)</option>
+            <option value="Bengali">Bengali (বাংলা)</option>
+            <option value="Telugu">Telugu (తెలుగు)</option>
+            <option value="Marathi">Marathi (मराठी)</option>
+            <option value="Tamil">Tamil (தமிழ்)</option>
+            <option value="Urdu">Urdu (اردو)</option>
+            <option value="Gujarati">Gujarati (ગુજરાતી)</option>
+            <option value="Kannada">Kannada (ಕನ್ನಡ)</option>
+            <option value="Odia">Odia (ଓଡ଼ିଆ)</option>
+            <option value="Malayalam">Malayalam (മലയാളം)</option>
+            <option value="Punjabi">Punjabi (ਪੰਜਾਬੀ)</option>
+            <option value="Assamese">Assamese (অসমীয়া)</option>
+        </select>
+
         <div class="flex-row">
             <select id="userSex">
                 <option value="" disabled selected>Select Sex</option>
@@ -235,30 +275,37 @@
         <div class="hand-guide-overlay" id="handGuide">
             <svg viewBox="0 0 100 120" preserveAspectRatio="xMidYMid meet">
                 <path d="M 35,115 C 30,90 20,70 20,50 C 20,40 30,35 35,45 L 40,65 L 40,25 C 40,15 50,15 50,25 L 50,60 L 50,15 C 50,5 60,5 60,15 L 60,60 L 60,20 C 60,10 70,10 70,20 L 70,65 L 70,35 C 70,25 80,25 80,35 L 80,80 C 80,95 75,105 65,115 Z" 
-                      fill="none" 
-                      stroke="var(--primary)" 
-                      stroke-width="2" 
-                      stroke-dasharray="4,4"/>
+                      fill="none" stroke="var(--primary)" stroke-width="2" stroke-dasharray="4,4"/>
             </svg>
         </div>
 
         <div class="scanner-line" id="scannerLine"></div>
     </div>
 
-    <button id="actionBtn" style="display: none; margin-top: 15px;">Scan Current Hand</button>
-    <div class="loading-text" id="loadingText">Channeling cosmic energies...</div>
+    <button id="actionBtn" style="display: none; margin-top: 15px;"></button>
 
     <div class="results-container" id="resultsSection">
-        <div class="hand-result-card" id="stage1Result" style="display: none;"></div>
-        <div class="hand-result-card" id="stage2Result" style="display: none;"></div>
+        <div class="hand-result-card" id="stage1Card">
+            <h3><span id="stage1Title">Hand 1</span> Analysis</h3>
+            <button class="audio-btn" id="audioBtn1" style="display: none;">🔊 Listen</button>
+            <div id="stage1Content" class="pulsing-text">Channeling cosmic energies...</div>
+        </div>
+
+        <div class="hand-result-card" id="stage2Card">
+            <h3><span id="stage2Title">Hand 2</span> Analysis</h3>
+            <button class="audio-btn" id="audioBtn2" style="display: none;">🔊 Listen</button>
+            <div id="stage2Content" class="pulsing-text">Awaiting scan...</div>
+        </div>
     </div>
 
     <div class="qa-container" id="qaSection">
         <h3 style="color: var(--primary); margin-bottom: 10px; width: 100%;">Seek Further Wisdom</h3>
-        <textarea id="questionInput" placeholder="Ask a question based on your full reading (e.g., 'What does my combined fate line say about wealth?')..."></textarea>
+        <textarea id="questionInput" placeholder="Ask a question based on your full reading..."></textarea>
         <button id="askBtn">Consult the Astrologer</button>
-        <div class="loading-text" id="qaLoadingText">Channeling the answer...</div>
-        <div class="answer-box" id="answerBox"></div>
+        <div class="answer-box" id="answerBox">
+            <button class="audio-btn" id="audioBtnQA" style="display: none;">🔊 Listen</button>
+            <div id="qaContent"></div>
+        </div>
     </div>
     
     <canvas id="captureCanvas"></canvas>
@@ -266,15 +313,29 @@
     <script>
         const API_ENDPOINT = "https://eprashala.pythonanywhere.com/api/chat";
         
-        // State Management
+        // BCP 47 Language Codes for TTS
+        const langMap = {
+            "English": "en-IN", "Hindi": "hi-IN", "Bengali": "bn-IN", "Telugu": "te-IN",
+            "Marathi": "mr-IN", "Tamil": "ta-IN", "Urdu": "ur-IN", "Gujarati": "gu-IN",
+            "Kannada": "kn-IN", "Odia": "or-IN", "Malayalam": "ml-IN", "Punjabi": "pa-IN",
+            "Assamese": "as-IN"
+        };
+
         let stream = null;
-        let scanStage = 0; // 0 = not started, 1 = first hand, 2 = second hand, 3 = complete
+        let scanStage = 0; 
         let firstHand = ""; 
         let secondHand = "";
         let fullReadingContext = ""; 
+        
+        // API Promise tracking
+        let hand1Resolved = false;
+        let hand2Resolved = false;
+        let rawText1 = "";
+        let rawText2 = "";
 
         // DOM Elements
         const setupSection = document.getElementById('setupSection');
+        const userLang = document.getElementById('userLang');
         const userSex = document.getElementById('userSex');
         const userAge = document.getElementById('userAge');
         const userNameInput = document.getElementById('userName');
@@ -286,17 +347,25 @@
         const videoFeed = document.getElementById('videoFeed');
         const handGuide = document.getElementById('handGuide');
         const scannerLine = document.getElementById('scannerLine');
-        const loadingText = document.getElementById('loadingText');
         const captureCanvas = document.getElementById('captureCanvas');
         const ctx = captureCanvas.getContext('2d');
 
         const resultsSection = document.getElementById('resultsSection');
-        const stage1Result = document.getElementById('stage1Result');
-        const stage2Result = document.getElementById('stage2Result');
+        const stage1Card = document.getElementById('stage1Card');
+        const stage1Title = document.getElementById('stage1Title');
+        const stage1Content = document.getElementById('stage1Content');
+        const audioBtn1 = document.getElementById('audioBtn1');
+
+        const stage2Card = document.getElementById('stage2Card');
+        const stage2Title = document.getElementById('stage2Title');
+        const stage2Content = document.getElementById('stage2Content');
+        const audioBtn2 = document.getElementById('audioBtn2');
         
         const qaSection = document.getElementById('qaSection');
         const askBtn = document.getElementById('askBtn');
         const answerBox = document.getElementById('answerBox');
+        const qaContent = document.getElementById('qaContent');
+        const audioBtnQA = document.getElementById('audioBtnQA');
 
         // Populate Age
         for (let i = 1; i <= 100; i++) {
@@ -307,36 +376,29 @@
             userAge.appendChild(option);
         }
 
-        // Initialize App
+        // Initialize Camera
         initBtn.addEventListener('click', async () => {
             if (!userNameInput.value.trim() || !userSex.value) {
                 alert("Please enter your name and select your sex to begin.");
                 return;
             }
 
-            // Determine Hand Order based on Sex
             if (userSex.value === 'Male') {
-                firstHand = "Left";
-                secondHand = "Right";
+                firstHand = "Left"; secondHand = "Right";
             } else {
-                firstHand = "Right";
-                secondHand = "Left";
+                firstHand = "Right"; secondHand = "Left";
             }
 
             try {
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: "environment" },
-                    audio: false
-                });
-                
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
                 videoFeed.srcObject = stream;
+                
                 setupSection.style.display = 'none';
                 cameraContainer.style.display = 'block';
+                resultsSection.style.display = 'flex'; // Show cards container
                 
                 setupStage1();
-                
             } catch (err) {
-                console.error("Camera access denied: ", err);
                 alert("Unable to access the camera. Ensure permissions are granted.");
             }
         });
@@ -346,13 +408,12 @@
             handInstruction.style.display = 'block';
             handInstruction.innerText = `Step 1: Align your ${firstHand} Hand within the dotted guide.`;
             
-            // The SVG default is a Right hand outline.
-            // If the required hand is Left, we flip the SVG overlay.
-            if (firstHand === "Left") {
-                handGuide.classList.add('flipped');
-            } else {
-                handGuide.classList.remove('flipped');
-            }
+            stage1Title.innerText = firstHand;
+            stage2Title.innerText = secondHand;
+
+            // Mirror logic for the guide
+            if (firstHand === "Left") handGuide.classList.add('flipped');
+            else handGuide.classList.remove('flipped');
 
             actionBtn.style.display = 'block';
             actionBtn.innerText = `Scan ${firstHand} Hand`;
@@ -362,49 +423,75 @@
             scanStage = 2;
             handInstruction.innerText = `Step 2: Now, align your ${secondHand} Hand within the dotted guide.`;
             
-            if (secondHand === "Left") {
-                handGuide.classList.add('flipped');
-            } else {
-                handGuide.classList.remove('flipped');
-            }
+            if (secondHand === "Left") handGuide.classList.add('flipped');
+            else handGuide.classList.remove('flipped');
 
-            actionBtn.style.display = 'block';
+            actionBtn.disabled = false;
             actionBtn.innerText = `Scan ${secondHand} Hand`;
+            stage2Content.innerText = "Awaiting scan...";
         }
 
         actionBtn.addEventListener('click', () => {
             actionBtn.disabled = true;
+            
+            // Trigger animation
             scannerLine.style.display = 'block';
-            loadingText.style.display = 'block';
+            scannerLine.style.animation = 'none';
+            void scannerLine.offsetWidth; // Trigger reflow
+            scannerLine.style.animation = 'scanAnimation 1.5s linear';
 
             setTimeout(() => {
-                if (scanStage === 1) captureAndAnalyze(firstHand, stage1Result);
-                else if (scanStage === 2) captureAndAnalyze(secondHand, stage2Result);
-            }, 2000); 
+                scannerLine.style.display = 'none';
+                
+                if (scanStage === 1) {
+                    const b64 = captureImage();
+                    stage1Card.style.display = 'block'; // Show card
+                    processHandAsync(firstHand, b64, 1); // Start background API
+                    setupStage2(); // INSTANTLY allow second scan
+                } 
+                else if (scanStage === 2) {
+                    const b64 = captureImage();
+                    stage2Card.style.display = 'block';
+                    stage2Content.innerText = "Channeling cosmic energies...";
+                    stage2Content.classList.add('pulsing-text');
+                    
+                    cameraContainer.style.display = 'none';
+                    actionBtn.style.display = 'none';
+                    handInstruction.innerText = "Cosmic Analysis in Progress...";
+                    
+                    // Stop camera
+                    if (stream) stream.getTracks().forEach(track => track.stop());
+                    
+                    processHandAsync(secondHand, b64, 2);
+                }
+            }, 1500); 
         });
 
-        async function captureAndAnalyze(currentHand, targetDiv) {
+        function captureImage() {
+            captureCanvas.width = videoFeed.videoWidth;
+            captureCanvas.height = videoFeed.videoHeight;
+            // Un-mirror the context so the AI gets the correct orientation
+            ctx.translate(captureCanvas.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(videoFeed, 0, 0, captureCanvas.width, captureCanvas.height);
+            return captureCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+        }
+
+        async function processHandAsync(currentHand, base64Image, stageNum) {
             const name = userNameInput.value.trim();
             const sex = userSex.value;
             const age = userAge.value;
+            const lang = userLang.value;
 
-            captureCanvas.width = videoFeed.videoWidth;
-            captureCanvas.height = videoFeed.videoHeight;
-            ctx.drawImage(videoFeed, 0, 0, captureCanvas.width, captureCanvas.height);
-            const base64Image = captureCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
-
-            // Provide deep astrological context to the prompt
-            let karmicContext = "";
-            if (sex === "Male") {
-                karmicContext = currentHand === "Left" ? "This is his Left hand, representing his Prarabdha Karma (past life/innate potential)." : "This is his Right hand, representing his Agami Karma (current life actions/free will).";
-            } else {
-                karmicContext = currentHand === "Right" ? "This is her Right hand, representing her Prarabdha Karma (past life/innate potential)." : "This is her Left hand, representing her Agami Karma (current life actions/free will).";
-            }
+            let karmicContext = sex === "Male" 
+                ? (currentHand === "Left" ? "Prarabdha Karma (past life/innate potential)." : "Agami Karma (current actions/free will).")
+                : (currentHand === "Right" ? "Prarabdha Karma (past life/innate potential)." : "Agami Karma (current actions/free will).");
 
             const systemPrompt = `Act as an expert Vedic Palmist. My name is ${name}. I am a ${age}-year-old ${sex}. 
-            Carefully analyze the provided image of my ${currentHand} hand. ${karmicContext}
-            Focus deeply on: 1. Pitra Rekha (Life Line) 2. Ayu Rekha (Heart Line) 3. Matri Rekha (Head Line) 4. Karma Rekha (Fate Line) 5. Key Planetary Mounts.
-            Provide a focused, accurate reading specifically for this hand based on Vedic rules. Use HTML formatting (<br>, <strong>).`;
+            Analyze my ${currentHand} hand. This represents my ${karmicContext}.
+            Focus on: 1. Pitra Rekha (Life Line) 2. Ayu Rekha (Heart Line) 3. Matri Rekha (Head Line) 4. Karma Rekha (Fate Line).
+            Provide a focused reading based on Vedic rules.
+            CRITICAL: You MUST write your entire response exclusively in the ${lang} language. Ensure formatting is simple HTML (<br>, <strong>).`;
 
             const payload = {
                 "contents": [{
@@ -424,62 +511,57 @@
 
                 const data = await response.json();
 
-                scannerLine.style.display = 'none';
-                loadingText.style.display = 'none';
-                actionBtn.disabled = false;
-
                 if (response.ok && data.candidates && data.candidates.length > 0) {
                     const aiText = data.candidates[0].content.parts[0].text;
-                    fullReadingContext += `\n\n[Reading for ${currentHand} Hand]:\n` + aiText;
+                    fullReadingContext += `\n[${currentHand} Hand]:\n` + aiText;
                     
-                    targetDiv.innerHTML = `<h3 style="color:var(--primary)">${currentHand} Hand Analysis</h3><div>${formatText(aiText)}</div>`;
-                    targetDiv.style.display = 'block';
-                    resultsSection.style.display = 'flex';
-
-                    if (scanStage === 1) {
-                        setupStage2();
-                    } else if (scanStage === 2) {
-                        // Both hands scanned
-                        scanStage = 3;
-                        cameraContainer.style.display = 'none';
-                        actionBtn.style.display = 'none';
-                        handInstruction.innerText = "Cosmic Analysis Complete.";
-                        qaSection.style.display = 'flex';
-                        
-                        // Stop the camera to save resources
-                        if (stream) {
-                            stream.getTracks().forEach(track => track.stop());
-                        }
+                    if (stageNum === 1) {
+                        rawText1 = aiText;
+                        stage1Content.classList.remove('pulsing-text');
+                        stage1Content.innerHTML = formatText(aiText);
+                        audioBtn1.style.display = 'flex';
+                        hand1Resolved = true;
+                    } else {
+                        rawText2 = aiText;
+                        stage2Content.classList.remove('pulsing-text');
+                        stage2Content.innerHTML = formatText(aiText);
+                        audioBtn2.style.display = 'flex';
+                        hand2Resolved = true;
                     }
-                } else {
-                    throw new Error("Invalid API response.");
-                }
+
+                    checkCompletion();
+
+                } else { throw new Error("API Error"); }
 
             } catch (error) {
-                console.error("API Error:", error);
-                scannerLine.style.display = 'none';
-                loadingText.style.display = 'none';
-                actionBtn.disabled = false;
-                alert("Cosmic connection interrupted. Please ensure the proxy is running and try again.");
+                const errDiv = stageNum === 1 ? stage1Content : stage2Content;
+                errDiv.classList.remove('pulsing-text');
+                errDiv.innerHTML = `<span style="color:red;">Connection interrupted. Please try again later.</span>`;
+                if(stageNum === 2) hand2Resolved = true; checkCompletion();
+            }
+        }
+
+        function checkCompletion() {
+            if (hand1Resolved && hand2Resolved) {
+                handInstruction.innerText = "Cosmic Analysis Complete.";
+                qaSection.style.display = 'flex';
             }
         }
 
         // Q&A System
         askBtn.addEventListener('click', async () => {
             const question = document.getElementById('questionInput').value.trim();
+            const lang = userLang.value;
             if (!question) return;
 
             askBtn.disabled = true;
-            document.getElementById('qaLoadingText').style.display = 'block';
-            answerBox.style.display = 'none';
+            answerBox.style.display = 'block';
+            audioBtnQA.style.display = 'none';
+            qaContent.innerHTML = `<span class="pulsing-text">Channeling the answer...</span>`;
 
-            const qaPrompt = `Act as an expert Vedic Palmist. Based on the complete two-hand reading you just provided:\n\n"${fullReadingContext}"\n\nThe user asks: "${question}"\n\nSynthesize the information from both the left and right hands to provide a unified, perfect, and insightful answer based on traditional Vedic Palmistry. Use HTML formatting.`;
+            const qaPrompt = `Act as an expert Vedic Palmist. Based on the complete reading you provided:\n"${fullReadingContext}"\n\nThe user asks: "${question}"\nSynthesize info from both hands. CRITICAL: You MUST write your entire response exclusively in the ${lang} language.`;
 
-            const payload = {
-                "contents": [{
-                    "parts": [{ "text": qaPrompt }]
-                }]
-            };
+            const payload = { "contents": [{ "parts": [{ "text": qaPrompt }] }] };
 
             try {
                 const response = await fetch(API_ENDPOINT, {
@@ -489,28 +571,44 @@
                 });
 
                 const data = await response.json();
-
                 askBtn.disabled = false;
-                document.getElementById('qaLoadingText').style.display = 'none';
 
-                if (response.ok && data.candidates && data.candidates.length > 0) {
-                    answerBox.innerHTML = `<strong>The Astrologer says:</strong><br><br>${formatText(data.candidates[0].content.parts[0].text)}`;
-                    answerBox.style.display = 'block';
+                if (response.ok && data.candidates) {
+                    const text = data.candidates[0].content.parts[0].text;
+                    qaContent.innerHTML = `<strong>The Astrologer says:</strong><br><br>${formatText(text)}`;
+                    
+                    // Attach raw text for TTS
+                    audioBtnQA.onclick = () => speakText(text, lang);
+                    audioBtnQA.style.display = 'flex';
                 }
             } catch (error) {
-                console.error("QA Error:", error);
                 askBtn.disabled = false;
-                document.getElementById('qaLoadingText').style.display = 'none';
-                alert("Failed to channel the answer. Please try again.");
+                qaContent.innerHTML = "Failed to channel the answer.";
             }
         });
 
+        // Text-to-Speech Engine
+        function speakText(text, langName) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel(); 
+                const plainText = text.replace(/<[^>]*>?/gm, ''); // Strip HTML
+                const utterance = new SpeechSynthesisUtterance(plainText);
+                utterance.lang = langMap[langName] || 'en-IN';
+                window.speechSynthesis.speak(utterance);
+            } else {
+                alert("Text-to-speech is not supported in this browser.");
+            }
+        }
+
+        // Attach audio buttons
+        audioBtn1.addEventListener('click', () => speakText(rawText1, userLang.value));
+        audioBtn2.addEventListener('click', () => speakText(rawText2, userLang.value));
+
         function formatText(text) {
-            return text
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') 
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')             
-                .replace(/\n\n/g, '<br><br>')
-                .replace(/\n/g, '<br>');                          
+            return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') 
+                       .replace(/\*(.*?)\*/g, '<em>$1</em>')             
+                       .replace(/\n\n/g, '<br><br>')
+                       .replace(/\n/g, '<br>');                          
         }
     </script>
 </body>
