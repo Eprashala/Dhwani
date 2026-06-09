@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vedic Palmistry Scanner v4.0</title>
+    <title>Vedic Palmistry Scanner v5.0</title>
     <style>
         :root {
             --primary: #d4af37; 
             --bg-color: #1a0b2e; 
             --text-color: #f4e8c1;
+            --error-color: #ff4c4c;
         }
 
         body {
@@ -20,6 +21,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            padding-bottom: 80px; /* Space for floating button */
         }
 
         h1 {
@@ -111,6 +113,15 @@
             transform: none;
         }
 
+        .retake-btn {
+            background-color: var(--error-color);
+            color: white;
+            font-size: 14px;
+            padding: 8px 16px;
+            width: auto;
+            margin-top: 10px;
+        }
+
         #handInstruction {
             font-weight: bold;
             color: var(--primary);
@@ -135,7 +146,7 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            transform: scaleX(-1); /* Mirror video for better user experience */
+            /* Removed Mirroring. Rear camera is direct perspective. */
         }
 
         .hand-guide-overlay {
@@ -156,7 +167,6 @@
             transform: scaleX(-1);
         }
 
-        /* Increased SVG Size */
         .hand-guide-overlay svg {
             width: 95%; 
             height: 95%;
@@ -197,7 +207,7 @@
             padding: 20px;
             border-radius: 10px;
             line-height: 1.6;
-            display: none; /* Hidden until processing starts */
+            display: none; 
         }
 
         .hand-result-card h3 {
@@ -227,15 +237,46 @@
             line-height: 1.5;
         }
         
+        /* Floating Share/PDF Button */
+        .floating-action {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: var(--primary);
+            color: black;
+            border-radius: 50px;
+            padding: 15px 25px;
+            font-size: 16px;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            cursor: pointer;
+            z-index: 1000;
+            display: none;
+            border: none;
+            transition: transform 0.2s;
+        }
+
+        .floating-action:hover {
+            transform: scale(1.05);
+        }
+
         canvas { display: none; }
         .pulsing-text { animation: pulse 1.5s infinite; color: #888; font-style: italic; }
         @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+
+        /* Print formatting */
+        @media print {
+            body { background-color: white; color: black; }
+            .setup-container, .camera-container, button, .audio-btn, .floating-action, .qa-container { display: none !important; }
+            .hand-result-card { border: 1px solid #ccc; background: transparent; page-break-inside: avoid; }
+            h1, h3 { color: black; text-shadow: none; }
+        }
 
     </style>
 </head>
 <body>
 
-    <h1>Hastarekha Darshan<br><span style="font-size: 16px; font-weight: normal;">Dual-Palm Vedic AI</span></h1>
+    <h1>Hastarekha Darshan<br><span style="font-size: 16px; font-weight: normal;">Free Vedic Palmistry API</span></h1>
 
     <div class="setup-container" id="setupSection">
         <input type="text" id="userName" placeholder="Enter your full name..." autocomplete="off">
@@ -289,12 +330,14 @@
             <h3><span id="stage1Title">Hand 1</span> Analysis</h3>
             <button class="audio-btn" id="audioBtn1" style="display: none;">🔊 Listen</button>
             <div id="stage1Content" class="pulsing-text">Channeling cosmic energies...</div>
+            <button class="retake-btn" id="retakeBtn1" style="display:none;">Retake Image</button>
         </div>
 
         <div class="hand-result-card" id="stage2Card">
             <h3><span id="stage2Title">Hand 2</span> Analysis</h3>
             <button class="audio-btn" id="audioBtn2" style="display: none;">🔊 Listen</button>
             <div id="stage2Content" class="pulsing-text">Awaiting scan...</div>
+            <button class="retake-btn" id="retakeBtn2" style="display:none;">Retake Image</button>
         </div>
     </div>
 
@@ -308,6 +351,8 @@
         </div>
     </div>
     
+    <button id="sharePdfBtn" class="floating-action">📤 Share / Save PDF</button>
+
     <canvas id="captureCanvas"></canvas>
 
     <script>
@@ -322,12 +367,12 @@
         };
 
         let stream = null;
+        let wakeLock = null;
         let scanStage = 0; 
         let firstHand = ""; 
         let secondHand = "";
         let fullReadingContext = ""; 
         
-        // API Promise tracking
         let hand1Resolved = false;
         let hand2Resolved = false;
         let rawText1 = "";
@@ -352,20 +397,21 @@
 
         const resultsSection = document.getElementById('resultsSection');
         const stage1Card = document.getElementById('stage1Card');
-        const stage1Title = document.getElementById('stage1Title');
         const stage1Content = document.getElementById('stage1Content');
         const audioBtn1 = document.getElementById('audioBtn1');
+        const retakeBtn1 = document.getElementById('retakeBtn1');
 
         const stage2Card = document.getElementById('stage2Card');
-        const stage2Title = document.getElementById('stage2Title');
         const stage2Content = document.getElementById('stage2Content');
         const audioBtn2 = document.getElementById('audioBtn2');
+        const retakeBtn2 = document.getElementById('retakeBtn2');
         
         const qaSection = document.getElementById('qaSection');
-        const askBtn = document.getElementById('askBtn');
-        const answerBox = document.getElementById('answerBox');
-        const qaContent = document.getElementById('qaContent');
-        const audioBtnQA = document.getElementById('audioBtnQA');
+        const sharePdfBtn = document.getElementById('sharePdfBtn');
+
+        // Audio State
+        let currentSynthUtterance = null;
+        let currentAudioBtn = null;
 
         // Populate Age
         for (let i = 1; i <= 100; i++) {
@@ -376,6 +422,23 @@
             userAge.appendChild(option);
         }
 
+        // --- Screen Wake Lock Request ---
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) {
+                console.log(`Wake Lock error: ${err.message}`);
+            }
+        }
+
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') {
+                await requestWakeLock();
+            }
+        });
+
         // Initialize Camera
         initBtn.addEventListener('click', async () => {
             if (!userNameInput.value.trim() || !userSex.value) {
@@ -383,40 +446,47 @@
                 return;
             }
 
+            requestWakeLock(); // Keep screen on
+
             if (userSex.value === 'Male') {
                 firstHand = "Left"; secondHand = "Right";
             } else {
                 firstHand = "Right"; secondHand = "Left";
             }
 
+            startCameraFlow();
+        });
+
+        async function startCameraFlow() {
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
                 videoFeed.srcObject = stream;
                 
                 setupSection.style.display = 'none';
                 cameraContainer.style.display = 'block';
-                resultsSection.style.display = 'flex'; // Show cards container
+                resultsSection.style.display = 'flex';
                 
                 setupStage1();
             } catch (err) {
                 alert("Unable to access the camera. Ensure permissions are granted.");
             }
-        });
+        }
 
         function setupStage1() {
             scanStage = 1;
             handInstruction.style.display = 'block';
             handInstruction.innerText = `Step 1: Align your ${firstHand} Hand within the dotted guide.`;
             
-            stage1Title.innerText = firstHand;
-            stage2Title.innerText = secondHand;
+            document.getElementById('stage1Title').innerText = firstHand;
+            document.getElementById('stage2Title').innerText = secondHand;
 
-            // Mirror logic for the guide
             if (firstHand === "Left") handGuide.classList.add('flipped');
             else handGuide.classList.remove('flipped');
 
             actionBtn.style.display = 'block';
+            actionBtn.disabled = false;
             actionBtn.innerText = `Scan ${firstHand} Hand`;
+            cameraContainer.style.display = 'block';
         }
 
         function setupStage2() {
@@ -426,18 +496,19 @@
             if (secondHand === "Left") handGuide.classList.add('flipped');
             else handGuide.classList.remove('flipped');
 
+            actionBtn.style.display = 'block';
             actionBtn.disabled = false;
             actionBtn.innerText = `Scan ${secondHand} Hand`;
             stage2Content.innerText = "Awaiting scan...";
+            cameraContainer.style.display = 'block';
         }
 
         actionBtn.addEventListener('click', () => {
             actionBtn.disabled = true;
             
-            // Trigger animation
             scannerLine.style.display = 'block';
             scannerLine.style.animation = 'none';
-            void scannerLine.offsetWidth; // Trigger reflow
+            void scannerLine.offsetWidth; 
             scannerLine.style.animation = 'scanAnimation 1.5s linear';
 
             setTimeout(() => {
@@ -445,22 +516,24 @@
                 
                 if (scanStage === 1) {
                     const b64 = captureImage();
-                    stage1Card.style.display = 'block'; // Show card
-                    processHandAsync(firstHand, b64, 1); // Start background API
-                    setupStage2(); // INSTANTLY allow second scan
+                    stage1Card.style.display = 'block'; 
+                    stage1Content.innerText = "Channeling cosmic energies...";
+                    stage1Content.classList.add('pulsing-text');
+                    retakeBtn1.style.display = 'none';
+
+                    processHandAsync(firstHand, b64, 1); 
+                    setupStage2(); // Move user to next hand
                 } 
                 else if (scanStage === 2) {
                     const b64 = captureImage();
                     stage2Card.style.display = 'block';
                     stage2Content.innerText = "Channeling cosmic energies...";
                     stage2Content.classList.add('pulsing-text');
+                    retakeBtn2.style.display = 'none';
                     
                     cameraContainer.style.display = 'none';
                     actionBtn.style.display = 'none';
                     handInstruction.innerText = "Cosmic Analysis in Progress...";
-                    
-                    // Stop camera
-                    if (stream) stream.getTracks().forEach(track => track.stop());
                     
                     processHandAsync(secondHand, b64, 2);
                 }
@@ -470,9 +543,7 @@
         function captureImage() {
             captureCanvas.width = videoFeed.videoWidth;
             captureCanvas.height = videoFeed.videoHeight;
-            // Un-mirror the context so the AI gets the correct orientation
-            ctx.translate(captureCanvas.width, 0);
-            ctx.scale(-1, 1);
+            // No mirroring! Raw rear camera feed.
             ctx.drawImage(videoFeed, 0, 0, captureCanvas.width, captureCanvas.height);
             return captureCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
         }
@@ -482,25 +553,21 @@
             const sex = userSex.value;
             const age = userAge.value;
             const lang = userLang.value;
+            const targetContent = stageNum === 1 ? stage1Content : stage2Content;
+            const targetRetake = stageNum === 1 ? retakeBtn1 : retakeBtn2;
+            const targetAudio = stageNum === 1 ? audioBtn1 : audioBtn2;
 
             let karmicContext = sex === "Male" 
                 ? (currentHand === "Left" ? "Prarabdha Karma (past life/innate potential)." : "Agami Karma (current actions/free will).")
                 : (currentHand === "Right" ? "Prarabdha Karma (past life/innate potential)." : "Agami Karma (current actions/free will).");
 
-            const systemPrompt = `Act as an expert Vedic Palmist. My name is ${name}. I am a ${age}-year-old ${sex}. 
-            Analyze my ${currentHand} hand. This represents my ${karmicContext}.
-            Focus on: 1. Pitra Rekha (Life Line) 2. Ayu Rekha (Heart Line) 3. Matri Rekha (Head Line) 4. Karma Rekha (Fate Line).
-            Provide a focused reading based on Vedic rules.
-            CRITICAL: You MUST write your entire response exclusively in the ${lang} language. Ensure formatting is simple HTML (<br>, <strong>).`;
+            const systemPrompt = `Act as an expert Vedic Palmist. My name is ${name}. I am a ${age}-year-old ${sex}. Analyze my ${currentHand} hand. This represents my ${karmicContext}.
+            CRITICAL RULES:
+            1. IMAGE VALIDATION: If the image is blurry, mostly dark, cut off, or DOES NOT clearly depict a human palm, you MUST stop and reply starting exactly with "ERROR_RETAKE:" followed by a short reason. Do NOT guess the lines.
+            2. ABSOLUTE HONESTY: Analyze the Pitra Rekha, Ayu Rekha, Matri Rekha, and Karma Rekha. If there are bad indicators, breaks, islands, or doshas, you MUST state them truthfully. Do not sugarcoat negative aspects, but do offer traditional Vedic remedies.
+            3. LANGUAGE: Write your entire reading in the ${lang} language. Format using HTML (<br>, <strong>).`;
 
-            const payload = {
-                "contents": [{
-                    "parts": [
-                        { "text": systemPrompt },
-                        { "inline_data": { "mime_type": "image/jpeg", "data": base64Image } }
-                    ]
-                }]
-            };
+            const payload = { "contents": [{ "parts": [ { "text": systemPrompt }, { "inline_data": { "mime_type": "image/jpeg", "data": base64Image } } ] }] };
 
             try {
                 const response = await fetch(API_ENDPOINT, {
@@ -511,63 +578,141 @@
 
                 const data = await response.json();
 
-                if (response.ok && data.candidates && data.candidates.length > 0) {
+                if (response.ok && data.candidates) {
                     const aiText = data.candidates[0].content.parts[0].text;
-                    fullReadingContext += `\n[${currentHand} Hand]:\n` + aiText;
                     
-                    if (stageNum === 1) {
-                        rawText1 = aiText;
-                        stage1Content.classList.remove('pulsing-text');
-                        stage1Content.innerHTML = formatText(aiText);
-                        audioBtn1.style.display = 'flex';
-                        hand1Resolved = true;
-                    } else {
-                        rawText2 = aiText;
-                        stage2Content.classList.remove('pulsing-text');
-                        stage2Content.innerHTML = formatText(aiText);
-                        audioBtn2.style.display = 'flex';
-                        hand2Resolved = true;
+                    // Handle Blur/False Image rejections
+                    if (aiText.includes("ERROR_RETAKE:")) {
+                        targetContent.classList.remove('pulsing-text');
+                        targetContent.innerHTML = `<span style="color:var(--error-color);"><strong>Detection Failed:</strong> ${aiText.replace("ERROR_RETAKE:", "")}</span>`;
+                        targetRetake.style.display = 'block';
+                        
+                        // Stop camera if it was hidden and wait for retake
+                        if(stageNum === 2) {
+                            handInstruction.innerText = "Error scanning second hand. Please retake.";
+                        }
+                        return;
                     }
 
-                    checkCompletion();
+                    fullReadingContext += `\n[${currentHand} Hand]:\n` + aiText;
+                    
+                    targetContent.classList.remove('pulsing-text');
+                    targetContent.innerHTML = formatText(aiText);
+                    targetAudio.style.display = 'flex';
 
+                    if (stageNum === 1) { rawText1 = aiText; hand1Resolved = true; } 
+                    else { rawText2 = aiText; hand2Resolved = true; }
+
+                    checkCompletion();
                 } else { throw new Error("API Error"); }
 
             } catch (error) {
-                const errDiv = stageNum === 1 ? stage1Content : stage2Content;
-                errDiv.classList.remove('pulsing-text');
-                errDiv.innerHTML = `<span style="color:red;">Connection interrupted. Please try again later.</span>`;
-                if(stageNum === 2) hand2Resolved = true; checkCompletion();
+                targetContent.classList.remove('pulsing-text');
+                targetContent.innerHTML = `<span style="color:var(--error-color);">Connection interrupted.</span>`;
+                targetRetake.style.display = 'block';
             }
         }
+
+        // Retake Handlers
+        retakeBtn1.addEventListener('click', () => {
+            if(!stream || !stream.active) startCameraFlow();
+            setupStage1();
+            stage1Content.innerText = "Awaiting scan...";
+            retakeBtn1.style.display = 'none';
+        });
+
+        retakeBtn2.addEventListener('click', () => {
+            if(!stream || !stream.active) startCameraFlow();
+            setupStage2();
+            retakeBtn2.style.display = 'none';
+        });
+
 
         function checkCompletion() {
             if (hand1Resolved && hand2Resolved) {
                 handInstruction.innerText = "Cosmic Analysis Complete.";
                 qaSection.style.display = 'flex';
+                sharePdfBtn.style.display = 'block';
+                if (stream) stream.getTracks().forEach(track => track.stop());
             }
         }
 
+        // Text-to-Speech Engine with Play/Pause/Resume
+        function toggleSpeech(text, langName, btnElement) {
+            const synth = window.speechSynthesis;
+
+            // If the same button is clicked during playback
+            if (synth.speaking && currentAudioBtn === btnElement) {
+                if (synth.paused) {
+                    synth.resume();
+                    btnElement.innerHTML = "⏸️ Pause";
+                } else {
+                    synth.pause();
+                    btnElement.innerHTML = "▶️ Resume";
+                }
+                return;
+            }
+
+            // Reset any existing speech
+            synth.cancel();
+            if(currentAudioBtn) currentAudioBtn.innerHTML = "🔊 Listen";
+            
+            currentAudioBtn = btnElement;
+            const plainText = text.replace(/<[^>]*>?/gm, ''); 
+            currentSynthUtterance = new SpeechSynthesisUtterance(plainText);
+            currentSynthUtterance.lang = langMap[langName] || 'en-IN';
+            
+            currentSynthUtterance.onstart = () => btnElement.innerHTML = "⏸️ Pause";
+            currentSynthUtterance.onend = () => { btnElement.innerHTML = "🔊 Listen"; currentAudioBtn = null; };
+            currentSynthUtterance.onerror = () => { btnElement.innerHTML = "🔊 Listen"; currentAudioBtn = null; };
+            
+            synth.speak(currentSynthUtterance);
+        }
+
+        audioBtn1.addEventListener('click', function() { toggleSpeech(rawText1, userLang.value, this); });
+        audioBtn2.addEventListener('click', function() { toggleSpeech(rawText2, userLang.value, this); });
+
+        // Share / PDF Export Logic
+        sharePdfBtn.addEventListener('click', async () => {
+            const compiledText = `Hastarekha Reading for ${userNameInput.value}\n\n` + rawText1 + `\n\n` + rawText2;
+            
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: 'My Vedic Palmistry Reading',
+                        text: compiledText,
+                    });
+                } catch(e) { 
+                    // If user cancels or it fails, fallback to PDF print
+                    if(e.name !== "AbortError") window.print(); 
+                }
+            } else {
+                window.print(); // Desktop fallback
+            }
+        });
+
         // Q&A System
-        askBtn.addEventListener('click', async () => {
+        document.getElementById('askBtn').addEventListener('click', async () => {
             const question = document.getElementById('questionInput').value.trim();
             const lang = userLang.value;
+            const askBtn = document.getElementById('askBtn');
+            const qaContent = document.getElementById('qaContent');
+            const audioBtnQA = document.getElementById('audioBtnQA');
+
             if (!question) return;
 
             askBtn.disabled = true;
-            answerBox.style.display = 'block';
+            document.getElementById('answerBox').style.display = 'block';
             audioBtnQA.style.display = 'none';
             qaContent.innerHTML = `<span class="pulsing-text">Channeling the answer...</span>`;
 
-            const qaPrompt = `Act as an expert Vedic Palmist. Based on the complete reading you provided:\n"${fullReadingContext}"\n\nThe user asks: "${question}"\nSynthesize info from both hands. CRITICAL: You MUST write your entire response exclusively in the ${lang} language.`;
-
-            const payload = { "contents": [{ "parts": [{ "text": qaPrompt }] }] };
+            const qaPrompt = `Act as an expert Vedic Palmist. Based on the complete reading:\n"${fullReadingContext}"\nThe user asks: "${question}"\nWrite entirely in the ${lang} language. Be honest.`;
 
             try {
                 const response = await fetch(API_ENDPOINT, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({ "contents": [{ "parts": [{ "text": qaPrompt }] }] })
                 });
 
                 const data = await response.json();
@@ -577,8 +722,7 @@
                     const text = data.candidates[0].content.parts[0].text;
                     qaContent.innerHTML = `<strong>The Astrologer says:</strong><br><br>${formatText(text)}`;
                     
-                    // Attach raw text for TTS
-                    audioBtnQA.onclick = () => speakText(text, lang);
+                    audioBtnQA.onclick = function() { toggleSpeech(text, lang, this); };
                     audioBtnQA.style.display = 'flex';
                 }
             } catch (error) {
@@ -586,23 +730,6 @@
                 qaContent.innerHTML = "Failed to channel the answer.";
             }
         });
-
-        // Text-to-Speech Engine
-        function speakText(text, langName) {
-            if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel(); 
-                const plainText = text.replace(/<[^>]*>?/gm, ''); // Strip HTML
-                const utterance = new SpeechSynthesisUtterance(plainText);
-                utterance.lang = langMap[langName] || 'en-IN';
-                window.speechSynthesis.speak(utterance);
-            } else {
-                alert("Text-to-speech is not supported in this browser.");
-            }
-        }
-
-        // Attach audio buttons
-        audioBtn1.addEventListener('click', () => speakText(rawText1, userLang.value));
-        audioBtn2.addEventListener('click', () => speakText(rawText2, userLang.value));
 
         function formatText(text) {
             return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') 
