@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vedic Palmistry Scanner</title>
+    <title>Vedic Palmistry Scanner v3.0</title>
     <style>
         :root {
-            --primary: #d4af37; /* Mystic Gold */
-            --bg-color: #1a0b2e; /* Deep Cosmic Purple */
+            --primary: #d4af37; 
+            --bg-color: #1a0b2e; 
             --text-color: #f4e8c1;
         }
 
@@ -26,20 +26,21 @@
             color: var(--primary);
             text-align: center;
             text-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
+            margin-bottom: 5px;
         }
 
         .setup-container {
-            margin-bottom: 20px;
+            margin-top: 20px;
             text-align: center;
             width: 100%;
             max-width: 400px;
         }
 
-        input[type="text"] {
+        input[type="text"], select, textarea {
             width: 80%;
             padding: 10px;
             border: 2px solid var(--primary);
-            background: transparent;
+            background: rgba(0, 0, 0, 0.3);
             color: white;
             font-size: 16px;
             border-radius: 5px;
@@ -47,7 +48,18 @@
             text-align: center;
         }
 
-        input[type="text"]:focus {
+        select { width: 45%; }
+        .flex-row { display: flex; justify-content: space-evenly; width: 85%; margin: 0 auto; }
+        
+        textarea {
+            width: 100%;
+            text-align: left;
+            resize: vertical;
+            min-height: 80px;
+            box-sizing: border-box;
+        }
+
+        input[type="text"]:focus, select:focus, textarea:focus {
             outline: none;
             box-shadow: 0 0 10px var(--primary);
         }
@@ -63,9 +75,10 @@
             cursor: pointer;
             transition: transform 0.2s, box-shadow 0.2s;
             width: 80%;
+            margin-top: 10px;
         }
 
-        button:hover {
+        button:hover:not(:disabled) {
             transform: scale(1.05);
             box-shadow: 0 0 15px var(--primary);
         }
@@ -75,7 +88,14 @@
             color: #888;
             cursor: not-allowed;
             box-shadow: none;
-            transform: none;
+        }
+
+        #handInstruction {
+            font-weight: bold;
+            color: var(--primary);
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            text-align: center;
         }
 
         .camera-container {
@@ -87,7 +107,7 @@
             border: 3px solid var(--primary);
             border-radius: 10px;
             overflow: hidden;
-            display: none; /* Hidden until name is entered */
+            display: none; 
         }
 
         video {
@@ -96,7 +116,32 @@
             object-fit: cover;
         }
 
-        /* The Red Scanning Line */
+        /* --- NEW: SVG Hand Outline Guide --- */
+        .hand-guide-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Let clicks pass through to video */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0.6;
+            transition: transform 0.5s ease;
+        }
+
+        /* Flipped state for the other hand */
+        .hand-guide-overlay.flipped {
+            transform: scaleX(-1);
+        }
+
+        .hand-guide-overlay svg {
+            width: 80%;
+            height: 80%;
+            filter: drop-shadow(0px 0px 5px rgba(212, 175, 55, 0.8));
+        }
+
         .scanner-line {
             position: absolute;
             top: 0;
@@ -121,187 +166,351 @@
             margin-top: 15px;
             font-style: italic;
             display: none;
+            text-align: center;
         }
 
         .results-container {
             margin-top: 20px;
             width: 100%;
             max-width: 600px;
+            display: none;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .hand-result-card {
             background: rgba(0, 0, 0, 0.5);
             border: 1px solid var(--primary);
             padding: 20px;
             border-radius: 10px;
-            display: none;
             line-height: 1.6;
-            white-space: pre-wrap;
+        }
+
+        .qa-container {
+            margin-top: 20px;
+            width: 100%;
+            max-width: 600px;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .answer-box {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(212, 175, 55, 0.1);
+            border-left: 4px solid var(--primary);
+            border-radius: 5px;
+            display: none;
+            width: 100%;
+            box-sizing: border-box;
+            line-height: 1.5;
         }
         
-        canvas {
-            display: none; /* Hidden canvas to capture the frame */
-        }
+        canvas { display: none; }
     </style>
 </head>
 <body>
 
-    <h1>Hastarekha Darshan<br><span style="font-size: 16px; font-weight: normal;">Vedic Palmistry AI</span></h1>
+    <h1>Hastarekha Darshan<br><span style="font-size: 16px; font-weight: normal;">Dual-Palm Vedic AI</span></h1>
 
     <div class="setup-container" id="setupSection">
         <input type="text" id="userName" placeholder="Enter your full name..." autocomplete="off">
-        <button id="initBtn">Initiate Camera</button>
+        <div class="flex-row">
+            <select id="userSex">
+                <option value="" disabled selected>Select Sex</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+            </select>
+            <select id="userAge"></select>
+        </div>
+        <button id="initBtn">Begin Reading</button>
     </div>
+
+    <div id="handInstruction" style="display: none;"></div>
 
     <div class="camera-container" id="cameraContainer">
         <video id="videoFeed" autoplay playsinline></video>
+        
+        <div class="hand-guide-overlay" id="handGuide">
+            <svg viewBox="0 0 100 120" preserveAspectRatio="xMidYMid meet">
+                <path d="M 35,115 C 30,90 20,70 20,50 C 20,40 30,35 35,45 L 40,65 L 40,25 C 40,15 50,15 50,25 L 50,60 L 50,15 C 50,5 60,5 60,15 L 60,60 L 60,20 C 60,10 70,10 70,20 L 70,65 L 70,35 C 70,25 80,25 80,35 L 80,80 C 80,95 75,105 65,115 Z" 
+                      fill="none" 
+                      stroke="var(--primary)" 
+                      stroke-width="2" 
+                      stroke-dasharray="4,4"/>
+            </svg>
+        </div>
+
         <div class="scanner-line" id="scannerLine"></div>
     </div>
 
-    <button id="scanBtn" style="display: none; margin-top: 15px;">Analyze Palm</button>
-    
-    <div class="loading-text" id="loadingText">Consulting the cosmic energies... Please hold your palm still.</div>
+    <button id="actionBtn" style="display: none; margin-top: 15px;">Scan Current Hand</button>
+    <div class="loading-text" id="loadingText">Channeling cosmic energies...</div>
 
-    <div class="results-container" id="resultsSection"></div>
+    <div class="results-container" id="resultsSection">
+        <div class="hand-result-card" id="stage1Result" style="display: none;"></div>
+        <div class="hand-result-card" id="stage2Result" style="display: none;"></div>
+    </div>
+
+    <div class="qa-container" id="qaSection">
+        <h3 style="color: var(--primary); margin-bottom: 10px; width: 100%;">Seek Further Wisdom</h3>
+        <textarea id="questionInput" placeholder="Ask a question based on your full reading (e.g., 'What does my combined fate line say about wealth?')..."></textarea>
+        <button id="askBtn">Consult the Astrologer</button>
+        <div class="loading-text" id="qaLoadingText">Channeling the answer...</div>
+        <div class="answer-box" id="answerBox"></div>
+    </div>
     
     <canvas id="captureCanvas"></canvas>
 
     <script>
         const API_ENDPOINT = "https://eprashala.pythonanywhere.com/api/chat";
         
+        // State Management
+        let stream = null;
+        let scanStage = 0; // 0 = not started, 1 = first hand, 2 = second hand, 3 = complete
+        let firstHand = ""; 
+        let secondHand = "";
+        let fullReadingContext = ""; 
+
         // DOM Elements
+        const setupSection = document.getElementById('setupSection');
+        const userSex = document.getElementById('userSex');
+        const userAge = document.getElementById('userAge');
         const userNameInput = document.getElementById('userName');
         const initBtn = document.getElementById('initBtn');
+        const actionBtn = document.getElementById('actionBtn');
+        const handInstruction = document.getElementById('handInstruction');
+        
         const cameraContainer = document.getElementById('cameraContainer');
         const videoFeed = document.getElementById('videoFeed');
-        const scanBtn = document.getElementById('scanBtn');
+        const handGuide = document.getElementById('handGuide');
         const scannerLine = document.getElementById('scannerLine');
         const loadingText = document.getElementById('loadingText');
-        const resultsSection = document.getElementById('resultsSection');
         const captureCanvas = document.getElementById('captureCanvas');
         const ctx = captureCanvas.getContext('2d');
 
-        let stream = null;
+        const resultsSection = document.getElementById('resultsSection');
+        const stage1Result = document.getElementById('stage1Result');
+        const stage2Result = document.getElementById('stage2Result');
+        
+        const qaSection = document.getElementById('qaSection');
+        const askBtn = document.getElementById('askBtn');
+        const answerBox = document.getElementById('answerBox');
 
-        // Step 1: Initialize Camera
+        // Populate Age
+        for (let i = 1; i <= 100; i++) {
+            let option = document.createElement('option');
+            option.value = i;
+            option.text = i + " years old";
+            if (i === 25) option.selected = true;
+            userAge.appendChild(option);
+        }
+
+        // Initialize App
         initBtn.addEventListener('click', async () => {
-            const name = userNameInput.value.trim();
-            if (!name) {
-                alert("Please enter your name to begin the reading.");
+            if (!userNameInput.value.trim() || !userSex.value) {
+                alert("Please enter your name and select your sex to begin.");
                 return;
             }
 
+            // Determine Hand Order based on Sex
+            if (userSex.value === 'Male') {
+                firstHand = "Left";
+                secondHand = "Right";
+            } else {
+                firstHand = "Right";
+                secondHand = "Left";
+            }
+
             try {
-                // Request rear camera specifically
                 stream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: "environment" },
                     audio: false
                 });
                 
                 videoFeed.srcObject = stream;
-                
-                // Update UI
-                document.getElementById('setupSection').style.display = 'none';
+                setupSection.style.display = 'none';
                 cameraContainer.style.display = 'block';
-                scanBtn.style.display = 'block';
+                
+                setupStage1();
                 
             } catch (err) {
-                console.error("Camera access denied or unavailable: ", err);
-                alert("Unable to access the camera. Please ensure permissions are granted and you are on a secure (HTTPS) connection.");
+                console.error("Camera access denied: ", err);
+                alert("Unable to access the camera. Ensure permissions are granted.");
             }
         });
 
-        // Step 2: Capture and Send to API
-        scanBtn.addEventListener('click', async () => {
-            const name = userNameInput.value.trim();
+        function setupStage1() {
+            scanStage = 1;
+            handInstruction.style.display = 'block';
+            handInstruction.innerText = `Step 1: Align your ${firstHand} Hand within the dotted guide.`;
             
-            // UI Updates
-            scanBtn.disabled = true;
+            // The SVG default is a Right hand outline.
+            // If the required hand is Left, we flip the SVG overlay.
+            if (firstHand === "Left") {
+                handGuide.classList.add('flipped');
+            } else {
+                handGuide.classList.remove('flipped');
+            }
+
+            actionBtn.style.display = 'block';
+            actionBtn.innerText = `Scan ${firstHand} Hand`;
+        }
+
+        function setupStage2() {
+            scanStage = 2;
+            handInstruction.innerText = `Step 2: Now, align your ${secondHand} Hand within the dotted guide.`;
+            
+            if (secondHand === "Left") {
+                handGuide.classList.add('flipped');
+            } else {
+                handGuide.classList.remove('flipped');
+            }
+
+            actionBtn.style.display = 'block';
+            actionBtn.innerText = `Scan ${secondHand} Hand`;
+        }
+
+        actionBtn.addEventListener('click', () => {
+            actionBtn.disabled = true;
             scannerLine.style.display = 'block';
             loadingText.style.display = 'block';
-            resultsSection.style.display = 'none';
 
-            // Wait a brief moment to simulate the "scanning" process visually
             setTimeout(() => {
-                captureAndAnalyze(name);
+                if (scanStage === 1) captureAndAnalyze(firstHand, stage1Result);
+                else if (scanStage === 2) captureAndAnalyze(secondHand, stage2Result);
             }, 2000); 
         });
 
-        async function captureAndAnalyze(name) {
-            // Set canvas size to video frame size
+        async function captureAndAnalyze(currentHand, targetDiv) {
+            const name = userNameInput.value.trim();
+            const sex = userSex.value;
+            const age = userAge.value;
+
             captureCanvas.width = videoFeed.videoWidth;
             captureCanvas.height = videoFeed.videoHeight;
-            
-            // Draw current video frame to canvas
             ctx.drawImage(videoFeed, 0, 0, captureCanvas.width, captureCanvas.height);
-            
-            // Convert to Base64 (remove the data:image/jpeg;base64, prefix for Gemini API)
             const base64Image = captureCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
 
-            // Construct the prompt for the Vedic Astrologer persona
-            const systemPrompt = `Act as an expert Vedic Palmist (Hastarekha Shastra expert). My name is ${name}. Carefully analyze the provided image of my palm. Look for and detail the following aspects:
-            1. The Life Line (Pitra Rekha)
-            2. The Heart Line (Ayu Rekha)
-            3. The Head Line (Matri Rekha)
-            4. The Fate Line (Karma Rekha)
-            5. The Planetary Mounts (Guru, Shani, Surya, Budh, Shukra, Chandra, Mangal)
-            Provide a detailed, respectful, and deeply insightful reading based strictly on Vedic traditions. Structure your response with clear headings.`;
+            // Provide deep astrological context to the prompt
+            let karmicContext = "";
+            if (sex === "Male") {
+                karmicContext = currentHand === "Left" ? "This is his Left hand, representing his Prarabdha Karma (past life/innate potential)." : "This is his Right hand, representing his Agami Karma (current life actions/free will).";
+            } else {
+                karmicContext = currentHand === "Right" ? "This is her Right hand, representing her Prarabdha Karma (past life/innate potential)." : "This is her Left hand, representing her Agami Karma (current life actions/free will).";
+            }
 
-            // Standard Gemini API payload structure expected by your proxy
+            const systemPrompt = `Act as an expert Vedic Palmist. My name is ${name}. I am a ${age}-year-old ${sex}. 
+            Carefully analyze the provided image of my ${currentHand} hand. ${karmicContext}
+            Focus deeply on: 1. Pitra Rekha (Life Line) 2. Ayu Rekha (Heart Line) 3. Matri Rekha (Head Line) 4. Karma Rekha (Fate Line) 5. Key Planetary Mounts.
+            Provide a focused, accurate reading specifically for this hand based on Vedic rules. Use HTML formatting (<br>, <strong>).`;
+
             const payload = {
-                "contents": [
-                    {
-                        "parts": [
-                            { "text": systemPrompt },
-                            {
-                                "inline_data": {
-                                    "mime_type": "image/jpeg",
-                                    "data": base64Image
-                                }
-                            }
-                        ]
-                    }
-                ]
+                "contents": [{
+                    "parts": [
+                        { "text": systemPrompt },
+                        { "inline_data": { "mime_type": "image/jpeg", "data": base64Image } }
+                    ]
+                }]
             };
 
             try {
                 const response = await fetch(API_ENDPOINT, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                        // If you require a user key later, add: 'X-Custom-Api-Key': 'user_key_here'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
 
                 const data = await response.json();
 
-                // Stop scanner animation
                 scannerLine.style.display = 'none';
                 loadingText.style.display = 'none';
-                scanBtn.disabled = false;
-                scanBtn.innerText = "Scan Again";
+                actionBtn.disabled = false;
 
                 if (response.ok && data.candidates && data.candidates.length > 0) {
                     const aiText = data.candidates[0].content.parts[0].text;
-                    resultsSection.innerHTML = `<h3>Reading for ${name}</h3><p>${formatText(aiText)}</p>`;
-                    resultsSection.style.display = 'block';
+                    fullReadingContext += `\n\n[Reading for ${currentHand} Hand]:\n` + aiText;
+                    
+                    targetDiv.innerHTML = `<h3 style="color:var(--primary)">${currentHand} Hand Analysis</h3><div>${formatText(aiText)}</div>`;
+                    targetDiv.style.display = 'block';
+                    resultsSection.style.display = 'flex';
+
+                    if (scanStage === 1) {
+                        setupStage2();
+                    } else if (scanStage === 2) {
+                        // Both hands scanned
+                        scanStage = 3;
+                        cameraContainer.style.display = 'none';
+                        actionBtn.style.display = 'none';
+                        handInstruction.innerText = "Cosmic Analysis Complete.";
+                        qaSection.style.display = 'flex';
+                        
+                        // Stop the camera to save resources
+                        if (stream) {
+                            stream.getTracks().forEach(track => track.stop());
+                        }
+                    }
                 } else {
-                    throw new Error("Invalid response from the cosmic servers.");
+                    throw new Error("Invalid API response.");
                 }
 
             } catch (error) {
                 console.error("API Error:", error);
                 scannerLine.style.display = 'none';
                 loadingText.style.display = 'none';
-                scanBtn.disabled = false;
-                alert("The cosmic connection was interrupted. Please try scanning again.");
+                actionBtn.disabled = false;
+                alert("Cosmic connection interrupted. Please ensure the proxy is running and try again.");
             }
         }
 
-        // Helper function to turn basic markdown from Gemini into HTML formatting
+        // Q&A System
+        askBtn.addEventListener('click', async () => {
+            const question = document.getElementById('questionInput').value.trim();
+            if (!question) return;
+
+            askBtn.disabled = true;
+            document.getElementById('qaLoadingText').style.display = 'block';
+            answerBox.style.display = 'none';
+
+            const qaPrompt = `Act as an expert Vedic Palmist. Based on the complete two-hand reading you just provided:\n\n"${fullReadingContext}"\n\nThe user asks: "${question}"\n\nSynthesize the information from both the left and right hands to provide a unified, perfect, and insightful answer based on traditional Vedic Palmistry. Use HTML formatting.`;
+
+            const payload = {
+                "contents": [{
+                    "parts": [{ "text": qaPrompt }]
+                }]
+            };
+
+            try {
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                askBtn.disabled = false;
+                document.getElementById('qaLoadingText').style.display = 'none';
+
+                if (response.ok && data.candidates && data.candidates.length > 0) {
+                    answerBox.innerHTML = `<strong>The Astrologer says:</strong><br><br>${formatText(data.candidates[0].content.parts[0].text)}`;
+                    answerBox.style.display = 'block';
+                }
+            } catch (error) {
+                console.error("QA Error:", error);
+                askBtn.disabled = false;
+                document.getElementById('qaLoadingText').style.display = 'none';
+                alert("Failed to channel the answer. Please try again.");
+            }
+        });
+
         function formatText(text) {
             return text
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')             // Italics
-                .replace(/\n/g, '<br>');                          // Line breaks
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') 
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')             
+                .replace(/\n\n/g, '<br><br>')
+                .replace(/\n/g, '<br>');                          
         }
     </script>
 </body>
