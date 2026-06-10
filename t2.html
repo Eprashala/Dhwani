@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TripLedger - Pro Expense Tracker</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --text-color: #333;
+            --card-bg: #ffffff;
+            --primary: #0056b3;
+            --primary-hover: #003d82;
+            --secondary: #6c757d;
+            --danger: #dc3545;
+            --success: #28a745;
+            --warning: #ff9800;
+            --info: #0288d1;
+            --border-color: #e0e0e0;
+            --shadow: 0 8px 20px rgba(0,0,0,0.08);
+            --box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+
+        body.dark-mode {
+            --bg-color: #121212;
+            --text-color: #e0e0e0;
+            --card-bg: #1e1e1e;
+            --primary: #4da3ff;
+            --primary-hover: #80bdff;
+            --secondary: #a0a0a0;
+            --border-color: #333;
+            --shadow: 0 8px 20px rgba(0,0,0,0.4);
+            --box-shadow: 0 4px 10px rgba(0,0,0,0.6);
+        }
+
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: var(--bg-color); color: var(--text-color); transition: background 0.3s, color 0.3s; }
+        .hidden { display: none !important; }
+        .view-section { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+
+        #splash-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--primary); color: white;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 9999; transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+        #splash-screen i { font-size: 5rem; margin-bottom: 20px; animation: bounce 2s infinite; }
+        #splash-screen h1 { font-size: 2.5rem; margin: 0; letter-spacing: 2px; }
+        .fade-out { opacity: 0; visibility: hidden; }
+        @keyframes bounce { 0%, 20%, 50%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-20px); } 60% { transform: translateY(-10px); } }
+
+        .main-top-bar { position: sticky; top: 0; width: 100%; background-color: var(--bg-color); padding: 15px 30px; z-index: 1000; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-color); box-sizing: border-box; }
+        .brand-logo { font-size: 1.5rem; font-weight: 900; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+        .curly-nav { background-color: var(--card-bg); padding: 8px 15px; display: flex; justify-content: center; align-items: center; gap: 10px; box-shadow: var(--shadow); border-radius: 50px; border: 1px solid var(--border-color); }
+        .curly-nav button { background-color: transparent; color: var(--primary); font-weight: bold; padding: 8px 15px; border-radius: 20px; border: 1px solid var(--primary); cursor: pointer; transition: all 0.2s; font-size: 0.95rem; display: flex; align-items: center; gap: 6px; }
+        .curly-nav button:hover { background-color: var(--primary); color: white; transform: scale(1.05); }
+        .curly-nav button#themeToggle { border: none; font-size: 1.2rem; padding: 8px; color: var(--text-color); }
+
+        .container { max-width: 800px; margin: 30px auto; padding: 0 20px; position: relative; } 
+        .container-wide { max-width: 1200px; margin: 30px auto; padding: 0 20px; } 
+        .card-box { background: var(--card-bg); padding: 30px; border-radius: 15px; box-shadow: var(--shadow); transition: background 0.3s; position: relative;}
+        .header-title { text-align: center; font-size: 2rem; color: var(--primary); margin-bottom: 25px; font-weight: 800; }
+
+        label { font-weight: bold; margin-top: 10px; display: block; font-size: 0.9rem; color: var(--secondary); }
+        input, select, textarea, button.action-btn { width: 100%; padding: 12px; margin: 8px 0 15px 0; box-sizing: border-box; border: 1px solid var(--border-color); border-radius: 8px; font-size: 1rem; background-color: var(--bg-color); color: var(--text-color); font-family: inherit; }
+        textarea { resize: vertical; min-height: 80px; }
+        button.primary-btn { width: 100%; background-color: var(--primary); color: white; border: none; cursor: pointer; font-weight: bold; font-size: 1.1rem; border-radius: 8px; padding: 15px; transition: background 0.3s; display: flex; justify-content: center; align-items: center; gap: 8px; }
+        button.primary-btn:hover { background-color: var(--primary-hover); }
+        button.secondary-btn { width: 100%; background-color: var(--secondary); color: white; border: none; cursor: pointer; font-weight: bold; padding: 15px; border-radius: 8px; display: flex; justify-content: center; align-items: center; gap: 8px; }
+        button.danger-btn { width: 100%; background-color: var(--danger); color: white; border: none; cursor: pointer; font-weight: bold; padding: 15px; border-radius: 8px; }
+        
+        .trip-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px; }
+        .trip-card { background: var(--card-bg); border-radius: 15px; overflow: hidden; box-shadow: var(--shadow); display: flex; flex-direction: column; transition: transform 0.2s; position: relative; border: 1px solid var(--border-color); cursor: pointer; }
+        .trip-card:hover { transform: translateY(-8px); box-shadow: 0 12px 25px rgba(0,0,0,0.15); }
+        .trip-image { width: 100%; aspect-ratio: 16/9; object-fit: cover; }
+        .trip-details { padding: 20px; }
+        .trip-title { font-size: 1.3rem; font-weight: bold; margin: 0 0 10px 0; color: var(--primary); padding-right: 30px; }
+        .trip-meta { font-size: 0.9rem; color: var(--secondary); margin: 5px 0; display: flex; align-items: center; gap: 8px; }
+        .status-badge { position: absolute; top: 10px; left: 10px; background: var(--success); color: white; padding: 4px 10px; border-radius: 15px; font-size: 0.75rem; font-weight: bold; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; justify-content: center; align-items: center; z-index: 2000; padding: 20px; box-sizing: border-box; }
+        .modal-box { background: var(--card-bg); padding: 25px; border-radius: 15px; width: 100%; max-width: 500px; box-shadow: 0 15px 35px rgba(0,0,0,0.3); animation: popIn 0.3s; max-height: 90vh; overflow-y: auto;}
+        .modal-title { font-size: 1.4rem; font-weight: bold; color: var(--primary); margin-top: 0; margin-bottom: 20px; text-align: center; border-bottom: 2px solid var(--border-color); padding-bottom: 10px; }
+        @keyframes popIn { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+        .expense-scroll-container { max-height: 500px; overflow-y: auto; padding: 5px; margin-bottom: 20px; }
+        .expense-box { background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; gap: 15px; box-shadow: var(--box-shadow); transition: transform 0.2s; }
+        .expense-box:hover { transform: translateY(-2px); }
+        .expense-info { flex-grow: 1; }
+        .expense-title { font-weight: bold; font-size: 1.1rem; margin: 0 0 5px 0; }
+        .expense-desc { font-size: 0.85rem; color: var(--text-color); font-style: italic; margin: 0 0 5px 0; opacity: 0.8;}
+        .expense-date { font-size: 0.8rem; color: var(--secondary); margin: 0; }
+        .expense-amount { font-size: 1.3rem; font-weight: bold; color: var(--primary); white-space: nowrap; }
+        .expense-meta-tags { display: flex; gap: 8px; margin-top: 5px; flex-wrap: wrap; }
+        .exp-tag { font-size: 0.7rem; padding: 3px 8px; border-radius: 10px; background: var(--border-color); color: var(--text-color); font-weight: bold; }
+        .exp-tag.bank { background: var(--info); color: white; }
+        .exp-tag.user-paid { background: #673ab7; color: white; }
+        
+        .expense-actions { display: flex; flex-direction: column; gap: 8px; }
+        .icon-btn { background: var(--card-bg) !important; color: var(--secondary) !important; border: 1px solid var(--border-color) !important; padding: 8px 12px !important; border-radius: 8px !important; cursor: pointer; transition: 0.2s; }
+        .icon-btn:hover { background: var(--primary) !important; color: white !important; }
+        .icon-btn.danger:hover { background: var(--danger) !important; }
+
+        /* Dual Dashboards */
+        .dashboard-widgets-container { display: flex; justify-content: space-between; position: absolute; top: -20px; left: 0; width: 100%; padding: 0 20px; box-sizing: border-box; pointer-events: none; }
+        .top-widget { pointer-events: auto; background: var(--card-bg); border: 2px solid var(--border-color); padding: 12px 20px; border-radius: 15px; box-shadow: var(--shadow); text-align: center; z-index: 100; min-width: 140px; background: linear-gradient(145deg, var(--card-bg), var(--bg-color));}
+        .top-widget.bank-widget { border-left: 5px solid var(--info); left: 20px; }
+        .top-widget.budget-widget { border-right: 5px solid var(--primary); right: 20px; }
+        .widget-title { font-size: 0.75rem; text-transform: uppercase; color: var(--secondary); font-weight: bold; letter-spacing: 1px; margin-bottom: 5px; display: flex; align-items: center; justify-content: center; gap: 5px;}
+        .widget-val { font-size: 1.5rem; font-weight: 900; }
+
+        .summary-list { list-style: none; padding: 0; margin: 0; }
+        .summary-list li { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px dashed var(--border-color); align-items: center;}
+        .grand-total-box { background: var(--primary); color: white; padding: 15px; border-radius: 10px; text-align: center; margin-top: 20px; }
+        .grand-total-box h4 { margin: 0 0 5px 0; font-size: 1rem; font-weight: normal; }
+        .grand-total-box h2 { margin: 0; font-size: 2rem; }
+        
+        .split-budget-bar { height: 6px; background: #e0e0e0; border-radius: 3px; margin-top: 5px; overflow: hidden; width: 100px;}
+        .split-budget-fill { height: 100%; border-radius: 3px; }
+
+        .ended-trip-grid { display: grid; grid-template-columns: 380px 1fr; gap: 25px; margin-top: 20px; align-items: start; }
+        .panel { background: var(--card-bg); padding: 25px; border-radius: 15px; box-shadow: var(--shadow); border: 1px solid var(--border-color); }
+        .panel h3 { border-bottom: 2px solid var(--primary); padding-bottom: 10px; margin-top: 0; }
+        
+        .member-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
+        .member-row input { margin: 0; }
+
+        @media (max-width: 950px) { .ended-trip-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 600px) {
+            .main-top-bar { flex-direction: column; gap: 15px; padding: 15px; }
+            .curly-nav { flex-wrap: wrap; border-radius: 20px; padding: 12px; width: 100%; }
+            .expense-box { flex-direction: column; align-items: flex-start; }
+            .expense-actions { flex-direction: row; width: 100%; justify-content: flex-end; margin-top: 10px; border-top: 1px dashed var(--border-color); padding-top: 10px; }
+            .dashboard-widgets-container { position: static; flex-direction: column; gap: 15px; padding: 0; margin-bottom: 20px; }
+            .top-widget { width: 100%; box-sizing: border-box; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="splash-screen">
+        <i class="fas fa-book-atlas"></i>
+        <h1>TripLedger</h1>
+    </div>
+
+    <div class="main-top-bar hidden" id="topNavContainer">
+        <div class="brand-logo"><i class="fas fa-book-atlas"></i> TripLedger</div>
+        <div class="curly-nav">
+            <button id="themeToggle" onclick="toggleTheme()" title="Toggle Dark Mode"><i class="fas fa-sun"></i></button>
+            <button onclick="showDashboard()"><i class="fas fa-home"></i> Home</button>
+            <button onclick="editProfile()"><i class="fas fa-user-edit"></i> Profile</button>
+            <button onclick="showCreateTrip()"><i class="fas fa-plus"></i> Create Trip</button>
+        </div>
+    </div>
+
+    <div id="loginView" class="container card-box view-section hidden" style="max-width: 400px; text-align: center;">
+        <h2 class="header-title"><i class="fas fa-lock"></i> Welcome Back</h2>
+        <input type="password" id="loginPassword" placeholder="Enter Password" class="action-btn">
+        <button class="primary-btn" onclick="performLogin()"><i class="fas fa-sign-in-alt"></i> Login</button>
+    </div>
+
+    <div id="profileView" class="container card-box view-section hidden">
+        <h2 class="header-title"><i class="fas fa-id-badge"></i> Set Up Profile</h2>
+        <input type="text" id="userName" placeholder="Full Name" class="action-btn">
+        <input type="email" id="userEmail" placeholder="Email ID" class="action-btn">
+        <input type="password" id="userPassword" placeholder="Set a Secure Password (Required)" class="action-btn">
+        <button class="primary-btn" onclick="saveProfile()"><i class="fas fa-save"></i> Save Profile & Enter</button>
+    </div>
+
+    <div id="dashboardView" class="container-wide view-section hidden">
+        <h1 class="header-title" id="welcomeMessage">My Trips</h1>
+        <div id="tripContainer" class="trip-grid"></div>
+    </div>
+
+    <div id="createTripView" class="container card-box view-section hidden">
+        <h2 class="header-title"><i class="fas fa-plane-departure"></i> Create New Trip</h2>
+        
+        <label>Trip Name:</label>
+        <input type="text" id="tripName" placeholder="e.g., Summer in Paris" class="action-btn">
+        
+        <div style="display: flex; gap: 15px;">
+            <div style="flex:1"><label>Start Date:</label><input type="date" id="tripStart" class="action-btn"></div>
+            <div style="flex:1"><label>End Date:</label><input type="date" id="tripEnd" class="action-btn"></div>
+        </div>
+        
+        <div style="border: 1px solid var(--border-color); padding: 15px; border-radius: 10px; margin-bottom: 15px; background: var(--bg-color);">
+            <h3 style="margin-top: 0; color: var(--primary);"><i class="fas fa-users"></i> Members & Bank Setup</h3>
+            <p style="font-size: 0.85rem; color: var(--secondary); margin-bottom: 15px;">Add trip members and any upfront money they are depositing into the shared 'Bank' pool.</p>
+            <div id="membersContainer"></div>
+            <button class="secondary-btn" style="padding: 8px; font-size: 0.9rem; margin-top: 10px;" onclick="addMemberRow()"><i class="fas fa-user-plus"></i> Add Member</button>
+        </div>
+
+        <label>Estimated Trip Budget (₹):</label>
+        <input type="number" id="tripBudget" placeholder="Overall planned limit (e.g., 50000)" class="action-btn">
+        
+        <button class="secondary-btn" style="margin-bottom: 15px; padding: 10px;" onclick="document.getElementById('splitBudgetConfig').classList.toggle('hidden')">
+            <i class="fas fa-sliders-h"></i> Split Budget by Category (Optional)
+        </button>
+        <div id="splitBudgetConfig" class="hidden card-box" style="padding: 15px; box-shadow: none; border: 1px solid var(--border-color); margin-bottom: 15px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div><label>Travel:</label><input type="number" id="budTravel" placeholder="₹"></div>
+                <div><label>Food:</label><input type="number" id="budFood" placeholder="₹"></div>
+                <div><label>Stay:</label><input type="number" id="budStay" placeholder="₹"></div>
+                <div><label>Shopping:</label><input type="number" id="budShopping" placeholder="₹"></div>
+                <div style="grid-column: span 2;"><label>Other:</label><input type="number" id="budOther" placeholder="₹"></div>
+            </div>
+        </div>
+
+        <label>Cover Photo (Optional):</label>
+        <input type="file" id="tripImage" accept="image/*" onchange="handleImageUpload(event)" class="action-btn">
+        <input type="hidden" id="tripImageData"> 
+
+        <button class="primary-btn" onclick="saveTrip()"><i class="fas fa-check"></i> Save Trip</button>
+    </div>
+
+    <div id="tripDetailsView" class="container view-section hidden">
+        <div class="card-box" style="margin-bottom: 20px; text-align: center; position: relative;" id="activeTripHeaderArea">
+            
+            <div class="dashboard-widgets-container" id="dashboardWidgets">
+                <div class="top-widget bank-widget" id="bankWidget">
+                    <div class="widget-title" style="color: var(--info);"><i class="fas fa-university"></i> Bank Balance</div>
+                    <div id="bankVal" class="widget-val" style="color: var(--info);">₹0</div>
+                    <div style="font-size: 0.65rem; color: var(--secondary); margin-top: 3px;">Pool Remaining</div>
+                </div>
+                <div class="top-widget budget-widget" id="budgetWidget">
+                    <div class="widget-title" style="color: var(--primary);"><i class="fas fa-wallet"></i> Budget Status</div>
+                    <div id="budgetVal" class="widget-val">₹0</div>
+                    <div style="font-size: 0.65rem; color: var(--secondary); margin-top: 3px;">Overall Limit Remaining</div>
+                </div>
+            </div>
+
+            <h2 class="header-title" id="detailTripName" style="margin-top: 50px; margin-bottom: 5px;">Trip Name</h2>
+            <p id="detailTripDates" style="color: var(--secondary); margin-top: 0;"></p>
+            
+            <div style="display: flex; justify-content: center; gap: 10px; margin-top: 20px; flex-wrap: wrap;">
+                <button class="primary-btn" style="width: auto; padding: 10px 25px; border-radius: 30px;" onclick="toggleExpenseForm()"><i class="fas fa-receipt"></i> Add Expense</button>
+                <button class="secondary-btn" style="width: auto; padding: 10px 25px; border-radius: 30px; background: var(--secondary);" onclick="openLiveSummary()"><i class="fas fa-chart-line"></i> Live Summary</button>
+            </div>
+        </div>
+
+        <div id="expenseFormBox" class="card-box hidden" style="margin-bottom: 20px; border: 2px solid var(--primary);">
+            <h3 id="expenseFormTitle"><i class="fas fa-edit"></i> Log Expense</h3>
+            <input type="hidden" id="editExpenseId"> 
+            
+            <label>Date & Time:</label>
+            <input type="datetime-local" id="expenseDateTime" class="action-btn">
+
+            <label>Category:</label>
+            <select id="expenseCategory" onchange="handleCategoryChange()" class="action-btn">
+                <option value="">Select Category...</option>
+                <option value="Travel">Travel</option>
+                <option value="Food">Food</option>
+                <option value="Stay">Stay</option>
+                <option value="Shopping">Shopping</option>
+                <option value="Other">Other</option>
+            </select>
+            <div id="customCategoryBox" class="hidden"><input type="text" id="customCategoryName" placeholder="Name your category..." class="action-btn"></div>
+            
+            <div id="subCategoryBox">
+                <label>Subcategory:</label>
+                <select id="expenseSubCategory" onchange="handleSubCategoryChange()" class="action-btn"></select>
+                <input type="text" id="customSubCategoryName" class="action-btn hidden" placeholder="Type custom subcategory...">
+            </div>
+
+            <label>Description (Optional):</label>
+            <textarea id="expenseDescription" class="action-btn" placeholder="E.g., Lunch in hotel near the temple..."></textarea>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div>
+                    <label>Paid By (Source):</label>
+                    <select id="expensePaidBy" class="action-btn"></select>
+                </div>
+                <div>
+                    <label>Payment Mode:</label>
+                    <select id="expensePaymentMode" class="action-btn">
+                        <option value="UPI">UPI</option>
+                        <option value="Cash">Cash</option>
+                        <option value="Credit Card">Credit Card</option>
+                        <option value="Debit Card">Debit Card</option>
+                    </select>
+                </div>
+            </div>
+
+            <label>Amount (₹):</label>
+            <input type="number" id="expenseAmount" placeholder="Amount" class="action-btn">
+            
+            <div style="display: flex; gap: 10px;">
+                <button class="primary-btn" onclick="saveExpense()"><i class="fas fa-save"></i> Save</button>
+                <button class="secondary-btn" onclick="toggleExpenseForm()"><i class="fas fa-times"></i> Cancel</button>
+            </div>
+        </div>
+
+        <div class="card-box">
+            <h3 style="border-bottom: 2px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px;"><i class="fas fa-list-ul"></i> Expense Log</h3>
+            <div id="expenseList" class="expense-scroll-container"></div>
+            
+            <div id="tripBottomBar" style="text-align: center; margin-top: 20px; border-top: 2px solid var(--border-color); padding-top: 20px;">
+                <div id="mainEndBar" style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;">
+                    <button class="primary-btn" style="background-color: var(--success); width: auto; padding: 12px 30px; border-radius: 30px;" onclick="revealEndOptions()"><i class="fas fa-flag-checkered"></i> End Trip</button>
+                    <button class="secondary-btn" style="background-color: #e74c3c; width: auto; padding: 12px 30px; border-radius: 30px;" onclick="exportPDF()"><i class="fas fa-file-pdf"></i> Export PDF</button>
+                </div>
+                
+                <div id="endTripOptions" class="hidden" style="display: flex; justify-content: center; gap: 15px; flex-wrap: wrap; margin-top: 15px;">
+                    <button class="secondary-btn" style="width: auto; padding: 12px 30px; border-radius: 30px;" onclick="confirmEndTrip('home')"><i class="fas fa-home"></i> End & Go Home</button>
+                    <button class="primary-btn" style="width: auto; padding: 12px 30px; border-radius: 30px;" onclick="confirmEndTrip('summary')"><i class="fas fa-chart-pie"></i> End & View Final Summary</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="endedTripView" class="container-wide view-section hidden">
+        <div id="printableArea">
+            <div class="card-box" style="text-align: center; padding: 20px;">
+                <span id="endedBadge" style="background: var(--success); color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; font-size: 0.9rem;"><i class="fas fa-check-circle"></i> Trip Completed</span>
+                <h2 class="header-title" id="endedTripName" style="margin: 15px 0 5px 0;">Trip Name</h2>
+                <p id="endedTripDates" style="color: var(--secondary); margin: 0;"></p>
+            </div>
+
+            <div class="ended-trip-grid">
+                <div class="panel">
+                    <h3><i class="fas fa-chart-pie"></i> Ledger & Settlement</h3>
+                    <div id="endedSummaryContent"></div>
+                </div>
+                
+                <div class="panel center-panel">
+                    <h3><i class="fas fa-list"></i> All Expenses</h3>
+                    <div id="endedExpenseList" class="expense-scroll-container" style="max-height: none; overflow: visible;"></div>
+                </div>
+            </div>
+        </div>
+        <div style="text-align: center; margin-top: 20px;">
+            <button class="primary-btn" style="width: auto; margin: auto; background-color: #e74c3c; padding: 12px 40px; border-radius: 30px;" onclick="exportPDF()"><i class="fas fa-file-pdf"></i> Download Full Accounting PDF</button>
+        </div>
+    </div>
+
+    <div id="liveSummaryModal" class="modal-overlay hidden">
+        <div class="modal-box">
+            <h3 class="modal-title"><i class="fas fa-chart-line"></i> Live Trip Summary</h3>
+            <div id="liveSummaryContent"></div>
+            <button class="primary-btn" style="margin-top: 20px;" onclick="closeModal('liveSummaryModal')">Close</button>
+        </div>
+    </div>
+
+    <script>
+        let currentActiveTripId = null;
+        const defaultImages = [
+            "https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+            "https://images.unsplash.com/photo-1491555103944-7c647fd857e6?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+        ];
+        const subcategories = {
+            "Travel": ["Flights", "Train/Bus", "Taxis/Rideshare", "Car Rental", "Fuel", "Tolls", "Public Transit", "Other"],
+            "Food": ["Groceries", "Restaurants/Cafes", "Bars", "Street Food", "Other"],
+            "Stay": ["Hotel", "Airbnb/Rentals", "City Taxes", "Room Service", "Other"],
+            "Shopping": ["Souvenirs", "Clothing", "Electronics", "Duty-Free", "Other"]
+        };
+
+        window.onload = function() {
+            setTimeout(() => { document.getElementById('splash-screen').classList.add('fade-out'); }, 1500);
+            if (localStorage.getItem('appTheme') === 'dark') toggleTheme(true);
+            const profile = localStorage.getItem('userProfile');
+            if (profile) showView('loginView'); else showView('profileView');
+        };
+
+        function toggleTheme(forceDark = false) {
+            const body = document.body;
+            if (forceDark || !body.classList.contains('dark-mode')) {
+                body.classList.add('dark-mode'); document.getElementById('themeToggle').innerHTML = '<i class="fas fa-moon"></i>';
+                localStorage.setItem('appTheme', 'dark');
+            } else {
+                body.classList.remove('dark-mode'); document.getElementById('themeToggle').innerHTML = '<i class="fas fa-sun"></i>';
+                localStorage.setItem('appTheme', 'light');
+            }
+        }
+
+        function showView(viewId) {
+            ['loginView', 'profileView', 'dashboardView', 'createTripView', 'tripDetailsView', 'endedTripView'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            setTimeout(() => { document.getElementById(viewId).classList.remove('hidden'); }, 10);
+            if (viewId === 'profileView' || viewId === 'loginView') document.getElementById('topNavContainer').classList.add('hidden');
+            else document.getElementById('topNavContainer').classList.remove('hidden');
+        }
+
+        // Auth
+        function saveProfile() {
+            const name = document.getElementById('userName').value, pass = document.getElementById('userPassword').value;
+            if (!name || !pass) return alert("Enter name and set a password.");
+            localStorage.setItem('userProfile', JSON.stringify({ name, email: document.getElementById('userEmail').value, pass: btoa(pass) }));
+            showDashboard();
+        }
+        function performLogin() {
+            if (btoa(document.getElementById('loginPassword').value) === JSON.parse(localStorage.getItem('userProfile')).pass) showDashboard();
+            else alert("Incorrect Password!");
+        }
+        function editProfile() {
+            const profile = JSON.parse(localStorage.getItem('userProfile'));
+            if (profile) { document.getElementById('userName').value = profile.name; document.getElementById('userEmail').value = profile.email; document.getElementById('userPassword').value = atob(profile.pass); }
+            showView('profileView');
+        }
+
+        // Dashboard
+        function showDashboard() {
+            showView('dashboardView');
+            document.getElementById('welcomeMessage').innerHTML = `<i class="fas fa-globe-americas"></i> ${JSON.parse(localStorage.getItem('userProfile')).name}'s Trips`;
+            renderTrips();
+        }
+        function renderTrips() {
+            const trips = JSON.parse(localStorage.getItem('myTrips')) || [];
+            const container = document.getElementById('tripContainer');
+            container.innerHTML = trips.length === 0 ? '<p style="text-align:center; width:100%; color:var(--secondary);">No trips created yet.</p>' : '';
+            [...trips].reverse().forEach(trip => {
+                const statBadge = trip.isEnded ? `<div class="status-badge"><i class="fas fa-lock"></i> Ended</div>` : '';
+                container.innerHTML += `
+                    <div class="trip-card" onclick="openTripDetails('${trip.id}')">
+                        ${statBadge}
+                        <img src="${trip.image || defaultImages[trip.number % defaultImages.length]}" class="trip-image" alt="Trip">
+                        <div class="trip-details">
+                            <p class="trip-title">${trip.name}</p>
+                            <p class="trip-meta"><i class="far fa-calendar"></i> ${trip.start} to ${trip.end}</p>
+                        </div>
+                    </div>`;
+            });
+        }
+
+        // Create Trip
+        function showCreateTrip() {
+            document.getElementById('tripName').value = document.getElementById('tripStart').value = document.getElementById('tripEnd').value = document.getElementById('tripBudget').value = '';
+            ['Travel','Food','Stay','Shopping','Other'].forEach(c => document.getElementById('bud'+c).value = '');
+            document.getElementById('membersContainer').innerHTML = '';
+            addMemberRow(JSON.parse(localStorage.getItem('userProfile')).name); // Auto-add Self
+            showView('createTripView');
+        }
+        function addMemberRow(defaultName = '') {
+            const div = document.createElement('div'); div.className = 'member-row';
+            div.innerHTML = `
+                <input type="text" class="action-btn mem-name" placeholder="Member Name" value="${defaultName}">
+                <input type="number" class="action-btn mem-deposit" placeholder="Upfront Deposit (₹)">
+                <button class="icon-btn danger" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>`;
+            document.getElementById('membersContainer').appendChild(div);
+        }
+        function handleImageUpload(e) { const f = e.target.files; if (f) { const r = new FileReader(); r.onload = ev => document.getElementById('tripImageData').value = ev.target.result; r.readAsDataURL(f); } }
+        
+        function saveTrip() {
+            const name = document.getElementById('tripName').value, start = document.getElementById('tripStart').value, end = document.getElementById('tripEnd').value;
+            if (!name || !start || !end) return alert("Fill Name and Dates.");
+            
+            let members = [];
+            document.querySelectorAll('.member-row').forEach(row => {
+                const mName = row.querySelector('.mem-name').value;
+                const mDep = parseFloat(row.querySelector('.mem-deposit').value) || 0;
+                if(mName) members.push({ id: 'm_'+Date.now()+Math.random(), name: mName, upfront: mDep });
+            });
+
+            let splitBudgets = {};
+            ['Travel','Food','Stay','Shopping','Other'].forEach(cat => { let v = document.getElementById('bud'+cat).value; if(v) splitBudgets[cat] = parseFloat(v); });
+
+            let trips = JSON.parse(localStorage.getItem('myTrips')) || [];
+            let newTrip = { id: Date.now().toString(), number: trips.length + 1, name, start, end, image: document.getElementById('tripImageData').value, totalBudget: parseFloat(document.getElementById('tripBudget').value) || null, splitBudgets, members, expenses: [], isEnded: false };
+            trips.push(newTrip); localStorage.setItem('myTrips', JSON.stringify(trips)); openTripDetails(newTrip.id);
+        }
+
+        // Active Trip Logic & Widgets
+        function openTripDetails(tripId) {
+            currentActiveTripId = tripId;
+            const trip = JSON.parse(localStorage.getItem('myTrips')).find(t => t.id === tripId);
+            
+            if (trip.isEnded) {
+                document.getElementById('endedBadge').style.display = 'inline-block';
+                document.getElementById('endedTripName').innerText = trip.name;
+                document.getElementById('endedTripDates').innerHTML = `${trip.start} to ${trip.end}`;
+                renderSummaryStats(trip, 'endedSummaryContent');
+                renderExpenseList(trip.expenses, trip.members, 'endedExpenseList', false);
+                showView('endedTripView');
+            } else {
+                document.getElementById('detailTripName').innerText = trip.name;
+                document.getElementById('detailTripDates').innerHTML = `${trip.start} to ${trip.end}`;
+                document.getElementById('expenseFormBox').classList.add('hidden');
+                document.getElementById('endTripOptions').classList.add('hidden');
+                document.getElementById('mainEndBar').classList.remove('hidden');
+                
+                const pb = document.getElementById('expensePaidBy');
+                pb.innerHTML = '<option value="bank">🏦 Common Bank Pool</option>';
+                (trip.members || []).forEach(m => pb.innerHTML += `<option value="${m.id}">👤 ${m.name}</option>`);
+
+                updateTopWidgets(trip);
+                renderExpenseList(trip.expenses, trip.members, 'expenseList', true);
+                showView('tripDetailsView');
+            }
+        }
+
+        function updateTopWidgets(trip) {
+            const spentTotal = trip.expenses.reduce((s, e) => s + e.amount, 0);
+            
+            // 1. Budget Tracking (Right)
+            const budW = document.getElementById('budgetWidget');
+            if(trip.totalBudget) {
+                budW.style.display = 'block';
+                let rem = trip.totalBudget - spentTotal;
+                let valEl = document.getElementById('budgetVal');
+                
+                if(rem >= 0) {
+                    valEl.innerText = `₹${rem.toLocaleString('en-IN')}`;
+                    valEl.style.color = (spentTotal <= trip.totalBudget * 0.8) ? 'var(--success)' : 'var(--warning)';
+                } else {
+                    valEl.innerText = `-₹${Math.abs(rem).toLocaleString('en-IN')}`;
+                    valEl.style.color = 'var(--danger)';
+                }
+            } else budW.style.display = 'none';
+
+            // 2. Bank Balance Liquidity (Left)
+            const bankW = document.getElementById('bankWidget');
+            if(trip.members && trip.members.length > 0) {
+                bankW.style.display = 'block';
+                const totalUpfront = trip.members.reduce((s, m) => s + m.upfront, 0);
+                // ONLY subtract expenses explicitly paid by the "Bank"
+                const bankSpent = trip.expenses.filter(e => e.paidBy === 'bank').reduce((s, e) => s + e.amount, 0);
+                const bankBal = totalUpfront - bankSpent;
+                
+                let bValEl = document.getElementById('bankVal');
+                bValEl.innerText = `₹${bankBal.toLocaleString('en-IN')}`;
+                bValEl.style.color = bankBal >= 0 ? 'var(--info)' : 'var(--danger)';
+            } else bankW.style.display = 'none';
+        }
+
+        // Expense Form Handling
+        function getLocalIsoString() { const tz = (new Date()).getTimezoneOffset() * 60000; return (new Date(Date.now() - tz)).toISOString().slice(0, 16); }
+        function toggleExpenseForm() {
+            const f = document.getElementById('expenseFormBox');
+            if(f.classList.toggle('hidden')) return;
+            document.getElementById('editExpenseId').value = document.getElementById('expenseCategory').value = document.getElementById('expenseAmount').value = document.getElementById('expenseDescription').value = '';
+            document.getElementById('expenseDateTime').value = getLocalIsoString();
+            document.getElementById('expensePaidBy').selectedIndex = 0; document.getElementById('expensePaymentMode').selectedIndex = 0;
+            handleCategoryChange();
+        }
+
+        function handleCategoryChange() {
+            const cat = document.getElementById("expenseCategory").value, sub = document.getElementById("expenseSubCategory"), cBox = document.getElementById("customCategoryBox");
+            sub.innerHTML = '<option value="">Select Subcategory...</option>';
+            if (cat === 'Other') { cBox.classList.remove('hidden'); document.getElementById("subCategoryBox").classList.add('hidden'); }
+            else { cBox.classList.add('hidden'); document.getElementById("subCategoryBox").classList.remove('hidden'); if(subcategories[cat]) subcategories[cat].forEach(s => sub.appendChild(new Option(s,s))); }
+            handleSubCategoryChange();
+        }
+        function handleSubCategoryChange() { document.getElementById("customSubCategoryName").classList.toggle("hidden", document.getElementById("expenseSubCategory").value !== "Other"); }
+
+        function saveExpense() {
+            const cat = document.getElementById('expenseCategory').value;
+            let finalCat = cat === 'Other' ? document.getElementById('customCategoryName').value : cat;
+            let subRaw = document.getElementById('expenseSubCategory').value;
+            let subCat = cat === 'Other' ? "Custom" : (subRaw === 'Other' ? document.getElementById('customSubCategoryName').value : subRaw);
+            const desc = document.getElementById('expenseDescription').value, rawDate = document.getElementById('expenseDateTime').value;
+            const amt = parseFloat(document.getElementById('expenseAmount').value), editId = document.getElementById('editExpenseId').value;
+            const paidBy = document.getElementById('expensePaidBy').value, payMode = document.getElementById('expensePaymentMode').value;
+            
+            if (!finalCat || !subCat || !amt || !rawDate) return alert("Complete required fields.");
+
+            let trips = JSON.parse(localStorage.getItem('myTrips'));
+            let i = trips.findIndex(t => t.id === currentActiveTripId);
+            
+            let expObj = { id: editId || Date.now().toString(), category: finalCat, subCategory: subCat, description: desc, amount: amt, dateStr: new Date(rawDate).toLocaleString('en-IN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }), rawDate, paidBy, payMode };
+
+            if(editId) { let ei = trips[i].expenses.findIndex(e => e.id === editId); if(ei !== -1) trips[i].expenses[ei] = expObj; } 
+            else trips[i].expenses.push(expObj);
+            
+            trips[i].expenses.sort((a,b) => new Date(b.rawDate) - new Date(a.rawDate));
+            localStorage.setItem('myTrips', JSON.stringify(trips));
+            updateTopWidgets(trips[i]); renderExpenseList(trips[i].expenses, trips[i].members, 'expenseList', true);
+            document.getElementById('expenseFormBox').classList.add('hidden'); 
+        }
+
+        function renderExpenseList(expenses, members, containerId, isEditable) {
+            const list = document.getElementById(containerId);
+            list.innerHTML = expenses.length ? '' : '<p style="text-align:center; color:var(--secondary);">No expenses recorded.</p>';
+            
+            expenses.forEach(exp => {
+                let actionHtml = isEditable ? `<div class="expense-actions"><button class="icon-btn" onclick="editExpense('${exp.id}')"><i class="fas fa-pen"></i></button><button class="icon-btn danger" onclick="deleteExpense('${exp.id}')"><i class="fas fa-trash"></i></button></div>` : '';
+                let descHtml = exp.description ? `<p class="expense-desc">"${exp.description}"</p>` : '';
+                
+                let payerName = "Common Bank";
+                if(exp.paidBy !== 'bank') { const m = (members||[]).find(x => x.id === exp.paidBy); payerName = m ? m.name : "Unknown"; }
+                
+                let tagClass = exp.paidBy === 'bank' ? 'exp-tag bank' : 'exp-tag user-paid';
+
+                list.innerHTML += `
+                    <div class="expense-box">
+                        <div class="expense-info">
+                            <p class="expense-title">${exp.category} <span style="font-size:0.85rem;font-weight:normal;color:var(--secondary)">(${exp.subCategory})</span></p>
+                            ${descHtml}
+                            <p class="expense-date"><i class="far fa-clock"></i> ${exp.dateStr}</p>
+                            <div class="expense-meta-tags">
+                                <span class="${tagClass}"><i class="fas fa-user"></i> Paid by: ${payerName}</span>
+                                <span class="exp-tag"><i class="fas fa-money-bill-wave"></i> ${exp.payMode}</span>
+                            </div>
+                        </div>
+                        <p class="expense-amount">₹${exp.amount.toLocaleString('en-IN')}</p>
+                        ${actionHtml}
+                    </div>`;
+            });
+        }
+
+        function editExpense(expId) {
+            const trip = JSON.parse(localStorage.getItem('myTrips')).find(t => t.id === currentActiveTripId);
+            const exp = trip.expenses.find(e => e.id === expId);
+            document.getElementById('expenseFormBox').classList.remove('hidden');
+            
+            document.getElementById('editExpenseId').value = exp.id; document.getElementById('expenseAmount').value = exp.amount;
+            document.getElementById('expenseDescription').value = exp.description || ""; document.getElementById('expenseDateTime').value = exp.rawDate;
+            document.getElementById('expensePaidBy').value = exp.paidBy || 'bank'; document.getElementById('expensePaymentMode').value = exp.payMode || 'Cash';
+
+            if(subcategories[exp.category]) { document.getElementById('expenseCategory').value = exp.category; handleCategoryChange(); 
+                if(subcategories[exp.category].includes(exp.subCategory)) document.getElementById('expenseSubCategory').value = exp.subCategory; 
+                else { document.getElementById('expenseSubCategory').value = "Other"; handleSubCategoryChange(); document.getElementById('customSubCategoryName').value = exp.subCategory; }
+            } else { document.getElementById('expenseCategory').value = "Other"; handleCategoryChange(); document.getElementById('customCategoryName').value = exp.category; }
+            document.getElementById('expenseFormBox').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function deleteExpense(expId) {
+            if(!confirm("Delete expense?")) return;
+            let trips = JSON.parse(localStorage.getItem('myTrips'));
+            let i = trips.findIndex(t => t.id === currentActiveTripId);
+            trips[i].expenses = trips[i].expenses.filter(e => e.id !== expId);
+            localStorage.setItem('myTrips', JSON.stringify(trips));
+            updateTopWidgets(trips[i]); renderExpenseList(trips[i].expenses, trips[i].members, 'expenseList', true);
+        }
+
+        // Accounting Summaries & PDF
+        function openLiveSummary() {
+            const trip = JSON.parse(localStorage.getItem('myTrips')).find(t => t.id === currentActiveTripId);
+            renderSummaryStats(trip, 'liveSummaryContent');
+            document.getElementById('liveSummaryModal').classList.remove('hidden');
+        }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        function renderSummaryStats(trip, containerId) {
+            let grandTotal = 0, cats = {}, memberStats = {};
+            
+            let activeMembers = trip.members || [];
+            activeMembers.forEach(m => {
+                memberStats[m.id] = { name: m.name, upfront: m.upfront, outOfPocket: 0, totalContribution: 0 };
+            });
+
+            let bankSpent = 0;
+            trip.expenses.forEach(e => { 
+                grandTotal += e.amount; 
+                cats[e.category] = (cats[e.category]||0) + e.amount; 
+                
+                if(e.paidBy === 'bank') bankSpent += e.amount;
+                else if(memberStats[e.paidBy]) memberStats[e.paidBy].outOfPocket += e.amount;
+            });
+
+            // 1. Category Breakdown
+            let html = `<h4 style="color:var(--primary); margin-bottom:5px; border-bottom: 2px solid var(--border-color); padding-bottom:5px;"><i class="fas fa-tag"></i> Expense by Category</h4><ul class="summary-list">`;
+            for(let c in cats) { 
+                let catBud = (trip.splitBudgets && trip.splitBudgets[c]) ? trip.splitBudgets[c] : null;
+                let budHtml = catBud ? `<div style="font-size: 0.75rem; color: var(--secondary); text-align:right;">Budget: ₹${catBud.toLocaleString()}</div><div class="split-budget-bar"><div class="split-budget-fill" style="width:${Math.min(100, (cats[c]/catBud)*100)}%; background-color:${(cats[c]/catBud) <= 0.8 ? 'var(--success)' : 'var(--warning)'};"></div></div>` : '';
+                html += `<li><div><strong>${c}</strong></div><div style="text-align: right;"><span style="font-weight:bold; font-size:1.1rem;">₹${cats[c].toLocaleString('en-IN')}</span>${budHtml}</div></li>`; 
+            }
+            html += `</ul>`;
+
+            // 2. Accounting Settlement Logic
+            if(activeMembers.length > 0) {
+                let perPersonShare = grandTotal / activeMembers.length;
+                html += `<h4 style="color:var(--info); margin-top:25px; margin-bottom:5px; border-bottom: 2px solid var(--border-color); padding-bottom:5px;"><i class="fas fa-balance-scale"></i> Accounting & Final Settlement</h4>`;
+                html += `<p style="font-size:0.85rem; color:var(--secondary); margin-top:5px; text-align:center;">Per Person Share: <strong>₹${perPersonShare.toLocaleString('en-IN', {maximumFractionDigits: 2})}</strong></p>`;
+                html += `<ul class="summary-list">`;
+
+                for(let mid in memberStats) {
+                    let m = memberStats[mid];
+                    m.totalContribution = m.upfront + m.outOfPocket;
+                    
+                    let balance = m.totalContribution - perPersonShare;
+                    let balanceText = balance >= 0 
+                        ? `<span style="color:var(--success);">Receives ₹${balance.toLocaleString('en-IN', {maximumFractionDigits: 2})}</span>`
+                        : `<span style="color:var(--danger);">Owes ₹${Math.abs(balance).toLocaleString('en-IN', {maximumFractionDigits: 2})}</span>`;
+
+                    html += `<li>
+                        <div style="flex:1;">
+                            👤 <strong style="font-size:1.1rem;">${m.name}</strong> <br>
+                            <span style="font-size:0.75rem;color:var(--secondary)">
+                                Upfront: ₹${m.upfront.toLocaleString('en-IN')} | Direct: ₹${m.outOfPocket.toLocaleString('en-IN')} <br>
+                                <span style="color:var(--text-color);">Total Contributed: <strong>₹${m.totalContribution.toLocaleString('en-IN')}</strong></span>
+                            </span>
+                        </div>
+                        <div style="text-align:right; font-weight:bold; font-size:1rem; flex:1;">
+                            ${balanceText}
+                        </div>
+                    </li>`;
+                }
+                
+                let bankBal = activeMembers.reduce((sum, m) => sum + m.upfront, 0) - bankSpent;
+                html += `</ul>`;
+                html += `<div style="background: var(--bg-color); padding: 12px; border-radius: 8px; text-align: center; margin-top: 15px; font-weight: bold; border: 1px dashed ${bankBal >= 0 ? 'var(--info)' : 'var(--danger)'}; color: ${bankBal >= 0 ? 'var(--info)' : 'var(--danger)'}">
+                    <i class="fas fa-university"></i> Remaining Common Bank Balance: ₹${bankBal.toLocaleString('en-IN')}
+                </div>`;
+            }
+
+            let totalBudHtml = trip.totalBudget ? `<div style="font-size:0.9rem; margin-top:5px;">Total Budget: ₹${trip.totalBudget.toLocaleString()}</div>` : '';
+            html += `<div class="grand-total-box"><h4>Total Trip Spent</h4><h2>₹${grandTotal.toLocaleString('en-IN')}</h2>${totalBudHtml}</div>`;
+            
+            document.getElementById(containerId).innerHTML = html;
+        }
+
+        function revealEndOptions() { document.getElementById('mainEndBar').classList.add('hidden'); document.getElementById('endTripOptions').classList.remove('hidden'); }
+        function confirmEndTrip(action) {
+            let trips = JSON.parse(localStorage.getItem('myTrips'));
+            let i = trips.findIndex(t => t.id === currentActiveTripId);
+            trips[i].isEnded = true; localStorage.setItem('myTrips', JSON.stringify(trips));
+            if(action === 'home') showDashboard(); if(action === 'summary') openTripDetails(currentActiveTripId); 
+        }
+
+        function exportPDF() {
+            const trip = JSON.parse(localStorage.getItem('myTrips')).find(t => t.id === currentActiveTripId);
+            if (!trip.isEnded) {
+                document.getElementById('endedBadge').style.display = 'none';
+                document.getElementById('endedTripName').innerText = trip.name + " (Live Accounting Report)";
+                document.getElementById('endedTripDates').innerHTML = `${trip.start} to ${trip.end}`;
+                renderSummaryStats(trip, 'endedSummaryContent');
+                renderExpenseList(trip.expenses, trip.members, 'endedExpenseList', false);
+            }
+            html2pdf().set({ margin: 0.5, filename: `TripLedger_${trip.name.replace(/\s+/g, '_')}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } }).from(document.getElementById('printableArea')).save();
+        }
+    </script>
+</body>
+</html>
