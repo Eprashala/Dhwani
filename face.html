@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vedic Mukha Samudrika - Absolute Truth</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         :root {
             --bg-primary: #121214;
@@ -354,14 +355,8 @@
             display: flex; flex-direction: column; gap: 1rem;
         }
 
-        @media print {
-            body { background: white; color: black; padding: 0; margin: 0; }
-            header, .setup-container, .workspace-card, .floating-action, .audio-btn { display: none !important; }
-            .report-card { border: none; background: transparent; padding: 0; display: block;}
-            .report-text h2, .report-text h3 { color: black; border-bottom: 1px solid #ccc; }
-            .report-text { color: black; }
-            .captured-display { border: 1px solid #ccc; box-shadow: none; max-width: 250px;}
-        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
     </style>
 </head>
 <body>
@@ -452,7 +447,7 @@
         </div>
     </main>
 
-    <button id="exportPdfBtn" class="floating-action" onclick="window.print()">📤 Export PDF</button>
+    <button id="exportPdfBtn" class="floating-action">📤 Download PDF</button>
 
     <div class="modal" id="settingsModal">
         <div class="modal-content">
@@ -667,7 +662,6 @@
                 else { drawW = viewW; drawH = viewW / imgRatio; }
                 pCtx.drawImage(activeImage, -drawW / 2, -drawH / 2, drawW, drawH);
             } else if (currentStream && video.readyState === video.HAVE_ENOUGH_DATA) {
-                // FIXED: Calculate aspect ratio geometry dynamically to prevent vertical stretching
                 const videoW = video.videoWidth;
                 const videoH = video.videoHeight;
                 const targetW = 600;
@@ -678,11 +672,9 @@
                 let sourceX = 0, sourceY = 0, sourceW = videoW, sourceH = videoH;
                 
                 if (videoRatio > targetRatio) {
-                    // Camera layout is wider than 4:5 box (crop sides uniformly)
                     sourceW = videoH * targetRatio;
                     sourceX = (videoW - sourceW) / 2;
                 } else {
-                    // Camera layout is taller than 4:5 box (crop top/bottom uniformly)
                     sourceH = videoW / targetRatio;
                     sourceY = (videoH - sourceH) / 2;
                 }
@@ -746,6 +738,34 @@
         }
 
         audioBtn.addEventListener('click', toggleSpeech);
+
+        // DIRECT PDF EXPORT LOGIC
+        exportPdfBtn.addEventListener('click', () => {
+            const element = document.getElementById('reportCard');
+            const name = document.getElementById('userName').value || 'Subject';
+            
+            // Temporarily hide the Listen button so it doesn't appear in the PDF
+            const originalAudioDisplay = audioBtn.style.display;
+            audioBtn.style.display = 'none';
+            
+            exportPdfBtn.innerText = "Generating PDF...";
+            exportPdfBtn.disabled = true;
+
+            const opt = {
+                margin:       [0.5, 0.5, 0.5, 0.5],
+                filename:     `Vedic_Face_Reading_${name.replace(/\s+/g, '_')}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#1e1e24' },
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(element).save().then(() => {
+                // Restore UI
+                audioBtn.style.display = originalAudioDisplay;
+                exportPdfBtn.innerText = "📤 Download PDF";
+                exportPdfBtn.disabled = false;
+            });
+        });
 
         async function runVedicAnalysis(base64Data) {
             const loader = document.getElementById('loader');
