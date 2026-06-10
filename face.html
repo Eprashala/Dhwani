@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vedic Mukha Samudrika - Absolute Truth</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         :root {
             --bg-primary: #121214;
@@ -355,14 +354,6 @@
             display: flex; flex-direction: column; gap: 1rem;
         }
 
-        @media print {
-            body { background: white; color: black; padding: 0; margin: 0; }
-            header, .setup-container, .workspace-card, .floating-action, .audio-btn { display: none !important; }
-            .report-card { border: none; background: transparent; padding: 0; display: block;}
-            .report-text h2, .report-text h3 { color: black; border-bottom: 1px solid #ccc; }
-            .report-text { color: black; }
-            .captured-display { border: 1px solid #ccc; box-shadow: none; max-width: 250px;}
-        }
     </style>
 </head>
 <body>
@@ -453,7 +444,7 @@
         </div>
     </main>
 
-    <button id="exportPdfBtn" class="floating-action">📤 Download PDF</button>
+    <button id="shareBtn" class="floating-action">📤 Share Reading</button>
 
     <div class="modal" id="settingsModal">
         <div class="modal-content">
@@ -495,7 +486,9 @@
         const scannerLine = document.getElementById('scannerLine');
         const analyzeBtn = document.getElementById('analyzeBtn');
         const audioBtn = document.getElementById('audioBtn');
-        const exportPdfBtn = document.getElementById('exportPdfBtn');
+        
+        // NEW SHARE BUTTON REFERENCE
+        const shareBtn = document.getElementById('shareBtn');
 
         window.addEventListener('DOMContentLoaded', () => {
             for (let i = 1; i <= 100; i++) {
@@ -507,7 +500,6 @@
             if (localStorage.getItem('user_api_key')) {
                 document.getElementById('apiKeyInput').value = localStorage.getItem('user_api_key');
             }
-            // Canvas init removed from here. It is moved inside the 'initBtn' click listener.
             setupInteractionListeners();
         });
 
@@ -554,10 +546,7 @@
             setupSection.style.display = 'none';
             mainWorkspace.style.display = 'flex';
             
-            // FIX: Initialize canvas dimensions AFTER the workspace is set to flex and visible.
-            // This guarantees clientWidth/Height are greater than 0.
             initCanvasDimensions();
-            
             startCamera('user');
         });
 
@@ -602,8 +591,6 @@
                 activeImage.src = e.target.result;
             }
             reader.readAsDataURL(file);
-            
-            // Reset input so the user can upload the same image again if needed
             event.target.value = '';
         }
 
@@ -705,7 +692,7 @@
 
             window.speechSynthesis.cancel();
             audioBtn.style.display = 'none';
-            exportPdfBtn.style.display = 'none';
+            shareBtn.style.display = 'none'; // Hide share during new scan
 
             analyzeBtn.disabled = true;
             analyzeBtn.innerText = "Scanning Elements...";
@@ -752,33 +739,38 @@
 
         audioBtn.addEventListener('click', toggleSpeech);
 
-        // DIRECT PDF EXPORT LOGIC
-        exportPdfBtn.addEventListener('click', () => {
-            const element = document.getElementById('reportCard');
+        // NATIVE SHARE LOGIC
+        shareBtn.addEventListener('click', async () => {
             const name = document.getElementById('userName').value || 'Subject';
             
-            // Temporarily hide the Listen button so it doesn't appear in the PDF
-            const originalAudioDisplay = audioBtn.style.display;
-            audioBtn.style.display = 'none';
-            
-            exportPdfBtn.innerText = "Generating PDF...";
-            exportPdfBtn.disabled = true;
+            // Extract the clean text natively rendered in the DOM to drop all HTML tags
+            // while preserving the readable layout and line breaks.
+            const reportDiv = document.getElementById('reportTarget');
+            const cleanText = `Vedic Face Reading Report for ${name}\n\n${reportDiv.innerText}`;
 
-            const opt = {
-                margin:       [0.5, 0.5, 0.5, 0.5],
-                filename:     `Vedic_Face_Reading_${name.replace(/\s+/g, '_')}.pdf`,
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#1e1e24' },
-                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-            };
-
-            html2pdf().set(opt).from(element).save().then(() => {
-                // Restore UI
-                audioBtn.style.display = originalAudioDisplay;
-                exportPdfBtn.innerText = "📤 Download PDF";
-                exportPdfBtn.disabled = false;
-            });
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: `Vedic Face Reading - ${name}`,
+                        text: cleanText
+                    });
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        fallbackCopy(cleanText);
+                    }
+                }
+            } else {
+                fallbackCopy(cleanText);
+            }
         });
+
+        function fallbackCopy(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert("Report copied to your clipboard!");
+            }).catch(err => {
+                alert("Failed to copy text.");
+            });
+        }
 
         async function runVedicAnalysis(base64Data) {
             const loader = document.getElementById('loader');
@@ -840,7 +832,7 @@ CRITICAL INSTRUCTION: Write your ENTIRE response exclusively in the ${targetLang
                     audioBtn.style.display = 'flex';
                     audioBtn.innerHTML = "🔊 Listen";
                     
-                    exportPdfBtn.style.display = 'block';
+                    shareBtn.style.display = 'block'; // Reveal the native share button
                     
                 } else {
                     throw new Error("Invalid payload format received from the matrix.");
