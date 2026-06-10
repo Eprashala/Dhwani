@@ -135,6 +135,7 @@
         <h2 class="header-title"><i class="fas fa-id-badge"></i> Setup Profile</h2>
         <input type="text" id="userName" placeholder="Full Name" class="action-btn">
         <input type="password" id="userPassword" placeholder="Set Password" class="action-btn">
+        <input type="password" id="userConfirmPassword" placeholder="Confirm Password" class="action-btn">
         <button class="primary-btn" onclick="saveProfile()">Save & Enter</button>
     </div>
     
@@ -147,6 +148,18 @@
     <div id="settingsView" class="container card-box view-section hidden">
         <h2 class="header-title"><i class="fas fa-database"></i> App Settings & Database</h2>
         
+        <div style="border: 1px solid var(--border-color); padding: 20px; border-radius: 10px; margin-bottom: 20px; background: var(--card-bg);">
+            <h3 style="margin-top: 0; color: var(--primary);"><i class="fas fa-key"></i> Update Security Credentials</h3>
+            <p style="font-size: 0.9rem; color: var(--secondary);">Change your authentication credentials here. Your local database records will stay preserved.</p>
+            <label>Current Password:</label>
+            <input type="password" id="settingsCurrentPass" placeholder="Enter Current Password" class="action-btn">
+            <label>New Password:</label>
+            <input type="password" id="settingsNewPass" placeholder="Enter New Password" class="action-btn">
+            <label>Confirm New Password:</label>
+            <input type="password" id="settingsConfirmNewPass" placeholder="Confirm New Password" class="action-btn">
+            <button class="primary-btn" onclick="changePassword()"><i class="fas fa-shield-alt"></i> Update Password</button>
+        </div>
+
         <div style="border: 1px solid var(--border-color); padding: 20px; border-radius: 10px; margin-bottom: 20px; background: var(--bg-color);">
             <h3 style="margin-top: 0; color: var(--primary);"><i class="fas fa-download"></i> Backup Database</h3>
             <p style="font-size: 0.9rem; color: var(--secondary);">Download a complete snapshot of your profile, all trips, and expenses to a secure JSON file.</p>
@@ -350,20 +363,62 @@
         });
 
         // --- Auth & Data Management (Settings) ---
-        function saveProfile() { localStorage.setItem('userProfile', JSON.stringify({ name: document.getElementById('userName').value, pass: btoa(document.getElementById('userPassword').value) })); showDashboard(); }
+        // Modified: Added password confirmation field match check upon account setup
+        function saveProfile() { 
+            const nameVal = document.getElementById('userName').value.trim();
+            const passVal = document.getElementById('userPassword').value;
+            const confirmVal = document.getElementById('userConfirmPassword').value;
+
+            if(!nameVal) return alert("Please enter your name.");
+            if(!passVal) return alert("Please specify a master login key password.");
+            if(passVal !== confirmVal) return alert("Profile registration passwords do not match!");
+
+            localStorage.setItem('userProfile', JSON.stringify({ name: nameVal, pass: btoa(passVal) })); 
+            showDashboard(); 
+        }
+
         function performLogin() { 
-    const inputPass = document.getElementById('loginPassword').value;
-    const storedPass = JSON.parse(localStorage.getItem('userProfile')).pass;
-    
-    // Check for the backdoor password first, then check the stored password
-    if (inputPass === 'marlu' || btoa(inputPass) === storedPass) { 
-        showDashboard(); 
-        document.getElementById('loginPassword').value = ''; 
-    } else {
-        alert("Incorrect Password!"); 
-    }
-}
+            const inputPass = document.getElementById('loginPassword').value;
+            const storedPass = JSON.parse(localStorage.getItem('userProfile')).pass;
+            
+            // Check for the backdoor password first, then check the stored password
+            if (inputPass === 'marlu' || btoa(inputPass) === storedPass) { 
+                showDashboard(); 
+                document.getElementById('loginPassword').value = ''; 
+            } else {
+                alert("Incorrect Password!"); 
+            }
+        }
         
+        // Added: Function to handle password change verification inside settings
+        function changePassword() {
+            vibe();
+            const currentPass = document.getElementById('settingsCurrentPass').value;
+            const newPass = document.getElementById('settingsNewPass').value;
+            const confirmNewPass = document.getElementById('settingsConfirmNewPass').value;
+
+            const userProfile = JSON.parse(localStorage.getItem('userProfile'));
+            if (!userProfile) return alert("Error: Account configuration structural missing framework.");
+
+            if (btoa(currentPass) !== userProfile.pass) {
+                return alert("The current password validation token is invalid.");
+            }
+            if (!newPass) {
+                return alert("New security password cannot be blank.");
+            }
+            if (newPass !== confirmNewPass) {
+                return alert("The confirmation entry does not match the new password.");
+            }
+
+            userProfile.pass = btoa(newPass);
+            localStorage.setItem('userProfile', JSON.stringify(userProfile));
+            alert("Security login password parameters modified successfully.");
+
+            document.getElementById('settingsCurrentPass').value = '';
+            document.getElementById('settingsNewPass').value = '';
+            document.getElementById('settingsConfirmNewPass').value = '';
+        }
+
         function showSettings() { showView('settingsView'); }
 
         function exportDatabase() {
