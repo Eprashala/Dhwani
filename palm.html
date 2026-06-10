@@ -146,6 +146,24 @@
             object-fit: cover;
         }
 
+        /* NEW FLASH BUTTON STYLES */
+        .torch-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 14px;
+            z-index: 10;
+            cursor: pointer;
+            width: auto;
+            margin-top: 0;
+            display: none; /* Hidden by default until capability is checked */
+        }
+
         .hand-guide-overlay {
             position: absolute;
             top: 0;
@@ -288,6 +306,8 @@
     <div id="handInstruction" style="display: none;"></div>
 
     <div class="camera-container" id="cameraContainer">
+        <button id="torchBtn" class="torch-btn">🔦 Flash: OFF</button>
+        
         <video id="videoFeed" autoplay playsinline></video>
         
         <div class="hand-guide-overlay" id="handGuide">
@@ -342,6 +362,9 @@
         let firstHand = "", secondHand = "", fullReadingContext = ""; 
         let hand1Resolved = false, hand2Resolved = false;
         let rawText1 = "", rawText2 = "";
+        
+        // NEW TORCH STATE VARIABLE
+        let isTorchOn = false;
 
         const setupSection = document.getElementById('setupSection');
         const userLang = document.getElementById('userLang');
@@ -357,6 +380,7 @@
         const handGuide = document.getElementById('handGuide');
         const scannerLine = document.getElementById('scannerLine');
         const captureCanvas = document.getElementById('captureCanvas');
+        const torchBtn = document.getElementById('torchBtn'); // NEW DOM REFERENCE
         const ctx = captureCanvas.getContext('2d');
 
         const resultsSection = document.getElementById('resultsSection');
@@ -409,6 +433,20 @@
                 stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
                 videoFeed.srcObject = stream;
                 
+                // NEW TORCH CAPABILITY CHECK
+                const track = stream.getVideoTracks()[0];
+                // Wait briefly for capabilities to populate in some browsers
+                setTimeout(() => {
+                    const capabilities = track.getCapabilities();
+                    if (capabilities.torch) {
+                        torchBtn.style.display = 'block';
+                        isTorchOn = false;
+                        torchBtn.innerText = "🔦 Flash: OFF";
+                    } else {
+                        torchBtn.style.display = 'none';
+                    }
+                }, 500);
+                
                 setupSection.style.display = 'none';
                 cameraContainer.style.display = 'block';
                 resultsSection.style.display = 'flex';
@@ -417,6 +455,20 @@
             } catch (err) { alert("Unable to access rear camera. Please verify permissions."); }
         }
 
+        // NEW TORCH EVENT LISTENER
+        torchBtn.addEventListener('click', async () => {
+            if (!stream) return;
+            const track = stream.getVideoTracks()[0];
+            try {
+                isTorchOn = !isTorchOn;
+                await track.applyConstraints({ advanced: [{ torch: isTorchOn }] });
+                torchBtn.innerText = isTorchOn ? "🔦 Flash: ON" : "🔦 Flash: OFF";
+            } catch (err) {
+                console.error("Torch constraint failed", err);
+                isTorchOn = !isTorchOn; // Revert state if failed
+            }
+        });
+
         function setupStage1() {
             scanStage = 1;
             handInstruction.style.display = 'block';
@@ -424,7 +476,6 @@
             document.getElementById('stage1Title').innerText = firstHand;
             document.getElementById('stage2Title').innerText = secondHand;
 
-            // Proper orientation logic
             if (firstHand === "Left") handGuide.classList.remove('flipped');
             else handGuide.classList.add('flipped');
 
@@ -438,7 +489,6 @@
             scanStage = 2;
             handInstruction.innerText = `Step 2: Now, align your ${secondHand} Hand AND wrist within the guide.`;
             
-            // Proper orientation logic
             if (secondHand === "Left") handGuide.classList.remove('flipped');
             else handGuide.classList.add('flipped');
 
@@ -480,6 +530,7 @@
                     
                     cameraContainer.style.display = 'none';
                     actionBtn.style.display = 'none';
+                    torchBtn.style.display = 'none'; // NEW: Hide torch button when camera closes
                     handInstruction.innerText = "Processing Palm Inscriptions...";
                     
                     const base64Str = dataUrl.split(',')[1];
@@ -506,7 +557,6 @@
 
             let karmicContext = sex === "Male" ? (currentHand === "Left" ? "Prarabdha Karma" : "Agami Karma") : (currentHand === "Right" ? "Prarabdha Karma" : "Agami Karma");
 
-            // Fully upgraded prompt for deep Vedic accuracy
             const systemPrompt = `Act as an expert Vedic Palmist. My name is ${name}. I am a ${age}-year-old ${sex}. Analyze my ${currentHand} hand (${karmicContext}).
             CRITICAL SYSTEM INSTRUCTIONS:
             1. IMAGE VALIDATION: If the image is blurry, fails to exhibit a clear human palm, or cuts off the wrist, you MUST fail immediately by responding with exactly "ERROR_RETAKE:" followed by a short reason.
@@ -574,7 +624,12 @@
                 handInstruction.innerText = "Vedic Diagnostics Compiled.";
                 qaSection.style.display = 'flex';
                 sharePdfBtn.style.display = 'block';
-                if (stream) stream.getTracks().forEach(track => track.stop());
+                if (stream) {
+                    // NEW: Ensure torch turns off completely when closing the stream
+                    const track = stream.getVideoTracks()[0];
+                    if(isTorchOn) track.applyConstraints({ advanced: [{ torch: false }] }).catch(()=>console.log("Torch auto-off bypass"));
+                    stream.getTracks().forEach(t => t.stop());
+                }
             }
         }
 
