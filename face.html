@@ -355,8 +355,14 @@
             display: flex; flex-direction: column; gap: 1rem;
         }
 
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+        @media print {
+            body { background: white; color: black; padding: 0; margin: 0; }
+            header, .setup-container, .workspace-card, .floating-action, .audio-btn { display: none !important; }
+            .report-card { border: none; background: transparent; padding: 0; display: block;}
+            .report-text h2, .report-text h3 { color: black; border-bottom: 1px solid #ccc; }
+            .report-text { color: black; }
+            .captured-display { border: 1px solid #ccc; box-shadow: none; max-width: 250px;}
+        }
     </style>
 </head>
 <body>
@@ -501,7 +507,7 @@
             if (localStorage.getItem('user_api_key')) {
                 document.getElementById('apiKeyInput').value = localStorage.getItem('user_api_key');
             }
-            initCanvasDimensions();
+            // Canvas init removed from here. It is moved inside the 'initBtn' click listener.
             setupInteractionListeners();
         });
 
@@ -548,6 +554,10 @@
             setupSection.style.display = 'none';
             mainWorkspace.style.display = 'flex';
             
+            // FIX: Initialize canvas dimensions AFTER the workspace is set to flex and visible.
+            // This guarantees clientWidth/Height are greater than 0.
+            initCanvasDimensions();
+            
             startCamera('user');
         });
 
@@ -592,6 +602,9 @@
                 activeImage.src = e.target.result;
             }
             reader.readAsDataURL(file);
+            
+            // Reset input so the user can upload the same image again if needed
+            event.target.value = '';
         }
 
         function setupInteractionListeners() {
