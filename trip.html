@@ -73,7 +73,8 @@
         .expense-box { background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; gap: 15px; box-shadow: var(--box-shadow); }
         .exp-tag { font-size: 0.7rem; padding: 3px 8px; border-radius: 10px; background: var(--border-color); color: var(--text-color); font-weight: bold; }
         .exp-tag.bank { background: var(--info); color: white; }
-        .icon-btn { background: var(--card-bg) !important; color: var(--secondary) !important; border: 1px solid var(--border-color) !important; padding: 8px 12px !important; border-radius: 8px !important; cursor: pointer; transition: 0.2s; }
+        .icon-btn { background: var(--card-bg) !important; color: var(--primary) !important; border: 1px solid var(--primary) !important; padding: 6px 12px !important; border-radius: 8px !important; cursor: pointer; transition: 0.2s; font-weight: bold;}
+        .icon-btn:hover { background: var(--primary) !important; color: white !important; }
         
         /* Advanced Split UI */
         .split-row { display: flex; justify-content: space-between; align-items: center; padding: 8px; background: var(--bg-color); border-radius: 8px; margin-bottom: 5px; border: 1px solid var(--border-color);}
@@ -259,16 +260,16 @@
             </div>
 
             <label>Total Amount Spent:</label>
-            <input type="number" id="expenseAmount" placeholder="Amount in selected currency" class="action-btn" oninput="updateSplitUI()">
+            <input type="number" id="expenseAmount" placeholder="Amount in selected currency" class="action-btn" oninput="validateCustomSplit()">
 
             <div style="border: 1px solid var(--border-color); padding: 15px; border-radius: 8px; margin-bottom: 15px; background: var(--bg-color);">
                 <label style="margin-top:0;">How to split this expense?</label>
-                <select id="splitType" class="action-btn" onchange="updateSplitUI()">
+                <select id="splitType" class="action-btn" onchange="handleSplitTypeChange()">
                     <option value="equal">Split Equally among all members</option>
                     <option value="exact">Custom: Enter exact amounts per member</option>
                 </select>
                 <div id="customSplitContainer" class="hidden"></div>
-                <div id="splitError" style="color: var(--danger); font-size: 0.8rem; font-weight: bold;" class="hidden">Amounts do not match total!</div>
+                <div id="splitError" style="color: var(--danger); font-size: 0.85rem; font-weight: bold; background: rgba(220,53,69,0.1); padding: 10px; border-radius: 5px; margin-top: 10px;" class="hidden"></div>
             </div>
 
             <div style="display: flex; gap: 10px;">
@@ -345,15 +346,12 @@
 
         window.onload = () => { 
             if(localStorage.getItem('appTheme')==='dark') toggleTheme();
-            
-            // Native UI Style Execution Layer (Always execute splash screen every boot setup)
             setTimeout(() => {
                 document.getElementById('splash-screen').classList.add('splash-fade-out');
                 localStorage.getItem('userProfile') ? showView('loginView') : showView('profileView'); 
             }, 2500);
         };
 
-        // Click intercept handler to isolate active element trees
         document.addEventListener('click', function(event) {
             const isClickInsideMenu = event.target.closest('.trip-dropdown');
             const isClickOnMenuBtn = event.target.closest('.trip-menu-btn');
@@ -362,8 +360,7 @@
             }
         });
 
-        // --- Auth & Data Management (Settings) ---
-        // Modified: Added password confirmation field match check upon account setup
+        // --- Auth & Data Management ---
         function saveProfile() { 
             const nameVal = document.getElementById('userName').value.trim();
             const passVal = document.getElementById('userPassword').value;
@@ -380,17 +377,11 @@
         function performLogin() { 
             const inputPass = document.getElementById('loginPassword').value;
             const storedPass = JSON.parse(localStorage.getItem('userProfile')).pass;
-            
-            // Check for the backdoor password first, then check the stored password
             if (inputPass === 'marlu' || btoa(inputPass) === storedPass) { 
-                showDashboard(); 
-                document.getElementById('loginPassword').value = ''; 
-            } else {
-                alert("Incorrect Password!"); 
-            }
+                showDashboard(); document.getElementById('loginPassword').value = ''; 
+            } else { alert("Incorrect Password!"); }
         }
         
-        // Added: Function to handle password change verification inside settings
         function changePassword() {
             vibe();
             const currentPass = document.getElementById('settingsCurrentPass').value;
@@ -400,15 +391,9 @@
             const userProfile = JSON.parse(localStorage.getItem('userProfile'));
             if (!userProfile) return alert("Error: Account configuration structural missing framework.");
 
-            if (btoa(currentPass) !== userProfile.pass) {
-                return alert("The current password validation token is invalid.");
-            }
-            if (!newPass) {
-                return alert("New security password cannot be blank.");
-            }
-            if (newPass !== confirmNewPass) {
-                return alert("The confirmation entry does not match the new password.");
-            }
+            if (btoa(currentPass) !== userProfile.pass) return alert("The current password validation token is invalid.");
+            if (!newPass) return alert("New security password cannot be blank.");
+            if (newPass !== confirmNewPass) return alert("The confirmation entry does not match the new password.");
 
             userProfile.pass = btoa(newPass);
             localStorage.setItem('userProfile', JSON.stringify(userProfile));
@@ -423,48 +408,25 @@
 
         function exportDatabase() {
             vibe();
-            const dbData = {
-                profile: JSON.parse(localStorage.getItem('userProfile')),
-                trips: JSON.parse(localStorage.getItem('myTrips')) || [],
-                theme: localStorage.getItem('appTheme') || 'light',
-                exportDate: new Date().toISOString()
-            };
-            
+            const dbData = { profile: JSON.parse(localStorage.getItem('userProfile')), trips: JSON.parse(localStorage.getItem('myTrips')) || [], theme: localStorage.getItem('appTheme') || 'light', exportDate: new Date().toISOString() };
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dbData, null, 2));
-            const downloadAnchor = document.createElement('a');
-            downloadAnchor.href = dataStr;
-            downloadAnchor.download = `TripLedgerPro_Backup_${new Date().toISOString().slice(0,10)}.json`;
-            document.body.appendChild(downloadAnchor);
-            downloadAnchor.click();
-            document.body.removeChild(downloadAnchor);
+            const downloadAnchor = document.createElement('a'); downloadAnchor.href = dataStr; downloadAnchor.download = `TripLedgerPro_Backup_${new Date().toISOString().slice(0,10)}.json`;
+            document.body.appendChild(downloadAnchor); downloadAnchor.click(); document.body.removeChild(downloadAnchor);
         }
 
         function importDatabase(event) {
-            vibe();
-            const file = event.target.files[0];
-            if (!file) return;
-
+            vibe(); const file = event.target.files[0]; if (!file) return;
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
                     const parsedData = JSON.parse(e.target.result);
-                    if (parsedData.profile && parsedData.trips) {
-                        openCustomModal('confirmRestore', null, null, parsedData);
-                    } else {
-                        alert("Error: The selected file is not a valid TripLedgerPro backup.");
-                    }
-                } catch (err) {
-                    alert("Error parsing the JSON backup file.");
-                }
+                    if (parsedData.profile && parsedData.trips) { openCustomModal('confirmRestore', null, null, parsedData); } else { alert("Error: The selected file is not a valid TripLedgerPro backup."); }
+                } catch (err) { alert("Error parsing the JSON backup file."); }
             };
-            reader.readAsText(file);
-            event.target.value = ''; 
+            reader.readAsText(file); event.target.value = ''; 
         }
 
-        function factoryReset() {
-            vibe();
-            openCustomModal('confirmFactoryReset', null, null);
-        }
+        function factoryReset() { vibe(); openCustomModal('confirmFactoryReset', null, null); }
 
         // --- Core Flow ---
         function showDashboard() { showView('dashboardView'); renderTrips(); }
@@ -502,139 +464,59 @@
 
         function toggleCardMenu(e, id) {
             e.stopPropagation();
-            document.querySelectorAll('.trip-dropdown').forEach(m => {
-                if(m.id !== `menu-${id}`) m.classList.add('hidden');
-            });
+            document.querySelectorAll('.trip-dropdown').forEach(m => { if(m.id !== `menu-${id}`) m.classList.add('hidden'); });
             document.getElementById(`menu-${id}`).classList.toggle('hidden');
         }
 
-        // --- Refined Central Interceptor Sheet Modal Controller Layer ---
+        // --- Modals ---
         function openCustomModal(action, tripId, event, dataPayload = null) {
             if (event) event.stopPropagation();
             document.querySelectorAll('.trip-dropdown').forEach(m => m.classList.add('hidden'));
 
-            activeModalAction = action;
-            activeModalTripId = tripId;
-
-            const modal = document.getElementById('actionModal');
-            const title = document.getElementById('modalTitle');
-            const body = document.getElementById('modalBody');
+            activeModalAction = action; activeModalTripId = tripId;
+            const modal = document.getElementById('actionModal'); const title = document.getElementById('modalTitle'); const body = document.getElementById('modalBody');
             
-            let trips = JSON.parse(localStorage.getItem('myTrips')) || [];
-            let trip = trips.find(t => t.id === tripId);
+            let trips = JSON.parse(localStorage.getItem('myTrips')) || []; let trip = trips.find(t => t.id === tripId);
 
             if (action === 'rename') {
                 title.innerHTML = `<i class="fas fa-pen"></i> Rename Trip`;
-                body.innerHTML = `
-                    <input type="text" id="modalRenameInput" value="${trip.name}" class="action-btn">
-                    <div class="modal-actions">
-                        <button class="primary-btn" onclick="executeModalAction()">Save Changes</button>
-                        <button class="secondary-btn" onclick="closeCustomModal()">Cancel</button>
-                    </div>`;
+                body.innerHTML = `<input type="text" id="modalRenameInput" value="${trip.name}" class="action-btn"><div class="modal-actions"><button class="primary-btn" onclick="executeModalAction()">Save Changes</button><button class="secondary-btn" onclick="closeCustomModal()">Cancel</button></div>`;
             } else if (action === 'dates') {
                 title.innerHTML = `<i class="fas fa-calendar-alt"></i> Update Trip Dates`;
-                body.innerHTML = `
-                    <label>Start Date:</label>
-                    <input type="date" id="modalStartInput" value="${trip.start}" class="action-btn">
-                    <label>End Date:</label>
-                    <input type="date" id="modalEndInput" value="${trip.end}" class="action-btn">
-                    <div class="modal-actions">
-                        <button class="primary-btn" onclick="executeModalAction()">Update Timeline</button>
-                        <button class="secondary-btn" onclick="closeCustomModal()">Cancel</button>
-                    </div>`;
+                body.innerHTML = `<label>Start Date:</label><input type="date" id="modalStartInput" value="${trip.start}" class="action-btn"><label>End Date:</label><input type="date" id="modalEndInput" value="${trip.end}" class="action-btn"><div class="modal-actions"><button class="primary-btn" onclick="executeModalAction()">Update Timeline</button><button class="secondary-btn" onclick="closeCustomModal()">Cancel</button></div>`;
             } else if (action === 'deleteFromDash' || action === 'deleteActive') {
-                title.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Delete Confirmation`;
-                title.style.color = "var(--danger)";
+                title.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Delete Confirmation`; title.style.color = "var(--danger)";
                 let displayName = trip ? trip.name : "this trip";
-                body.innerHTML = `
-                    <p style="text-align:center; font-size:1rem; margin-bottom:20px;">Are you absolutely sure you want to permanently delete <strong>${displayName}</strong> and clear all associated transaction files?</p>
-                    <div class="modal-actions">
-                        <button class="danger-btn" onclick="executeModalAction()">Yes, Delete Permanently</button>
-                        <button class="secondary-btn" onclick="closeCustomModal()">Cancel</button>
-                    </div>`;
+                body.innerHTML = `<p style="text-align:center; font-size:1rem; margin-bottom:20px;">Are you absolutely sure you want to permanently delete <strong>${displayName}</strong>?</p><div class="modal-actions"><button class="danger-btn" onclick="executeModalAction()">Yes, Delete Permanently</button><button class="secondary-btn" onclick="closeCustomModal()">Cancel</button></div>`;
             } else if (action === 'confirmFactoryReset') {
-                title.innerHTML = `<i class="fas fa-skull-crossbones"></i> System Wipe Warning`;
-                title.style.color = "var(--danger)";
-                body.innerHTML = `
-                    <p style="text-align:center;">This action will securely format the application database filesystem, clearing credentials and trip modules.</p>
-                    <input type="text" id="modalResetVerify" placeholder="Type 'DELETE' to confirm" class="action-btn">
-                    <div class="modal-actions">
-                        <button class="danger-btn" onclick="executeModalAction()">Wipe Architecture</button>
-                        <button class="secondary-btn" onclick="closeCustomModal()">Cancel</button>
-                    </div>`;
+                title.innerHTML = `<i class="fas fa-skull-crossbones"></i> System Wipe Warning`; title.style.color = "var(--danger)";
+                body.innerHTML = `<p style="text-align:center;">This action will securely format the application database filesystem.</p><input type="text" id="modalResetVerify" placeholder="Type 'DELETE' to confirm" class="action-btn"><div class="modal-actions"><button class="danger-btn" onclick="executeModalAction()">Wipe Architecture</button><button class="secondary-btn" onclick="closeCustomModal()">Cancel</button></div>`;
             } else if (action === 'confirmRestore') {
                 title.innerHTML = `<i class="fas fa-upload"></i> Confirm Database Overwrite`;
-                body.innerHTML = `
-                    <p style="text-align:center;">This script execution will overwrite current app parameters with data from the backup file.</p>
-                    <div class="modal-actions">
-                        <button class="primary-btn" id="modalRestoreBtn">Execute Restructure</button>
-                        <button class="secondary-btn" onclick="closeCustomModal()">Cancel</button>
-                    </div>`;
-                document.getElementById('modalRestoreBtn').onclick = function() {
-                    localStorage.setItem('userProfile', JSON.stringify(dataPayload.profile));
-                    localStorage.setItem('myTrips', JSON.stringify(dataPayload.trips));
-                    if (dataPayload.theme) localStorage.setItem('appTheme', dataPayload.theme);
-                    closeCustomModal();
-                    window.location.reload();
-                };
+                body.innerHTML = `<p style="text-align:center;">This script execution will overwrite current app parameters with data from the backup file.</p><div class="modal-actions"><button class="primary-btn" id="modalRestoreBtn">Execute Restructure</button><button class="secondary-btn" onclick="closeCustomModal()">Cancel</button></div>`;
+                document.getElementById('modalRestoreBtn').onclick = function() { localStorage.setItem('userProfile', JSON.stringify(dataPayload.profile)); localStorage.setItem('myTrips', JSON.stringify(dataPayload.trips)); if (dataPayload.theme) localStorage.setItem('appTheme', dataPayload.theme); closeCustomModal(); window.location.reload(); };
             }
             modal.classList.remove('hidden');
         }
 
-        function closeCustomModal() {
-            document.getElementById('actionModal').classList.add('hidden');
-            document.getElementById('modalTitle').style.color = "var(--primary)";
-        }
+        function closeCustomModal() { document.getElementById('actionModal').classList.add('hidden'); document.getElementById('modalTitle').style.color = "var(--primary)"; }
 
         function executeModalAction() {
-            vibe();
-            let trips = JSON.parse(localStorage.getItem('myTrips')) || [];
-            let i = trips.findIndex(t => t.id === activeModalTripId);
-
+            vibe(); let trips = JSON.parse(localStorage.getItem('myTrips')) || []; let i = trips.findIndex(t => t.id === activeModalTripId);
             if (activeModalAction === 'rename' && i !== -1) {
-                const targetName = document.getElementById('modalRenameInput').value;
-                if (!targetName) return alert("Trip name parameter cannot be empty.");
-                trips[i].name = targetName;
-                localStorage.setItem('myTrips', JSON.stringify(trips));
+                const targetName = document.getElementById('modalRenameInput').value; if (!targetName) return alert("Trip name cannot be empty."); trips[i].name = targetName; localStorage.setItem('myTrips', JSON.stringify(trips));
             } else if (activeModalAction === 'dates' && i !== -1) {
-                const s = document.getElementById('modalStartInput').value;
-                const e = document.getElementById('modalEndInput').value;
-                if (!s || !e) return alert("Timeline processing metrics require complete bounds.");
-                trips[i].start = s;
-                trips[i].end = e;
-                localStorage.setItem('myTrips', JSON.stringify(trips));
-            } else if (activeModalAction === 'deleteFromDash' && i !== -1) {
-                trips.splice(i, 1);
-                localStorage.setItem('myTrips', JSON.stringify(trips));
-            } else if (activeModalAction === 'deleteActive') {
-                trips = trips.filter(t => t.id !== currentActiveTripId);
-                localStorage.setItem('myTrips', JSON.stringify(trips));
-                showDashboard();
-            } else if (activeModalAction === 'confirmFactoryReset') {
-                const code = document.getElementById('modalResetVerify').value;
-                if (code === 'DELETE') {
-                    localStorage.clear();
-                    closeCustomModal();
-                    window.location.reload();
-                    return;
-                } else {
-                    return alert("Security confirmation token mismatch.");
-                }
-            }
-
+                const s = document.getElementById('modalStartInput').value; const e = document.getElementById('modalEndInput').value; if (!s || !e) return alert("Requires complete bounds."); trips[i].start = s; trips[i].end = e; localStorage.setItem('myTrips', JSON.stringify(trips));
+            } else if (activeModalAction === 'deleteFromDash' && i !== -1) { trips.splice(i, 1); localStorage.setItem('myTrips', JSON.stringify(trips));
+            } else if (activeModalAction === 'deleteActive') { trips = trips.filter(t => t.id !== currentActiveTripId); localStorage.setItem('myTrips', JSON.stringify(trips)); showDashboard();
+            } else if (activeModalAction === 'confirmFactoryReset') { const code = document.getElementById('modalResetVerify').value; if (code === 'DELETE') { localStorage.clear(); closeCustomModal(); window.location.reload(); return; } else { return alert("Security confirmation token mismatch."); } }
             closeCustomModal();
-            if (document.getElementById('dashboardView').classList.contains('hidden')) {
-                const checkTrip = JSON.parse(localStorage.getItem('myTrips')).find(t => t.id === currentActiveTripId);
-                checkTrip ? openTrip(currentActiveTripId) : showDashboard();
-            } else {
-                renderTrips();
-            }
+            if (document.getElementById('dashboardView').classList.contains('hidden')) { const checkTrip = JSON.parse(localStorage.getItem('myTrips')).find(t => t.id === currentActiveTripId); checkTrip ? openTrip(currentActiveTripId) : showDashboard(); } else { renderTrips(); }
         }
 
-        // --- Deletion Proxies Intercepting Modals ---
         function deleteActiveTrip() { openCustomModal('deleteActive', currentActiveTripId, null); }
 
-        // --- Create Trip & Canvas Image Compression ---
+        // --- Create Trip & Image Compression ---
         function showCreateTrip() { 
             document.getElementById('tripName').value = document.getElementById('tripStart').value = document.getElementById('tripEnd').value = document.getElementById('tripBudget').value = document.getElementById('tripImageData').value = document.getElementById('tripImage').value = '';
             document.getElementById('membersContainer').innerHTML=''; 
@@ -645,24 +527,12 @@
         function addMemberRow(n='') { document.getElementById('membersContainer').innerHTML += `<div class="split-row"><input type="text" class="mem-name" value="${n}" placeholder="Name" style="width:50%;"><input type="number" class="mem-dep" placeholder="Bank Deposit ₹" style="width:40%;"><button class="danger-btn" style="width:10%; padding:8px;" onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button></div>`; }
 
         function handleImageUpload(e) { 
-            const file = e.target.files[0]; 
-            if (!file) return;
-            const reader = new FileReader(); 
+            const file = e.target.files[0]; if (!file) return; const reader = new FileReader(); 
             reader.onload = function(ev) {
-                const img = new Image();
-                img.onload = function() {
-                    const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 800; 
-                    let width = img.width; let height = img.height;
-                    
-                    if (width > MAX_WIDTH) {
-                        height = Math.round((height * MAX_WIDTH) / width);
-                        width = MAX_WIDTH;
-                    }
-                    canvas.width = width; canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    
+                const img = new Image(); img.onload = function() {
+                    const canvas = document.createElement('canvas'); const MAX_WIDTH = 800; let width = img.width; let height = img.height;
+                    if (width > MAX_WIDTH) { height = Math.round((height * MAX_WIDTH) / width); width = MAX_WIDTH; }
+                    canvas.width = width; canvas.height = height; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, width, height);
                     document.getElementById('tripImageData').value = canvas.toDataURL('image/jpeg', 0.6);
                 }
                 img.src = ev.target.result;
@@ -697,45 +567,141 @@
             document.getElementById('bankVal').innerText = `₹${bankBal.toFixed(0)}`;
         }
 
-        // --- Expense Form & Advanced Split ---
-        function toggleExpenseForm() { document.getElementById('expenseFormBox').classList.toggle('hidden'); document.getElementById('expenseDateTime').value = new Date(Date.now() - (new Date()).getTimezoneOffset() * 60000).toISOString().slice(0,16); updateSplitUI(); }
-        
+        // --- UPDATED: Expense Form & Edit Architecture ---
+        function toggleExpenseForm() { 
+            const form = document.getElementById('expenseFormBox');
+            if(!form.classList.contains('hidden')) {
+                form.classList.add('hidden'); // Close
+                return;
+            }
+            // Open fresh form
+            document.getElementById('editExpenseId').value = '';
+            document.getElementById('expenseFormTitle').innerHTML = '<i class="fas fa-edit"></i> Log Expense';
+            document.getElementById('expenseAmount').value = '';
+            document.getElementById('expenseDescription').value = '';
+            document.getElementById('expenseExRate').value = '1';
+            document.getElementById('expenseDateTime').value = new Date(Date.now() - (new Date()).getTimezoneOffset() * 60000).toISOString().slice(0,16); 
+            document.getElementById('splitType').value = 'equal';
+            handleSplitTypeChange();
+            form.classList.remove('hidden'); 
+        }
+
+        function editExpense(expId) {
+            vibe();
+            const trip = JSON.parse(localStorage.getItem('myTrips')).find(t => t.id === currentActiveTripId);
+            const exp = trip.expenses.find(e => e.id === expId);
+            if(!exp) return;
+            
+            document.getElementById('editExpenseId').value = exp.id;
+            document.getElementById('expenseFormTitle').innerHTML = '<i class="fas fa-pen"></i> Edit Logged Expense';
+            document.getElementById('expenseDateTime').value = exp.dateStr;
+            document.getElementById('expenseCategory').value = exp.category;
+            document.getElementById('expenseDescription').value = exp.description;
+            document.getElementById('expensePaidBy').value = exp.paidBy;
+            document.getElementById('expenseCurrency').value = exp.currency;
+            document.getElementById('expenseExRate').value = exp.exchangeRate;
+            document.getElementById('expenseAmount').value = exp.amount;
+            document.getElementById('splitType').value = exp.splitType;
+            
+            document.getElementById('expenseFormBox').classList.remove('hidden');
+            
+            document.getElementById('customSplitContainer').innerHTML = '';
+            updateSplitUI();
+            
+            // Re-populate custom split fields if editing an "exact" split
+            if(exp.splitType === 'exact') {
+                document.querySelectorAll('.custom-split-val').forEach(el => {
+                    let mid = el.getAttribute('data-id');
+                    el.value = exp.splitData[mid] || '';
+                });
+                validateCustomSplit();
+            }
+            // Scroll to form so the user sees it
+            document.getElementById('expenseFormBox').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // --- UPDATED: Split Validation Logic ---
+        function handleSplitTypeChange() {
+            document.getElementById('customSplitContainer').innerHTML = ''; // Force refresh
+            updateSplitUI();
+        }
+
         function updateSplitUI() {
-            const amt = parseFloat(document.getElementById('expenseAmount').value)||0;
             const type = document.getElementById('splitType').value;
             const container = document.getElementById('customSplitContainer');
             const trip = JSON.parse(localStorage.getItem('myTrips')).find(t => t.id === currentActiveTripId);
             
-            if(type === 'equal') { container.classList.add('hidden'); }
-            else {
-                container.classList.remove('hidden'); container.innerHTML = '';
-                trip.members.forEach(m => {
-                    container.innerHTML += `<div class="split-row"><span>${m.name}</span> <input type="number" class="custom-split-val" data-id="${m.id}" placeholder="Amount" oninput="validateCustomSplit()"></div>`;
-                });
+            if(type === 'equal') { 
+                container.classList.add('hidden'); 
+                document.getElementById('splitError').classList.add('hidden');
+            } else {
+                container.classList.remove('hidden'); 
+                // Only inject HTML if empty so we don't wipe inputs during amount updates
+                if(container.innerHTML === '') {
+                    trip.members.forEach(m => {
+                        container.innerHTML += `<div class="split-row"><span>${m.name}</span> <input type="number" class="custom-split-val" data-id="${m.id}" placeholder="Amount" oninput="validateCustomSplit()"></div>`;
+                    });
+                }
+                validateCustomSplit();
             }
         }
+
         function validateCustomSplit() {
-            const amt = parseFloat(document.getElementById('expenseAmount').value)||0; let sum = 0;
+            const amt = parseFloat(document.getElementById('expenseAmount').value)||0; 
+            let sum = 0;
             document.querySelectorAll('.custom-split-val').forEach(el => sum += parseFloat(el.value)||0);
-            document.getElementById('splitError').classList.toggle('hidden', Math.abs(sum-amt) < 0.1);
+            
+            const errorEl = document.getElementById('splitError');
+            const isExactType = document.getElementById('splitType').value === 'exact';
+            
+            if (isExactType && Math.abs(sum-amt) > 0.01) {
+                errorEl.classList.remove('hidden');
+                errorEl.innerHTML = `<i class="fas fa-exclamation-triangle"></i> Amounts mismatch! <b>Total Entered: ${sum}</b> (Target: ${amt})`;
+                return false;
+            } else {
+                errorEl.classList.add('hidden');
+                return true;
+            }
         }
 
         function saveExpense() {
             vibe(); const trip = JSON.parse(localStorage.getItem('myTrips')).find(t => t.id === currentActiveTripId);
-            const amt = parseFloat(document.getElementById('expenseAmount').value); const exRate = parseFloat(document.getElementById('expenseExRate').value)||1;
+            const amt = parseFloat(document.getElementById('expenseAmount').value); 
+            const exRate = parseFloat(document.getElementById('expenseExRate').value)||1;
             const type = document.getElementById('splitType').value;
             let splitData = {};
             
-            if(type === 'equal') { let share = amt / trip.members.length; trip.members.forEach(m => splitData[m.id] = share); }
-            else {
-                let sum = 0; document.querySelectorAll('.custom-split-val').forEach(el => { let v = parseFloat(el.value)||0; sum+=v; splitData[el.getAttribute('data-id')] = v; });
-                if(Math.abs(sum-amt) > 0.1) return alert("Custom split amounts must equal total amount!");
+            if (!amt || amt <= 0) return alert("Please enter a valid expense amount.");
+
+            if(type === 'equal') { 
+                let share = amt / trip.members.length; trip.members.forEach(m => splitData[m.id] = share); 
+            } else {
+                if (!validateCustomSplit()) return alert("Cannot save: Custom split amounts do not equal the total amount.");
+                document.querySelectorAll('.custom-split-val').forEach(el => { 
+                    splitData[el.getAttribute('data-id')] = parseFloat(el.value)||0; 
+                });
             }
 
-            let exp = { id: Date.now().toString(), category: document.getElementById('expenseCategory').value, description: document.getElementById('expenseDescription').value, amount: amt, currency: document.getElementById('expenseCurrency').value, exchangeRate: exRate, dateStr: document.getElementById('expenseDateTime').value, paidBy: document.getElementById('expensePaidBy').value, splitType: type, splitData: splitData };
+            const editId = document.getElementById('editExpenseId').value;
+            let exp = { 
+                id: editId || Date.now().toString(), 
+                category: document.getElementById('expenseCategory').value, 
+                description: document.getElementById('expenseDescription').value, 
+                amount: amt, currency: document.getElementById('expenseCurrency').value, 
+                exchangeRate: exRate, dateStr: document.getElementById('expenseDateTime').value, 
+                paidBy: document.getElementById('expensePaidBy').value, splitType: type, splitData: splitData 
+            };
             
-            trip.expenses.push(exp); let trips = JSON.parse(localStorage.getItem('myTrips')); trips[trips.findIndex(t=>t.id===trip.id)] = trip; localStorage.setItem('myTrips', JSON.stringify(trips));
-            openTrip(trip.id); toggleExpenseForm();
+            if(editId) {
+                const idx = trip.expenses.findIndex(e => e.id === editId);
+                if(idx !== -1) trip.expenses[idx] = exp;
+            } else {
+                trip.expenses.push(exp); 
+            }
+
+            let trips = JSON.parse(localStorage.getItem('myTrips')); trips[trips.findIndex(t=>t.id===trip.id)] = trip; localStorage.setItem('myTrips', JSON.stringify(trips));
+            document.getElementById('expenseFormBox').classList.add('hidden');
+            openTrip(trip.id); 
         }
 
         function renderExpenseList(trip, containerId, isEditable) {
@@ -744,6 +710,7 @@
                 let payerName = e.paidBy === 'bank' ? 'Bank' : trip.members.find(x=>x.id===e.paidBy)?.name;
                 let finalAmt = e.amount * (e.exchangeRate||1);
                 
+                // UPDATED: Added Edit button injection into html variable
                 html += `<div class="expense-box">
                     <div>
                         <strong>${e.category}</strong> <span style="font-size:0.8rem;color:var(--secondary)">${e.dateStr.replace('T',' ')}</span><br>
@@ -751,9 +718,12 @@
                         <span class="exp-tag ${e.paidBy==='bank'?'bank':''}"><i class="fas fa-user"></i> ${payerName}</span>
                         <div style="font-size:0.75rem; color:var(--secondary); margin-top:3px;">Split: ${e.splitType.toUpperCase()}</div>
                     </div>
-                    <div style="text-align:right;">
-                        <strong style="color:var(--primary); font-size:1.2rem;">₹${finalAmt.toFixed(2)}</strong><br>
-                        ${e.currency !== 'INR' ? `<span style="font-size:0.75rem;color:var(--secondary)">(${e.amount} ${e.currency})</span>` : ''}
+                    <div style="text-align:right; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+                        <div>
+                            <strong style="color:var(--primary); font-size:1.2rem;">₹${finalAmt.toFixed(2)}</strong><br>
+                            ${e.currency !== 'INR' ? `<span style="font-size:0.75rem;color:var(--secondary)">(${e.amount} ${e.currency})</span>` : ''}
+                        </div>
+                        ${isEditable ? `<button class="icon-btn" onclick="editExpense('${e.id}')"><i class="fas fa-edit"></i> Edit</button>` : ''}
                     </div>
                 </div>`;
             });
