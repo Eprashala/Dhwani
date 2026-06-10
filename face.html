@@ -1,154 +1,765 @@
-<script>
-    let streamReference = null;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vedic Mukha Samudrika - Absolute Truth</title>
+    <style>
+        :root {
+            --bg-primary: #121214;
+            --bg-surface: #1e1e24;
+            --accent: #f59e0b;
+            --accent-hover: #d97706;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --border: #374151;
+            --error-color: #ff4c4c;
+        }
 
-    async function initializeCamera() {
-        const video = document.getElementById('video-preview');
-        const img = document.getElementById('image-preview');
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 1rem;
+        }
+
+        header {
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 1.5rem;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            color: var(--accent);
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }
+
+        .settings-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            transition: all 0.2s;
+        }
+
+        .settings-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        main {
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .workspace-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .viewport-container {
+            position: relative;
+            width: 100%;
+            max-width: 450px;
+            aspect-ratio: 4/5;
+            background: #000;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            border: 2px solid var(--border);
+            touch-action: none;
+        }
+
+        video, canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .guideline-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+        }
+
+        .guide-oval {
+            position: absolute;
+            top: 10%;
+            left: 15%;
+            width: 70%;
+            height: 75%;
+            border: 2px dashed var(--accent);
+            border-radius: 50% 50% 48% 48% / 60% 60% 40% 40%;
+            opacity: 0.65;
+        }
+
+        .guide-line-h {
+            position: absolute;
+            top: 45%;
+            left: 0;
+            width: 100%;
+            border-top: 1px dotted var(--accent);
+            opacity: 0.5;
+        }
+
+        .guide-line-v {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            height: 100%;
+            border-left: 1px dotted var(--accent);
+            opacity: 0.5;
+        }
+
+        .scanner-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background-color: red;
+            box-shadow: 0 0 15px red, 0 0 30px red;
+            display: none;
+            z-index: 20;
+        }
+
+        @keyframes scanAnimation {
+            0% { top: 0; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+
+        .control-panel {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .row-group {
+            display: flex;
+            justify-content: center;
+            gap: 0.75rem;
+            width: 100%;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            background: var(--border);
+            color: var(--text-main);
+            padding: 0.625rem 1.25rem;
+            border: none;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #000;
+            font-weight: 600;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: var(--accent-hover);
+            box-shadow: 0 0 10px var(--accent);
+        }
+
+        .btn:disabled {
+            background-color: #555;
+            color: #888;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .btn:hover:not(.btn-primary):not(:disabled) {
+            background: #4b5563;
+        }
+
+        .zoom-slider-container {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            width: 100%;
+            max-width: 450px;
+            margin: 0 auto;
+        }
+
+        .zoom-slider {
+            flex: 1;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        select.input-field {
+            cursor: pointer;
+            background-color: rgba(0, 0, 0, 0.3);
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 0.625rem;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            border-radius: 0.375rem;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .report-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        .report-card.active {
+            display: flex;
+        }
+
+        .captured-display {
+            width: 100%;
+            max-width: 300px;
+            border-radius: 0.5rem;
+            border: 2px solid var(--accent);
+            margin-bottom: 1.5rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            display: none;
+        }
+
+        .audio-btn {
+            background-color: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            padding: 8px 16px;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 15px;
+            transition: all 0.2s;
+        }
+
+        .audio-btn:hover {
+            background-color: rgba(245, 158, 11, 0.1);
+        }
+
+        .report-text {
+            line-height: 1.6;
+            color: #e5e7eb;
+            width: 100%;
+        }
+
+        .report-text h2, .report-text h3 {
+            color: var(--accent);
+            margin: 1.25rem 0 0.5rem 0;
+        }
+
+        .report-text p, .report-text ul {
+            margin-bottom: 0.75rem;
+        }
         
-        // Reset display states
-        img.style.display = 'none';
-        video.style.display = 'block';
+        .report-text ul {
+            padding-left: 1.5rem;
+        }
 
-        try {
-            // Stop any existing stream before starting a new one
-            if (streamReference) {
-                streamReference.getTracks().forEach(track => track.stop());
+        .loader {
+            display: none;
+            border: 4px solid var(--border);
+            border-top: 4px solid var(--accent);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 1rem auto;
+        }
+
+        .pulsing-status {
+            animation: pulse 1.5s infinite;
+            color: var(--accent);
+            font-weight: bold;
+            margin-top: 10px;
+            display: none;
+            text-align: center;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.75);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            width: 90%;
+            max-width: 400px;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Vedic Mukha Samudrika</h1>
+        <button class="settings-btn" onclick="toggleModal(true)">
+            ⚙️ Settings
+        </button>
+    </header>
+
+    <main>
+        <div class="workspace-card">
+            <div class="viewport-container" id="viewport">
+                <video id="video" autoplay playsinline muted></video>
+                <canvas id="canvas"></canvas>
+                
+                <div class="guideline-overlay">
+                    <div class="guide-oval"></div>
+                    <div class="guide-line-h"></div>
+                    <div class="guide-line-v"></div>
+                </div>
+
+                <div class="scanner-line" id="scannerLine"></div>
+            </div>
+
+            <div class="zoom-slider-container">
+                <span>🔍 -</span>
+                <input type="range" id="zoomSlider" class="zoom-slider" min="1" max="4" step="0.05" value="1" disabled>
+                <span>+</span>
+            </div>
+
+            <div class="control-panel">
+                <div class="row-group">
+                    <button class="btn" onclick="startCamera('user')">📸 Front Cam</button>
+                    <button class="btn" onclick="startCamera('environment')">📹 Rear Cam</button>
+                    <button class="btn" onclick="document.getElementById('fileInput').click()">📁 Upload</button>
+                    <input type="file" id="fileInput" accept="image/*" style="display: none" onchange="handleFileUpload(event)">
+                </div>
+
+                <div class="row-group" style="margin-top: 0.5rem;">
+                    <select id="userLang" class="input-field" style="max-width: 300px;">
+                        <option value="English">English</option>
+                        <option value="Hindi">Hindi (हिन्दी)</option>
+                        <option value="Bengali">Bengali (বাংলা)</option>
+                        <option value="Telugu">Telugu (తెలుగు)</option>
+                        <option value="Marathi" selected>Marathi (मराठी)</option>
+                        <option value="Tamil">Tamil (தமிழ்)</option>
+                        <option value="Gujarati">Gujarati (ગુજરાતી)</option>
+                        <option value="Kannada">Kannada (ಕನ್ನಡ)</option>
+                        <option value="Malayalam">Malayalam (മലയാളം)</option>
+                        <option value="Odia">Odia (ଓଡ଼ିଆ)</option>
+                        <option value="Punjabi">Punjabi (ਪੰਜਾਬੀ)</option>
+                    </select>
+                </div>
+
+                <div class="row-group">
+                    <button class="btn btn-primary" id="analyzeBtn" onclick="initiateScanSequence()">Deep Face Scan</button>
+                </div>
+            </div>
+            
+            <div class="loader" id="loader"></div>
+            <div class="pulsing-status" id="statusText">Extracting 478 biometric points...</div>
+        </div>
+
+        <div class="report-card" id="reportCard">
+            <img id="capturedDisplay" class="captured-display" alt="Captured Face for Analysis">
+            <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 1rem;">
+                <h2 style="color: var(--accent); margin: 0;">Absolute Samudrika Report</h2>
+                <button class="audio-btn" id="audioBtn" style="display: none;">🔊 Listen</button>
+            </div>
+            <div class="report-text" id="reportTarget"></div>
+        </div>
+    </main>
+
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <h3 style="color: var(--accent)">Personalized API Key</h3>
+            <p style="font-size: 0.875rem; color: var(--text-muted);">
+                Enter your own AI key to bypass server limits and ensure uninterrupted deep readings.
+            </p>
+            <div>
+                <input type="password" id="apiKeyInput" class="input-field" placeholder="AIzaSy...">
+            </div>
+            <div class="row-group" style="justify-content: flex-end; margin-top: 0.5rem;">
+                <button class="btn" onclick="toggleModal(false)">Cancel</button>
+                <button class="btn btn-primary" onclick="saveSettings()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const PROXY_SERVER_URL = "https://eprashala.pythonanywhere.com/api/chat";
+        
+        // Comprehensive BCP-47 Mapping for the SpeechSynthesis API
+        const langMap = { 
+            "English": "en-IN", "Hindi": "hi-IN", "Bengali": "bn-IN", 
+            "Telugu": "te-IN", "Marathi": "mr-IN", "Tamil": "ta-IN", 
+            "Gujarati": "gu-IN", "Kannada": "kn-IN", "Malayalam": "ml-IN", 
+            "Odia": "or-IN", "Punjabi": "pa-IN" 
+        };
+
+        let currentStream = null;
+        let activeImage = null;
+        let zoom = 1, offsetX = 0, offsetY = 0, isDragging = false, startX, startY;
+        
+        // TTS State variables
+        let currentSynthUtterance = null;
+        let isSpeaking = false;
+        let rawReportText = "";
+
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const zoomSlider = document.getElementById('zoomSlider');
+        const viewport = document.getElementById('viewport');
+        const scannerLine = document.getElementById('scannerLine');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const audioBtn = document.getElementById('audioBtn');
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('user_api_key')) {
+                document.getElementById('apiKeyInput').value = localStorage.getItem('user_api_key');
             }
+            initCanvasDimensions();
+            setupInteractionListeners();
+            startCamera('user');
+        });
 
-            // Use 'ideal' so it doesn't fail if exact 720p isn't supported by the webcam
-            streamReference = await navigator.mediaDevices.getUserMedia({ 
-                video: { 
-                    width: { ideal: 1280 }, 
-                    height: { ideal: 720 }, 
-                    facingMode: "user" 
-                } 
+        function initCanvasDimensions() {
+            canvas.width = viewport.clientWidth * window.devicePixelRatio;
+            canvas.height = viewport.clientHeight * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        }
+
+        async function startCamera(mode) {
+            if (currentStream) { currentStream.getTracks().forEach(track => track.stop()); }
+            activeImage = null;
+            ctx.clearRect(0, 0, canvas.width, canvas.height); 
+            video.style.display = 'block';
+            zoomSlider.disabled = true;
+
+            try {
+                const constraints = { video: { facingMode: mode, width: { ideal: 1080 }, height: { ideal: 1350 } } };
+                currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = currentStream;
+            } catch (err) { console.warn("Camera init failed:", err.message); }
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+            }
+            video.style.display = 'none';
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                activeImage = new Image();
+                activeImage.onload = function() {
+                    zoom = 1; offsetX = 0; offsetY = 0;
+                    zoomSlider.value = 1; zoomSlider.disabled = false;
+                    renderCanvasTransformations();
+                }
+                activeImage.src = e.target.result;
+            }
+            reader.readAsDataURL(file);
+        }
+
+        function setupInteractionListeners() {
+            zoomSlider.addEventListener('input', (e) => { zoom = parseFloat(e.target.value); renderCanvasTransformations(); });
+            viewport.addEventListener('mousedown', (e) => {
+                if (!activeImage) return;
+                isDragging = true; startX = e.clientX - offsetX; startY = e.clientY - offsetY;
             });
-            
-            video.srcObject = streamReference;
-            
-            // Explicitly call play() to bypass strict browser autoplay policies
-            await video.play();
-            
-        } catch (err) {
-            alert("Camera access denied or unavailable. Please check browser permissions.");
-            console.error("Camera Init Error:", err);
-        }
-    }
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                offsetX = e.clientX - startX; offsetY = e.clientY - startY; renderCanvasTransformations();
+            });
+            window.addEventListener('mouseup', () => isDragging = false);
 
-    function captureSnapshot() {
-        const video = document.getElementById('video-preview');
-        const img = document.getElementById('image-preview');
-        
-        // 1. Check if the camera was actually started
-        if (!streamReference) {
-            alert("Please start the camera first.");
-            return;
+            viewport.addEventListener('touchstart', (e) => {
+                if (!activeImage || e.touches.length !== 1) return;
+                isDragging = true; startX = e.touches[0].clientX - offsetX; startY = e.touches[0].clientY - offsetY;
+            });
+            viewport.addEventListener('touchmove', (e) => {
+                if (!isDragging || e.touches.length !== 1) return;
+                offsetX = e.touches[0].clientX - startX; offsetY = e.touches[0].clientY - startY; renderCanvasTransformations();
+            });
+            viewport.addEventListener('touchend', () => isDragging = false);
         }
 
-        // 2. Ensure video metadata has loaded so we don't draw a 0x0 canvas
-        if (video.videoWidth === 0 || video.videoHeight === 0) {
-            alert("Camera hardware is still initializing. Please wait one second and try again.");
-            return;
+        function renderCanvasTransformations() {
+            if (!activeImage) return;
+            const viewW = canvas.width / window.devicePixelRatio;
+            const viewH = canvas.height / window.devicePixelRatio;
+            ctx.clearRect(0, 0, viewW, viewH);
+            ctx.save();
+            ctx.translate(viewW / 2 + offsetX, viewH / 2 + offsetY);
+            ctx.scale(zoom, zoom);
+            const imgRatio = activeImage.width / activeImage.height;
+            const viewRatio = viewW / viewH;
+            let drawW, drawH;
+
+            if (imgRatio > viewRatio) { drawH = viewH; drawW = viewH * imgRatio; } 
+            else { drawW = viewW; drawH = viewW / imgRatio; }
+
+            ctx.drawImage(activeImage, -drawW / 2, -drawH / 2, drawW, drawH);
+            ctx.restore();
         }
 
-        try {
-            // Create canvas matching actual video feed dimensions
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
+        function toggleModal(show) { document.getElementById('settingsModal').classList.toggle('active', show); }
+        function saveSettings() {
+            const key = document.getElementById('apiKeyInput').value.trim();
+            localStorage.setItem('user_api_key', key);
+            toggleModal(false);
+        }
 
-            // Draw the current video frame onto the canvas
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        function captureFrameData() {
+            const processCanvas = document.createElement('canvas');
+            processCanvas.width = 600; processCanvas.height = 750;
+            const pCtx = processCanvas.getContext('2d');
 
-            // Extract the image data
-            const imageDataUrl = canvas.toDataURL('image/png');
+            if (activeImage) {
+                const viewW = canvas.width / window.devicePixelRatio;
+                const viewH = canvas.height / window.devicePixelRatio;
+                pCtx.imageSmoothingEnabled = true; pCtx.imageSmoothingQuality = 'high';
+                pCtx.translate(300, 375); pCtx.scale(zoom * (600 / viewW), zoom * (750 / viewH));
+                pCtx.translate(offsetX, offsetY);
 
-            // Failsafe: check if canvas returned an empty string
-            if (imageDataUrl === 'data:,') {
-                alert("Failed to capture image. Canvas data is empty.");
+                const imgRatio = activeImage.width / activeImage.height;
+                const viewRatio = viewW / viewH;
+                let drawW, drawH;
+                if (imgRatio > viewRatio) { drawH = viewH; drawW = viewH * imgRatio; } 
+                else { drawW = viewW; drawH = viewW / imgRatio; }
+                pCtx.drawImage(activeImage, -drawW / 2, -drawH / 2, drawW, drawH);
+            } else if (currentStream && video.readyState === video.HAVE_ENOUGH_DATA) {
+                pCtx.drawImage(video, 0, 0, 600, 750);
+            } else { return null; }
+            return processCanvas.toDataURL('image/jpeg', 0.85);
+        }
+
+        function initiateScanSequence() {
+            const base64Data = captureFrameData();
+            if (!base64Data) {
+                alert("Please ensure the camera is active or an image is uploaded and properly positioned.");
                 return;
             }
 
-            // Apply to image tag and swap visibility
-            img.src = imageDataUrl;
-            video.style.display = 'none';
-            img.style.display = 'block';
-            
-            // 3. Stop the camera stream to free up system memory/battery
-            streamReference.getTracks().forEach(track => track.stop());
-            streamReference = null; // Clear reference so the app knows the camera is off
+            // Stop any ongoing speech
+            window.speechSynthesis.cancel();
+            audioBtn.style.display = 'none';
 
-        } catch (error) {
-            console.error("Snapshot Error:", error);
-            alert("An error occurred while processing the image frame.");
+            analyzeBtn.disabled = true;
+            analyzeBtn.innerText = "Scanning Elements...";
+            
+            scannerLine.style.display = 'block';
+            scannerLine.style.animation = 'none';
+            void scannerLine.offsetWidth; 
+            scannerLine.style.animation = 'scanAnimation 1.2s linear 3';
+
+            setTimeout(() => {
+                scannerLine.style.display = 'none';
+                analyzeBtn.innerText = "Deep Face Scan";
+                analyzeBtn.disabled = false;
+                
+                const capturedDisplay = document.getElementById('capturedDisplay');
+                capturedDisplay.src = base64Data;
+                capturedDisplay.style.display = 'block';
+                
+                runVedicAnalysis(base64Data);
+            }, 3600); 
         }
-    }
 
-    function handleImageUpload(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const img = document.getElementById('image-preview');
-            const video = document.getElementById('video-preview');
+        // --- Text to Speech Logic ---
+        function toggleSpeech() {
+            const synth = window.speechSynthesis;
+            const targetLang = document.getElementById('userLang').value;
             
-            // If camera is running, shut it down when user uploads a file instead
-            if (streamReference) {
-                streamReference.getTracks().forEach(track => track.stop());
-                streamReference = null;
+            if (synth.speaking) {
+                if (synth.paused) { 
+                    synth.resume(); 
+                    audioBtn.innerHTML = "⏸️ Pause"; 
+                } else { 
+                    synth.pause(); 
+                    audioBtn.innerHTML = "▶️ Resume"; 
+                }
+                return;
             }
             
-            video.style.display = 'none';
-            img.style.display = 'block';
-            img.src = e.target.result;
+            synth.cancel();
+            audioBtn.innerHTML = "⏸️ Pause";
+            
+            // Strip HTML tags for clean audio reading
+            const plainText = rawReportText.replace(/<[^>]*>?/gm, '').trim(); 
+            
+            currentSynthUtterance = new SpeechSynthesisUtterance(plainText);
+            currentSynthUtterance.lang = langMap[targetLang] || 'en-IN';
+            
+            currentSynthUtterance.onend = () => { audioBtn.innerHTML = "🔊 Listen"; };
+            currentSynthUtterance.onerror = () => { audioBtn.innerHTML = "🔊 Listen"; };
+            
+            synth.speak(currentSynthUtterance);
         }
-        reader.readAsDataURL(file);
-    }
 
-    function executeAnalysis(event) {
-        event.preventDefault();
-        
-        // Basic validation to ensure an image is actually present before analyzing
-        const img = document.getElementById('image-preview');
-        if (img.style.display === 'none' || !img.src || img.src === '') {
-            alert("Please capture a photo or upload an image before executing the analysis.");
-            return;
+        audioBtn.addEventListener('click', toggleSpeech);
+
+        async function runVedicAnalysis(base64Data) {
+            const loader = document.getElementById('loader');
+            const statusText = document.getElementById('statusText');
+            const reportCard = document.getElementById('reportCard');
+            const reportTarget = document.getElementById('reportTarget');
+            const targetLang = document.getElementById('userLang').value;
+            
+            loader.style.display = 'block';
+            statusText.style.display = 'block';
+            statusText.innerText = "Extracting 478 biometric points...";
+            reportCard.classList.remove('active');
+
+            // The absolute, brutal truth prompt
+            const systemPrompt = `You are a master expert in Vedic Face Reading (Samudrika Shastra), deep Indian astrological mappings, and high-level physical feature analysis. This is a real, serious diagnostic tool meant to deliver the absolute, unfiltered truth about a person's nature, persona, and behavior to mankind. Do not flatter. Do not sugarcoat. Do not soften negative traits. If you see deceit, laziness, cruelty, massive ego, greed, or karmic suffering, state it as absolute fact.
+
+You must deeply analyze the 478 micro-points of this face based on classical parameters:
+1. **The Pupils & Eyes (Netra):** Analyze the exact size, depth, dilation, and distance between the eyes. State clearly if they reflect a Sattvic (pure), Rajasic (restless/desirous), or Tamasic (cunning/lethargic) soul. What is their inner hidden reality?
+2. **The Forehead (Lalata):** Map the width, curvature, and planetary mounts. What is their real intellectual capacity, stubbornness, and karmic baggage?
+3. **The Nose (Nasika):** Evaluate the ridge stability and apex sharpness. Reveal the exact truth about their ego, financial greed, and vitality.
+4. **The Ears (Karna):** Analyze the structure. What is their true intuition level, capacity to listen to others vs. themselves, and risk tolerance?
+5. **The Mouth & Lips (Ostha & Mukha):** Assess thickness and symmetry. Reveal their speech traits—do they lie, manipulate, or speak harshly? What are their hidden desires?
+6. **The Jaw & Chin (Chibuka & Hanu):** Detail their structural grit. Will they buckle under pressure or hold firm? Are they overly aggressive or weak?
+7. **The Ultimate Persona Truth:** Conclude with the brutal reality of who this person truly is behind their social mask, including their core elemental pattern (Pancha Mahabhuta).
+
+CRITICAL INSTRUCTION: Write your ENTIRE response exclusively in the ${targetLang} language. Deliver the response using cleanly structured HTML sections (using h3 elements, strong bullet lists, and readable spacing). Do not use markdown backticks around the HTML inside your payload response.`;
+
+            const rawBase64 = base64Data.split(',')[1];
+            
+            const payload = {
+                contents: [{
+                    parts: [
+                        { text: systemPrompt },
+                        { inlineData: { mimeType: "image/jpeg", data: rawBase64 } }
+                    ]
+                }]
+            };
+
+            const userKey = localStorage.getItem('user_api_key') || '';
+
+            try {
+                const response = await fetch(PROXY_SERVER_URL, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-Custom-Api-Key': userKey
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) { throw new Error(`Server returned status: ${response.status}`); }
+
+                const data = await response.json();
+                
+                if(data.candidates && data.candidates[0].content.parts[0].text) {
+                    let resultText = data.candidates[0].content.parts[0].text;
+                    resultText = resultText.replace(/```html/g, '').replace(/```/g, '').trim();
+                    
+                    rawReportText = resultText; // Save for TTS processing
+                    reportTarget.innerHTML = resultText;
+                    
+                    // Reveal the Listen button
+                    audioBtn.style.display = 'flex';
+                    audioBtn.innerHTML = "🔊 Listen";
+                } else {
+                    throw new Error("Invalid payload format received from the matrix.");
+                }
+                
+                reportCard.classList.add('active');
+                reportCard.scrollIntoView({ behavior: 'smooth' });
+                
+            } catch (err) {
+                alert("Processing Error: " + err.message + "\nCheck proxy server connectivity.");
+            } finally {
+                loader.style.display = 'none';
+                statusText.style.display = 'none';
+            }
         }
-        
-        document.getElementById('status-placeholder').classList.add('hidden');
-        const results = document.getElementById('results-container');
-        results.classList.remove('hidden');
-        
-        // The mock results injection remains the same
-        results.innerHTML = `
-            <div class="report-section">
-                <h3>
-                    <span>1. Craniofacial Symmetry & Forehead Geometry</span>
-                    <span class="citation">Brihat Samhita, Ch. 68, Verse 12</span>
-                </h3>
-                <div class="verse-text">
-                    "अन्विद्धा विपुलाः शङ्खास्त्र्यश्राश्च सुकुमारकाः। अर्धेन्दुसदृशाश्चैव ललाटा मानवाधिपान्॥"
-                </div>
-                <div class="analysis-text">
-                    <strong>Metric Extraction:</strong> Broad, smooth, semi-circular forehead boundary curve (2.4:1 ratio). Horizontal rekhās scanning reveals two clearly defined, deep uninterrupted lines corresponding to standard Jupiter and Sun markers. Indicative of highly structured analytical capacity, robust logical processing, and baseline administrative stability.
-                </div>
-            </div>
-
-            <!-- Remaining mock sections... -->
-            <div class="report-section">
-                <h3>
-                    <span>2. Ocular Proportions & Gaze Stability</span>
-                    <span class="citation">Garuda Purana, Vol 1, Ch. 65, p. 192</span>
-                </h3>
-                <div class="verse-text">
-                    "स्निग्धाः समाः समायूता विपुलाः कृष्णतारकाः। नयनाः स्युः सुखावह नराणां न च संशयाः॥"
-                </div>
-                <div class="analysis-text">
-                    <strong>Metric Extraction:</strong> Clear iris boundaries with normal sclera visibility. High structural fixity and blink-rate moderation during recording indicate high sustained focus, baseline emotional resiliency, and a high processing capacity for intricate patterns—excellent indicators for specialized analytical engineering roles.
-                </div>
-            </div>
-        `;
-    }
-</script>
+    </script>
+</body>
+</html>
