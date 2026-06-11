@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pada Samudrika Scanner v1.1</title>
+    <title>Pada Samudrika Scanner v1.3</title>
     <style>
         :root {
             --primary: #d4af37; 
@@ -60,7 +60,7 @@
         }
         button:hover:not(:disabled) { transform: scale(1.05); box-shadow: 0 0 15px var(--primary); }
         button:disabled { background-color: #555; color: #888; cursor: not-allowed; }
-        .small-btn { background-color: transparent; border: 1px solid var(--primary); color: var(--primary); width: auto; padding: 5px 15px; font-size: 14px; cursor: pointer; }
+        .small-btn { background-color: transparent; border: 1px solid var(--primary); color: var(--primary); width: auto; padding: 5px 15px; font-size: 14px; margin-top: 0; cursor: pointer; }
 
         /* Camera UI */
         #footInstruction { font-weight: bold; color: var(--primary); margin-bottom: 15px; font-size: 1.1em; text-align: center; }
@@ -79,15 +79,8 @@
             opacity: 0.7;
         }
         
-        /* New precise flipping logic for just the foot */
-        #footGraphics {
-            transform-origin: 50px center; /* 50 is exact middle of 100 viewBox */
-            transition: transform 0.5s ease;
-        }
-        
-        #footGraphics.left-foot {
-            transform: scaleX(-1);
-        }
+        #footGraphics { transform-origin: 50px center; transition: transform 0.5s ease; }
+        #footGraphics.left-foot { transform: scaleX(-1); }
 
         .scanner-line {
             position: absolute; top: 0; left: 0; width: 100%; height: 4px;
@@ -103,6 +96,16 @@
         .reading-section h4 { margin: 0 0 8px 0; color: var(--primary); font-size: 1.1em; text-transform: uppercase; }
         .reading-section p { margin: 0; font-size: 0.95em; line-height: 1.5; }
         
+        /* Floating Action Button for Sharing */
+        .floating-action {
+            position: fixed; bottom: 20px; right: 20px;
+            background-color: var(--primary); color: black;
+            border-radius: 50px; padding: 15px 25px;
+            font-size: 16px; font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5); cursor: pointer;
+            z-index: 1000; display: none; width: auto; margin: 0;
+        }
+
         canvas { display: none; }
         .pulsing-text { animation: pulse 1.5s infinite; color: #888; font-style: italic; }
         @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
@@ -175,7 +178,10 @@
 
     <div class="results-container" id="resultsSection">
         <div class="foot-result-card" id="stage1Card">
-            <h3 style="margin:0 0 20px 0; color: var(--primary);"><span id="stage1Title">Foot 1</span> Analysis</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin:0; color: var(--primary);"><span id="stage1Title">Foot 1</span> Analysis</h3>
+                <button class="small-btn audio-btn" id="audioBtn1" style="display: none;">🔊 Listen</button>
+            </div>
             <div id="stage1Status" class="pulsing-text">Calculating ratios against A4 baseline...</div>
             
             <div id="stage1Data" style="display: none;">
@@ -188,7 +194,10 @@
         </div>
 
         <div class="foot-result-card" id="stage2Card">
-            <h3 style="margin:0 0 20px 0; color: var(--primary);"><span id="stage2Title">Foot 2</span> Analysis</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 style="margin:0; color: var(--primary);"><span id="stage2Title">Foot 2</span> Analysis</h3>
+                <button class="small-btn audio-btn" id="audioBtn2" style="display: none;">🔊 Listen</button>
+            </div>
             <div id="stage2Status" class="pulsing-text">Awaiting scan...</div>
             
             <div id="stage2Data" style="display: none;">
@@ -201,6 +210,7 @@
         </div>
     </div>
 
+    <button id="shareTxtBtn" class="floating-action">📋 Copy Report</button>
     <canvas id="captureCanvas"></canvas>
 
     <script>
@@ -227,6 +237,8 @@
         }
 
         let stream = null, scanStage = 0, firstFoot = "Left", secondFoot = "Right";
+        let foot1JSON = null, foot2JSON = null; 
+
         const userSex = document.getElementById('userSex');
         const userNameInput = document.getElementById('userName');
         const userLang = document.getElementById('userLang');
@@ -239,7 +251,6 @@
 
         document.getElementById('initBtn').addEventListener('click', async () => {
             if (!userNameInput.value.trim() || !userSex.value) return alert("Please enter name and sex.");
-            // In Samudrika, traditionally Male active side is Right, Female is Left.
             if (userSex.value === 'Male') { firstFoot = "Right"; secondFoot = "Left"; } 
             else { firstFoot = "Left"; secondFoot = "Right"; }
             startCameraFlow();
@@ -247,7 +258,6 @@
 
         async function startCameraFlow() {
             try {
-                // Force environment camera (rear) for pointing down at the floor
                 const constraints = {
                     video: { facingMode: { exact: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
                     audio: false
@@ -269,13 +279,9 @@
             document.getElementById('stage1Title').innerText = firstFoot;
             document.getElementById('stage2Title').innerText = secondFoot;
             
-            // Flip the SVG graphic depending on which foot
             const footShape = document.getElementById('footGraphics');
-            if (firstFoot === 'Left') {
-                footShape.classList.add('left-foot');
-            } else {
-                footShape.classList.remove('left-foot');
-            }
+            if (firstFoot === 'Left') { footShape.classList.add('left-foot'); } 
+            else { footShape.classList.remove('left-foot'); }
             
             const btn = document.getElementById('actionBtn');
             btn.style.display = 'block'; btn.disabled = false; btn.innerText = `Scan ${firstFoot} Foot`;
@@ -286,11 +292,8 @@
             document.getElementById('footInstruction').innerText = `Step 2: Place ${secondFoot} foot on A4 paper. Align with guide.`;
             
             const footShape = document.getElementById('footGraphics');
-            if (secondFoot === 'Left') {
-                footShape.classList.add('left-foot');
-            } else {
-                footShape.classList.remove('left-foot');
-            }
+            if (secondFoot === 'Left') { footShape.classList.add('left-foot'); } 
+            else { footShape.classList.remove('left-foot'); }
             
             const btn = document.getElementById('actionBtn');
             btn.style.display = 'block'; btn.disabled = false; btn.innerText = `Scan ${secondFoot} Foot`;
@@ -327,8 +330,8 @@
             const statusEl = document.getElementById(`stage${stageNum}Status`);
             const dataEl = document.getElementById(`stage${stageNum}Data`);
             const retakeBtn = document.getElementById(`retakeBtn${stageNum}`);
+            const audioBtn = document.getElementById(`audioBtn${stageNum}`);
 
-            // Tailored Prompt for Foot Morphology using A4 scale
             const prompt = `Act as an expert in Pada Samudrika (Vedic Foot Morphology).
             The user (${userSex.value}) has placed their ${foot} foot on a standard A4 paper (210x297mm). Use the paper edges to estimate the structural ratios of the foot.
             
@@ -365,16 +368,22 @@
                     retakeBtn.style.display = 'block'; return;
                 }
 
-                // Populate UI
                 document.getElementById(`stg${stageNum}_toes`).innerText = parsed.toeProportions;
                 document.getElementById(`stg${stageNum}_arch`).innerText = parsed.archAnalysis;
                 document.getElementById(`stg${stageNum}_gait`).innerText = parsed.groundedness;
                 document.getElementById(`stg${stageNum}_remedies`).innerText = parsed.remedies;
 
+                if (stageNum === 1) foot1JSON = parsed; else foot2JSON = parsed;
+                
                 statusEl.style.display = 'none';
                 dataEl.style.display = 'block';
+                audioBtn.style.display = 'block'; 
 
-                if(stageNum === 2 && stream) { stream.getTracks().forEach(t => t.stop()); document.getElementById('footInstruction').innerText = "Pada Diagnostics Complete."; }
+                if(stageNum === 2 && stream) { 
+                    stream.getTracks().forEach(t => t.stop()); 
+                    document.getElementById('footInstruction').innerText = "Pada Diagnostics Complete."; 
+                    document.getElementById('shareTxtBtn').style.display = 'block'; // Show Share Button
+                }
 
             } catch (err) {
                 statusEl.classList.remove('pulsing-text');
@@ -389,11 +398,87 @@
         function resetStage(stageNum) {
             if(!stream || !stream.active) startCameraFlow();
             document.getElementById(`stage${stageNum}Data`).style.display = 'none';
+            document.getElementById(`audioBtn${stageNum}`).style.display = 'none';
             document.getElementById(`stage${stageNum}Status`).style.display = 'block';
             document.getElementById(`stage${stageNum}Status`).innerText = "Awaiting scan...";
             document.getElementById(`retakeBtn${stageNum}`).style.display = 'none';
+            
+            document.getElementById('shareTxtBtn').style.display = 'none'; // Hide share button on retake
+            
             if(stageNum === 1) setupStage1(); else setupStage2();
         }
+
+        // ==========================================
+        // TEXT-TO-SPEECH (TTS) ENGINE
+        // ==========================================
+        function generateSpeechText(jsonObj) {
+            if (!jsonObj) return "";
+            return `${jsonObj.toeProportions}. ${jsonObj.archAnalysis}. ${jsonObj.groundedness}. Remedies: ${jsonObj.remedies}`;
+        }
+
+        let currentSynth = null, currentAudioBtn = null;
+        
+        function toggleSpeech(text, langName, btnElement) {
+            const synth = window.speechSynthesis;
+            if (synth.speaking && currentAudioBtn === btnElement) {
+                if (synth.paused) { synth.resume(); btnElement.innerHTML = "⏸️ Pause"; } 
+                else { synth.pause(); btnElement.innerHTML = "▶️ Resume"; } return;
+            }
+            synth.cancel();
+            if(currentAudioBtn) currentAudioBtn.innerHTML = "🔊 Listen";
+            
+            currentAudioBtn = btnElement;
+            const ut = new SpeechSynthesisUtterance(text);
+            const langMap = {"English":"en-IN", "Hindi":"hi-IN", "Marathi":"mr-IN"};
+            ut.lang = langMap[langName] || 'en-IN';
+            
+            ut.onstart = () => btnElement.innerHTML = "⏸️ Pause";
+            ut.onend = ut.onerror = () => { btnElement.innerHTML = "🔊 Listen"; currentAudioBtn = null; };
+            synth.speak(ut);
+        }
+
+        document.getElementById('audioBtn1').addEventListener('click', function() { toggleSpeech(generateSpeechText(foot1JSON), userLang.value, this); });
+        document.getElementById('audioBtn2').addEventListener('click', function() { toggleSpeech(generateSpeechText(foot2JSON), userLang.value, this); });
+
+        // ==========================================
+        // SHARE TO CLIPBOARD LOGIC
+        // ==========================================
+        document.getElementById('shareTxtBtn').addEventListener('click', () => {
+            if (!foot1JSON || !foot2JSON) return;
+
+            const name = userNameInput.value.trim() || "User";
+            const reportText = `PADA DARSHAN - VEDIC FOOT MORPHOLOGY REPORT
+Prepared for: ${name}
+
+--- ${firstFoot} Foot ---
+Padanguli (Toes): ${foot1JSON.toeProportions}
+Pada Tala (Arch/Sole): ${foot1JSON.archAnalysis}
+Gati (Groundedness): ${foot1JSON.groundedness}
+Remedies: ${foot1JSON.remedies}
+
+--- ${secondFoot} Foot ---
+Padanguli (Toes): ${foot2JSON.toeProportions}
+Pada Tala (Arch/Sole): ${foot2JSON.archAnalysis}
+Gati (Groundedness): ${foot2JSON.groundedness}
+Remedies: ${foot2JSON.remedies}
+
+Generated by Pada Samudrika Scanner`;
+
+            navigator.clipboard.writeText(reportText).then(() => {
+                const btn = document.getElementById('shareTxtBtn');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = "✅ Copied!";
+                btn.style.backgroundColor = "#4cff4c"; // Flash green
+                
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.style.backgroundColor = "var(--primary)";
+                }, 2000);
+            }).catch(err => {
+                alert("Failed to copy report to clipboard. Please check browser permissions.");
+            });
+        });
+
     </script>
 </body>
 </html>
