@@ -274,7 +274,10 @@
                     <h3 class="text-orange-600 font-bold mb-2 border-b border-orange-100 pb-1 title-font">पंचांग अंग</h3>
                     <p class="text-sm mb-1">पक्ष: <span id="r-paksha" class="font-bold text-gray-900"></span></p>
                     <p class="text-sm mb-1">तिथी: <span id="r-tithi" class="font-bold text-gray-900"></span></p>
-                    <p class="text-sm mb-1">नक्षत्र: <span id="r-nakshatra" class="font-bold text-gray-900"></span></p>
+					<p class="text-sm mb-1 flex flex-wrap items-center gap-1">
+					नक्षत्र: <span id="r-nakshatra" class="font-bold text-gray-900"></span>
+					<span id="r-rain-vahan" class="hidden text-[11px] px-1.5 py-0.5 rounded border shadow-sm ml-1 transition-all"></span>
+					</p>
                     <p class="text-sm mb-1">योग: <span id="r-yoga" class="font-bold text-gray-900"></span></p>
                     <p class="text-sm">वार: <span id="r-vaar" class="font-bold text-gray-900"></span></p>
                 </div>
@@ -903,6 +906,26 @@
     // Your server uses Lahiri Ayanamsa (approx 24 degrees). We add it back to get the Tropical Sun.
     const currentAyanamsa = 24.11 + ((calcTime.getFullYear() - 2024) * 0.01396);
     let sun_true = (sun_nirayana + currentAyanamsa) % 360;
+			// --- 6. Parjanya (Rainfall) Vahan Calculation ---
+    let sunNakshatraIndex = Math.floor(sun_nirayana / (360/27));
+    
+    // Formula: (Moon Nakshatra - Sun Nakshatra + 1) mod 9
+    let parjanyaCalc = (nakshatraIndex - sunNakshatraIndex + 1) % 9;
+    if (parjanyaCalc <= 0) parjanyaCalc += 9; // Handle JavaScript's negative modulo
+
+    const PARJANYA_DATA = {
+        1: { name: "घोडा", prediction: "पर्वतावर पाऊस पडेल", style: "text-orange-700 bg-orange-100 border-orange-300" },
+        2: { name: "कोल्हा", prediction: "अत्यल्प पाऊस", style: "text-red-700 bg-red-100 border-red-300" },
+        3: { name: "बेडूक", prediction: "जोरदार वृष्टी", style: "text-blue-700 bg-blue-100 border-blue-300" },
+        4: { name: "मेंढा", prediction: "अत्यल्प पाऊस", style: "text-red-700 bg-red-100 border-red-300" },
+        5: { name: "मोर", prediction: "अनियमित पाऊस", style: "text-yellow-700 bg-yellow-100 border-yellow-300" },
+        6: { name: "उंदीर", prediction: "अल्प पाऊस", style: "text-yellow-700 bg-yellow-100 border-yellow-300" },
+        7: { name: "म्हैस", prediction: "जोरदार वृष्टी", style: "text-blue-700 bg-blue-100 border-blue-300" },
+        8: { name: "गाढव", prediction: "अनियमित पाऊस", style: "text-yellow-700 bg-yellow-100 border-yellow-300" },
+        9: { name: "हत्ती", prediction: "जोरदार वृष्टी", style: "text-blue-700 bg-blue-100 border-blue-300" }
+    };
+
+
 
     return {
         sun_true: sun_true,
@@ -919,8 +942,12 @@
         dayOfWeek: calcTime.getDay(),
         isBhadra: (k1_name === "विष्टी" || k2_name === "विष्टी"),
         eclipseType: "none", // For absolute eclipse data, you'd need the Rahu coordinates from API
-        exactLagna: RASHIS[apiData.asc_sign - 1] // Pulled directly from swe.houses_ex
+        exactLagna: RASHIS[apiData.asc_sign - 1], // Pulled directly from swe.houses_ex
+		rainVahan: PARJANYA_DATA[parjanyaCalc]
     };
+
+
+
 }
 
         function calculateMuhurats(baseDate, lat, lon, dayOfWeek) {
@@ -1152,6 +1179,12 @@
                 document.getElementById('r-paksha').innerText = vedic.paksha;
                 document.getElementById('r-tithi').innerText = vedic.tithi;
                 document.getElementById('r-nakshatra').innerText = vedic.nakshatra;
+							const rainSpan = document.getElementById('r-rain-vahan');
+				if(rainSpan && vedic.rainVahan) {
+					rainSpan.innerHTML = `🌧️ पर्जन्य वाहन: ${vedic.rainVahan.name} - <strong>${vedic.rainVahan.prediction}</strong>`;
+					rainSpan.className = `text-[11px] px-1.5 py-0.5 rounded border shadow-sm ml-1 flex items-center ${vedic.rainVahan.style}`;
+					rainSpan.classList.remove('hidden');
+				}
                 document.getElementById('r-yoga').innerText = vedic.yoga;
                 document.getElementById('r-vaar').innerText = vedic.vaar;
                 document.getElementById('r-sunsign').innerText = vedic.sunSign;
@@ -1530,7 +1563,7 @@
                 const langDropdown = document.getElementById('appLang');
                 const selectedLangText = langDropdown.options[langDropdown.selectedIndex].text;
                 
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash:generateContent?key=${apiKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
