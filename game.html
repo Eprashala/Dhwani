@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elite Cognitive Assessment Battery</title>
+    <style>
+        :root {
+            --bg-primary: #f0f4f8;
+            --surface: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --accent: #0ea5e9;
+            --accent-hover: #0284c7;
+            --border: #cbd5e1;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --radius: 12px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: var(--bg-primary); color: var(--text-main); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+        
+        .app-container {
+            width: 100%; max-width: 800px; background: var(--surface); border-radius: var(--radius);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border); padding: 40px; transition: all 0.3s ease;
+        }
+
+        .screen { display: none; }
+        .screen.active { display: block; animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        h2 { font-size: 26px; font-weight: 800; margin-bottom: 8px; color: #0f172a; }
+        p.subtitle { color: var(--text-muted); font-size: 15px; margin-bottom: 24px; line-height: 1.5; }
+        
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 8px; }
+        input, select { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 15px; outline: none; transition: border-color 0.2s; }
+        input:focus, select:focus { border-color: var(--accent); }
+        
+        button { background-color: var(--accent); color: white; border: none; padding: 14px 24px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; width: 100%; transition: all 0.2s; }
+        button:hover { background-color: var(--accent-hover); transform: translateY(-1px); }
+        button:disabled { background-color: var(--border); color: var(--text-muted); cursor: not-allowed; transform: none; }
+        .btn-secondary { background-color: var(--surface); color: var(--text-main); border: 2px solid var(--border); }
+        .btn-secondary:hover { background-color: var(--bg-primary); }
+
+        .game-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .game-card { border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; background: #f8fafc; display: flex; flex-direction: column; justify-content: space-between;}
+        .game-card h4 { margin-bottom: 4px; font-size: 16px; color: #0f172a; }
+        .game-card p { font-size: 12px; color: var(--text-muted); margin-bottom: 12px; }
+        .status-badge { display: inline-block; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; margin-top: 8px;}
+        .status-pending { background: #e2e8f0; color: #475569; }
+        .status-complete { background: #dcfce7; color: #166534; }
+
+        /* Shared Game UI */
+        .game-arena { height: 250px; background: #e2e8f0; border-radius: 8px; display: flex; justify-content: center; align-items: center; margin-bottom: 20px; border: 2px dashed var(--border); flex-direction: column; position: relative;}
+        .large-prompt { font-size: 48px; font-weight: 900; letter-spacing: 2px; text-align: center; }
+        .dynamic-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;}
+        .dynamic-btns button { width: auto; min-width: 120px; }
+
+        /* Specific Elements */
+        .gng-target { width: 100px; height: 100px; border-radius: 50%; display: none; cursor: pointer; }
+        .gng-green { background-color: var(--success); }
+        .gng-red { background-color: var(--danger); }
+        .balloon-container { display: flex; justify-content: center; align-items: center; height: 200px; position: relative; }
+        .balloon { width: 50px; height: 60px; background: radial-gradient(circle at 30% 30%, #fca5a5, #ef4444); border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%; transition: transform 0.1s; position: relative; }
+        
+        /* Tables & Prompt Box */
+        .results-table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; text-align: left; }
+        .results-table th, .results-table td { padding: 12px; border-bottom: 1px solid var(--border); }
+        .results-table th { background-color: #f1f5f9; font-weight: 700; color: #334155; }
+        .ai-prompt-box { background: linear-gradient(to right, #eff6ff, #e0e7ff); border: 1px solid #bfdbfe; padding: 24px; margin-top: 32px; border-radius: 12px; text-align: center; }
+        .ai-btn { background: linear-gradient(135deg, #4f46e5, #9333ea); color: white; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3); font-size: 18px; margin-top: 16px;}
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    
+    <div id="screen-onboarding" class="screen active">
+        <h2>Cognitive Architecture Assessment</h2>
+        <p class="subtitle">Complete 13 objective neuro-cognitive modules to mathematically determine your career suitability matrix.</p>
+        
+        <div class="form-group"><label>Candidate Full Name</label><input type="text" id="input-name" placeholder="Enter name"></div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+            <div class="form-group"><label>Age</label><input type="number" id="input-age" placeholder="Age"></div>
+            <div class="form-group"><label>Target Industry Domain</label>
+                <select id="input-edu"><option value="Tech">Technology & IT</option><option value="Finance">Business & Finance</option><option value="Health">Healthcare</option><option value="General">Open Evaluation</option></select>
+            </div>
+        </div>
+        <button id="btn-start-battery">Initialize Assessment</button>
+    </div>
+
+    <div id="screen-hub" class="screen">
+        <h2>Assessment Hub</h2>
+        <div class="game-grid">
+            <div class="game-card"><h4>Stroop Task</h4><p>Inhibitory Control</p><button onclick="startModule('stroop')" class="btn-secondary" id="b-stroop">Play</button><div class="status-badge status-pending" id="s-stroop">PENDING</div></div>
+            <div class="game-card"><h4>BART</h4><p>Risk Tolerance</p><button onclick="startModule('bart')" class="btn-secondary" id="b-bart">Play</button><div class="status-badge status-pending" id="s-bart">PENDING</div></div>
+            <div class="game-card"><h4>Go / No-Go</h4><p>Impulse Control</p><button onclick="startModule('gng')" class="btn-secondary" id="b-gng">Play</button><div class="status-badge status-pending" id="s-gng">PENDING</div></div>
+            <div class="game-card" style="grid-column: 1 / -1; background: #e0e7ff; border-color: #a5b4fc;">
+                <h4>Rapid Diagnostics Battery (10 Modules)</h4>
+                <p>Flanker, 1-Back, Boolean Logic, Spatial Processing, Digit Span, Visual Search & More.</p>
+                <button onclick="startRapidSuite()" id="b-rapid" style="background: #4f46e5;">Initiate Rapid Battery</button>
+                <div class="status-badge status-pending" id="s-rapid" style="display:none;">PENDING</div>
+            </div>
+        </div>
+        <button id="btn-view-results" disabled>Compile Final Data & View Results</button>
+    </div>
+
+    <div id="screen-stroop" class="screen">
+        <h2>Stroop Task</h2><p class="subtitle" style="text-align:center;">Select the INK COLOR, not the word!</p>
+        <div class="game-arena"><div id="stroop-word" class="large-prompt">RED</div></div>
+        <div class="dynamic-btns" id="stroop-btns"></div>
+    </div>
+
+    <div id="screen-bart" class="screen">
+        <h2>Risk Task (BART)</h2><p class="subtitle" style="text-align:center;">Pump for points. If it pops, you lose the round's points.</p>
+        <div style="display:flex; justify-content:space-around; font-weight:bold; margin-bottom:10px;">
+            <span>Bank: <span id="bart-bank" style="color:var(--success)">0</span></span>
+            <span>Temp: <span id="bart-temp" style="color:var(--warning)">0</span></span>
+        </div>
+        <div class="game-arena balloon-container"><div id="bart-balloon" class="balloon"></div></div>
+        <div class="dynamic-btns"><button style="background:#ef4444;" onclick="pumpBart()">Pump (+10)</button><button style="background:#10b981;" onclick="cashBart()">Cash Out</button></div>
+    </div>
+
+    <div id="screen-gng" class="screen">
+        <h2>Go / No-Go</h2><p class="subtitle" style="text-align:center;">Click GREEN immediately. Do NOTHING for RED.</p>
+        <div class="game-arena" id="gng-arena" onmousedown="clickGng()"><div id="gng-target" class="gng-target"></div></div>
+    </div>
+
+    <div id="screen-rapid" class="screen">
+        <h2 id="rapid-title">Rapid Suite</h2>
+        <p class="subtitle" id="rapid-desc" style="text-align:center;">Follow the on-screen instructions.</p>
+        <div class="game-arena">
+            <div id="rapid-prompt" class="large-prompt" style="font-size: 32px;"></div>
+            <input type="text" id="rapid-input" style="display:none; width: 60%; margin-top:20px; text-align:center; font-size:24px;" autocomplete="off">
+        </div>
+        <div class="dynamic-btns" id="rapid-btns"></div>
+    </div>
+
+    <div id="screen-results" class="screen">
+        <h2>Cognitive Architecture Profile</h2>
+        <p class="subtitle">Metrics compiled securely across 13 behavioral nodes.</p>
+        <table class="results-table"><thead><tr><th>Assessment Module</th><th>Cognitive Trait</th><th>Accuracy / Score</th><th>Processing (ms)</th></tr></thead><tbody id="results-body"></tbody></table>
+        <div class="ai-prompt-box">
+            <h3 style="color:#3730a3; margin-bottom: 8px;">Find Your Perfect Career Path</h3>
+            <p style="font-size: 14px; color: #475569;">Click below to securely generate an exact prompt containing your telemetry. Paste it into Gemini to receive objective career placement.</p>
+            <button id="btn-copy-prompt" class="ai-btn">📋 Copy Prompt & Open Gemini</button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    let state = { user: {}, metrics: [], flags: { stroop: false, bart: false, gng: false, rapid: false } };
+
+    function nav(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+    
+    function checkHub() {
+        ['stroop', 'bart', 'gng', 'rapid'].forEach(f => {
+            if(state.flags[f]) { document.getElementById(`b-${f}`).style.display = 'none'; document.getElementById(`s-${f}`).style.display = 'inline-block'; document.getElementById(`s-${f}`).innerText = 'COMPLETED'; document.getElementById(`s-${f}`).className = 'status-badge status-complete'; }
+        });
+        if (state.flags.stroop && state.flags.bart && state.flags.gng && state.flags.rapid) {
+            const b = document.getElementById('btn-view-results'); b.disabled = false; b.style.background = '#10b981';
+        }
+    }
+
+    document.getElementById('btn-start-battery').addEventListener('click', () => {
+        state.user.name = document.getElementById('input-name').value || "Candidate";
+        state.user.age = document.getElementById('input-age').value || "25";
+        state.user.edu = document.getElementById('input-edu').value;
+        nav('screen-hub');
+    });
+
+    function startModule(mod) {
+        if(mod==='stroop') initStroop();
+        if(mod==='bart') initBart();
+        if(mod==='gng') initGng();
+    }
+
+    // --- 1. STROOP ---
+    let stData = { t: 0, m: 5, c: 0, rt: 0, st: 0, cols: ['red', 'blue', 'green'] };
+    function initStroop() { stData = { t: 1, m: 5, c: 0, rt: 0, st: 0, cols: ['red', 'blue', 'green'] }; nav('screen-stroop'); nextStroop(); }
+    function nextStroop() {
+        if(stData.t > stData.m) { state.metrics.push({id:"01", name:"Stroop", trait:"Inhibitory Control", score:`${(stData.c/stData.m)*100}%`, time:Math.round(stData.rt/stData.m)}); state.flags.stroop=true; nav('screen-hub'); checkHub(); return; }
+        const text = stData.cols[Math.floor(Math.random()*3)];
+        let ink = stData.cols[Math.floor(Math.random()*3)]; while(ink===text) ink = stData.cols[Math.floor(Math.random()*3)];
+        document.getElementById('stroop-word').innerText = text; document.getElementById('stroop-word').style.color = ink;
+        document.getElementById('stroop-btns').innerHTML = stData.cols.map(c => `<button style="background:${c};color:white;" onclick="ansStroop('${c}', '${ink}')">${c.toUpperCase()}</button>`).join('');
+        stData.st = performance.now();
+    }
+    function ansStroop(ans, correct) { stData.rt += (performance.now()-stData.st); if(ans===correct) stData.c++; stData.t++; nextStroop(); }
+
+    // --- 2. BART ---
+    let btData = { r: 1, m: 3, p: 0, b: 0, tp: 0, un: 0, lim: 0 };
+    function initBart() { btData = { r: 1, m: 3, p: 0, b: 0, tp: 0, un: 0, lim: 0 }; nav('screen-bart'); nBart(); }
+    function nBart() {
+        if(btData.r > btData.m) { 
+            const avg = btData.un>0 ? (btData.tp/btData.un).toFixed(1) : 0;
+            state.metrics.push({id:"02", name:"BART", trait:"Risk Tolerance", score:`${avg} avg pumps`, time:"N/A"}); state.flags.bart=true; nav('screen-hub'); checkHub(); return; 
+        }
+        btData.p = 0; btData.lim = Math.floor(Math.random()*15)+3;
+        document.getElementById('bart-balloon').style.transform = `scale(1)`; document.getElementById('bart-balloon').innerHTML=''; document.getElementById('bart-temp').innerText='0';
+    }
+    function pumpBart() {
+        btData.p++;
+        if(btData.p >= btData.lim) { document.getElementById('bart-balloon').innerHTML='💥'; setTimeout(()=>{ btData.r++; nBart(); }, 500); }
+        else { document.getElementById('bart-temp').innerText = btData.p*10; document.getElementById('bart-balloon').style.transform = `scale(${1+(btData.p*0.1)})`; }
+    }
+    function cashBart() { if(btData.p===0)return; btData.b += btData.p*10; btData.tp += btData.p; btData.un++; btData.r++; document.getElementById('bart-bank').innerText = btData.b; nBart(); }
+
+    // --- 3. GO/NO-GO ---
+    let ggData = { t: 1, m: 6, fa: 0, rt: 0, c: 0, st: 0, act: false, typ: '', tmr: null };
+    function initGng() { ggData = { t: 1, m: 6, fa: 0, rt: 0, c: 0, st: 0, act: false, typ: '', tmr: null }; nav('screen-gng'); nGng(); }
+    function nGng() {
+        if(ggData.t > ggData.m) { state.metrics.push({id:"03", name:"Go / No-Go", trait:"Impulse Control", score:`${ggData.fa} Errors`, time:ggData.c>0?Math.round(ggData.rt/ggData.c):0}); state.flags.gng=true; nav('screen-hub'); checkHub(); return; }
+        document.getElementById('gng-target').style.display = 'none'; ggData.act = false;
+        ggData.tmr = setTimeout(() => {
+            ggData.typ = Math.random()>0.3 ? 'go' : 'nogo';
+            document.getElementById('gng-target').className = `gng-target ${ggData.typ==='go'?'gng-green':'gng-red'}`;
+            document.getElementById('gng-target').style.display = 'block'; ggData.act = true; ggData.st = performance.now();
+            ggData.tmr = setTimeout(()=>{ ggData.act=false; document.getElementById('gng-target').style.display='none'; ggData.t++; nGng(); }, 1000);
+        }, Math.floor(Math.random()*1000)+500);
+    }
+    function clickGng() {
+        if(!ggData.act) return; clearTimeout(ggData.tmr); ggData.act=false; document.getElementById('gng-target').style.display='none';
+        if(ggData.typ==='go') { ggData.c++; ggData.rt += (performance.now()-ggData.st); } else { ggData.fa++; }
+        ggData.t++; nGng();
+    }
+
+    // --- 4. RAPID ENGINE (10 Mini-Games) ---
+    const RAPID_GAMES = [
+        { id: "04", n: "Flanker Task", tr: "Selective Attention", trials: 3, d: "Is the center arrow pointing Left or Right?",
+          gen: () => { const d=Math.random()>0.5?'<':'>'; const o=d==='<'?'>':'<'; return { p: `${o}${o}${d}${o}${o}`, a: d==='<'?'Left':'Right', b: ['Left', 'Right'] }; } },
+        { id: "05", n: "Math Fluency", tr: "Quantitative Processing", trials: 3, d: "Solve accurately.",
+          gen: () => { const x=Math.floor(Math.random()*10)+5, y=Math.floor(Math.random()*10)+5; const a=x+y; return { p:`${x} + ${y}`, a:a.toString(), b: [a.toString(), (a+1).toString(), (a-1).toString()].sort(()=>Math.random()-0.5) }; } },
+        { id: "06", n: "Direction Matrix", tr: "Spatial Conflict", trials: 3, d: "Does the word match the arrow?",
+          gen: () => { const w=Math.random()>0.5?'UP':'DOWN'; const m=Math.random()>0.5; const i=m?w:(w==='UP'?'DOWN':'UP'); const arr=i==='UP'?'↑':'↓'; return { p:`${arr} ${w}`, a:m?'Yes':'No', b:['Yes', 'No'] }; } },
+        { id: "07", n: "Lexical Check", tr: "Verbal Processing", trials: 3, d: "Is this a real word?",
+          gen: () => { const w=[{t:"SYSTEM", r:true}, {t:"SYSTAM", r:false}, {t:"METRIC", r:true}, {t:"METREK", r:false}]; const c=w[Math.floor(Math.random()*w.length)]; return { p:c.t, a:c.r?'Real':'Fake', b:['Real', 'Fake'] }; } },
+        { id: "08", n: "Visual Search", tr: "Perceptual Speed", trials: 3, d: "Find the letter 'O' among 'Q's.",
+          gen: () => { const arr=Array(15).fill('Q'); arr[Math.floor(Math.random()*15)]='O'; return { p:arr.join(''), a:'Found', b:['Found'] }; } },
+        { id: "09", n: "Boolean Logic", tr: "Abstract Reasoning", trials: 3, d: "Evaluate the logic statement.",
+          gen: () => { const f=Math.random()>0.5?'AND':'OR'; const a=Math.random()>0.5; const b=Math.random()>0.5; const ans = f==='AND'?(a&&b):(a||b); return { p:`${a?'TRUE':'FALSE'} ${f} ${b?'TRUE':'FALSE'}`, a:ans?'True':'False', b:['True','False'] }; } },
+        { id: "10", n: "Simple RT", tr: "Processing Speed", trials: 3, d: "Click when the box appears.", delay: true,
+          gen: () => { return { p:"🟢", a:"Click", b:["Click"] }; } },
+        { id: "11", n: "Digit Span", tr: "Short-Term Memory", trials: 2, d: "Memorize the sequence, then type it.", input: true,
+          gen: () => { const n=Math.floor(Math.random()*9000)+1000; return { p:n, a:n.toString(), hide: 1500 }; } },
+        { id: "12", n: "Odd One Out", tr: "Pattern Recognition", trials: 3, d: "Which number is different?",
+          gen: () => { const a=Array(4).fill(8); a[Math.floor(Math.random()*4)]=3; return { p:a.join(' '), a:'3', b:['8','3'] }; } },
+        { id: "13", n: "Symbol Map", tr: "Coding Speed", trials: 3, d: "If ★=1 and ♠=2, what is ★ + ♠ ?",
+          gen: () => { return { p:"★ + ♠ = ?", a:"3", b:["2","3","4"] }; } }
+    ];
+
+    let rapState = { gIdx: 0, tIdx: 0, cr: 0, rt: 0, st: 0, curr: null, tmr: null };
+
+    function startRapidSuite() { rapState = { gIdx: 0, tIdx: 0, cr: 0, rt: 0, st: 0, curr: null, tmr: null }; nav('screen-rapid'); runRapid(); }
+
+    function runRapid() {
+        if(rapState.gIdx >= RAPID_GAMES.length) { state.flags.rapid=true; nav('screen-hub'); checkHub(); return; }
+        const game = RAPID_GAMES[rapState.gIdx];
+        
+        if(rapState.tIdx === 0 && rapState.rt === 0) {
+            // Setup new game intro
+            document.getElementById('rapid-title').innerText = game.n;
+            document.getElementById('rapid-desc').innerText = game.d;
+        }
+
+        if(rapState.tIdx >= game.trials) {
+            // End of mini-game
+            const acc = Math.round((rapState.cr/game.trials)*100);
+            const avg = Math.round(rapState.rt/game.trials);
+            state.metrics.push({ id: game.id, name: game.n, trait: game.tr, score: `${acc}%`, time: avg });
+            rapState.gIdx++; rapState.tIdx = 0; rapState.cr = 0; rapState.rt = 0;
+            runRapid(); return;
+        }
+
+        rapState.curr = game.gen();
+        const pEl = document.getElementById('rapid-prompt'); const bEl = document.getElementById('rapid-btns'); const iEl = document.getElementById('rapid-input');
+        pEl.style.display = 'block'; bEl.style.display = 'flex'; iEl.style.display = 'none'; iEl.value = '';
+        
+        if(game.delay) {
+            pEl.innerText = "Wait..."; bEl.innerHTML = '';
+            setTimeout(()=>{ pEl.innerText = rapState.curr.p; bEl.innerHTML = rapState.curr.b.map(b=>`<button onclick="ansRapid('${b}')">${b}</button>`).join(''); rapState.st = performance.now(); }, Math.random()*1000+500);
+        } else if(game.input) {
+            pEl.innerText = rapState.curr.p; bEl.innerHTML = '';
+            setTimeout(()=>{ pEl.innerText = "Type it:"; iEl.style.display = 'block'; iEl.focus(); bEl.innerHTML = `<button onclick="ansRapid(document.getElementById('rapid-input').value)">Submit</button>`; rapState.st = performance.now(); }, rapState.curr.hide);
+        } else {
+            pEl.innerText = rapState.curr.p;
+            bEl.innerHTML = rapState.curr.b.map(b=>`<button onclick="ansRapid('${b}')">${b}</button>`).join('');
+            rapState.st = performance.now();
+        }
+    }
+
+    function ansRapid(ans) {
+        rapState.rt += (performance.now() - rapState.st);
+        if(ans.toString().trim() === rapState.curr.a) rapState.cr++;
+        rapState.tIdx++; runRapid();
+    }
+
+    // --- RESULTS & PROMPT ---
+    document.getElementById('btn-view-results').addEventListener('click', () => {
+        const tb = document.getElementById('results-body'); tb.innerHTML = '';
+        state.metrics.sort((a,b) => parseInt(a.id) - parseInt(b.id));
+        state.metrics.forEach(m => { tb.innerHTML += `<tr><td>${m.id}. ${m.name}</td><td>${m.trait}</td><td style="font-weight:bold;">${m.score}</td><td>${m.time} ${m.time!=='N/A'?'ms':''}</td></tr>`; });
+        nav('screen-results');
+    });
+
+    document.getElementById('btn-copy-prompt').addEventListener('click', async () => {
+        let tStr = "ID | Assessment | Trait | Score | Avg Time\n---|---|---|---|---\n";
+        state.metrics.forEach(m => { tStr += `${m.id} | ${m.name} | ${m.trait} | ${m.score} | ${m.time}\n`; });
+
+        const prompt = `Act as an elite executive headhunter and industrial-organizational psychologist. I have completed a 13-module Cognitive Assessment Battery. 
+
+Candidate Profile: ${state.user.name}, Age: ${state.user.age}, Target Domain: ${state.user.edu}
+
+RAW TELEMETRY:
+${tStr}
+
+Based on this precise data, evaluate my cognitive architecture. Select my ideal career paths from: Technology & IT, Healthcare, Business & Finance, Education, Arts & Media, Law & Public Service, Hospitality, or Skilled Trades.
+
+FORMAT YOUR OUTPUT EXACTLY:
+1st Option: [Specific Role] - [Deep reasoning referencing specific game metrics like Stroop, BART risk, or Flanker time].
+2nd Option: [Specific Role] - [Detailed reasoning referencing metrics].
+3rd Option: [Specific Role] - [Detailed reasoning referencing metrics].
+
+Tone: Professional, clinical, constructive.`;
+
+        try { await navigator.clipboard.writeText(prompt); alert("✅ Prompt Copied! Opening Gemini..."); window.open('https://gemini.google.com', '_blank'); } 
+        catch (err) { alert("Error copying prompt."); }
+    });
+</script>
+</body>
+</html>
