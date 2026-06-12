@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise CV Architect</title>
+    <style>
+        :root {
+            --bg-page: #f8fafc;
+            --surface: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --border: #e2e8f0;
+            --radius: 8px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        
+        body { background-color: var(--bg-page); color: var(--text-main); display: flex; flex-direction: column; align-items: center; padding: 20px; min-height: 100vh; }
+
+        /* App Layout */
+        .app-header { width: 100%; max-width: 1200px; margin-bottom: 20px; text-align: center; }
+        .app-header h1 { font-size: 28px; color: #1e293b; letter-spacing: -0.5px; font-weight: 800;}
+        .app-header p { color: var(--text-muted); font-size: 14px; margin-top: 4px; }
+
+        .workspace { display: flex; gap: 24px; width: 100%; max-width: 1200px; align-items: flex-start; }
+        
+        /* Form Editor Panel */
+        .editor-panel { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); max-height: 85vh; overflow-y: auto; }
+        
+        .section-title { font-size: 18px; font-weight: 700; margin: 24px 0 12px 0; padding-bottom: 8px; border-bottom: 2px solid var(--bg-page); color: #334155; }
+        .section-title:first-child { margin-top: 0; }
+
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .form-group { display: flex; flex-direction: column; margin-bottom: 12px; }
+        .form-group.full-width { grid-column: 1 / -1; }
+        
+        label { font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #475569; }
+        input, textarea { padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; outline: none; transition: border-color 0.2s; background: #f8fafc; }
+        input:focus, textarea:focus { border-color: var(--accent); background: #ffffff; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);}
+        textarea { resize: vertical; min-height: 60px; }
+
+        .checkbox-group { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; grid-column: 1 / -1; background: #eff6ff; padding: 10px 12px; border-radius: 6px; border: 1px solid #bfdbfe;}
+        .checkbox-group input { width: 16px; height: 16px; cursor: pointer; }
+        .checkbox-group label { margin-bottom: 0; color: #1e3a8a; cursor: pointer; }
+
+        .dynamic-list { margin-bottom: 16px; }
+        .dynamic-item { background: #f1f5f9; padding: 16px; border-radius: 6px; border: 1px solid var(--border); margin-bottom: 12px; position: relative; }
+        .remove-btn { position: absolute; top: 12px; right: 12px; background: #ef4444; color: white; border: none; border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; }
+
+        button.action-btn { background-color: var(--surface); color: var(--accent); border: 1px dashed var(--accent); padding: 10px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; width: 100%; margin-bottom: 16px; }
+        button.action-btn:hover { background-color: var(--accent); color: white; border-style: solid; }
+
+        /* Preview Panel */
+        .preview-panel { flex: 1; display: flex; flex-direction: column; gap: 16px; position: sticky; top: 20px; }
+        
+        .controls-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+        .template-selector { display: flex; gap: 8px; margin-bottom: 16px; }
+        .template-btn { flex: 1; padding: 8px; border: 1px solid var(--border); background: var(--surface); border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-muted); transition: all 0.2s; }
+        .template-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+        
+        .btn-download { background-color: #10b981; color: white; border: none; padding: 14px; border-radius: 6px; font-size: 15px; font-weight: bold; cursor: pointer; width: 100%; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2); transition: background-color 0.2s;}
+        .btn-download:hover { background-color: #059669; }
+
+        /* The CV Render Canvas */
+        .cv-canvas { width: 100%; aspect-ratio: 1 / 1.414; background: white; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-radius: 4px; overflow-y: auto; font-size: 11px; }
+
+        /* ==========================================
+           CV TEMPLATE ARCHITECTURES
+        ========================================== */
+        
+        /* 1. Executive Corporate (Strict, Serif, Traditional) */
+        .cv-exec { padding: 40px; font-family: "Georgia", serif; color: #111; line-height: 1.5; }
+        .cv-exec .cv-header { text-align: center; border-bottom: 2px solid #111; padding-bottom: 16px; margin-bottom: 20px; }
+        .cv-exec .cv-name { font-size: 28px; font-weight: normal; text-transform: uppercase; letter-spacing: 2px; }
+        .cv-exec .cv-contact { font-size: 10px; color: #444; margin-top: 8px; line-height: 1.6;}
+        .cv-exec .cv-section-title { font-size: 14px; text-transform: uppercase; font-weight: bold; border-bottom: 1px solid #ccc; margin: 16px 0 8px 0; padding-bottom: 4px; }
+        .cv-exec .cv-item-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 2px; }
+        .cv-exec .cv-item-sub { font-style: italic; color: #555; margin-bottom: 4px; }
+        
+        /* 2. Modern Minimalist (Clean, Sans-Serif, Whitespace) */
+        .cv-modern { padding: 40px; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; color: #333; line-height: 1.6; }
+        .cv-modern .cv-header { margin-bottom: 30px; }
+        .cv-modern .cv-name { font-size: 32px; font-weight: 300; letter-spacing: 1px; color: #000; }
+        .cv-modern .cv-contact { font-size: 10px; color: #777; margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+        .cv-modern .cv-section-title { font-size: 12px; text-transform: uppercase; font-weight: bold; letter-spacing: 1.5px; color: #2563eb; margin: 24px 0 12px 0; }
+        .cv-modern .cv-item { margin-bottom: 16px; }
+        .cv-modern .cv-item-header { display: flex; justify-content: space-between; font-weight: 600; font-size: 12px; color: #000; }
+        .cv-modern .cv-item-sub { color: #666; font-size: 11px; margin-bottom: 4px;}
+
+        /* 3. Tech Sidebar (Two-column, Structural) */
+        .cv-tech { display: flex; height: 100%; font-family: -apple-system, Roboto, sans-serif; }
+        .cv-tech .cv-sidebar { width: 34%; background: #1e293b; color: #f8fafc; padding: 30px 20px; }
+        .cv-tech .cv-main { width: 66%; padding: 30px; background: white; color: #334155; }
+        .cv-tech .cv-name { font-size: 24px; font-weight: 800; line-height: 1.2; margin-bottom: 20px; }
+        .cv-tech .cv-sidebar-title { font-size: 12px; text-transform: uppercase; color: #94a3b8; border-bottom: 1px solid #475569; margin: 20px 0 10px 0; padding-bottom: 4px; }
+        .cv-tech .cv-section-title { font-size: 16px; font-weight: 700; color: #0f172a; margin: 0 0 12px 0; border-bottom: 2px solid #e2e8f0; padding-bottom:4px;}
+        .cv-tech .cv-contact div { margin-bottom: 8px; font-size: 10px; line-height: 1.4;}
+        .cv-tech .cv-item { margin-bottom: 16px; border-left: 2px solid #cbd5e1; padding-left: 12px; }
+        .cv-tech .cv-item-header { font-weight: 700; color: #0f172a; display: flex; justify-content: space-between;}
+        .cv-tech .cv-item-sub { color: #64748b; font-size: 10px; font-weight: 600; margin-bottom: 4px; }
+
+        /* 4. Creative Bold (High Contrast, Assertive) */
+        .cv-bold { padding: 40px; font-family: 'Segoe UI', Tahoma, sans-serif; color: #2d3748; }
+        .cv-bold .cv-header { display: flex; flex-direction: column; align-items: flex-end; text-align: right; border-bottom: 4px solid #10b981; padding-bottom: 20px; margin-bottom: 20px; }
+        /* FIXED: Changed text-transform to capitalize so names render correctly */
+        .cv-bold .cv-name { font-size: 36px; font-weight: 900; letter-spacing: -1px; color: #0f172a; text-transform: capitalize; }
+        .cv-bold .cv-contact { font-size: 10px; font-weight: 600; color: #475569; text-align: right; line-height: 1.6;}
+        .cv-bold .cv-section-title { display: inline-block; background: #0f172a; color: white; padding: 4px 12px; font-size: 12px; text-transform: uppercase; font-weight: bold; margin: 20px 0 12px 0; border-radius: 2px;}
+        .cv-bold .cv-item-header { display: flex; justify-content: space-between; font-weight: 800; font-size: 13px; color: #10b981; margin-bottom: 2px;}
+        .cv-bold .cv-item-sub { font-weight: 600; font-size: 11px; margin-bottom: 4px;}
+
+        /* Print Formatting */
+        @media print {
+            body { background: white; padding: 0; align-items: flex-start; }
+            .app-header, .editor-panel, .controls-card { display: none !important; }
+            .preview-panel { width: 100%; flex: none; position: static; gap: 0;}
+            .cv-canvas { box-shadow: none; border-radius: 0; width: 100%; height: auto; aspect-ratio: auto; overflow: visible;}
+            @page { margin: 0; size: A4; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-header">
+        <h1>Enterprise CV Architect</h1>
+        <p>Complete the parameters below. The rendering engine will strictly format and compile your document locally for immediate PDF export.</p>
+    </div>
+
+    <div class="workspace">
+        
+        <div class="editor-panel" id="data-form">
+            
+            <div class="section-title">Identity & Contact Matrix</div>
+            <div class="form-group full-width"><label>Full Name</label><input type="text" id="cv-f-name" value="Pramod Shinde" oninput="renderCV()"></div>
+            <div class="form-group full-width"><label>Professional Title</label><input type="text" id="cv-f-title" value="Senior Technical Project Manager" oninput="renderCV()"></div>
+            
+            <div class="form-grid">
+                <div class="form-group"><label>Email Address</label><input type="email" id="cv-f-email" value="pramod@example.com" oninput="renderCV()"></div>
+                <div class="form-group"><label>Phone Number</label><input type="text" id="cv-f-phone" value="+91 9869065253" oninput="renderCV()"></div>
+                <div class="form-group"><label>LinkedIn / Portfolio URL</label><input type="text" id="cv-f-link" value="linkedin.com/in/pramod" oninput="renderCV()"></div>
+            </div>
+
+            <div class="form-group full-width" style="margin-top: 8px;">
+                <label>Current Address</label>
+                <textarea id="cv-f-curr-addr" oninput="syncAddresses()"></textarea>
+            </div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" id="cv-f-same-addr" onchange="toggleAddressLock()">
+                <label for="cv-f-same-addr">Permanent Address is the same as Current Address</label>
+            </div>
+
+            <div class="form-group full-width">
+                <label>Permanent Address</label>
+                <textarea id="cv-f-perm-addr" oninput="renderCV()"></textarea>
+            </div>
+
+            <div style="background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; margin: 24px 0;">
+                <label style="color: #475569; margin-bottom: 12px; display:block; font-size:14px; font-weight:700;">Biographical Anchors (Optional)</label>
+                <div class="form-grid">
+                    <div class="form-group"><label>Date of Birth</label><input type="date" id="cv-f-dob" oninput="renderCV()"></div>
+                    <div class="form-group"><label>Time of Birth</label><input type="time" id="cv-f-tob" oninput="renderCV()"></div>
+                    <div class="form-group full-width"><label>Place of Birth</label><input type="text" id="cv-f-pob" placeholder="e.g., Mumbai, Maharashtra" oninput="renderCV()"></div>
+                </div>
+            </div>
+
+            <div class="section-title">Executive Summary</div>
+            <div class="form-group full-width">
+                <textarea id="cv-f-summary" oninput="renderCV()">A highly analytical and results-driven professional with a proven track record in strategic planning and cross-functional leadership. Adept at optimizing complex software workflows and deploying robust technical architectures under high-pressure environments.</textarea>
+            </div>
+
+            <div class="section-title">Academic Architecture</div>
+            <div id="edu-container" class="dynamic-list"></div>
+            <button class="action-btn" onclick="addEducation()">+ Add Education Node</button>
+
+            <div class="section-title">Professional Experience</div>
+            <div class="form-group full-width">
+                <label style="color:var(--accent); font-size:12px; margin-top:-8px; margin-bottom:12px;">Expert Tip: Use bullet points (•) and focus on measurable outcomes (e.g., "Deployed system X, improving efficiency by Y%").</label>
+            </div>
+            <div id="exp-container" class="dynamic-list"></div>
+            <button class="action-btn" onclick="addExperience()">+ Add Experience Node</button>
+
+            <div class="section-title">Projects & Certifications</div>
+            <div id="proj-container" class="dynamic-list"></div>
+            <button class="action-btn" onclick="addProject()">+ Add Project / Certification Node</button>
+
+            <div class="section-title">Special Achievements & Extracurriculars</div>
+            <div class="form-group full-width">
+                <label>Highlight sports, martial arts, arts, languages, or unique personal awards.</label>
+                <textarea id="cv-f-special" oninput="renderCV()">• Black Belt in Shotokan Karate (National Gold Medalist)
+• Fluent in English, Hindi, Marathi, and conversational French
+• Published author in regional literary magazines</textarea>
+            </div>
+
+            <div class="section-title">Core Competencies & Technical Skills</div>
+            <div class="form-group full-width">
+                <label>Enter skills separated by commas</label>
+                <textarea id="cv-f-skills" oninput="renderCV()">Strategic Planning, Risk Assessment, Agile Methodologies, Python Data Analysis, Cross-functional Leadership, Conflict Resolution</textarea>
+            </div>
+
+        </div>
+
+        <div class="preview-panel">
+            
+            <div class="controls-card">
+                <label style="font-size:14px; font-weight:700; margin-bottom:12px; display:block;">Select Architectural Layout</label>
+                <div class="template-selector">
+                    <button class="template-btn active" onclick="setTemplate('cv-exec', this)">Executive</button>
+                    <button class="template-btn" onclick="setTemplate('cv-modern', this)">Modern</button>
+                    <button class="template-btn" onclick="setTemplate('cv-tech', this)">Sidebar</button>
+                    <button class="template-btn" onclick="setTemplate('cv-bold', this)">Creative Bold</button>
+                </div>
+                <button class="btn-download" onclick="window.print()">Export to PDF</button>
+            </div>
+
+            <div id="cv-render-target" class="cv-canvas cv-exec">
+                </div>
+
+        </div>
+
+    </div>
+
+<script>
+    // Internal Data State
+    let educationData = [
+        { degree: "Master of Business Administration (MBA)", school: "Global Business School", date: "2018 - 2020", desc: "Specialization in Operations and Strategic Management." },
+        { degree: "Bachelor of Science in Computer Science", school: "National Institute of Technology", date: "2014 - 2018", desc: "Graduated First Class with Distinction." }
+    ];
+
+    let experienceData = [
+        { title: "Senior Technical Project Manager", company: "Apex Enterprise Solutions", date: "Jan 2021 - Present", desc: "• Directed a team of 45 cross-functional developers.\n• Architected logistics workflows, reducing overhead by 22%.\n• Ensured 100% compliance with strict local-first data privacy architectures." },
+        { title: "Project Coordinator", company: "Nexus Dynamics", date: "Jun 2018 - Dec 2020", desc: "• Managed $2M software deployment portfolios.\n• Implemented Agile frameworks that accelerated deployment timelines by 15%." }
+    ];
+
+    let projectData = [
+        { title: "Certified Scrum Master (CSM)", context: "Project Management Institute", desc: "Advanced certification in Agile workflow execution and cross-functional team leadership." }
+    ];
+
+    let currentTemplate = 'cv-exec';
+
+    // UI Initializers
+    function init() {
+        document.getElementById('cv-f-curr-addr').value = "402, Skyline Towers, Andheri West, Mumbai, 400053";
+        document.getElementById('cv-f-perm-addr').value = "402, Skyline Towers, Andheri West, Mumbai, 400053";
+        document.getElementById('cv-f-same-addr').checked = true;
+        toggleAddressLock();
+
+        renderEducationForms();
+        renderExperienceForms();
+        renderProjectForms();
+        renderCV();
+    }
+
+    // Address Hub Logic
+    function toggleAddressLock() {
+        const isChecked = document.getElementById('cv-f-same-addr').checked;
+        const permAddrInput = document.getElementById('cv-f-perm-addr');
+        
+        if (isChecked) {
+            permAddrInput.value = document.getElementById('cv-f-curr-addr').value;
+            permAddrInput.disabled = true;
+            permAddrInput.style.backgroundColor = '#e2e8f0';
+        } else {
+            permAddrInput.disabled = false;
+            permAddrInput.style.backgroundColor = '#f8fafc';
+        }
+        renderCV();
+    }
+
+    function syncAddresses() {
+        if (document.getElementById('cv-f-same-addr').checked) {
+            document.getElementById('cv-f-perm-addr').value = document.getElementById('cv-f-curr-addr').value;
+        }
+        renderCV();
+    }
+
+    // Form Handlers: Education
+    function renderEducationForms() {
+        const container = document.getElementById('edu-container');
+        container.innerHTML = '';
+        educationData.forEach((edu, index) => {
+            container.innerHTML += `
+                <div class="dynamic-item">
+                    <button class="remove-btn" onclick="removeEducation(${index})">Remove</button>
+                    <div class="form-group"><label>Degree / Certificate</label><input type="text" value="${edu.degree}" oninput="updateEdu(${index}, 'degree', this.value)"></div>
+                    <div class="form-group"><label>Institution</label><input type="text" value="${edu.school}" oninput="updateEdu(${index}, 'school', this.value)"></div>
+                    <div class="form-group"><label>Date Range / Year</label><input type="text" value="${edu.date}" oninput="updateEdu(${index}, 'date', this.value)"></div>
+                    <div class="form-group"><label>Details (Optional)</label><input type="text" value="${edu.desc}" oninput="updateEdu(${index}, 'desc', this.value)"></div>
+                </div>
+            `;
+        });
+    }
+    function updateEdu(index, field, value) { educationData[index][field] = value; renderCV(); }
+    function addEducation() { educationData.push({ degree: "", school: "", date: "", desc: "" }); renderEducationForms(); renderCV(); }
+    function removeEducation(index) { educationData.splice(index, 1); renderEducationForms(); renderCV(); }
+
+    // Form Handlers: Experience
+    function renderExperienceForms() {
+        const container = document.getElementById('exp-container');
+        container.innerHTML = '';
+        experienceData.forEach((exp, index) => {
+            container.innerHTML += `
+                <div class="dynamic-item">
+                    <button class="remove-btn" onclick="removeExperience(${index})">Remove</button>
+                    <div class="form-group"><label>Job Title</label><input type="text" value="${exp.title}" oninput="updateExp(${index}, 'title', this.value)"></div>
+                    <div class="form-group"><label>Company / Organization</label><input type="text" value="${exp.company}" oninput="updateExp(${index}, 'company', this.value)"></div>
+                    <div class="form-group"><label>Date Range</label><input type="text" value="${exp.date}" oninput="updateExp(${index}, 'date', this.value)"></div>
+                    <div class="form-group"><label>Description / Achievements (Use • Bullets)</label><textarea oninput="updateExp(${index}, 'desc', this.value)">${exp.desc}</textarea></div>
+                </div>
+            `;
+        });
+    }
+    function updateExp(index, field, value) { experienceData[index][field] = value; renderCV(); }
+    function addExperience() { experienceData.push({ title: "", company: "", date: "", desc: "• " }); renderExperienceForms(); renderCV(); }
+    function removeExperience(index) { experienceData.splice(index, 1); renderExperienceForms(); renderCV(); }
+
+    // Form Handlers: Projects & Certifications
+    function renderProjectForms() {
+        const container = document.getElementById('proj-container');
+        container.innerHTML = '';
+        projectData.forEach((proj, index) => {
+            container.innerHTML += `
+                <div class="dynamic-item">
+                    <button class="remove-btn" onclick="removeProject(${index})">Remove</button>
+                    <div class="form-group"><label>Project Name / Certification</label><input type="text" value="${proj.title}" oninput="updateProj(${index}, 'title', this.value)"></div>
+                    <div class="form-group"><label>Platform / Issuer / Tech Stack</label><input type="text" value="${proj.context}" oninput="updateProj(${index}, 'context', this.value)"></div>
+                    <div class="form-group"><label>Description & Impact</label><textarea oninput="updateProj(${index}, 'desc', this.value)">${proj.desc}</textarea></div>
+                </div>
+            `;
+        });
+    }
+    function updateProj(index, field, value) { projectData[index][field] = value; renderCV(); }
+    function addProject() { projectData.push({ title: "", context: "", desc: "• " }); renderProjectForms(); renderCV(); }
+    function removeProject(index) { projectData.splice(index, 1); renderProjectForms(); renderCV(); }
+
+    // Template Selector
+    function setTemplate(templateClass, btnElement) {
+        currentTemplate = templateClass;
+        document.querySelectorAll('.template-btn').forEach(btn => btn.classList.remove('active'));
+        btnElement.classList.add('active');
+        document.getElementById('cv-render-target').className = `cv-canvas ${templateClass}`;
+        renderCV(); 
+    }
+
+    // Main Compilation Engine
+    function renderCV() {
+        const name = document.getElementById('cv-f-name').value;
+        const title = document.getElementById('cv-f-title').value;
+        const email = document.getElementById('cv-f-email').value;
+        const phone = document.getElementById('cv-f-phone').value;
+        const link = document.getElementById('cv-f-link').value;
+        const summary = document.getElementById('cv-f-summary').value;
+        const specialRaw = document.getElementById('cv-f-special').value.trim();
+        const skillsRaw = document.getElementById('cv-f-skills').value;
+        
+        const currAddr = document.getElementById('cv-f-curr-addr').value.trim();
+        const permAddr = document.getElementById('cv-f-perm-addr').value.trim();
+
+        const dob = document.getElementById('cv-f-dob').value;
+        const tob = document.getElementById('cv-f-tob').value;
+        const pob = document.getElementById('cv-f-pob').value.trim();
+        
+        let bioString = "";
+        let bioArr = [];
+        if (dob) bioArr.push(`Born: ${dob}`);
+        if (tob) bioArr.push(`Time: ${tob}`);
+        if (pob) bioArr.push(`Place: ${pob}`);
+        if (bioArr.length > 0) bioString = bioArr.join(" | ");
+
+        const skillsArr = skillsRaw.split(',').map(s => s.trim()).filter(s => s);
+        const target = document.getElementById('cv-render-target');
+
+        // Render Logic Based on Architecture
+        if (currentTemplate === 'cv-tech') {
+            
+            // --- SIDEBAR LAYOUT ---
+            let html = `<div class="cv-sidebar">
+                <div class="cv-name">${name}</div>
+                <div style="color:#38bdf8; margin-bottom:24px; font-weight:600;">${title}</div>
+                
+                <div class="cv-sidebar-title">Contact Architecture</div>
+                <div class="cv-contact">
+                    ${email ? `<div><strong>E:</strong> ${email}</div>` : ''}
+                    ${phone ? `<div><strong>P:</strong> ${phone}</div>` : ''}
+                    ${link ? `<div><strong>W:</strong> ${link}</div>` : ''}
+                    ${currAddr ? `<div style="margin-top:8px;"><strong>Current Loc:</strong><br>${currAddr}</div>` : ''}
+                    ${permAddr && (permAddr !== currAddr) ? `<div style="margin-top:4px;"><strong>Perm Loc:</strong><br>${permAddr}</div>` : ''}
+                </div>`;
+            
+            if(bioString) {
+                html += `<div class="cv-sidebar-title">Biographical Anchors</div>
+                         <div class="cv-contact"><div>${bioString.replace(/ \| /g, '<br>')}</div></div>`;
+            }
+
+            if(specialRaw) {
+                html += `<div class="cv-sidebar-title">Special Achievements</div>
+                         <div style="font-size:10px; line-height:1.5; white-space:pre-wrap;">${specialRaw}</div>`;
+            }
+
+            html += `<div class="cv-sidebar-title">Core Competencies</div>
+                     <ul style="padding-left:16px; font-size:11px; line-height:1.8;">`;
+            skillsArr.forEach(s => { html += `<li>${s}</li>`; });
+            html += `</ul></div>`;
+
+            // Main Content Area
+            html += `<div class="cv-main">
+                <div class="cv-section-title">Executive Summary</div>
+                <p style="font-size:11px; margin-bottom:24px; line-height:1.6;">${summary}</p>
+                
+                <div class="cv-section-title">Academic Architecture</div>`;
+            
+            educationData.forEach(edu => {
+                html += `
+                    <div class="cv-item">
+                        <div class="cv-item-header"><span>${edu.degree}</span><span>${edu.date}</span></div>
+                        <div class="cv-item-sub">${edu.school}</div>
+                        ${edu.desc ? `<p style="font-size:11px; white-space:pre-wrap;">${edu.desc}</p>` : ''}
+                    </div>`;
+            });
+
+            html += `<div class="cv-section-title" style="margin-top:24px;">Professional Experience</div>`;
+            experienceData.forEach(exp => {
+                html += `
+                    <div class="cv-item">
+                        <div class="cv-item-header"><span>${exp.title}</span><span>${exp.date}</span></div>
+                        <div class="cv-item-sub">${exp.company}</div>
+                        <p style="font-size:11px; white-space:pre-wrap;">${exp.desc}</p>
+                    </div>`;
+            });
+
+            if (projectData.length > 0) {
+                html += `<div class="cv-section-title" style="margin-top:24px;">Projects & Certifications</div>`;
+                projectData.forEach(proj => {
+                    html += `
+                        <div class="cv-item">
+                            <div class="cv-item-header"><span>${proj.title}</span></div>
+                            <div class="cv-item-sub">${proj.context}</div>
+                            <p style="font-size:11px; white-space:pre-wrap;">${proj.desc}</p>
+                        </div>`;
+                });
+            }
+
+            html += `</div>`; // Close Main
+            target.innerHTML = html;
+
+        } else {
+            
+            // --- TOP-DOWN LAYOUTS (Exec, Modern, Bold) ---
+            let contactHTML = [email, phone, link].filter(Boolean).join(" • ");
+            
+            let addressHTML = "";
+            if (currAddr) addressHTML += `Current: ${currAddr}`;
+            if (permAddr && permAddr !== currAddr) addressHTML += ` | Permanent: ${permAddr}`;
+
+            let html = `
+                <div class="cv-header">
+                    <div class="cv-name">${name}</div>
+                    <div style="font-weight:bold; margin-top:4px; font-size:13px;">${title}</div>
+                    <div class="cv-contact">${contactHTML}</div>
+                    ${addressHTML ? `<div class="cv-contact">${addressHTML}</div>` : ''}
+                    ${bioString ? `<div class="cv-contact" style="font-style:italic;">${bioString}</div>` : ''}
+                </div>
+                
+                ${summary ? `<div class="cv-section-title">Profile</div><p>${summary}</p>` : ''}
+                
+                <div class="cv-section-title">Education</div>`;
+            
+            educationData.forEach(edu => {
+                html += `
+                    <div class="cv-item">
+                        <div class="cv-item-header"><span>${edu.degree}</span><span>${edu.date}</span></div>
+                        <div class="cv-item-sub">${edu.school}</div>
+                        ${edu.desc ? `<p style="white-space:pre-wrap;">${edu.desc}</p>` : ''}
+                    </div>`;
+            });
+
+            html += `<div class="cv-section-title">Experience</div>`;
+            experienceData.forEach(exp => {
+                html += `
+                    <div class="cv-item">
+                        <div class="cv-item-header"><span>${exp.title}, ${exp.company}</span><span>${exp.date}</span></div>
+                        <p style="white-space:pre-wrap;">${exp.desc}</p>
+                    </div>`;
+            });
+
+            if (projectData.length > 0) {
+                html += `<div class="cv-section-title">Projects & Certifications</div>`;
+                projectData.forEach(proj => {
+                    html += `
+                        <div class="cv-item">
+                            <div class="cv-item-header"><span>${proj.title}</span></div>
+                            <div class="cv-item-sub">${proj.context}</div>
+                            <p style="white-space:pre-wrap;">${proj.desc}</p>
+                        </div>`;
+                });
+            }
+
+            if (specialRaw) {
+                html += `<div class="cv-section-title">Special Achievements & Extracurriculars</div>
+                         <p style="white-space:pre-wrap; line-height:1.6;">${specialRaw}</p>`;
+            }
+
+            html += `<div class="cv-section-title">Skills & Competencies</div>
+                     <p style="line-height:1.6;">${skillsArr.join(' • ')}</p>`;
+
+            target.innerHTML = html;
+        }
+    }
+
+    // Start App
+    init();
+
+</script>
+</body>
+</html>
