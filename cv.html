@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Enterprise CV Architect</title>
     
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" integrity="sha512-BNaRQmJbSlZGg2aGWZ1143kqPfG6rBf1+1b2nS7f1bAMh1z1mZ20YqbOq4D8OPEaQzPZJ2fX515LwLBB/v6P2g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
     <style>
         :root {
             --bg-page: #f8fafc;
@@ -29,7 +32,7 @@
         .workspace { display: flex; gap: 24px; width: 100%; max-width: 1200px; align-items: flex-start; }
         
         /* Form Editor Panel */
-        .editor-panel { flex: 1; width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); max-height: 85vh; overflow-y: auto; }
+        .editor-panel { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); max-height: 85vh; overflow-y: auto; }
         
         .section-title { font-size: 18px; font-weight: 700; margin: 24px 0 12px 0; padding-bottom: 8px; border-bottom: 2px solid var(--bg-page); color: #334155; }
         .section-title:first-child { margin-top: 0; }
@@ -39,8 +42,8 @@
         .form-group.full-width { grid-column: 1 / -1; }
         
         label { font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #475569; }
-        input, select, textarea { padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; outline: none; transition: border-color 0.2s; background: #f8fafc; }
-        input:focus, select:focus, textarea:focus { border-color: var(--accent); background: #ffffff; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);}
+        input, textarea { padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; outline: none; transition: border-color 0.2s; background: #f8fafc; }
+        input:focus, textarea:focus { border-color: var(--accent); background: #ffffff; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);}
         textarea { resize: vertical; min-height: 60px; }
 
         .checkbox-group { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; grid-column: 1 / -1; background: #eff6ff; padding: 10px 12px; border-radius: 6px; border: 1px solid #bfdbfe;}
@@ -49,30 +52,39 @@
 
         .dynamic-list { margin-bottom: 16px; }
         .dynamic-item { background: #f1f5f9; padding: 16px; border-radius: 6px; border: 1px solid var(--border); margin-bottom: 12px; position: relative; }
-        .remove-btn { position: absolute; top: 12px; right: 12px; background: #ef4444; color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+        .remove-btn { position: absolute; top: 12px; right: 12px; background: #ef4444; color: white; border: none; border-radius: 4px; padding: 4px 8px; font-size: 11px; cursor: pointer; }
 
-        button.action-btn { background-color: var(--surface); color: var(--accent); border: 1px dashed var(--accent); padding: 12px 16px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; width: 100%; margin-bottom: 16px; }
+        button.action-btn { background-color: var(--surface); color: var(--accent); border: 1px dashed var(--accent); padding: 10px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; width: 100%; margin-bottom: 16px; }
         button.action-btn:hover { background-color: var(--accent); color: white; border-style: solid; }
 
-        /* Preview Panel */
-        .preview-panel { flex: 1; width: 100%; display: flex; flex-direction: column; gap: 16px; position: sticky; top: 20px; }
-        
+        /* Preview Panel & Controls */
+        .preview-panel { flex: 1; display: flex; flex-direction: column; gap: 16px; position: sticky; top: 20px; }
         .controls-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
         .template-selector { display: flex; gap: 8px; margin-bottom: 16px; }
-        .template-btn { flex: 1; padding: 10px; border: 1px solid var(--border); background: var(--surface); border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-muted); transition: all 0.2s; text-align: center; }
+        .template-btn { flex: 1; padding: 8px; border: 1px solid var(--border); background: var(--surface); border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-muted); transition: all 0.2s; }
         .template-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
         
-        .btn-download { background-color: #10b981; color: white; border: none; padding: 16px; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; width: 100%; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2); transition: background-color 0.2s;}
+        .action-row { display: flex; gap: 12px; margin-top: 10px; }
+        .btn-half { flex: 1; padding: 14px; border-radius: 6px; font-size: 14px; font-weight: bold; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.2s; display: flex; justify-content: center; align-items: center; border: none;}
+        
+        .btn-download { background-color: #10b981; color: white; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2); }
         .btn-download:hover { background-color: #059669; }
+        .btn-download:disabled { background-color: #94a3b8; cursor: not-allowed; box-shadow: none; }
+        
+        .btn-fullscreen { background-color: #0f172a; color: white; box-shadow: 0 4px 6px rgba(15, 23, 42, 0.2); }
+        .btn-fullscreen:hover { background-color: #1e293b; }
 
-        /* The CV Render Canvas - Set to exact A4 Proportions */
-        .cv-canvas { width: 100%; max-width: 210mm; aspect-ratio: 1 / 1.414; background: white; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-radius: 4px; overflow-y: auto; font-size: 11px; margin: 0 auto; }
+        /* The CV Render Canvas - Strictly A4 Proportions */
+        .cv-canvas { width: 100%; max-width: 210mm; min-height: 297mm; background: white; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-radius: 4px; font-size: 11px; margin: 0 auto; overflow: visible; }
 
+        /* Full Screen Overlay */
+        .fullscreen-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #e2e8f0; z-index: 9999; overflow-y: auto; padding: 60px 20px 40px 20px; justify-content: center; align-items: flex-start; }
+        .fullscreen-overlay.active { display: flex; }
+        .fullscreen-controls { position: fixed; top: 15px; right: 20px; display: flex; gap: 12px; z-index: 10000; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid var(--border);}
+        
         /* ==========================================
            CV TEMPLATE ARCHITECTURES
         ========================================== */
-        
-        /* 1. Executive Corporate */
         .cv-exec { padding: 40px; font-family: "Georgia", serif; color: #111; line-height: 1.5; }
         .cv-exec .cv-header { text-align: center; border-bottom: 2px solid #111; padding-bottom: 16px; margin-bottom: 20px; }
         .cv-exec .cv-name { font-size: 28px; font-weight: normal; text-transform: uppercase; letter-spacing: 2px; }
@@ -81,7 +93,6 @@
         .cv-exec .cv-item-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 2px; }
         .cv-exec .cv-item-sub { font-style: italic; color: #555; margin-bottom: 4px; }
         
-        /* 2. Modern Minimalist */
         .cv-modern { padding: 40px; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; color: #333; line-height: 1.6; }
         .cv-modern .cv-header { margin-bottom: 30px; }
         .cv-modern .cv-name { font-size: 32px; font-weight: 300; letter-spacing: 1px; color: #000; }
@@ -91,8 +102,7 @@
         .cv-modern .cv-item-header { display: flex; justify-content: space-between; font-weight: 600; font-size: 12px; color: #000; }
         .cv-modern .cv-item-sub { color: #666; font-size: 11px; margin-bottom: 4px;}
 
-        /* 3. Tech Sidebar */
-        .cv-tech { display: flex; height: 100%; font-family: -apple-system, Roboto, sans-serif; }
+        .cv-tech { display: flex; min-height: 297mm; font-family: -apple-system, Roboto, sans-serif; }
         .cv-tech .cv-sidebar { width: 34%; background: #1e293b; color: #f8fafc; padding: 30px 20px; }
         .cv-tech .cv-main { width: 66%; padding: 30px; background: white; color: #334155; }
         .cv-tech .cv-name { font-size: 24px; font-weight: 800; line-height: 1.2; margin-bottom: 20px; }
@@ -103,7 +113,6 @@
         .cv-tech .cv-item-header { font-weight: 700; color: #0f172a; display: flex; justify-content: space-between;}
         .cv-tech .cv-item-sub { color: #64748b; font-size: 10px; font-weight: 600; margin-bottom: 4px; }
 
-        /* 4. Creative Bold */
         .cv-bold { padding: 40px; font-family: 'Segoe UI', Tahoma, sans-serif; color: #2d3748; }
         .cv-bold .cv-header { display: flex; flex-direction: column; align-items: flex-end; text-align: right; border-bottom: 4px solid #10b981; padding-bottom: 20px; margin-bottom: 20px; }
         .cv-bold .cv-name { font-size: 36px; font-weight: 900; letter-spacing: -1px; color: #0f172a; text-transform: capitalize; }
@@ -111,94 +120,17 @@
         .cv-bold .cv-section-title { display: inline-block; background: #0f172a; color: white; padding: 4px 12px; font-size: 12px; text-transform: uppercase; font-weight: bold; margin: 20px 0 12px 0; border-radius: 2px;}
         .cv-bold .cv-item-header { display: flex; justify-content: space-between; font-weight: 800; font-size: 13px; color: #10b981; margin-bottom: 2px;}
         .cv-bold .cv-item-sub { font-weight: 600; font-size: 11px; margin-bottom: 4px;}
-
-        /* ==========================================
-           MOBILE RESPONSIVENESS (SMARTPHONES/TABLETS)
-        ========================================== */
-        @media (max-width: 850px) {
-            body { padding: 10px; }
-            .workspace { flex-direction: column; gap: 16px; }
-            
-            /* Remove sticky positioning and max-height for natural mobile scrolling */
-            .editor-panel { max-height: none; overflow-y: visible; padding: 16px; }
-            .preview-panel { position: static; }
-
-            /* Collapse 2-column grids into single columns */
-            .form-grid { grid-template-columns: 1fr; gap: 12px; }
-            
-            /* Stack template selector buttons elegantly */
-            .template-selector { flex-wrap: wrap; gap: 8px; }
-            .template-btn { flex: 1 1 45%; padding: 12px; }
-            
-            /* Adjust app title size */
-            .app-header h1 { font-size: 24px; }
-        }
-
-        /* ==========================================
-           ATS-COMPLIANT VECTOR PRINT ENGINE 
-           (Fixes Android Cut-off & Blank PDF bugs)
-        ========================================== */
-        @media print {
-            /* Hide the web application interface completely */
-            body.printing-active .app-header,
-            body.printing-active .workspace {
-                display: none !important;
-            }
-            
-            /* Reset body to pure white canvas */
-            body.printing-active {
-                background-color: white !important;
-                padding: 0 !important;
-                margin: 0 !important;
-            }
-
-            /* Release all constraints so the CV flows naturally onto A4 pages */
-            #print-clone {
-                width: 100% !important;
-                max-width: 100% !important;
-                height: auto !important;
-                max-height: none !important;
-                overflow: visible !important;
-                box-shadow: none !important;
-                border: none !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                aspect-ratio: auto !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-
-            /* Fix Tech Sidebar height cut-off bug */
-            .cv-tech, .cv-tech .cv-sidebar, .cv-tech .cv-main {
-                height: auto !important;
-                min-height: 100% !important;
-            }
-
-            /* Prevent elements from being sliced in half across pages */
-            .cv-item, .cv-section-title {
-                page-break-inside: avoid;
-                break-inside: avoid;
-            }
-
-            /* Force standard A4 sizing from the device */
-            @page {
-                size: A4 portrait;
-                margin: 0mm; /* CV padding acts as the margin */
-            }
-        }
     </style>
 </head>
 <body>
 
     <div class="app-header">
         <h1>Enterprise CV Architect</h1>
-        <p>Complete the parameters below. The rendering engine will format a 100% vector, ATS-compliant PDF.</p>
+        <p>Complete the parameters below. The rendering engine will cleanly format your document for exact A4 PDF export and High-Res Screenshots.</p>
     </div>
 
     <div class="workspace">
-        
         <div class="editor-panel" id="data-form">
-            
             <div class="section-title">Identity & Contact Matrix</div>
             <div class="form-group full-width"><label>Full Name</label><input type="text" id="cv-f-name" value="Pramod Shinde" oninput="renderCV()"></div>
             <div class="form-group full-width"><label>Professional Title</label><input type="text" id="cv-f-title" value="Software Developer & Technical Project Manager" oninput="renderCV()"></div>
@@ -213,12 +145,10 @@
                 <label>Current Address</label>
                 <textarea id="cv-f-curr-addr" oninput="syncAddresses()">Thane, Maharashtra, India</textarea>
             </div>
-            
             <div class="checkbox-group">
                 <input type="checkbox" id="cv-f-same-addr" onchange="toggleAddressLock()" checked>
-                <label for="cv-f-same-addr">Permanent Address is same as Current</label>
+                <label for="cv-f-same-addr">Permanent Address is the same as Current Address</label>
             </div>
-
             <div class="form-group full-width">
                 <label>Permanent Address</label>
                 <textarea id="cv-f-perm-addr" oninput="renderCV()">Thane, Maharashtra, India</textarea>
@@ -243,9 +173,7 @@
             <button class="action-btn" onclick="addEducation()">+ Add Education Node</button>
 
             <div class="section-title">Professional Experience</div>
-            <div class="form-group full-width">
-                <label style="color:var(--accent); font-size:12px; margin-top:-8px; margin-bottom:12px;">Expert Tip: Use bullet points (•) and focus on measurable outcomes.</label>
-            </div>
+            <div class="form-group full-width"><label style="color:var(--accent); font-size:12px; margin-top:-8px; margin-bottom:12px;">Expert Tip: Use bullet points (•) and focus on measurable outcomes.</label></div>
             <div id="exp-container" class="dynamic-list"></div>
             <button class="action-btn" onclick="addExperience()">+ Add Experience Node</button>
 
@@ -265,11 +193,9 @@
                 <label>Enter skills separated by commas</label>
                 <textarea id="cv-f-skills" oninput="renderCV()">Python, JavaScript, HTML/CSS, Electron & PyWebView, Local-First Architecture, Technical Project Management, API Integration, Cross-functional Leadership</textarea>
             </div>
-
         </div>
 
-        <div class="preview-panel">
-            
+        <div class="preview-panel" id="main-preview-area">
             <div class="controls-card">
                 <label style="font-size:14px; font-weight:700; margin-bottom:12px; display:block;">Select Architectural Layout</label>
                 <div class="template-selector">
@@ -278,14 +204,25 @@
                     <button class="template-btn" onclick="setTemplate('cv-tech', this)">Sidebar</button>
                     <button class="template-btn" onclick="setTemplate('cv-bold', this)">Creative</button>
                 </div>
-                <button class="btn-download" onclick="generatePDF()">Export to PDF</button>
+                
+                <div class="action-row">
+                    <button class="btn-half btn-download" onclick="generatePDF()">📄 Export PDF</button>
+                    <button class="btn-half btn-fullscreen" onclick="openFullscreen()">⛶ Full Screen</button>
+                </div>
             </div>
 
-            <div id="cv-render-target" class="cv-canvas cv-exec">
-                </div>
-
+            <div id="cv-mount-point">
+                <div id="cv-render-target" class="cv-canvas cv-exec"></div>
+            </div>
         </div>
+    </div>
 
+    <div id="fullscreen-overlay" class="fullscreen-overlay">
+        <div class="fullscreen-controls">
+            <button class="btn-half btn-download" style="padding: 10px 16px; margin: 0; box-shadow:none;" onclick="takeScreenshot()">📷 Capture Screenshot</button>
+            <button class="btn-half btn-fullscreen" style="background:#ef4444; padding: 10px 16px; margin: 0; box-shadow:none;" onclick="closeFullscreen()">✖ Close</button>
+        </div>
+        <div id="fullscreen-wrapper" style="width:100%; max-width:210mm; display:flex; justify-content:center;"></div>
     </div>
 
 <script>
@@ -314,89 +251,46 @@
         renderCV();
     }
 
-    // Address Hub Logic
     function toggleAddressLock() {
         const isChecked = document.getElementById('cv-f-same-addr').checked;
         const permAddrInput = document.getElementById('cv-f-perm-addr');
-        
-        if (isChecked) {
-            permAddrInput.value = document.getElementById('cv-f-curr-addr').value;
-            permAddrInput.disabled = true;
-            permAddrInput.style.backgroundColor = '#e2e8f0';
-        } else {
-            permAddrInput.disabled = false;
-            permAddrInput.style.backgroundColor = '#f8fafc';
-        }
+        if (isChecked) { permAddrInput.value = document.getElementById('cv-f-curr-addr').value; permAddrInput.disabled = true; permAddrInput.style.backgroundColor = '#e2e8f0'; } 
+        else { permAddrInput.disabled = false; permAddrInput.style.backgroundColor = '#f8fafc'; }
         renderCV();
     }
 
-    function syncAddresses() {
-        if (document.getElementById('cv-f-same-addr').checked) {
-            document.getElementById('cv-f-perm-addr').value = document.getElementById('cv-f-curr-addr').value;
-        }
-        renderCV();
-    }
+    function syncAddresses() { if (document.getElementById('cv-f-same-addr').checked) document.getElementById('cv-f-perm-addr').value = document.getElementById('cv-f-curr-addr').value; renderCV(); }
 
-    // Form Handlers: Education
     function renderEducationForms() {
-        const container = document.getElementById('edu-container');
-        container.innerHTML = '';
+        const container = document.getElementById('edu-container'); container.innerHTML = '';
         educationData.forEach((edu, index) => {
-            container.innerHTML += `
-                <div class="dynamic-item">
-                    <button class="remove-btn" onclick="removeEducation(${index})">Remove</button>
-                    <div class="form-group"><label>Degree / Certificate</label><input type="text" value="${edu.degree}" oninput="updateEdu(${index}, 'degree', this.value)"></div>
-                    <div class="form-group"><label>Institution</label><input type="text" value="${edu.school}" oninput="updateEdu(${index}, 'school', this.value)"></div>
-                    <div class="form-group"><label>Date Range / Year</label><input type="text" value="${edu.date}" oninput="updateEdu(${index}, 'date', this.value)"></div>
-                    <div class="form-group"><label>Details (Optional)</label><input type="text" value="${edu.desc}" oninput="updateEdu(${index}, 'desc', this.value)"></div>
-                </div>
-            `;
+            container.innerHTML += `<div class="dynamic-item"><button class="remove-btn" onclick="removeEducation(${index})">Remove</button><div class="form-group"><label>Degree / Certificate</label><input type="text" value="${edu.degree}" oninput="updateEdu(${index}, 'degree', this.value)"></div><div class="form-group"><label>Institution</label><input type="text" value="${edu.school}" oninput="updateEdu(${index}, 'school', this.value)"></div><div class="form-group"><label>Date Range / Year</label><input type="text" value="${edu.date}" oninput="updateEdu(${index}, 'date', this.value)"></div><div class="form-group"><label>Details (Optional)</label><input type="text" value="${edu.desc}" oninput="updateEdu(${index}, 'desc', this.value)"></div></div>`;
         });
     }
     function updateEdu(index, field, value) { educationData[index][field] = value; renderCV(); }
     function addEducation() { educationData.push({ degree: "", school: "", date: "", desc: "" }); renderEducationForms(); renderCV(); }
     function removeEducation(index) { educationData.splice(index, 1); renderEducationForms(); renderCV(); }
 
-    // Form Handlers: Experience
     function renderExperienceForms() {
-        const container = document.getElementById('exp-container');
-        container.innerHTML = '';
+        const container = document.getElementById('exp-container'); container.innerHTML = '';
         experienceData.forEach((exp, index) => {
-            container.innerHTML += `
-                <div class="dynamic-item">
-                    <button class="remove-btn" onclick="removeExperience(${index})">Remove</button>
-                    <div class="form-group"><label>Job Title</label><input type="text" value="${exp.title}" oninput="updateExp(${index}, 'title', this.value)"></div>
-                    <div class="form-group"><label>Company / Organization</label><input type="text" value="${exp.company}" oninput="updateExp(${index}, 'company', this.value)"></div>
-                    <div class="form-group"><label>Date Range</label><input type="text" value="${exp.date}" oninput="updateExp(${index}, 'date', this.value)"></div>
-                    <div class="form-group"><label>Description / Achievements (Use • Bullets)</label><textarea oninput="updateExp(${index}, 'desc', this.value)">${exp.desc}</textarea></div>
-                </div>
-            `;
+            container.innerHTML += `<div class="dynamic-item"><button class="remove-btn" onclick="removeExperience(${index})">Remove</button><div class="form-group"><label>Job Title</label><input type="text" value="${exp.title}" oninput="updateExp(${index}, 'title', this.value)"></div><div class="form-group"><label>Company / Organization</label><input type="text" value="${exp.company}" oninput="updateExp(${index}, 'company', this.value)"></div><div class="form-group"><label>Date Range</label><input type="text" value="${exp.date}" oninput="updateExp(${index}, 'date', this.value)"></div><div class="form-group"><label>Description / Achievements (Use • Bullets)</label><textarea oninput="updateExp(${index}, 'desc', this.value)">${exp.desc}</textarea></div></div>`;
         });
     }
     function updateExp(index, field, value) { experienceData[index][field] = value; renderCV(); }
     function addExperience() { experienceData.push({ title: "", company: "", date: "", desc: "• " }); renderExperienceForms(); renderCV(); }
     function removeExperience(index) { experienceData.splice(index, 1); renderExperienceForms(); renderCV(); }
 
-    // Form Handlers: Projects & Certifications
     function renderProjectForms() {
-        const container = document.getElementById('proj-container');
-        container.innerHTML = '';
+        const container = document.getElementById('proj-container'); container.innerHTML = '';
         projectData.forEach((proj, index) => {
-            container.innerHTML += `
-                <div class="dynamic-item">
-                    <button class="remove-btn" onclick="removeProject(${index})">Remove</button>
-                    <div class="form-group"><label>Project Name / Certification</label><input type="text" value="${proj.title}" oninput="updateProj(${index}, 'title', this.value)"></div>
-                    <div class="form-group"><label>Platform / Issuer / Tech Stack</label><input type="text" value="${proj.context}" oninput="updateProj(${index}, 'context', this.value)"></div>
-                    <div class="form-group"><label>Description & Impact</label><textarea oninput="updateProj(${index}, 'desc', this.value)">${proj.desc}</textarea></div>
-                </div>
-            `;
+            container.innerHTML += `<div class="dynamic-item"><button class="remove-btn" onclick="removeProject(${index})">Remove</button><div class="form-group"><label>Project Name / Certification</label><input type="text" value="${proj.title}" oninput="updateProj(${index}, 'title', this.value)"></div><div class="form-group"><label>Platform / Issuer / Tech Stack</label><input type="text" value="${proj.context}" oninput="updateProj(${index}, 'context', this.value)"></div><div class="form-group"><label>Description & Impact</label><textarea oninput="updateProj(${index}, 'desc', this.value)">${proj.desc}</textarea></div></div>`;
         });
     }
     function updateProj(index, field, value) { projectData[index][field] = value; renderCV(); }
     function addProject() { projectData.push({ title: "", context: "", desc: "• " }); renderProjectForms(); renderCV(); }
     function removeProject(index) { projectData.splice(index, 1); renderProjectForms(); renderCV(); }
 
-    // Template Selector
     function setTemplate(templateClass, btnElement) {
         currentTemplate = templateClass;
         document.querySelectorAll('.template-btn').forEach(btn => btn.classList.remove('active'));
@@ -405,7 +299,7 @@
         renderCV(); 
     }
 
-    // Main Compilation Engine
+    // Dynamic Engine
     function renderCV() {
         const name = document.getElementById('cv-f-name').value || "Pramod Shinde";
         const title = document.getElementById('cv-f-title').value;
@@ -423,188 +317,140 @@
         const tob = document.getElementById('cv-f-tob').value;
         const pob = document.getElementById('cv-f-pob').value.trim();
         
-        let bioString = "";
-        let bioArr = [];
-        if (dob) bioArr.push(`Born: ${dob}`);
-        if (tob) bioArr.push(`Time: ${tob}`);
-        if (pob) bioArr.push(`Place: ${pob}`);
+        let bioString = ""; let bioArr = [];
+        if (dob) bioArr.push(`Born: ${dob}`); if (tob) bioArr.push(`Time: ${tob}`); if (pob) bioArr.push(`Place: ${pob}`);
         if (bioArr.length > 0) bioString = bioArr.join(" | ");
 
         const skillsArr = skillsRaw.split(',').map(s => s.trim()).filter(s => s);
         const target = document.getElementById('cv-render-target');
 
-        // Render Logic Based on Architecture
         if (currentTemplate === 'cv-tech') {
-            
-            // --- SIDEBAR LAYOUT ---
-            let html = `<div class="cv-sidebar">
-                <div class="cv-name">${name}</div>
-                <div style="color:#38bdf8; margin-bottom:24px; font-weight:600;">${title}</div>
-                
-                <div class="cv-sidebar-title">Contact Architecture</div>
-                <div class="cv-contact">
-                    ${email ? `<div><strong>E:</strong> ${email}</div>` : ''}
-                    ${phone ? `<div><strong>P:</strong> ${phone}</div>` : ''}
-                    ${link ? `<div><strong>W:</strong> ${link}</div>` : ''}
-                    ${currAddr ? `<div style="margin-top:8px;"><strong>Current Loc:</strong><br>${currAddr}</div>` : ''}
-                    ${permAddr && (permAddr !== currAddr) ? `<div style="margin-top:4px;"><strong>Perm Loc:</strong><br>${permAddr}</div>` : ''}
-                </div>`;
-            
-            if(bioString) {
-                html += `<div class="cv-sidebar-title">Biographical Anchors</div>
-                         <div class="cv-contact"><div>${bioString.replace(/ \| /g, '<br>')}</div></div>`;
-            }
-
-            if(specialRaw) {
-                html += `<div class="cv-sidebar-title">Special Achievements</div>
-                         <div style="font-size:10px; line-height:1.5; white-space:pre-wrap;">${specialRaw}</div>`;
-            }
-
-            html += `<div class="cv-sidebar-title">Core Competencies</div>
-                     <ul style="padding-left:16px; font-size:11px; line-height:1.8;">`;
-            skillsArr.forEach(s => { html += `<li>${s}</li>`; });
-            html += `</ul></div>`;
-
-            // Main Content Area
-            html += `<div class="cv-main">
-                <div class="cv-section-title">Executive Summary</div>
-                <p style="font-size:11px; margin-bottom:24px; line-height:1.6;">${summary}</p>
-                
-                <div class="cv-section-title">Academic Architecture</div>`;
-            
-            educationData.forEach(edu => {
-                html += `
-                    <div class="cv-item">
-                        <div class="cv-item-header"><span>${edu.degree}</span><span>${edu.date}</span></div>
-                        <div class="cv-item-sub">${edu.school}</div>
-                        ${edu.desc ? `<p style="font-size:11px; white-space:pre-wrap;">${edu.desc}</p>` : ''}
-                    </div>`;
-            });
-
+            let html = `<div class="cv-sidebar"><div class="cv-name">${name}</div><div style="color:#38bdf8; margin-bottom:24px; font-weight:600;">${title}</div><div class="cv-sidebar-title">Contact Architecture</div><div class="cv-contact">${email ? `<div><strong>E:</strong> ${email}</div>` : ''}${phone ? `<div><strong>P:</strong> ${phone}</div>` : ''}${link ? `<div><strong>W:</strong> ${link}</div>` : ''}${currAddr ? `<div style="margin-top:8px;"><strong>Current Loc:</strong><br>${currAddr}</div>` : ''}${permAddr && (permAddr !== currAddr) ? `<div style="margin-top:4px;"><strong>Perm Loc:</strong><br>${permAddr}</div>` : ''}</div>`;
+            if(bioString) html += `<div class="cv-sidebar-title">Biographical Anchors</div><div class="cv-contact"><div>${bioString.replace(/ \| /g, '<br>')}</div></div>`;
+            if(specialRaw) html += `<div class="cv-sidebar-title">Special Achievements</div><div style="font-size:10px; line-height:1.5; white-space:pre-wrap;">${specialRaw}</div>`;
+            html += `<div class="cv-sidebar-title">Core Competencies</div><ul style="padding-left:16px; font-size:11px; line-height:1.8;">`;
+            skillsArr.forEach(s => { html += `<li>${s}</li>`; }); html += `</ul></div>`;
+            html += `<div class="cv-main"><div class="cv-section-title">Executive Summary</div><p style="font-size:11px; margin-bottom:24px; line-height:1.6;">${summary}</p><div class="cv-section-title">Academic Architecture</div>`;
+            educationData.forEach(edu => { html += `<div class="cv-item"><div class="cv-item-header"><span>${edu.degree}</span><span>${edu.date}</span></div><div class="cv-item-sub">${edu.school}</div>${edu.desc ? `<p style="font-size:11px; white-space:pre-wrap;">${edu.desc}</p>` : ''}</div>`; });
             html += `<div class="cv-section-title" style="margin-top:24px;">Professional Experience</div>`;
-            experienceData.forEach(exp => {
-                html += `
-                    <div class="cv-item">
-                        <div class="cv-item-header"><span>${exp.title}</span><span>${exp.date}</span></div>
-                        <div class="cv-item-sub">${exp.company}</div>
-                        <p style="font-size:11px; white-space:pre-wrap;">${exp.desc}</p>
-                    </div>`;
-            });
-
+            experienceData.forEach(exp => { html += `<div class="cv-item"><div class="cv-item-header"><span>${exp.title}</span><span>${exp.date}</span></div><div class="cv-item-sub">${exp.company}</div><p style="font-size:11px; white-space:pre-wrap;">${exp.desc}</p></div>`; });
             if (projectData.length > 0) {
                 html += `<div class="cv-section-title" style="margin-top:24px;">Projects & Certifications</div>`;
-                projectData.forEach(proj => {
-                    html += `
-                        <div class="cv-item">
-                            <div class="cv-item-header"><span>${proj.title}</span></div>
-                            <div class="cv-item-sub">${proj.context}</div>
-                            <p style="font-size:11px; white-space:pre-wrap;">${proj.desc}</p>
-                        </div>`;
-                });
+                projectData.forEach(proj => { html += `<div class="cv-item"><div class="cv-item-header"><span>${proj.title}</span></div><div class="cv-item-sub">${proj.context}</div><p style="font-size:11px; white-space:pre-wrap;">${proj.desc}</p></div>`; });
             }
-
-            html += `</div>`; 
-            target.innerHTML = html;
-
+            html += `</div>`; target.innerHTML = html;
         } else {
-            
-            // --- TOP-DOWN LAYOUTS (Exec, Modern, Bold) ---
             let contactHTML = [email, phone, link].filter(Boolean).join(" • ");
-            
-            let addressHTML = "";
-            if (currAddr) addressHTML += `Current: ${currAddr}`;
-            if (permAddr && permAddr !== currAddr) addressHTML += ` | Permanent: ${permAddr}`;
-
-            let html = `
-                <div class="cv-header">
-                    <div class="cv-name">${name}</div>
-                    <div style="font-weight:bold; margin-top:4px; font-size:13px;">${title}</div>
-                    <div class="cv-contact">${contactHTML}</div>
-                    ${addressHTML ? `<div class="cv-contact">${addressHTML}</div>` : ''}
-                    ${bioString ? `<div class="cv-contact" style="font-style:italic;">${bioString}</div>` : ''}
-                </div>
-                
-                ${summary ? `<div class="cv-section-title">Profile</div><p>${summary}</p>` : ''}
-                
-                <div class="cv-section-title">Education</div>`;
-            
-            educationData.forEach(edu => {
-                html += `
-                    <div class="cv-item">
-                        <div class="cv-item-header"><span>${edu.degree}</span><span>${edu.date}</span></div>
-                        <div class="cv-item-sub">${edu.school}</div>
-                        ${edu.desc ? `<p style="white-space:pre-wrap;">${edu.desc}</p>` : ''}
-                    </div>`;
-            });
-
+            let addressHTML = ""; if (currAddr) addressHTML += `Current: ${currAddr}`; if (permAddr && permAddr !== currAddr) addressHTML += ` | Permanent: ${permAddr}`;
+            let html = `<div class="cv-header"><div class="cv-name">${name}</div><div style="font-weight:bold; margin-top:4px; font-size:13px;">${title}</div><div class="cv-contact">${contactHTML}</div>${addressHTML ? `<div class="cv-contact">${addressHTML}</div>` : ''}${bioString ? `<div class="cv-contact" style="font-style:italic;">${bioString}</div>` : ''}</div>${summary ? `<div class="cv-section-title">Profile</div><p>${summary}</p>` : ''}<div class="cv-section-title">Education</div>`;
+            educationData.forEach(edu => { html += `<div class="cv-item"><div class="cv-item-header"><span>${edu.degree}</span><span>${edu.date}</span></div><div class="cv-item-sub">${edu.school}</div>${edu.desc ? `<p style="white-space:pre-wrap;">${edu.desc}</p>` : ''}</div>`; });
             html += `<div class="cv-section-title">Experience</div>`;
-            experienceData.forEach(exp => {
-                html += `
-                    <div class="cv-item">
-                        <div class="cv-item-header"><span>${exp.title}, ${exp.company}</span><span>${exp.date}</span></div>
-                        <p style="white-space:pre-wrap;">${exp.desc}</p>
-                    </div>`;
-            });
-
+            experienceData.forEach(exp => { html += `<div class="cv-item"><div class="cv-item-header"><span>${exp.title}, ${exp.company}</span><span>${exp.date}</span></div><p style="white-space:pre-wrap;">${exp.desc}</p></div>`; });
             if (projectData.length > 0) {
                 html += `<div class="cv-section-title">Projects & Certifications</div>`;
-                projectData.forEach(proj => {
-                    html += `
-                        <div class="cv-item">
-                            <div class="cv-item-header"><span>${proj.title}</span></div>
-                            <div class="cv-item-sub">${proj.context}</div>
-                            <p style="white-space:pre-wrap;">${proj.desc}</p>
-                        </div>`;
-                });
+                projectData.forEach(proj => { html += `<div class="cv-item"><div class="cv-item-header"><span>${proj.title}</span></div><div class="cv-item-sub">${proj.context}</div><p style="white-space:pre-wrap;">${proj.desc}</p></div>`; });
             }
-
-            if (specialRaw) {
-                html += `<div class="cv-section-title">Special Achievements & Extracurriculars</div>
-                         <p style="white-space:pre-wrap; line-height:1.6;">${specialRaw}</p>`;
-            }
-
-            html += `<div class="cv-section-title">Skills & Competencies</div>
-                     <p style="line-height:1.6;">${skillsArr.join(' • ')}</p>`;
-
+            if (specialRaw) html += `<div class="cv-section-title">Special Achievements & Extracurriculars</div><p style="white-space:pre-wrap; line-height:1.6;">${specialRaw}</p>`;
+            html += `<div class="cv-section-title">Skills & Competencies</div><p style="line-height:1.6;">${skillsArr.join(' • ')}</p>`;
             target.innerHTML = html;
         }
     }
 
-    // --- FLAWLESS ATS VECTOR EXPORT ENGINE ---
-    function generatePDF() {
-        const btn = document.querySelector('.btn-download');
-        const origText = btn.innerText;
-        btn.innerText = "PREPARING PDF...";
-        btn.disabled = true;
+    // --- FULL SCREEN & SCREENSHOT LOGIC ---
+    const overlay = document.getElementById('fullscreen-overlay');
+    const fWrapper = document.getElementById('fullscreen-wrapper');
+    const mWrapper = document.getElementById('cv-mount-point');
+    const cvElement = document.getElementById('cv-render-target');
 
-        // 1. Grab the exact CV container
-        const cvElement = document.getElementById('cv-render-target');
-        
-        // 2. Clone it to escape all flexbox and height constraints of the web UI
-        const printClone = cvElement.cloneNode(true);
-        printClone.id = 'print-clone';
-        
-        // 3. Mount it securely to the body 
-        document.body.appendChild(printClone);
-        
-        // 4. Trigger the print mode CSS override
-        document.body.classList.add('printing-active');
-
-        // 5. Allow browser to reflow the DOM cleanly, then open print dialog
-        setTimeout(() => {
-            window.print();
-            
-            // 6. Cleanup immediately after print completes/cancels
-            document.body.classList.remove('printing-active');
-            document.body.removeChild(printClone);
-            btn.innerText = origText;
-            btn.disabled = false;
-        }, 300);
+    function openFullscreen() {
+        fWrapper.appendChild(cvElement);
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden'; // Lock background scroll
     }
 
-    // Start App
-    init();
+    function closeFullscreen() {
+        mWrapper.appendChild(cvElement);
+        overlay.classList.remove('active');
+        document.body.style.overflow = 'auto'; // Restore scroll
+    }
 
+    function takeScreenshot() {
+        const btn = document.querySelector('.fullscreen-controls .btn-download');
+        const origText = btn.innerText;
+        btn.innerText = "CAPTURING..."; btn.disabled = true;
+
+        const userName = document.getElementById('cv-f-name').value.trim() || "Pramod_Shinde";
+        const fileName = `${userName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_cv.png`;
+
+        html2canvas(cvElement, { scale: 2, useCORS: true }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = fileName;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            btn.innerText = origText; btn.disabled = false;
+        }).catch(err => {
+            alert("Error capturing screenshot.");
+            btn.innerText = origText; btn.disabled = false;
+        });
+    }
+
+    // --- FLAWLESS ACTIVE-DOM PDF ENGINE ---
+    // This fixes the blank/cut-off PDF bug by rendering exactly what is on the screen, isolated.
+    function generatePDF() {
+        const btn = document.querySelector('.controls-card .btn-download');
+        const origText = btn.innerText;
+        btn.innerText = "PREPARING PDF..."; btn.disabled = true;
+
+        // Step 1: Temporarily hide all UI elements to isolate the CV Canvas
+        const toHide = [document.querySelector('.app-header'), document.querySelector('.editor-panel'), document.querySelector('.controls-card')];
+        toHide.forEach(el => { if(el) el.style.display = 'none'; });
+        
+        // Strip padding/backgrounds to ensure the engine only captures the CV box
+        const origBodyBg = document.body.style.background;
+        const origBodyPad = document.body.style.padding;
+        document.body.style.background = 'white';
+        document.body.style.padding = '0';
+        
+        // Remove box shadow so it doesn't bleed into the PDF
+        const origShadow = cvElement.style.boxShadow;
+        cvElement.style.boxShadow = 'none';
+        cvElement.style.margin = '0 auto';
+
+        const userName = document.getElementById('cv-f-name').value.trim() || "Pramod_Shinde";
+        const fileName = `${userName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_cv.pdf`;
+
+        // Step 2: Strict A4 Configuration
+        const opt = {
+            margin:       0,
+            filename:     fileName,
+            image:        { type: 'jpeg', quality: 1 },
+            html2canvas:  { 
+                scale: 2, 
+                useCORS: true,
+                scrollY: 0,
+                windowWidth: 800 // Forces the browser to render it correctly
+            },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            pagebreak:    { mode: ['css', 'legacy'], avoid: ['.cv-item', '.cv-section-title'] }
+        };
+
+        // Step 3: Generate and Restore
+        html2pdf().set(opt).from(cvElement).save().then(() => {
+            // Restore UI
+            toHide.forEach(el => { if(el) el.style.display = ''; });
+            document.body.style.background = origBodyBg;
+            document.body.style.padding = origBodyPad;
+            cvElement.style.boxShadow = origShadow;
+            
+            btn.innerText = origText; btn.disabled = false;
+        }).catch(err => {
+            toHide.forEach(el => { if(el) el.style.display = ''; });
+            document.body.style.background = origBodyBg; document.body.style.padding = origBodyPad; cvElement.style.boxShadow = origShadow;
+            alert("Error generating PDF."); btn.innerText = origText; btn.disabled = false;
+        });
+    }
+
+    init();
 </script>
 </body>
 </html>
