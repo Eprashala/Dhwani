@@ -5,8 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Enterprise CV Architect</title>
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-
     <style>
         :root {
             --bg-page: #f8fafc;
@@ -66,10 +64,9 @@
         
         .btn-download { background-color: #10b981; color: white; border: none; padding: 14px; border-radius: 6px; font-size: 15px; font-weight: bold; cursor: pointer; width: 100%; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2); transition: background-color 0.2s;}
         .btn-download:hover { background-color: #059669; }
-        .btn-download:disabled { background-color: #94a3b8; cursor: not-allowed; box-shadow: none; }
 
-        /* The CV Render Canvas */
-        .cv-canvas { width: 100%; aspect-ratio: 1 / 1.414; background: white; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-radius: 4px; overflow-y: auto; font-size: 11px; }
+        /* The CV Render Canvas - Set to exact A4 Proportions */
+        .cv-canvas { width: 100%; max-width: 210mm; aspect-ratio: 1 / 1.414; background: white; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-radius: 4px; overflow-y: auto; font-size: 11px; margin: 0 auto; }
 
         /* ==========================================
            CV TEMPLATE ARCHITECTURES
@@ -115,13 +112,65 @@
         .cv-bold .cv-item-header { display: flex; justify-content: space-between; font-weight: 800; font-size: 13px; color: #10b981; margin-bottom: 2px;}
         .cv-bold .cv-item-sub { font-weight: 600; font-size: 11px; margin-bottom: 4px;}
 
+        /* ==========================================
+           ATS-COMPLIANT VECTOR PRINT ENGINE 
+           (Fixes Android Cut-off & Blank PDF bugs)
+        ========================================== */
+        @media print {
+            /* Hide the web application interface completely */
+            body.printing-active .app-header,
+            body.printing-active .workspace {
+                display: none !important;
+            }
+            
+            /* Reset body to pure white canvas */
+            body.printing-active {
+                background-color: white !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+
+            /* Release all constraints so the CV flows naturally onto A4 pages */
+            #print-clone {
+                width: 100% !important;
+                max-width: 100% !important;
+                height: auto !important;
+                max-height: none !important;
+                overflow: visible !important;
+                box-shadow: none !important;
+                border: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                aspect-ratio: auto !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            /* Fix Tech Sidebar height cut-off bug */
+            .cv-tech, .cv-tech .cv-sidebar, .cv-tech .cv-main {
+                height: auto !important;
+                min-height: 100% !important;
+            }
+
+            /* Prevent elements from being sliced in half across pages */
+            .cv-item, .cv-section-title {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
+
+            /* Force standard A4 sizing from the device */
+            @page {
+                size: A4 portrait;
+                margin: 0mm; /* CV padding acts as the margin */
+            }
+        }
     </style>
 </head>
 <body>
 
     <div class="app-header">
         <h1>Enterprise CV Architect</h1>
-        <p>Complete the parameters below. The rendering engine will strictly format and compile your document locally for immediate PDF export.</p>
+        <p>Complete the parameters below. The rendering engine will format a 100% vector, ATS-compliant PDF.</p>
     </div>
 
     <div class="workspace">
@@ -130,7 +179,7 @@
             
             <div class="section-title">Identity & Contact Matrix</div>
             <div class="form-group full-width"><label>Full Name</label><input type="text" id="cv-f-name" value="Pramod Shinde" oninput="renderCV()"></div>
-            <div class="form-group full-width"><label>Professional Title</label><input type="text" id="cv-f-title" value="Senior Technical Project Manager" oninput="renderCV()"></div>
+            <div class="form-group full-width"><label>Professional Title</label><input type="text" id="cv-f-title" value="Software Developer & Technical Project Manager" oninput="renderCV()"></div>
             
             <div class="form-grid">
                 <div class="form-group"><label>Email Address</label><input type="email" id="cv-f-email" value="pramod@example.com" oninput="renderCV()"></div>
@@ -140,31 +189,31 @@
 
             <div class="form-group full-width" style="margin-top: 8px;">
                 <label>Current Address</label>
-                <textarea id="cv-f-curr-addr" oninput="syncAddresses()"></textarea>
+                <textarea id="cv-f-curr-addr" oninput="syncAddresses()">Thane, Maharashtra, India</textarea>
             </div>
             
             <div class="checkbox-group">
-                <input type="checkbox" id="cv-f-same-addr" onchange="toggleAddressLock()">
+                <input type="checkbox" id="cv-f-same-addr" onchange="toggleAddressLock()" checked>
                 <label for="cv-f-same-addr">Permanent Address is the same as Current Address</label>
             </div>
 
             <div class="form-group full-width">
                 <label>Permanent Address</label>
-                <textarea id="cv-f-perm-addr" oninput="renderCV()"></textarea>
+                <textarea id="cv-f-perm-addr" oninput="renderCV()">Thane, Maharashtra, India</textarea>
             </div>
 
             <div style="background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; margin: 24px 0;">
                 <label style="color: #475569; margin-bottom: 12px; display:block; font-size:14px; font-weight:700;">Biographical Anchors (Optional)</label>
                 <div class="form-grid">
-                    <div class="form-group"><label>Date of Birth</label><input type="date" id="cv-f-dob" oninput="renderCV()"></div>
+                    <div class="form-group"><label>Date of Birth</label><input type="date" id="cv-f-dob" value="1982-02-11" oninput="renderCV()"></div>
                     <div class="form-group"><label>Time of Birth</label><input type="time" id="cv-f-tob" oninput="renderCV()"></div>
-                    <div class="form-group full-width"><label>Place of Birth</label><input type="text" id="cv-f-pob" placeholder="e.g., Mumbai, Maharashtra" oninput="renderCV()"></div>
+                    <div class="form-group full-width"><label>Place of Birth</label><input type="text" id="cv-f-pob" placeholder="e.g., Thane, Maharashtra" value="Thane, Maharashtra" oninput="renderCV()"></div>
                 </div>
             </div>
 
             <div class="section-title">Executive Summary</div>
             <div class="form-group full-width">
-                <textarea id="cv-f-summary" oninput="renderCV()">A highly analytical and results-driven professional with a proven track record in strategic planning and cross-functional leadership. Adept at optimizing complex software workflows and deploying robust technical architectures under high-pressure environments.</textarea>
+                <textarea id="cv-f-summary" oninput="renderCV()">A highly analytical and results-driven software developer and entrepreneur. Proven track record in orchestrating digital tools, integrating complex APIs, and bridging technological infrastructure with human-centric psychometric analysis to deliver flawless local-first architectures.</textarea>
             </div>
 
             <div class="section-title">Academic Architecture</div>
@@ -173,7 +222,7 @@
 
             <div class="section-title">Professional Experience</div>
             <div class="form-group full-width">
-                <label style="color:var(--accent); font-size:12px; margin-top:-8px; margin-bottom:12px;">Expert Tip: Use bullet points (•) and focus on measurable outcomes (e.g., "Deployed system X, improving efficiency by Y%").</label>
+                <label style="color:var(--accent); font-size:12px; margin-top:-8px; margin-bottom:12px;">Expert Tip: Use bullet points (•) and focus on measurable outcomes.</label>
             </div>
             <div id="exp-container" class="dynamic-list"></div>
             <button class="action-btn" onclick="addExperience()">+ Add Experience Node</button>
@@ -185,15 +234,14 @@
             <div class="section-title">Special Achievements & Extracurriculars</div>
             <div class="form-group full-width">
                 <label>Highlight sports, martial arts, arts, languages, or unique personal awards.</label>
-                <textarea id="cv-f-special" oninput="renderCV()">• Black Belt in Shotokan Karate (National Gold Medalist)
-• Fluent in English, Hindi, Marathi, and conversational French
-• Published author in regional literary magazines</textarea>
+                <textarea id="cv-f-special" oninput="renderCV()">• Founder & Operator of a premier local sports complex and cricket ground.
+• Passionate student and developer of Vedic Astrology (Jyotisha) software tools.</textarea>
             </div>
 
             <div class="section-title">Core Competencies & Technical Skills</div>
             <div class="form-group full-width">
                 <label>Enter skills separated by commas</label>
-                <textarea id="cv-f-skills" oninput="renderCV()">Strategic Planning, Risk Assessment, Agile Methodologies, Python Data Analysis, Cross-functional Leadership, Conflict Resolution</textarea>
+                <textarea id="cv-f-skills" oninput="renderCV()">Python, JavaScript, HTML/CSS, Electron & PyWebView, Local-First Architecture, Technical Project Management, API Integration, Cross-functional Leadership</textarea>
             </div>
 
         </div>
@@ -221,28 +269,23 @@
 <script>
     // Internal Data State
     let educationData = [
-        { degree: "Master of Business Administration (MBA)", school: "Global Business School", date: "2018 - 2020", desc: "Specialization in Operations and Strategic Management." },
-        { degree: "Bachelor of Science in Computer Science", school: "National Institute of Technology", date: "2014 - 2018", desc: "Graduated First Class with Distinction." }
+        { degree: "Bachelor of Science in Computer Science", school: "University of Mumbai", date: "Graduated: 2004", desc: "Specialization in Systems Architecture and Data Structures." }
     ];
 
     let experienceData = [
-        { title: "Senior Technical Project Manager", company: "Apex Enterprise Solutions", date: "Jan 2021 - Present", desc: "• Directed a team of 45 cross-functional developers.\n• Architected logistics workflows, reducing overhead by 22%.\n• Ensured 100% compliance with strict local-first data privacy architectures." },
-        { title: "Project Coordinator", company: "Nexus Dynamics", date: "Jun 2018 - Dec 2020", desc: "• Managed $2M software deployment portfolios.\n• Implemented Agile frameworks that accelerated deployment timelines by 15%." }
+        { title: "Founder & Lead Developer", company: "Marrvish Technologies", date: "May 2026 - Present", desc: "• Architected server infrastructure and local-first psychometric evaluation platforms.\n• Developed highly reliable corporate talent placement assessment tools." },
+        { title: "Technical Project Manager", company: "Eprashala Systems", date: "Jan 2026 - April 2026", desc: "• Directed the deployment of comprehensive LMS tools.\n• Executed cross-platform conversions and integrated advanced MP4 encryption protocols." }
     ];
 
     let projectData = [
-        { title: "Certified Scrum Master (CSM)", context: "Project Management Institute", desc: "Advanced certification in Agile workflow execution and cross-functional team leadership." }
+        { title: "Dhwani & Sanjeevani AI Tools", context: "Independent Development", desc: "• Engineered custom AI-tutors and psychometric analysis applications utilizing state-of-the-art LLM capabilities." }
     ];
 
     let currentTemplate = 'cv-exec';
 
     // UI Initializers
     function init() {
-        document.getElementById('cv-f-curr-addr').value = "402, Skyline Towers, Andheri West, Mumbai, 400053";
-        document.getElementById('cv-f-perm-addr').value = "402, Skyline Towers, Andheri West, Mumbai, 400053";
-        document.getElementById('cv-f-same-addr').checked = true;
         toggleAddressLock();
-
         renderEducationForms();
         renderExperienceForms();
         renderProjectForms();
@@ -438,7 +481,7 @@
                 });
             }
 
-            html += `</div>`; // Close Main
+            html += `</div>`; 
             target.innerHTML = html;
 
         } else {
@@ -505,61 +548,36 @@
         }
     }
 
-    // --- FLAWLESS PDF EXPORT ENGINE ---
+    // --- FLAWLESS ATS VECTOR EXPORT ENGINE ---
     function generatePDF() {
         const btn = document.querySelector('.btn-download');
-        const originalText = btn.innerText;
-        btn.innerText = "GENERATING PDF...";
+        const origText = btn.innerText;
+        btn.innerText = "PREPARING PDF...";
         btn.disabled = true;
 
-        const element = document.getElementById('cv-render-target');
+        // 1. Grab the exact CV container
+        const cvElement = document.getElementById('cv-render-target');
         
-        // Critical Fix: Strip scrollbars and allow the element to stretch to its full content height
-        const origOverflow = element.style.overflow;
-        const origHeight = element.style.height;
-        const origAspect = element.style.aspectRatio;
+        // 2. Clone it to escape all flexbox and height constraints of the web UI
+        const printClone = cvElement.cloneNode(true);
+        printClone.id = 'print-clone';
         
-        element.style.overflow = 'visible';
-        element.style.height = 'max-content';
-        element.style.aspectRatio = 'auto';
+        // 3. Mount it securely to the body 
+        document.body.appendChild(printClone);
+        
+        // 4. Trigger the print mode CSS override
+        document.body.classList.add('printing-active');
 
-        const userName = document.getElementById('cv-f-name').value.trim() || "Pramod_Shinde";
-        const fileName = `${userName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_professional_cv.pdf`;
-
-        // Configure html2pdf to prevent text cutting and scale for crisp high-res printing
-        const opt = {
-            margin:       0,
-            filename:     fileName,
-            image:        { type: 'jpeg', quality: 1 },
-            html2canvas:  { 
-                scale: 2, 
-                useCORS: true,
-                scrollY: 0, // Locks the render to the absolute top pixel
-                windowWidth: 800 // Forces the browser to render it like a desktop monitor
-            },
-            jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' },
-            pagebreak:    { mode: 'css', avoid: ['.cv-item', '.cv-section-title'] } // Prevents slicing paragraphs in half
-        };
-
-        // Fire the export
-        html2pdf().set(opt).from(element).save().then(() => {
-            // Restore UI Constraints
-            element.style.overflow = origOverflow;
-            element.style.height = origHeight;
-            element.style.aspectRatio = origAspect;
-
-            btn.innerText = originalText;
+        // 5. Allow browser to reflow the DOM cleanly, then open print dialog
+        setTimeout(() => {
+            window.print();
+            
+            // 6. Cleanup immediately after print completes/cancels
+            document.body.classList.remove('printing-active');
+            document.body.removeChild(printClone);
+            btn.innerText = origText;
             btn.disabled = false;
-        }).catch(err => {
-            // Failsafe: Restore UI even if there is an error
-            element.style.overflow = origOverflow;
-            element.style.height = origHeight;
-            element.style.aspectRatio = origAspect;
-
-            alert("An error occurred generating the PDF. Please try again.");
-            btn.innerText = originalText;
-            btn.disabled = false;
-        });
+        }, 300);
     }
 
     // Start App
