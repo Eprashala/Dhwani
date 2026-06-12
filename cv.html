@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Enterprise CV Architect</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
     <style>
         :root {
             --bg-page: #f8fafc;
@@ -63,6 +66,7 @@
         
         .btn-download { background-color: #10b981; color: white; border: none; padding: 14px; border-radius: 6px; font-size: 15px; font-weight: bold; cursor: pointer; width: 100%; text-transform: uppercase; letter-spacing: 0.5px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.2); transition: background-color 0.2s;}
         .btn-download:hover { background-color: #059669; }
+        .btn-download:disabled { background-color: #94a3b8; cursor: not-allowed; box-shadow: none; }
 
         /* The CV Render Canvas */
         .cv-canvas { width: 100%; aspect-ratio: 1 / 1.414; background: white; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-radius: 4px; overflow-y: auto; font-size: 11px; }
@@ -105,21 +109,12 @@
         /* 4. Creative Bold (High Contrast, Assertive) */
         .cv-bold { padding: 40px; font-family: 'Segoe UI', Tahoma, sans-serif; color: #2d3748; }
         .cv-bold .cv-header { display: flex; flex-direction: column; align-items: flex-end; text-align: right; border-bottom: 4px solid #10b981; padding-bottom: 20px; margin-bottom: 20px; }
-        /* FIXED: Changed text-transform to capitalize so names render correctly */
         .cv-bold .cv-name { font-size: 36px; font-weight: 900; letter-spacing: -1px; color: #0f172a; text-transform: capitalize; }
         .cv-bold .cv-contact { font-size: 10px; font-weight: 600; color: #475569; text-align: right; line-height: 1.6;}
         .cv-bold .cv-section-title { display: inline-block; background: #0f172a; color: white; padding: 4px 12px; font-size: 12px; text-transform: uppercase; font-weight: bold; margin: 20px 0 12px 0; border-radius: 2px;}
         .cv-bold .cv-item-header { display: flex; justify-content: space-between; font-weight: 800; font-size: 13px; color: #10b981; margin-bottom: 2px;}
         .cv-bold .cv-item-sub { font-weight: 600; font-size: 11px; margin-bottom: 4px;}
 
-        /* Print Formatting */
-        @media print {
-            body { background: white; padding: 0; align-items: flex-start; }
-            .app-header, .editor-panel, .controls-card { display: none !important; }
-            .preview-panel { width: 100%; flex: none; position: static; gap: 0;}
-            .cv-canvas { box-shadow: none; border-radius: 0; width: 100%; height: auto; aspect-ratio: auto; overflow: visible;}
-            @page { margin: 0; size: A4; }
-        }
     </style>
 </head>
 <body>
@@ -134,13 +129,13 @@
         <div class="editor-panel" id="data-form">
             
             <div class="section-title">Identity & Contact Matrix</div>
-            <div class="form-group full-width"><label>Full Name</label><input type="text" id="cv-f-name" value="Pramod Shinde" oninput="renderCV()"></div>
+            <div class="form-group full-width"><label>Full Name</label><input type="text" id="cv-f-name" value="Jane Doe" oninput="renderCV()"></div>
             <div class="form-group full-width"><label>Professional Title</label><input type="text" id="cv-f-title" value="Senior Technical Project Manager" oninput="renderCV()"></div>
             
             <div class="form-grid">
-                <div class="form-group"><label>Email Address</label><input type="email" id="cv-f-email" value="pramod@example.com" oninput="renderCV()"></div>
-                <div class="form-group"><label>Phone Number</label><input type="text" id="cv-f-phone" value="+91 9869065253" oninput="renderCV()"></div>
-                <div class="form-group"><label>LinkedIn / Portfolio URL</label><input type="text" id="cv-f-link" value="linkedin.com/in/pramod" oninput="renderCV()"></div>
+                <div class="form-group"><label>Email Address</label><input type="email" id="cv-f-email" value="jane.doe@example.com" oninput="renderCV()"></div>
+                <div class="form-group"><label>Phone Number</label><input type="text" id="cv-f-phone" value="+91 98765 43210" oninput="renderCV()"></div>
+                <div class="form-group"><label>LinkedIn / Portfolio URL</label><input type="text" id="cv-f-link" value="linkedin.com/in/janedoe" oninput="renderCV()"></div>
             </div>
 
             <div class="form-group full-width" style="margin-top: 8px;">
@@ -213,7 +208,7 @@
                     <button class="template-btn" onclick="setTemplate('cv-tech', this)">Sidebar</button>
                     <button class="template-btn" onclick="setTemplate('cv-bold', this)">Creative Bold</button>
                 </div>
-                <button class="btn-download" onclick="window.print()">Export to PDF</button>
+                <button class="btn-download" onclick="generatePDF()">Export to PDF</button>
             </div>
 
             <div id="cv-render-target" class="cv-canvas cv-exec">
@@ -508,6 +503,41 @@
 
             target.innerHTML = html;
         }
+    }
+
+    // Enterprise Mobile-Optimized PDF Export Engine
+    function generatePDF() {
+        const btn = document.querySelector('.btn-download');
+        const originalText = btn.innerText;
+        btn.innerText = "GENERATING PDF...";
+        btn.disabled = true;
+
+        const element = document.getElementById('cv-render-target');
+        
+        const userName = document.getElementById('cv-f-name').value.trim() || "Candidate";
+        const fileName = `${userName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_professional_cv.pdf`;
+
+        // Strict configuration for high-resolution, mobile-friendly PDF rendering
+        const opt = {
+            margin:       [0, 0, 0, 0], 
+            filename:     fileName,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { 
+                scale: 2, // Retina resolution
+                useCORS: true,
+                windowWidth: 800 // Forces desktop layout even on mobile browsers
+            },
+            jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+        };
+
+        html2pdf().set(opt).from(element).save().then(() => {
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }).catch(err => {
+            alert("An error occurred generating the PDF. Please try again.");
+            btn.innerText = originalText;
+            btn.disabled = false;
+        });
     }
 
     // Start App
