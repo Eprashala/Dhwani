@@ -32,7 +32,6 @@
         .controls label { font-size: 0.9em; color: #fbc531; font-weight: 600; white-space: nowrap; }
         .controls input[type="number"] { background: #1e272e; border: 1px solid #718093; padding: 10px; color: #fff; border-radius: 4px; width: 65px; text-align: center; font-size: 16px; }
         
-        /* NEW: Slider UI Styling */
         .slider-container { display: flex; align-items: center; gap: 15px; width: 100%; background: #1e272e; padding: 10px 15px; border-radius: 6px; box-sizing: border-box; border: 1px solid #485460; }
         .slider-container input[type="range"] { flex: 1; accent-color: #e1b12c; height: 6px; }
         .slider-value { color: #e1b12c; font-weight: bold; min-width: 45px; text-align: right; }
@@ -141,7 +140,6 @@
     </div>
 
     <script>
-        // Massive touch targets for mobile reliability
         fabric.Object.prototype.cornerSize = 28; 
         fabric.Object.prototype.touchCornerSize = 40; 
         fabric.Object.prototype.transparentCorners = false;
@@ -179,7 +177,7 @@
             });
 
             initVastuCompassGrid(wrapper.clientWidth / 2, wrapper.clientHeight / 2, wrapper.clientWidth, wrapper.clientHeight);
-            setupCompassSlider(); // Connect the new UI slider
+            setupCompassSlider(); 
 
             canvas.on('selection:created', handleAssetSelection);
             canvas.on('selection:updated', handleAssetSelection);
@@ -217,12 +215,10 @@
             };
         }
 
-        // NEW: Master sync between Slider and Canvas Compass
         function setupCompassSlider() {
             const slider = document.getElementById('compass-slider');
             const display = document.getElementById('slider-display');
 
-            // When slider moves, update compass
             slider.addEventListener('input', (e) => {
                 const degrees = parseInt(e.target.value);
                 display.innerText = degrees + "°";
@@ -232,7 +228,6 @@
                 }
             });
 
-            // If user drags the canvas handle, update the slider
             canvas.on('object:rotating', (e) => {
                 if (e.target.isVastuCompass) {
                     let currentAngle = Math.round(e.target.angle % 360);
@@ -248,6 +243,7 @@
             const radius = Math.min(width, height) / 2.2;
             const elements = [];
 
+            // 1. Base Rings
             const outerCircle = new fabric.Circle({
                 radius: radius, fill: 'transparent', stroke: '#e1b12c', strokeWidth: 1.5, strokeDashArray: [6, 6], originX: 'center', originY: 'center', selectable: false
             });
@@ -258,6 +254,91 @@
             });
             elements.push(innerCenter);
 
+            // 2. EMBEDDED GEOMETRIC VASTU PURUSHA MANDALA (HIGH VISIBILITY)
+            // Helper to map 360 degree space to exact XY relative to center
+            const getPurushaPos = (angleDeg, distanceMultiplier) => {
+                const rad = (angleDeg - 90) * (Math.PI / 180);
+                return { x: Math.cos(rad) * (radius * distanceMultiplier), y: Math.sin(rad) * (radius * distanceMultiplier) };
+            };
+
+            // Calculate precise anatomical mapping for the Purusha
+            const pPts = {
+                head: getPurushaPos(45, 0.72),        // NE (Ishanya)
+                neck: getPurushaPos(45, 0.50),
+                heart: getPurushaPos(45, 0.25),       // Hands folded at heart
+                navel: getPurushaPos(0, 0),           // Brahma Sthana
+                sacral: getPurushaPos(225, 0.25),
+                feet: getPurushaPos(225, 0.72),       // SW (Nairutya)
+                rShoulder: getPurushaPos(90, 0.22),   // East-ish
+                lShoulder: getPurushaPos(0, 0.22),    // North-ish
+                rElbow: getPurushaPos(135, 0.48),     // SE (Agneya)
+                lElbow: getPurushaPos(315, 0.48),     // NW (Vayu)
+                rHip: getPurushaPos(180, 0.22),       // South-ish
+                lHip: getPurushaPos(270, 0.22),       // West-ish
+                rKnee: getPurushaPos(180, 0.55),      // Bowed toward South
+                lKnee: getPurushaPos(270, 0.55)       // Bowed toward West
+            };
+
+            // Map the anatomical connections with bold, clear vectors
+            const purushaConnections = [
+                ['head', 'neck'], ['neck', 'rShoulder'], ['neck', 'lShoulder'],
+                ['rShoulder', 'rElbow'], ['rElbow', 'heart'], 
+                ['lShoulder', 'lElbow'], ['lElbow', 'heart'],
+                ['neck', 'heart'], ['heart', 'navel'], ['navel', 'sacral'],
+                ['sacral', 'rHip'], ['sacral', 'lHip'],
+                ['rHip', 'rKnee'], ['rKnee', 'feet'],
+                ['lHip', 'lKnee'], ['lKnee', 'feet'],
+                ['sacral', 'feet']
+            ];
+
+            // Render Thick Dotted Limbs
+            purushaConnections.forEach(pair => {
+                const p1 = pPts[pair[0]];
+                const p2 = pPts[pair[1]];
+                elements.push(new fabric.Line([p1.x, p1.y, p2.x, p2.y], {
+                    stroke: '#fbc531',       // High visibility gold
+                    strokeWidth: 2.5,        // Increased thickness
+                    strokeDashArray: [6, 4], // More distinct dotted pattern
+                    opacity: 0.9,            // High opacity
+                    selectable: false, 
+                    originX: 'center', 
+                    originY: 'center'
+                }));
+            });
+
+            // Render Prominent Chakra/Joint Nodes
+            Object.keys(pPts).forEach(key => {
+                const p = pPts[key];
+                const isMajor = (key === 'head' || key === 'navel' || key === 'feet' || key === 'heart');
+                elements.push(new fabric.Circle({
+                    left: p.x, top: p.y, 
+                    radius: isMajor ? 6.5 : 3.5, 
+                    fill: isMajor ? '#e84118' : '#fbc531', // Crimson for main chakras, gold for joints
+                    stroke: '#1e272e', 
+                    strokeWidth: 1.5,
+                    opacity: 1, 
+                    selectable: false, 
+                    originX: 'center', 
+                    originY: 'center'
+                }));
+            });
+
+            // Prominent Halo around the Head in NE
+            elements.push(new fabric.Circle({
+                left: pPts.head.x, top: pPts.head.y, 
+                radius: 18, 
+                stroke: '#e1b12c', 
+                strokeWidth: 2.5, 
+                strokeDashArray: [3, 4], 
+                fill: 'transparent', 
+                opacity: 0.8, 
+                selectable: false, 
+                originX: 'center', 
+                originY: 'center'
+            }));
+
+
+            // 3. Direction Vectors & Labels
             const directions = [
                 { name: 'N', angle: 0, color: '#e84118', isMajor: true },
                 { name: 'NE', angle: 45, color: '#fbc531', isMajor: false },
@@ -297,11 +378,12 @@
                 }
             });
 
+            // 4. Group Assembly & Logic lock
             vastuCompassGroup = new fabric.Group(elements, {
                 left: centerX, top: centerY, originX: 'center', originY: 'center',
                 hasControls: true, hasBorders: true, borderColor: 'transparent', transparentCorners: false,
                 lockMovementX: true, lockMovementY: true, lockScalingX: true, lockScalingY: true, lockSkewingX: true, lockSkewingY: true, lockScalingFlip: true,
-                padding: 40, // CORE FIX: Pushes the native control handle far out so it doesn't clip
+                padding: 40, 
                 hoverCursor: 'grab', moveCursor: 'grabbing'
             });
 
@@ -540,6 +622,7 @@
             }
 
             try {
+                // To utilize the latest Gemini 3.1 architecture, ensure your backend script at this URL is routing to "gemini-3.1-pro" or "gemini-3.1-flash".
                 const response = await fetch('https://eprashala.pythonanywhere.com/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-Custom-Api-Key': apiKey },
@@ -551,7 +634,7 @@
 
                 if (data.candidates && data.candidates[0].content.parts[0].text) {
                     let cleanedText = data.candidates[0].content.parts[0].text;
-                    cleanedText = cleanedText.replace(/[*_~`]/g, ''); // Extra front-end regex safety strip
+                    cleanedText = cleanedText.replace(/[*_~`]/g, ''); 
                     outputReportView.innerText = cleanedText;
                     document.getElementById('tts-btn').style.display = 'block'; 
                 } else if (data.error) {
