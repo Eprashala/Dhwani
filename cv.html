@@ -221,8 +221,24 @@
             </div>
         </div>
 
-        <div class="preview-panel">
+		<div class="preview-panel">
             <div class="controls-card">
+                <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                    <label style="font-size:14px; font-weight:800; margin-bottom:12px; display:block; color: #1e3a8a;">✨ ATS AI Optimizer</label>
+                    
+                    <div class="form-group">
+                        <input type="password" id="cv-f-api-key" placeholder="Optional: Enter custom Gemini API Key (Overrides Server Pool)" style="font-size: 12px; background: white; margin-bottom: 8px;">
+                    </div>
+                    
+                    <div class="form-group">
+                        <textarea id="cv-f-jd" placeholder="Paste the target Job Description (JD) here... The AI will tailor your summary, skills, and bullet points to match the required keywords." style="min-height: 100px; font-size: 12px; background: white; margin-bottom: 12px;"></textarea>
+                    </div>
+                    
+                    <button class="action-btn" id="btn-ai-optimize" onclick="optimizeForATS()" style="background: #1e3a8a; color: white; border: none; margin-bottom: 0; box-shadow: 0 4px 6px rgba(30, 58, 138, 0.2);">
+                        ⚡ Tailor CV to JD (Gemini 3.1)
+                    </button>
+                </div>
+
                 <label style="font-size:14px; font-weight:700; margin-bottom:12px; display:block;">Select Architectural Layout</label>
                 <div class="template-selector">
                     <button class="template-btn active" onclick="setTemplate('cv-exec', this)">Executive</button>
@@ -511,6 +527,135 @@
             btn.disabled = false;
         }
     }
+// --- ATS OPTIMIZATION ENGINE ---
+    async function optimizeForATS() {
+        const jd = document.getElementById('cv-f-jd').value.trim();
+        if (!jd) {
+            alert("Please paste the target Job Description first.");
+            return;
+        }
+
+        const apiKey = document.getElementById('cv-f-api-key').value.trim();
+        const btn = document.getElementById('btn-ai-optimize');
+        const origText = btn.innerHTML;
+        
+        btn.innerHTML = "⏳ Analyzing & Rewriting... (Takes 10-20s)";
+        btn.disabled = true;
+        btn.style.backgroundColor = "#94a3b8";
+
+        // Extract current state to feed to the AI
+        const currentData = {
+            title: document.getElementById('cv-f-title').value,
+            summary: document.getElementById('cv-f-summary').value,
+            skills: document.getElementById('cv-f-skills').value,
+            experience: experienceData,
+            projects: projectData
+        };
+
+        const promptText = `You are an Expert Technical Recruiter and ATS Optimization AI.
+Your task is to rewrite the provided CV data to perfectly align with the target Job Description (JD). 
+Goal: Bypass ATS filters and catch human recruiters' attention by weaving JD keywords naturally into the candidate's existing experience.
+
+STRICT RULES:
+1. Do NOT invent false degrees, new companies, or experience the candidate doesn't have.
+2. Reframe existing facts to highlight relevance to the JD.
+3. Use strong, metric-driven action verbs (e.g., "Architected", "Orchestrated", "Optimized").
+4. Output ONLY a valid JSON object. No markdown formatting, no backticks, no conversational text.
+
+Target Job Description:
+${jd}
+
+Candidate's Current CV Data:
+${JSON.stringify(currentData)}
+
+Required Output JSON Schema:
+{
+  "title": "A highly targeted professional title",
+  "summary": "A punchy, ATS-optimized executive summary",
+  "skills": "Comma, separated, list, of, optimized, skills",
+  "experience": [
+    {"title": "...", "company": "...", "date": "...", "desc": "• Optimized bullet 1\\n• Optimized bullet 2"}
+  ],
+  "projects": [
+    {"title": "...", "context": "...", "desc": "• Optimized bullet 1\\n• Optimized bullet 2"}
+  ]
+}`;
+
+        const payload = {
+            contents: [{ parts: [{ text: promptText }] }],
+            generationConfig: {
+                temperature: 0.2, // Low variance for highly structured output
+                responseMimeType: "application/json" // Force strict JSON parsing in Gemini 3.1
+            }
+        };
+
+        try {
+            // Pointing to your local app.py proxy
+            const response = await fetch("https://eprashala.pythonanywhere.com/api/chat", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Custom-Api-Key": apiKey 
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) throw new Error(`Server returned ${response.status}`);
+
+            const data = await response.json();
+            
+            // Handle error messages passed back from the Python proxy
+            if (data.candidates[0].content.parts[0].text.includes("experiencing a disturbance") || 
+                data.candidates[0].content.parts[0].text.includes("daily limit")) {
+                alert("API Error: " + data.candidates[0].content.parts[0].text);
+                return;
+            }
+
+            let aiResponseText = data.candidates[0].content.parts[0].text;
+            
+            // Failsafe cleanup in case the model ignores the MimeType directive
+            aiResponseText = aiResponseText.replace(/```json/g, '').replace(/```/g, '').trim();
+            const optimizedData = JSON.parse(aiResponseText);
+
+            // Inject the optimized data back into the form fields
+            if (optimizedData.title) document.getElementById('cv-f-title').value = optimizedData.title;
+            if (optimizedData.summary) document.getElementById('cv-f-summary').value = optimizedData.summary;
+            if (optimizedData.skills) document.getElementById('cv-f-skills').value = optimizedData.skills;
+            
+            // Rebuild the dynamic arrays
+            if (optimizedData.experience) {
+                experienceData = optimizedData.experience;
+                renderExperienceForms();
+            }
+            if (optimizedData.projects) {
+                projectData = optimizedData.projects;
+                renderProjectForms();
+            }
+
+            // Push changes to the live PDF engine
+            renderCV();
+
+            // Flash success state
+            btn.innerHTML = "✅ CV Successfully Optimized!";
+            btn.style.backgroundColor = "#10b981";
+            setTimeout(() => {
+                btn.innerHTML = "⚡ Tailor CV to JD (Gemini 3.1)";
+                btn.style.backgroundColor = "#1e3a8a";
+            }, 3000);
+
+        } catch (err) {
+            console.error("ATS Optimization Error:", err);
+            alert("Please insert your own valid Gemini 3.1 API key.");
+        } finally {
+            btn.disabled = false;
+            if (btn.innerHTML.includes("Analyzing")) {
+                btn.innerHTML = "⚡ Tailor CV to JD (Gemini 3.1)";
+                btn.style.backgroundColor = "#1e3a8a";
+            }
+        }
+    }
+
+
 
     init();
 </script>
