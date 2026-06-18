@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tri-Modal Verification: Graphology Matrix</title>
+    <style>
+        :root {
+            --primary: #d4af37;
+            --bg-color: #1a0b2e;
+            --panel-bg: rgba(0, 0, 0, 0.5);
+            --text-color: #f4e8c1;
+            --error-color: #ff4c4c;
+            --success-color: #4cff4c;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-bottom: 50px;
+        }
+
+        h1 {
+            color: var(--primary);
+            text-align: center;
+            text-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
+            margin-bottom: 20px;
+        }
+
+        .container {
+            background: var(--panel-bg);
+            border: 2px solid var(--primary);
+            padding: 25px;
+            border-radius: 10px;
+            width: 100%;
+            max-width: 650px;
+            box-shadow: 0 0 15px rgba(212, 175, 55, 0.1);
+            text-align: center;
+        }
+
+        .input-group { margin-bottom: 15px; }
+        
+        input[type="text"], input[type="date"], select {
+            width: 100%;
+            padding: 12px;
+            border-radius: 5px;
+            border: 1px solid var(--primary);
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            font-size: 16px;
+            box-sizing: border-box;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .instruction-box {
+            background: rgba(212, 175, 55, 0.05);
+            border-left: 4px solid var(--primary);
+            padding: 15px;
+            text-align: left;
+            margin-bottom: 20px;
+            font-size: 0.95em;
+            line-height: 1.6;
+        }
+
+        .script-container {
+            background: #fff;
+            color: #000;
+            padding: 25px;
+            border-radius: 5px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 15px;
+            line-height: 1.4;
+            text-align: justify;
+            margin-bottom: 20px;
+            display: none;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+            user-select: none; /* Prevents copy-pasting */
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: #000;
+            border: none;
+            padding: 14px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin: 10px 0;
+            width: 100%;
+        }
+
+        button:hover:not(:disabled) { transform: scale(1.02); box-shadow: 0 0 15px var(--primary); }
+        button:disabled { background-color: #555; color: #888; cursor: not-allowed; }
+
+        .hidden-file-input { display: none; }
+
+        #timerDisplay {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--error-color);
+            font-family: monospace;
+            display: none;
+            margin: 10px 0;
+            letter-spacing: 2px;
+        }
+
+        .result-box {
+            margin-top: 20px;
+            padding: 15px;
+            border-top: 2px dashed var(--primary);
+            display: none;
+            text-align: left;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid rgba(212, 175, 55, 0.3);
+        }
+
+        .value-high { color: var(--success-color); font-weight: bold; }
+        .value-warn { color: var(--error-color); font-weight: bold; }
+        .value-neutral { color: var(--primary); font-weight: bold; }
+        
+        .pulsing-text { animation: pulse 1.5s infinite; color: var(--primary); }
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+
+    </style>
+</head>
+<body>
+
+    <h1>Tri-Modal Verification<br><span style="font-size: 18px; font-weight: normal; color: #888;">Phase 1: Graphology Matrix</span></h1>
+
+    <div class="container">
+        
+        <div id="registrationPhase">
+            <h3 style="color: var(--primary); margin-top: 0;">Candidate Registration</h3>
+            <input type="text" id="candidateName" placeholder="Full Legal Name" autocomplete="off">
+            <input type="date" id="candidateDOB">
+            <select id="candidateSex">
+                <option value="" disabled selected>Select Biological Sex</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+            </select>
+            <button id="registerBtn">Proceed to Instructions</button>
+            <div id="regError" style="color: var(--error-color); display: none; margin-top: 10px;">Please complete all fields.</div>
+        </div>
+
+        <div id="instructionPhase" style="display: none;">
+            <div class="instruction-box">
+                <strong>CRITICAL PROTOCOL:</strong><br><br>
+                1. Prepare a blank sheet of unlined white paper and a blue or black pen.<br>
+                2. We will generate a unique, raw block of text (approx. 20 sentences). It will have <strong>NO formatting or paragraphs</strong>.<br>
+                3. <strong>Your Task:</strong> You must read the block and write it down neatly on your paper, <strong>breaking it into 3 logical paragraphs</strong>.<br>
+                4. The timer begins the moment you click "Commence". Your cognitive organization and writing speed (WPM) will be heavily graded.<br>
+                5. Do not let your device sleep. Upon finishing, click "Capture Upload" immediately.
+            </div>
+            <button id="generateBtn">Acknowledge & Generate Script</button>
+            <div id="generationStatus" class="pulsing-text" style="display: none; margin-top: 15px;">Synthesizing Unique AI Script... Please wait.</div>
+        </div>
+
+        <div id="activePhase" style="display: none;">
+            <div id="timerDisplay">00:00</div>
+            <div class="script-container" id="scriptText"></div>
+            
+            <button id="captureBtn">Capture Upload</button>
+            <input type="file" id="fileUpload" class="hidden-file-input" accept="image/*" capture="environment">
+        </div>
+
+        <div id="processingPhase" style="display: none;">
+            <h3 class="pulsing-text">Analyzing Handwriting Signatures & Cognitive Formatting...</h3>
+        </div>
+
+        <div id="resultBox" class="result-box">
+            <h3 style="color: var(--primary); margin-top: 0; text-align: center;">Diagnostic Results</h3>
+            
+            <h4 style="color: var(--primary); border-bottom: 1px solid #555; padding-bottom: 5px;">Performance Metrics</h4>
+            <div class="metric-row"><span>Candidate:</span> <span id="outName" class="value-neutral">-</span></div>
+            <div class="metric-row"><span>Total Time:</span> <span id="outTime" class="value-neutral">-</span></div>
+            <div class="metric-row"><span>Writing Speed (WPM):</span> <span id="outWpm" class="value-neutral">-</span></div>
+            <div class="metric-row"><span>Transcription Accuracy:</span> <span id="outAcc" class="value-neutral">-</span></div>
+            <div class="metric-row"><span>Paragraph Formatting:</span> <span id="outPara" class="value-neutral">-</span></div>
+            
+            <h4 style="color: var(--primary); border-bottom: 1px solid #555; padding-bottom: 5px; margin-top: 20px;">Structural Graphology Profiling</h4>
+            <div class="metric-row"><span>Baseline Trajectory:</span> <span id="outBaseline" class="value-neutral">-</span></div>
+            <div class="metric-row"><span>Slant Angle:</span> <span id="outSlant" class="value-neutral">-</span></div>
+            <div class="metric-row"><span>Pressure/Stroke:</span> <span id="outPressure" class="value-neutral">-</span></div>
+            
+            <p style="font-size: 0.9em; margin-top: 15px; text-align: justify; line-height: 1.5; background: rgba(0,0,0,0.3); padding: 10px; border-left: 3px solid var(--primary);" id="behavioralText"></p>
+        </div>
+
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const PROXY_API_ENDPOINT = "https://eprashala.pythonanywhere.com/api/chat";
+        let customApiKey = localStorage.getItem('hastarekha_api_key') || "";
+        function getActiveEndpoint() {
+            return customApiKey ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash:generateContent?key=${customApiKey}` : PROXY_API_ENDPOINT;
+        }
+
+        // --- GLOBAL STATE ---
+        let wakeLock = null;
+        let startTime = 0;
+        let timerInterval = null;
+        let targetWordCount = 0;
+        let generatedScript = "";
+        
+        let candName = "", candDOB = "", candSex = "";
+
+        // --- DOM ELEMENTS ---
+        const regPhase = document.getElementById('registrationPhase');
+        const instPhase = document.getElementById('instructionPhase');
+        const activePhase = document.getElementById('activePhase');
+        const procPhase = document.getElementById('processingPhase');
+        const resultBox = document.getElementById('resultBox');
+
+        // --- WAKE LOCK ENGINE ---
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) { console.error("Wake Lock Failed:", err); }
+        }
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible') await requestWakeLock();
+        });
+
+        // --- STEP 1: REGISTRATION LOGIC ---
+        document.getElementById('registerBtn').addEventListener('click', () => {
+            candName = document.getElementById('candidateName').value.trim();
+            candDOB = document.getElementById('candidateDOB').value;
+            candSex = document.getElementById('candidateSex').value;
+
+            if(!candName || !candDOB || !candSex) {
+                document.getElementById('regError').style.display = 'block';
+                return;
+            }
+            regPhase.style.display = 'none';
+            instPhase.style.display = 'block';
+        });
+
+        // --- STEP 2: DYNAMIC AI TEXT GENERATION ---
+        document.getElementById('generateBtn').addEventListener('click', async () => {
+            document.getElementById('generateBtn').disabled = true;
+            document.getElementById('generationStatus').style.display = 'block';
+
+            // Strict prompt to generate exactly 20 sentences with NO formatting
+            const textPrompt = `Generate a highly complex, philosophical text regarding ethics, corporate pressure, and human resilience. 
+            RULES: 
+            1. It MUST be exactly 20 sentences long. 
+            2. It MUST be output as one single, massive block of unformatted text. Absolutely NO paragraph breaks (no \n or \r). 
+            3. Do not include introductory or concluding remarks. Just raw text.`;
+
+            try {
+                const response = await fetch(getActiveEndpoint(), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ "contents": [{ "parts": [{ "text": textPrompt }] }] })
+                });
+
+                const data = await response.json();
+                if (data.error) throw new Error(data.error.message);
+
+                generatedScript = data.candidates[0].content.parts[0].text.trim().replace(/\n/g, " "); // Ensure no breaks
+                targetWordCount = generatedScript.split(' ').length;
+
+                // Move to Active Phase
+                instPhase.style.display = 'none';
+                activePhase.style.display = 'block';
+                document.getElementById('scriptText').innerText = generatedScript;
+                document.getElementById('scriptText').style.display = 'block';
+                document.getElementById('timerDisplay').style.display = 'block';
+
+                await requestWakeLock();
+                startTime = Date.now();
+                timerInterval = setInterval(updateTimer, 1000);
+
+            } catch (err) {
+                document.getElementById('generationStatus').innerHTML = `<span style="color:var(--error-color)">Script generation failed. Please check connection.</span>`;
+                document.getElementById('generateBtn').disabled = false;
+            }
+        });
+
+        function updateTimer() {
+            const diff = Math.floor((Date.now() - startTime) / 1000);
+            const m = String(Math.floor(diff / 60)).padStart(2, '0');
+            const s = String(diff % 60).padStart(2, '0');
+            document.getElementById('timerDisplay').innerText = `${m}:${s}`;
+        }
+
+        // --- STEP 3: CAPTURE & UPLOAD ---
+        document.getElementById('captureBtn').addEventListener('click', () => {
+            document.getElementById('fileUpload').click();
+        });
+
+        document.getElementById('fileUpload').addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            clearInterval(timerInterval);
+            const totalSeconds = (Date.now() - startTime) / 1000;
+            const wpm = Math.round(targetWordCount / (totalSeconds / 60));
+
+            activePhase.style.display = 'none';
+            procPhase.style.display = 'block';
+            if (wakeLock !== null) wakeLock.release();
+
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onloadend = async () => {
+                await executeGraphologyMatrix(reader.result.split(',')[1], generatedScript, totalSeconds, wpm);
+            };
+        });
+
+        // --- STEP 4: AI FORENSIC ANALYSIS ---
+        async function executeGraphologyMatrix(imageBase64, targetText, totalSeconds, wpm) {
+            const prompt = `Act as an expert forensic graphologist and OCR system. 
+            Candidate Name: ${candName}. Sex: ${candSex}.
+            Task: The candidate was given a massive unformatted block of text ("${targetText}") and instructed to write it down NEATLY into 3 separate paragraphs.
+            
+            CRITICAL INSTRUCTION: Respond ONLY with a valid, raw JSON object. No markdown wrappers.
+            
+            SCHEMA:
+            {
+              "transcriptionAccuracy": number (0 to 100, checking for omitted words or mistakes),
+              "paragraphFormatting": string ("Excellent" if clearly broken into 3 paragraphs, "Poor" if they failed to follow formatting instructions),
+              "structuralTraits": {
+                "baseline": string (e.g., 'Ascending', 'Descending', 'Straight'),
+                "slant": string (e.g., 'Right-leaning', 'Left-leaning', 'Vertical'),
+                "pressure": string (e.g., 'Heavy', 'Light', 'Uneven')
+              },
+              "behavioralSynthesis": string (A professional 4-sentence psychological profile based on their handwriting traits and their ability to cognitively format the text. Mention if their speed of ${wpm} WPM aligns with their trait profile.)
+            }`;
+
+            try {
+                const response = await fetch(getActiveEndpoint(), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        "contents": [{ "parts": [ { "text": prompt }, { "inline_data": { "mime_type": "image/jpeg", "data": imageBase64 } } ] }] 
+                    })
+                });
+
+                const data = await response.json();
+                if (data.error) throw new Error(data.error.message);
+
+                let textResp = data.candidates[0].content.parts[0].text;
+                textResp = textResp.replace(/```json/gi, '').replace(/```/g, '').trim(); 
+                const parsed = JSON.parse(textResp);
+
+                // --- UI RENDERING ---
+                procPhase.style.display = 'none';
+                
+                document.getElementById('outName').innerText = `${candName} (${candSex})`;
+                
+                const min = Math.floor(totalSeconds / 60);
+                const sec = Math.floor(totalSeconds % 60);
+                document.getElementById('outTime').innerText = `${min}m ${sec}s`;
+                
+                const wpmEl = document.getElementById('outWpm');
+                wpmEl.innerText = `${wpm} WPM`;
+                wpmEl.className = wpm < 12 || wpm > 30 ? 'value-warn' : 'value-high';
+
+                const accEl = document.getElementById('outAcc');
+                accEl.innerText = `${parsed.transcriptionAccuracy}%`;
+                accEl.className = parsed.transcriptionAccuracy < 85 ? 'value-warn' : 'value-high';
+                
+                const paraEl = document.getElementById('outPara');
+                paraEl.innerText = parsed.paragraphFormatting;
+                paraEl.className = parsed.paragraphFormatting.includes("Poor") ? 'value-warn' : 'value-high';
+
+                document.getElementById('outBaseline').innerText = parsed.structuralTraits.baseline;
+                document.getElementById('outSlant').innerText = parsed.structuralTraits.slant;
+                document.getElementById('outPressure').innerText = parsed.structuralTraits.pressure;
+                document.getElementById('behavioralText').innerHTML = `<strong>Final Graphology Assessment:</strong> ${parsed.behavioralSynthesis}`;
+
+                resultBox.style.display = 'block';
+
+            } catch (err) {
+                procPhase.innerHTML = `<span style="color:var(--error-color);">Matrix Verification Failed: ${err.message}. Please refresh and try again.</span>`;
+            }
+        }
+    </script>
+</body>
+</html>
