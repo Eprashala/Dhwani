@@ -3,74 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Vedic Fingerprint Scanner - Complete Hand Analysis</title>
+    <title>Marrvish - Vedic Fingerprint Scanner</title>
     <style>
         :root {
-            --primary: #2A1B38; --secondary: #5A3A5E; --accent: #E5B25D; 
-            --bg: #FDFCF8; --text: #2C2C2C; --white: #FFFFFF; --danger: #D9534F;
+            --primary: #1F2937; --secondary: #4B5563; --accent: #D97706; 
+            --bg: #F9FAFB; --text: #111827; --white: #FFFFFF; --danger: #DC2626;
+            --success: #059669;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Georgia', serif; }
         body { background-color: var(--bg); color: var(--text); overflow-x: hidden; }
-        .container { max-width: 600px; margin: 0 auto; padding: 25px 20px; text-align: center; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; }
+        .container { max-width: 650px; margin: 0 auto; padding: 25px 20px; text-align: center; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; }
         
-        h1 { color: var(--primary); margin-bottom: 10px; font-size: 28px; font-weight: bold; }
+        h1 { color: var(--primary); margin-bottom: 10px; font-size: 28px; font-weight: bold; letter-spacing: -0.5px;}
         h3 { color: var(--secondary); margin-bottom: 15px; font-size: 18px; }
         p { margin-bottom: 20px; line-height: 1.6; font-family: 'Segoe UI', Tahoma, sans-serif; font-size: 15px; }
 
-        input[type="text"], input[type="number"], select { width: 100%; max-width: 280px; padding: 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; font-family: 'Segoe UI', sans-serif;}
+        input[type="text"], input[type="number"], select { width: 100%; max-width: 300px; padding: 14px; margin-bottom: 15px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 16px; font-family: 'Segoe UI', sans-serif; background: var(--white); outline: none;}
+        input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.2); }
         
-        .btn { background-color: var(--primary); color: var(--accent); border: 2px solid var(--accent); padding: 15px 25px; font-size: 16px; border-radius: 8px; cursor: pointer; margin: 10px 5px; width: 100%; max-width: 280px; font-weight: bold; transition: all 0.3s ease; display: inline-flex; justify-content: center; align-items: center; }
-        .btn:active { transform: scale(0.97); background-color: var(--secondary); }
+        .btn { background-color: var(--primary); color: var(--white); border: 2px solid var(--primary); padding: 15px 25px; font-size: 16px; border-radius: 8px; cursor: pointer; margin: 10px 5px; width: 100%; max-width: 300px; font-weight: bold; transition: all 0.2s ease; display: inline-flex; justify-content: center; align-items: center; }
+        .btn:active { transform: scale(0.97); }
         .btn-upload { background-color: var(--bg); color: var(--primary); border: 2px dashed var(--primary); }
-        .btn-ai { background: linear-gradient(135deg, #2A1B38, #E5B25D); color: white; border: none; }
-        .btn-print { background-color: #1a1a1a; color: white; border: none; }
-        .btn-listen { background-color: #3b82f6; color: white; border: none; width: auto; padding: 12px 20px; }
+        .btn-ai { background: linear-gradient(135deg, #1F2937, #D97706); color: white; border: none; }
+        .btn-print { background-color: #111827; color: white; border: none; }
+        .btn-listen { background-color: #2563EB; color: white; border: none; width: auto; padding: 12px 20px; border-radius: 8px; font-family: 'Segoe UI', sans-serif;}
 
         .step { display: none; width: 100%; }
         .step.active { display: block; animation: fadeIn 0.4s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 
-        .instruction-box { background: #FFF9F0; border-left: 5px solid var(--accent); padding: 20px; text-align: left; margin-bottom: 25px; border-radius: 0 8px 8px 0; }
-        .instruction-box li { margin-bottom: 10px; font-family: 'Segoe UI', sans-serif; font-size: 14px; color: #444; }
+        .instruction-box { background: #FEF3C7; border-left: 5px solid var(--accent); padding: 20px; text-align: left; margin-bottom: 25px; border-radius: 0 8px 8px 0; }
+        .instruction-box li { margin-bottom: 10px; font-family: 'Segoe UI', sans-serif; font-size: 14.5px; color: #444; }
 
         /* Camera Layout */
-        #camera-container { position: relative; width: 100%; max-width: 350px; aspect-ratio: 3/4; margin: 0 auto 20px auto; background: #000; border-radius: 12px; overflow: hidden; border: 3px solid var(--accent); display: none; }
+        #camera-container { position: relative; width: 100%; max-width: 350px; aspect-ratio: 3/4; margin: 0 auto 20px auto; background: #000; border-radius: 12px; overflow: hidden; border: 3px solid var(--accent); display: none; box-shadow: 0 10px 25px rgba(0,0,0,0.1);}
         #camera-stream { width: 100%; height: 100%; object-fit: cover; transform: scale(2); }
         .overlay-guide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.65); display: flex; align-items: center; justify-content: center; pointer-events: none; }
         .cutout { width: 130px; height: 190px; border: 2px dashed var(--accent); border-radius: 50% 50% 45% 45%; box-shadow: 0 0 0 9999px rgba(0,0,0,0.6); position: relative; }
-        .cutout::after { content: ''; position: absolute; top: 50%; left: -15px; right: -15px; height: 1px; background: rgba(229, 178, 93, 0.8); } 
+        .cutout::after { content: ''; position: absolute; top: 50%; left: -15px; right: -15px; height: 1px; background: rgba(217, 119, 6, 0.8); } 
 
         /* Report Cards List */
         #reports-list { display: flex; flex-direction: column; gap: 20px; margin-bottom: 20px; }
-        .report-card { background: var(--white); border: 1px solid #E0D5C1; border-radius: 12px; padding: 20px; text-align: left; border-top: 6px solid var(--accent); box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-        .report-card h2 { color: var(--primary); font-size: 20px; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; display: flex; justify-content: space-between;}
+        .report-card { background: var(--white); border: 1px solid #E5E7EB; border-radius: 12px; padding: 20px; text-align: left; border-top: 6px solid var(--accent); box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .report-card h2 { color: var(--primary); font-size: 20px; margin-bottom: 15px; border-bottom: 1px solid #E5E7EB; padding-bottom: 10px; display: flex; justify-content: space-between;}
         .report-card h2 span { color: var(--secondary); font-style: italic; font-size: 16px; font-weight: normal;}
         
         .param-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
-        .param-item { background: #FDFBF7; padding: 10px; border-radius: 6px; border-left: 3px solid var(--secondary); }
-        .param-label { font-size: 11px; text-transform: uppercase; color: #888; font-family: 'Segoe UI', sans-serif; }
+        .param-item { background: #F3F4F6; padding: 12px; border-radius: 8px; border-left: 4px solid var(--secondary); }
+        .param-label { font-size: 11px; text-transform: uppercase; color: #6B7280; font-family: 'Segoe UI', sans-serif; letter-spacing: 0.5px;}
         .param-value { font-size: 15px; font-weight: bold; color: var(--primary); margin-top: 4px; }
-        .synthesis-text { font-family: 'Segoe UI', sans-serif; font-size: 14px; color: #444; line-height: 1.5; background: #f9f9f9; padding: 10px; border-radius: 6px;}
+        .synthesis-text { font-family: 'Segoe UI', sans-serif; font-size: 14.5px; color: #374151; line-height: 1.6; background: #FEF3C7; padding: 15px; border-radius: 8px;}
 
         #capture-canvas { display: none; width: 100%; max-width: 180px; border-radius: 12px; margin: 0 auto; border: 3px solid var(--accent); }
         input[type="file"] { display: none; }
         
-        .loader { border: 6px solid #f3f3f3; border-top: 6px solid var(--accent); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 20px auto; }
+        .loader { border: 6px solid #F3F4F6; border-top: 6px solid var(--accent); border-radius: 50%; width: 55px; height: 55px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        .ai-content { font-family: 'Segoe UI', sans-serif; text-align: left; line-height: 1.7; font-size: 15px; padding: 15px; background: #fff; border-radius: 8px; border: 1px solid #eee; margin-top: 15px;}
-        .ai-content h2, .ai-content h3 { color: var(--primary); margin-top: 15px; margin-bottom: 10px; font-family: 'Georgia', serif;}
-        .ai-content strong { color: var(--secondary); }
+        /* Deep AI Markdown Styles */
+        .ai-content { font-family: 'Segoe UI', sans-serif; text-align: left; line-height: 1.8; font-size: 15.5px; padding: 20px; background: var(--white); border-radius: 12px; border: 1px solid #E5E7EB; margin-top: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05);}
+        .ai-content h2 { color: var(--primary); margin-top: 25px; margin-bottom: 15px; font-family: 'Georgia', serif; font-size: 22px; border-bottom: 2px solid #F3F4F6; padding-bottom: 8px;}
+        .ai-content h3 { color: var(--accent); margin-top: 20px; margin-bottom: 10px; font-size: 18px;}
+        .ai-content strong { color: var(--primary); }
+        .ai-content ul { padding-left: 20px; margin-bottom: 15px; }
+        .ai-content li { margin-bottom: 8px; }
         
-        .toolbar { display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;}
+        .toolbar { display: flex; justify-content: center; align-items: center; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; background: #F3F4F6; padding: 15px; border-radius: 12px;}
 
         /* PRINT STYLES */
         @media print {
             body { background: white; color: black; font-size: 12pt; }
             .container { max-width: 100%; padding: 0; display: block; }
             .btn, .instruction-box, #camera-container, .toolbar { display: none !important; }
-            .report-card { break-inside: avoid; border: 1px solid #000; box-shadow: none; margin-bottom: 20px; border-top: 4px solid #000; }
-            .param-item { border-left: 2px solid #000; }
+            .report-card, .ai-content { break-inside: avoid; border: 1px solid #000; box-shadow: none; margin-bottom: 20px; border-top: 4px solid #000; }
+            .param-item { border-left: 2px solid #000; background: transparent; }
+            .synthesis-text { background: transparent; border: 1px dashed #000; }
             h1 { text-align: center; font-size: 24pt; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px;}
         }
     </style>
@@ -80,32 +87,33 @@
 <div class="container">
     
     <div id="step-intake" class="step active">
-        <h1>Hasta Rekha Pro</h1>
-        <p>Complete Hand Analysis Pipeline</p>
+        <h1 style="color: var(--accent);">Marrvish.com</h1>
+        <h1>Absolute Truth Scanner</h1>
+        <p>Complete Vedic Hand Analysis Pipeline</p>
         
-        <input type="text" id="user-name" placeholder="Enter your Name" required>
-        <input type="number" id="user-age" placeholder="Enter your Age" required>
+        <input type="text" id="user-name" placeholder="Enter Full Name" required>
+        <input type="number" id="user-age" placeholder="Enter Age" required>
 
-        <h3 style="margin-top: 10px;">Select Active Hand:</h3>
-        <p style="font-size: 12px; margin-top: -10px; margin-bottom: 15px;">(Male = Right, Female = Left)</p>
+        <h3 style="margin-top: 15px;">Select Active Hand:</h3>
+        <p style="font-size: 13px; margin-top: -10px; margin-bottom: 15px; color: var(--secondary);">(Male = Right Hand, Female = Left Hand)</p>
         <div style="display: flex; justify-content: center; gap: 10px; margin-bottom: 20px;">
-            <button class="btn" style="padding: 10px 20px; max-width: 150px;" onclick="initializeScanner('Male')">Male (Right)</button>
-            <button class="btn" style="padding: 10px 20px; max-width: 150px;" onclick="initializeScanner('Female')">Female (Left)</button>
+            <button class="btn" style="padding: 12px 20px; max-width: 150px;" onclick="initializeScanner('Male')">Male (Right)</button>
+            <button class="btn" style="padding: 12px 20px; max-width: 150px;" onclick="initializeScanner('Female')">Female (Left)</button>
         </div>
     </div>
 
     <div id="step-capture-choice" class="step">
         <h1 id="header-user-info">Scanner Preparation</h1>
-        <h3 id="hand-target" style="color: var(--danger); font-weight: bold; font-size: 22px; margin: 20px 0;"></h3>
+        <h3 id="hand-target" style="color: var(--danger); font-weight: bold; font-size: 24px; margin: 20px 0;"></h3>
         
         <div class="instruction-box">
             <ul>
-                <li><strong>Upload:</strong> Rub ink on finger, press on paper, upload photo.</li>
-                <li><strong>Camera:</strong> Hold 4 inches away in good side-lighting.</li>
+                <li><strong>Upload Method:</strong> Rub ink on the finger, press firmly on white paper, upload the photo.</li>
+                <li><strong>Camera Method:</strong> Hold phone 4 inches away. Ensure bright side-lighting.</li>
             </ul>
         </div>
         <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
-            <label for="file-upload" class="btn btn-upload">📁 Upload Impression</label>
+            <label for="file-upload" class="btn btn-upload">📁 Upload Ink Impression</label>
             <input type="file" id="file-upload" accept="image/*">
             <button class="btn" onclick="startCamera()">📷 Open Live Scanner</button>
         </div>
@@ -118,48 +126,70 @@
             <div class="overlay-guide"><div class="cutout"></div></div>
         </div>
         <button class="btn" onclick="captureFromVideo()">Extract Biometrics</button>
-        <button class="btn btn-upload" style="border: none; margin-top: 5px;" onclick="stopCamera(); showStep('capture-choice');">Cancel</button>
+        <button class="btn btn-upload" style="border: none; margin-top: 10px;" onclick="stopCamera(); showStep('capture-choice');">Cancel</button>
     </div>
 
     <div id="step-loading" class="step">
-        <h1>Gemini 3.1 AI</h1>
+        <h1>Marrvish AI Core</h1>
         <div class="loader"></div>
-        <p id="loading-target-text">Transmitting impression to the AI proxy for mathematical extraction...</p>
+        <p id="loading-target-text" style="font-weight: bold; color: var(--accent);">Transmitting impression for absolute truth extraction...</p>
         <canvas id="capture-canvas"></canvas>
     </div>
 
     <div id="step-results" class="step">
-        <h1 id="print-header">Hasta Rekha Report</h1>
-        <p style="font-weight: bold; font-size: 16px; margin-bottom: 20px;" id="results-user-info"></p>
+        <h1 id="print-header">Marrvish Basic Report</h1>
+        <p style="font-weight: bold; font-size: 16px; margin-bottom: 20px; color: var(--secondary);" id="results-user-info"></p>
         
         <div id="reports-list"></div>
         
-        <div id="action-buttons-container" style="margin-top: 25px; border-top: 1px solid #ccc; padding-top: 20px;">
+        <div id="action-buttons-container" style="margin-top: 25px; border-top: 1px solid #E5E7EB; padding-top: 25px;">
             <button id="btn-next" class="btn" onclick="prepareNextFinger()"></button>
-            <button id="btn-print" class="btn btn-print" style="display:none;" onclick="window.print()">🖨️ Print Complete Report</button>
-            <button id="btn-deep-ai" class="btn btn-ai" style="display:none; width: 100%; max-width: 100%; margin-top: 10px;" onclick="showDeepAI()">🔮 View Deep AI Astrological Synthesis</button>
+            <button id="btn-print" class="btn btn-print" style="display:none;" onclick="window.print()">🖨️ Print Basic Report</button>
+            <button id="btn-deep-ai" class="btn btn-ai" style="display:none; width: 100%; max-width: 100%; margin-top: 15px;" onclick="showDeepAI()">🔮 View Uncompromising Absolute Truth Report</button>
         </div>
     </div>
 
     <div id="step-deep-ai" class="step">
-        <h1>Complete Cosmic Blueprint</h1>
+        <h1 style="color: var(--accent);">Absolute Truth Blueprint</h1>
         <h3 id="deep-title" style="color: var(--secondary); margin-bottom: 15px;"></h3>
         
         <div class="toolbar">
-            <select id="language-selector" onchange="translateDeepAI()" style="margin: 0; width: auto; min-width: 150px;">
-                <option value="English">English</option>
-                <option value="Hindi">Hindi (हिंदी)</option>
-                <option value="Sanskrit">Sanskrit (संस्कृतम्)</option>
-                <option value="Spanish">Spanish (Español)</option>
-                <option value="French">French (Français)</option>
+            <select id="language-selector" onchange="translateDeepAI()" style="margin: 0; width: auto; min-width: 200px;">
+                <optgroup label="Default">
+                    <option value="English">English</option>
+                </optgroup>
+                <optgroup label="Indian Languages">
+                    <option value="Hindi">Hindi (हिंदी)</option>
+                    <option value="Bengali">Bengali (বাংলা)</option>
+                    <option value="Telugu">Telugu (తెలుగు)</option>
+                    <option value="Marathi">Marathi (मराठी)</option>
+                    <option value="Tamil">Tamil (தமிழ்)</option>
+                    <option value="Urdu">Urdu (اردو)</option>
+                    <option value="Gujarati">Gujarati (ગુજરાતી)</option>
+                    <option value="Kannada">Kannada (ಕನ್ನಡ)</option>
+                    <option value="Odia">Odia (ଓଡ଼ିଆ)</option>
+                    <option value="Malayalam">Malayalam (മലയാളം)</option>
+                    <option value="Punjabi">Punjabi (ਪੰਜਾਬੀ)</option>
+                    <option value="Assamese">Assamese (অসমীয়া)</option>
+                    <option value="Sanskrit">Sanskrit (संस्कृतम्)</option>
+                    <option value="Maithili">Maithili (मैथिली)</option>
+                    <option value="Santali">Santali (ᱥᱟᱱᱛᱟᱲᱤ)</option>
+                    <option value="Kashmiri">Kashmiri (कॉशुर)</option>
+                    <option value="Nepali">Nepali (नेपाली)</option>
+                    <option value="Sindhi">Sindhi (سنڌي)</option>
+                    <option value="Dogri">Dogri (डोगरी)</option>
+                    <option value="Konkani">Konkani (कोंकणी)</option>
+                    <option value="Manipuri">Manipuri (ꯃꯤꯇꯩꯂꯣꯟ)</option>
+                    <option value="Bodo">Bodo (बड़ो)</option>
+                </optgroup>
             </select>
-            <button id="btn-listen" class="btn btn-listen" onclick="toggleSpeech('deep-content')">🔊 Listen</button>
+            <button id="btn-listen" class="btn btn-listen" onclick="toggleSpeech('deep-content')">🔊 Listen to Report</button>
         </div>
 
         <div class="ai-content" id="deep-content"></div>
         
-        <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
-            <button class="btn btn-print" onclick="window.print()">🖨️ Print Blueprint</button>
+        <div style="display: flex; gap: 10px; justify-content: center; margin-top: 25px; flex-wrap: wrap;">
+            <button class="btn btn-print" onclick="window.print()">🖨️ Print Absolute Truth</button>
             <button class="btn btn-upload" onclick="location.reload()">Start New Scan</button>
         </div>
     </div>
@@ -167,18 +197,20 @@
 </div>
 
 <script>
+    // System Constants
     const API_URL = 'https://eprashala.pythonanywhere.com/api/chat';
-    
     let videoStream = null;
     let isSpeaking = false;
+    let utteranceQueue = []; // For sentence chunking
+    
     let userData = { name: '', age: '', handSide: '', base64Image: '', cumulativeDeepHTML: '', currentLanguageHTML: '' };
     
     const fingerSequence = [
-        { name: "Thumb", sanskrit: "Angustha", planet: "Willpower & Logic" },
-        { name: "Index Finger", sanskrit: "Tarjani", planet: "Jupiter (Ego/Leadership)" },
-        { name: "Middle Finger", sanskrit: "Madhyama", planet: "Saturn (Career/Karma)" },
-        { name: "Ring Finger", sanskrit: "Anamika", planet: "Sun (Fame/Vitality)" },
-        { name: "Little Finger", sanskrit: "Kanishthika", planet: "Mercury (Intellect/Business)" }
+        { name: "Thumb", sanskrit: "Angustha", planet: "Soul, Willpower & Logic" },
+        { name: "Index Finger", sanskrit: "Tarjani", planet: "Jupiter (Ego, Leadership, Dharma)" },
+        { name: "Middle Finger", sanskrit: "Madhyama", planet: "Saturn (Career, Karma, Hard Work)" },
+        { name: "Ring Finger", sanskrit: "Anamika", planet: "Sun (Fame, Vitality, Relationships)" },
+        { name: "Little Finger", sanskrit: "Kanishthika", planet: "Mercury (Intellect, Accountability, Wealth)" }
     ];
     let currentFingerIdx = 0;
 
@@ -190,13 +222,13 @@
     function initializeScanner(gender) {
         const nameVal = document.getElementById('user-name').value.trim();
         const ageVal = document.getElementById('user-age').value.trim();
-        if(!nameVal || !ageVal) { alert("Please enter Name and Age first."); return; }
+        if(!nameVal || !ageVal) { alert("Please enter your Full Name and Age to proceed."); return; }
         
         userData.name = nameVal;
         userData.age = ageVal;
         userData.handSide = gender === 'Male' ? 'Right' : 'Left';
         
-        document.getElementById('results-user-info').innerText = `Client: ${userData.name} | Age: ${userData.age} | Active Hand: ${userData.handSide}`;
+        document.getElementById('results-user-info').innerText = `Client: ${userData.name} | Age: ${userData.age} | Hand: ${userData.handSide}`;
         
         currentFingerIdx = 0;
         document.getElementById('reports-list').innerHTML = ''; 
@@ -207,7 +239,7 @@
 
     function showCaptureChoice() {
         const targetFinger = fingerSequence[currentFingerIdx];
-        document.getElementById('hand-target').innerText = `SCAN TARGET:\n${userData.handSide.toUpperCase()} ${targetFinger.name.toUpperCase()}`;
+        document.getElementById('hand-target').innerText = `SCANNING:\n${userData.handSide.toUpperCase()} ${targetFinger.name.toUpperCase()}`;
         showStep('capture-choice');
     }
 
@@ -234,7 +266,7 @@
         event.target.value = '';
     });
 
-    // --- CAMERA LOGIC ---
+    // --- MATHEMATICAL CAMERA CROP LOGIC ---
     async function startCamera() {
         showStep('camera');
         document.getElementById('camera-container').style.display = 'block';
@@ -245,7 +277,7 @@
             });
             videoElement.srcObject = videoStream;
         } catch (error) { 
-            alert("Camera access denied. Please upload a photo instead."); 
+            alert("Camera access denied. Please use the Upload Impression method."); 
             showCaptureChoice();
         }
     }
@@ -281,32 +313,35 @@
         analyzeWithGemini();
     }
 
-    // --- GEMINI 3.1 AI CONNECTION & CLARITY GATEKEEPER ---
+    // --- GEMINI AI BRUTAL TRUTH ENGINE ---
     async function analyzeWithGemini() {
         const currentFinger = fingerSequence[currentFingerIdx];
         
         showStep('loading');
-        document.getElementById('loading-target-text').innerText = `Analyzing the ridges of the ${currentFinger.name}...`;
+        document.getElementById('loading-target-text').innerText = `Extracting absolute truth from the ${currentFinger.name}...`;
         
         let cleanBase64 = userData.base64Image.split(',')[1];
 
+        // The Uncompromising System Prompt
         const systemPrompt = `
-        You are a master of Samudrika Shastra and Vedic Palmistry. 
+        You are a brutally honest, uncompromising master of Samudrika Shastra acting as the core engine for Marrvish.com.
         Analyze this fingerprint image for: Name: ${userData.name}, Age: ${userData.age}, Gender: ${userData.handSide} Hand.
         Target Finger: ${currentFinger.name} (${currentFinger.sanskrit}), representing ${currentFinger.planet}.
         
-        FIRST RULE: Evaluate image clarity. Can you clearly see the ridge patterns (Whorl, Loop, or Arch)? If it is completely blurry, completely dark, or unrecognizable, mark it as invalid.
+        FIRST RULE (GATEKEEPER): Evaluate image clarity. If it is completely blurry, dark, or unrecognizable, mark "is_clear_impression" as "No" and state the error.
         
-        You MUST respond ONLY with a valid JSON object. Do not wrap it in markdown code blocks.
+        SECOND RULE (THE TRUTH): Do NOT flatter the user. Provide an absolutely honest, uncompromising reading based on ancient texts.
+        
+        You MUST respond ONLY with a valid JSON object. Do NOT wrap it in markdown code blocks.
         Format required:
         {
             "is_clear_impression": "Yes or No",
-            "clarity_error": "If No, strictly explain why (e.g. 'Image is too blurry or dark.'). If Yes, leave empty.",
+            "clarity_error": "If No, explain why. If Yes, leave empty.",
             "pattern": "Concentric Whorl / Flowing Loop / Stable Arch",
             "pattern_sanskrit": "Chakra / Shankha / Seep",
             "nabhi": "High / Centered / Low",
-            "synthesis_desc": "One powerful sentence summarizing the meaning of this pattern SPECIFICALLY on the ${currentFinger.name}.",
-            "deep_reading_html": "<p>A perfectly accurate, highly detailed 2-paragraph astrological deep dive into what this pattern means for their ${currentFinger.planet}. Base this solely on authentic ancient fingerprint reading science.</p>"
+            "synthesis_desc": "One brutally honest sentence summarizing their karmic tendency for this finger.",
+            "deep_reading_html": "<p>A detailed, honest 2-paragraph astrological deep dive into what this pattern means for their ${currentFinger.planet}.</p><h3>Truth Metrics & Percentages</h3><p>Based firmly on the structural integrity of this specific finger's pattern, provide precise percentage ratings (0% to 100%). Be realistic and honest (e.g., if accountability is weak, give 35%).</p><ul><li><b>The 4 Purusharthas:</b> Dharma X%, Artha X%, Kama X%, Moksha X%</li><li><b>The 5 Enemies (Arishadvargas):</b> Kama (Lust) X%, Krodha (Anger) X%, Moha (Attachment) X%, Mada/Maar (Pride) X%, Matsarya (Jealousy) X%</li><li><b>Modern Professional Traits:</b> Honesty X%, Reliability X%, Hardworking X%, Punctuality X%, Accountability X%</li></ul>"
         }
         `;
 
@@ -317,7 +352,7 @@
                     { "inlineData": { "mimeType": "image/jpeg", "data": cleanBase64 } }
                 ]
             }],
-            "generationConfig": { "temperature": 0.5 }
+            "generationConfig": { "temperature": 0.3 } // Lower temperature for brutal factual honesty
         };
 
         try {
@@ -334,7 +369,7 @@
                 aiText = aiText.replace(/```json/g, '').replace(/```/g, '').trim();
                 const resultObj = JSON.parse(aiText);
                 
-                // --- THE CLARITY GATEKEEPER CHECK ---
+                // Clarity Check
                 if (resultObj.is_clear_impression.toLowerCase().includes("no")) {
                     alert("Image Quality Error: " + resultObj.clarity_error + "\n\nPlease ensure good lighting and rescan the " + currentFinger.name + ".");
                     document.getElementById('capture-canvas').style.display = 'none';
@@ -342,40 +377,41 @@
                     return;
                 }
                 
+                // Build Basic UI Card
                 const cardHTML = `
                     <div class="report-card">
                         <h2>${currentFinger.name} <span>(${currentFinger.sanskrit})</span></h2>
                         <div class="param-grid">
-                            <div class="param-item"><div class="param-label">Pattern</div><div class="param-value">${resultObj.pattern} <br><span style="font-weight:normal; font-size:13px; color:#5A3A5E;">${resultObj.pattern_sanskrit}</span></div></div>
+                            <div class="param-item"><div class="param-label">Pattern</div><div class="param-value">${resultObj.pattern} <br><span style="font-weight:normal; font-size:13px; color:var(--secondary);">${resultObj.pattern_sanskrit}</span></div></div>
                             <div class="param-item"><div class="param-label">Core/Nabhi</div><div class="param-value">${resultObj.nabhi}</div></div>
                         </div>
-                        <div class="synthesis-text"><strong>Analysis:</strong> ${resultObj.synthesis_desc}</div>
+                        <div class="synthesis-text"><strong>Absolute Truth:</strong> ${resultObj.synthesis_desc}</div>
                     </div>
                 `;
                 
                 document.getElementById('reports-list').innerHTML += cardHTML;
                 
+                // Append the deep truth reading with metrics
                 userData.cumulativeDeepHTML += `
-                    <div style="margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px dashed #ccc;">
-                        <h2 style="color: #2A1B38;">${currentFinger.name} (${currentFinger.planet})</h2>
+                    <div style="margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px dashed #E5E7EB;">
+                        <h2 style="color: var(--primary); text-transform: uppercase;">${currentFinger.name} (${currentFinger.planet})</h2>
                         ${resultObj.deep_reading_html}
                     </div>
                 `;
                 
-                // Save English as base state
                 userData.currentLanguageHTML = userData.cumulativeDeepHTML;
                 
                 updateActionButtons();
                 showStep('results');
                 
             } else {
-                alert("Gemini returned an unexpected format. Please capture again.");
+                alert("Gemini AI timeout. Please capture again.");
                 showCaptureChoice();
             }
 
         } catch (error) {
             console.error("API Error:", error);
-            alert("AI Connection failed. Ensure server is running.");
+            alert("Connection to Marrvish Core failed. Ensure backend is running.");
             showCaptureChoice();
         }
     }
@@ -404,22 +440,21 @@
     }
 
     function showDeepAI() {
-        document.getElementById('deep-title').innerText = `Synthesis for ${userData.name} (Age: ${userData.age})`;
+        document.getElementById('deep-title').innerText = `Report for ${userData.name} (Age: ${userData.age})`;
         document.getElementById('deep-content').innerHTML = userData.currentLanguageHTML;
         
-        // Reset language and speech states if opening fresh
+        // Reset states
         document.getElementById('language-selector').value = "English";
         if(isSpeaking) toggleSpeech('deep-content'); 
         
         showStep('deep-ai');
     }
 
-    // --- LANGUAGE TRANSLATOR PROXY ---
+    // --- ROBUST TRANSLATOR PROXY ---
     async function translateDeepAI() {
         const targetLang = document.getElementById('language-selector').value;
         
-        // Stop audio if they switch language while reading
-        if(isSpeaking) toggleSpeech('deep-content');
+        if(isSpeaking) toggleSpeech('deep-content'); // Stop audio during translation
 
         if (targetLang === 'English') {
             userData.currentLanguageHTML = userData.cumulativeDeepHTML;
@@ -428,17 +463,21 @@
         }
 
         const contentBox = document.getElementById('deep-content');
-        contentBox.innerHTML = `<div class="loader"></div><p style="text-align:center;">Translating ancient wisdom into ${targetLang}...</p>`;
+        contentBox.innerHTML = `<div class="loader"></div><p style="text-align:center; font-weight:bold;">Translating absolute truth into ${targetLang}...</p>`;
 
-        const prompt = `Translate the following astrological HTML report into ${targetLang}. 
-        CRITICAL: Preserve all HTML tags exactly. Only translate the text content inside the tags. Do not wrap the response in markdown code blocks.
+        const prompt = `Translate the following Marrvish astrological HTML report into ${targetLang}. 
+        CRITICAL RULES:
+        1. Preserve ALL HTML tags, classes, and structure exactly as they are.
+        2. Only translate the human-readable text inside the tags.
+        3. Keep the metric percentage numbers exactly the same.
+        4. Do NOT wrap the response in markdown code blocks. Just output the raw HTML.
         
         HTML TO TRANSLATE:
         ${userData.cumulativeDeepHTML}`;
 
         const payload = {
             "contents": [{ "parts": [{ "text": prompt }] }],
-            "generationConfig": { "temperature": 0.2 } // Low temp for accurate translation
+            "generationConfig": { "temperature": 0.1 } // Strict translation mode
         };
 
         try {
@@ -454,7 +493,7 @@
                 userData.currentLanguageHTML = translatedText;
                 contentBox.innerHTML = userData.currentLanguageHTML;
             } else {
-                alert("Translation failed. Restoring English.");
+                alert("Translation engine timeout. Restoring English.");
                 document.getElementById('language-selector').value = "English";
                 contentBox.innerHTML = userData.cumulativeDeepHTML;
             }
@@ -465,47 +504,61 @@
         }
     }
 
-    // --- TEXT TO SPEECH (LISTEN) ---
+    // --- FLAWLESS TTS (SENTENCE CHUNKING) ---
     function toggleSpeech(elementId) {
         if (isSpeaking) {
             window.speechSynthesis.cancel();
             isSpeaking = false;
-            document.getElementById('btn-listen').innerText = '🔊 Listen';
+            document.getElementById('btn-listen').innerText = '🔊 Listen to Report';
             return;
         }
 
-        const textToRead = document.getElementById(elementId).innerText;
+        const contentBox = document.getElementById(elementId);
+        // Extract raw text, removing HTML noise
+        const textToRead = contentBox.innerText || contentBox.textContent;
         if (!textToRead) return;
 
-        const targetLang = document.getElementById('language-selector').value;
-        let langCode = 'en-US';
-        if(targetLang === 'Hindi') langCode = 'hi-IN';
-        if(targetLang === 'Spanish') langCode = 'es-ES';
-        if(targetLang === 'French') langCode = 'fr-FR';
-
-        const utterance = new SpeechSynthesisUtterance(textToRead);
-        utterance.lang = langCode;
-        utterance.rate = 0.95; 
-
-        utterance.onend = () => {
-            isSpeaking = false;
-            document.getElementById('btn-listen').innerText = '🔊 Listen';
-        };
+        // Split text by punctuation to prevent browser TTS character limits/timeouts
+        const sentences = textToRead.match(/[^.!?\n]+[.!?\n]+/g) || [textToRead];
         
-        utterance.onerror = () => {
-            isSpeaking = false;
-            document.getElementById('btn-listen').innerText = '🔊 Listen';
-        }
+        // Map common Indian languages to browser TTS codes
+        const targetLang = document.getElementById('language-selector').value;
+        let langCode = 'en-IN'; 
+        const langMap = {
+            'Hindi': 'hi-IN', 'Marathi': 'mr-IN', 'Tamil': 'ta-IN', 'Telugu': 'te-IN',
+            'Gujarati': 'gu-IN', 'Kannada': 'kn-IN', 'Malayalam': 'ml-IN', 'Bengali': 'bn-IN', 'Urdu': 'ur-IN'
+        };
+        if(langMap[targetLang]) langCode = langMap[targetLang];
 
-        window.speechSynthesis.speak(utterance);
+        // Ensure voices are loaded
+        window.speechSynthesis.getVoices();
+
         isSpeaking = true;
-        document.getElementById('btn-listen').innerText = '⏹ Stop Listening';
+        document.getElementById('btn-listen').innerText = '⏹ Stop Audio';
+
+        // Queue sentences
+        sentences.forEach((sentence, index) => {
+            if (sentence.trim().length === 0) return;
+            const utterance = new SpeechSynthesisUtterance(sentence.trim());
+            utterance.lang = langCode;
+            utterance.rate = 0.90; // Slightly slower for clarity
+            
+            if (index === sentences.length - 1) {
+                utterance.onend = () => {
+                    isSpeaking = false;
+                    document.getElementById('btn-listen').innerText = '🔊 Listen to Report';
+                };
+            }
+            utterance.onerror = () => {
+                isSpeaking = false;
+                document.getElementById('btn-listen').innerText = '🔊 Listen to Report';
+            }
+            window.speechSynthesis.speak(utterance);
+        });
     }
 
-    // Stop speaking if user closes tab
-    window.onbeforeunload = () => {
-        window.speechSynthesis.cancel();
-    };
+    // Failsafe: Stop speaking if user refreshes or closes tab
+    window.onbeforeunload = () => { window.speechSynthesis.cancel(); };
 </script>
 </body>
 </html>
