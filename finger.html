@@ -174,31 +174,77 @@
         reader.readAsDataURL(file);
     });
 
-    async function startCamera() {
+async function startCamera() {
         showStep(2);
         document.getElementById('camera-container').style.display = 'block';
+        const videoElement = document.getElementById('camera-stream');
+        
         try {
-            videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } } });
-            document.getElementById('camera-stream').srcObject = videoStream;
-        } catch (error) { alert("Camera access denied."); showStep(1); }
+            // Request the best possible rear camera with specific advanced constraints
+            videoStream = await navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    facingMode: 'environment', 
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 },
+                    advanced: [{ focusMode: "continuous" }] // Suggests macro focus if available
+                } 
+            });
+            videoElement.srcObject = videoStream;
+            
+            // Note: We leave the CSS transform: scale(2) in place for the UI,
+            // but we will handle the actual crop mathematically during capture.
+        } catch (error) { 
+            alert("Camera access denied or unsupported."); 
+            showStep(1); 
+        }
     }
-
     function stopCamera() {
         if (videoStream) { videoStream.getTracks().forEach(track => track.stop()); videoStream = null; }
         document.getElementById('camera-container').style.display = 'none';
     }
-
-    function captureFromVideo() {
+	
+function captureFromVideo() {
         const video = document.getElementById('camera-stream');
         const canvas = document.getElementById('capture-canvas');
-        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        const ctx = canvas.getContext('2d');
+
+        // 1. Get the true hardware resolution of the video sensor
+        const sensorWidth = video.videoWidth;
+        const sensorHeight = video.videoHeight;
+
+        // 2. The Math of the 2x Zoom Crop
+        // Because the UI is zoomed 2x from the center, the user is only looking at
+        // the central 50% of the raw video frame. We must extract only that specific box.
+        const cropWidth = sensorWidth / 2;
+        const cropHeight = sensorHeight / 2;
+        
+        // Calculate the starting X and Y coordinates to hit the exact center
+        const startX = (sensorWidth - cropWidth) / 2;
+        const startY = (sensorHeight - cropHeight) / 2;
+
+        // 3. Set the canvas output size (Standardizing to 400px wide for AI efficiency)
+        const OUTPUT_WIDTH = 400;
+        const OUTPUT_HEIGHT = OUTPUT_WIDTH * (cropHeight / cropWidth);
+        
+        canvas.width = OUTPUT_WIDTH;
+        canvas.height = OUTPUT_HEIGHT;
+
+        // 4. Draw ONLY the cropped central frame onto the canvas
+        // Syntax: drawImage(image, sourceX, sourceY, sourceW, sourceH, destX, destY, destW, destH)
+        ctx.drawImage(
+            video, 
+            startX, startY, cropWidth, cropHeight, // Source (The exact center crop)
+            0, 0, canvas.width, canvas.height      // Destination (Stretch to fill our canvas)
+        );
+        
         stopCamera();
         canvas.style.display = 'block';
-        userData.base64Image = canvas.toDataURL('image/jpeg', 0.8);
+        
+        // 5. Extract with max quality (1.0) to preserve the ridge data
+        userData.base64Image = canvas.toDataURL('image/jpeg', 1.0);
         sendToBasicBackend();
     }
-
+	
     async function sendToBasicBackend() {
         showStep('loading');
         document.getElementById('loading-title').innerText = "Analyzing Print...";
