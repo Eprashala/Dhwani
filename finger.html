@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Vedic Fingerprint Scanner - Pro Edition</title>
+    <title>Vedic Fingerprint Scanner - Pro</title>
     <style>
         :root {
             --primary: #2A1B38;
@@ -21,14 +21,13 @@
 
         .container { max-width: 600px; margin: 0 auto; padding: 25px 20px; text-align: center; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; }
 
-        h1 { color: var(--primary); margin-bottom: 10px; font-size: 28px; font-weight: bold; letter-spacing: 0.5px; }
+        h1 { color: var(--primary); margin-bottom: 10px; font-size: 28px; font-weight: bold; }
         h3 { color: var(--secondary); margin-bottom: 15px; font-size: 18px; }
         p { margin-bottom: 20px; line-height: 1.6; font-family: 'Segoe UI', Tahoma, sans-serif; font-size: 15px; }
 
         .btn { background-color: var(--primary); color: var(--accent); border: 2px solid var(--accent); padding: 15px 25px; font-size: 16px; border-radius: 8px; cursor: pointer; margin: 10px 5px; width: 100%; max-width: 280px; font-weight: bold; transition: all 0.3s ease; display: inline-flex; justify-content: center; align-items: center; gap: 10px; }
         .btn:active { transform: scale(0.97); background-color: var(--secondary); }
         .btn-upload { background-color: var(--bg); color: var(--primary); border: 2px dashed var(--primary); }
-        .btn-upload:active { background-color: #f0ebe1; }
 
         /* Step Containers */
         .step { display: none; width: 100%; }
@@ -38,10 +37,9 @@
 
         /* Instruction Box */
         .instruction-box { background: #FFF9F0; border-left: 5px solid var(--accent); padding: 20px; text-align: left; margin-bottom: 25px; border-radius: 0 8px 8px 0; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        .instruction-box h4 { color: var(--primary); margin-bottom: 12px; font-family: 'Segoe UI', sans-serif; text-transform: uppercase; letter-spacing: 1px; font-size: 14px; }
+        .instruction-box h4 { color: var(--primary); margin-bottom: 12px; font-family: 'Segoe UI', sans-serif; text-transform: uppercase; font-size: 14px; }
         .instruction-box ul { padding-left: 20px; font-family: 'Segoe UI', sans-serif; font-size: 14.5px; color: #444; }
         .instruction-box li { margin-bottom: 10px; }
-        .highlight-text { font-weight: bold; color: var(--secondary); }
 
         /* Camera Layout */
         #camera-container { position: relative; width: 100%; max-width: 350px; aspect-ratio: 3/4; margin: 0 auto 20px auto; background: #000; border-radius: 12px; overflow: hidden; border: 3px solid var(--accent); display: none; }
@@ -59,12 +57,13 @@
         .sanskrit { font-style: italic; color: var(--secondary); font-size: 13px; font-weight: normal; }
 
         .synthesis { font-size: 15px; color: #333; line-height: 1.7; font-family: 'Segoe UI', sans-serif; }
-        .synthesis p { margin-bottom: 15px; }
-
-        #capture-canvas { display: none; width: 100%; max-width: 180px; border-radius: 12px; margin: 0 auto; border: 3px solid var(--accent); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
         
-        /* Hidden file input */
+        #capture-canvas { display: none; width: 100%; max-width: 180px; border-radius: 12px; margin: 0 auto; border: 3px solid var(--accent); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
         input[type="file"] { display: none; }
+
+        /* Loading Spinner */
+        .loader { border: 6px solid #f3f3f3; border-top: 6px solid var(--accent); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
@@ -86,19 +85,15 @@
             <div class="instruction-box">
                 <h4>Guidelines for Absolute Accuracy</h4>
                 <ul>
-                    <li><span class="highlight-text">Method 1 (Recommended):</span> Rub dark ink, kajal, or marker on your thumb. Press it onto a plain white paper. Upload the photo of the paper.</li>
-                    <li><span class="highlight-text">Method 2 (Live Camera):</span> Do not put the phone too close! Hold it 4-5 inches away. Face a window so light hits the ridges from the side.</li>
+                    <li><strong>Method 1 (Recommended):</strong> Rub dark ink or marker on your thumb. Press it onto plain white paper. Upload the photo.</li>
+                    <li><strong>Method 2 (Live Camera):</strong> Hold phone 4-5 inches away. Face a window so light hits the ridges from the side.</li>
                 </ul>
             </div>
 
             <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
-                <label for="file-upload" class="btn btn-upload">
-                    <span>📁 Upload Clear Impression</span>
-                </label>
+                <label for="file-upload" class="btn btn-upload"><span>📁 Upload Clear Impression</span></label>
                 <input type="file" id="file-upload" accept="image/*">
-
-                <p style="margin: 0; font-size: 12px; color: #888; text-transform: uppercase;">— OR —</p>
-
+                <p style="margin: 0; font-size: 12px; color: #888;">— OR —</p>
                 <button class="btn" onclick="startCamera()">📷 Open Live Scanner</button>
             </div>
         </div>
@@ -108,124 +103,105 @@
         <h1>Align Print</h1>
         <div id="camera-container">
             <video id="camera-stream" autoplay playsinline></video>
-            <div class="overlay-guide">
-                <div class="cutout"></div>
-            </div>
+            <div class="overlay-guide"><div class="cutout"></div></div>
         </div>
-        <p style="color: var(--secondary); font-weight: bold; font-family: 'Segoe UI', sans-serif;">Align the core (Nabhi) on the golden line.</p>
+        <p style="color: var(--secondary); font-weight: bold;">Align the core (Nabhi) on the golden line.</p>
         <button class="btn" onclick="captureFromVideo()">Extract Biometrics</button>
         <button class="btn btn-upload" style="border: none; margin-top: 5px;" onclick="stopCamera(); showStep(1);">Cancel</button>
     </div>
 
-    <div id="step-3" class="step">
-        <h1>Vedic Analysis Complete</h1>
-        
+    <div id="step-loading" class="step">
+        <h1>Analyzing Shastras...</h1>
+        <div class="loader"></div>
+        <p>Our AI is mathematically calculating ridge density, core placement, and pattern circularity.</p>
         <canvas id="capture-canvas"></canvas>
-        
+    </div>
+
+    <div id="step-results" class="step">
+        <h1>Vedic Analysis Complete</h1>
         <div class="report-card">
             <h3>Extracted Parameters</h3>
             <div class="param-grid">
                 <div class="param-item">
-                    <div class="param-label">Finger Analyzed</div>
-                    <div class="param-value" id="result-hand">Thumb <br><span class="sanskrit">(Angustha)</span></div>
+                    <div class="param-label">Target</div>
+                    <div class="param-value" id="res-finger">Thumb</div>
                 </div>
                 <div class="param-item">
                     <div class="param-label">Primary Pattern</div>
-                    <div class="param-value">Concentric Whorl <br><span class="sanskrit">(Chakra)</span></div>
+                    <div class="param-value"><span id="res-pattern"></span><br><span class="sanskrit" id="res-pattern-sk"></span></div>
                 </div>
                 <div class="param-item">
                     <div class="param-label">Center Placement</div>
-                    <div class="param-value">Centered <br><span class="sanskrit">(Madhya Nabhi)</span></div>
+                    <div class="param-value"><span id="res-nabhi"></span><br><span class="sanskrit" id="res-nabhi-sk"></span></div>
                 </div>
                 <div class="param-item">
                     <div class="param-label">Ridge Texture</div>
-                    <div class="param-value">Fine / Thin <br><span class="sanskrit">(Sookshma)</span></div>
+                    <div class="param-value"><span id="res-texture"></span><br><span class="sanskrit" id="res-texture-sk"></span></div>
                 </div>
             </div>
 
             <h3>The Shastric Synthesis</h3>
-            <div class="synthesis">
-                <p>According to ancient texts, the Thumb governs your willpower and logic. Your ruling pattern is the <strong>Chakra (Whorl)</strong>, indicating an independent soul, born to lead rather than follow.</p>
-                <p>Because your fingerprint's core is perfectly centered, your immense willpower is balanced by emotional stability. You do not make reckless decisions.</p>
-                <p>Crucially, the AI detected <em>Sookshma</em> (fine, thin) ridge textures. This is the mark of high intellectual refinement, executing your independent will with diplomacy and strategy.</p>
-            </div>
+            <div class="synthesis" id="res-synthesis"></div>
         </div>
-        <button class="btn" style="margin-top:20px;" onclick="location.reload()">Scan Next Finger (Jupiter)</button>
+        <button class="btn" style="margin-top:20px;" onclick="location.reload()">Scan Another Finger</button>
     </div>
 
 </div>
 
 <script>
+    // --- CONFIGURATION ---
+    // Make sure this matches your deployed PythonAnywhere URL
+    const API_URL = 'https://eprashala.pythonanywhere.com/api/analyze_fingerprint';
+    
     let videoStream = null;
-    let selectedHand = '';
+    let selectedHand = 'Thumb (Angustha)';
 
-    // Navigation logic
-    function showStep(stepNumber) {
+    function showStep(stepId) {
         document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
-        document.getElementById('step-' + stepNumber).classList.add('active');
+        document.getElementById('step-' + stepId).classList.add('active');
     }
 
-    // Step 1: Gender selection triggers the instructions UI
     function setGender(gender) {
-        selectedHand = gender === 'Male' ? 'Right Thumb' : 'Left Thumb';
+        selectedHand = gender === 'Male' ? 'Right Thumb (Angustha)' : 'Left Thumb (Angustha)';
         document.getElementById('hand-target').innerText = `TARGET: ${selectedHand.toUpperCase()}`;
-        document.getElementById('result-hand').innerHTML = `${selectedHand} <br><span class="sanskrit">(Angustha)</span>`;
-        
-        // Show the upload/camera options
         document.getElementById('capture-instructions').style.display = 'block';
     }
 
-    // ==========================================
-    // PATH A: FILE UPLOAD LOGIC
-    // ==========================================
+    // --- FILE UPLOAD LOGIC ---
     document.getElementById('file-upload').addEventListener('change', function(event) {
         const file = event.target.files[0];
         if (!file) return;
 
-        // Use FileReader to convert the file into a data URL
         const reader = new FileReader();
         reader.onload = function(e) {
             const img = new Image();
             img.onload = function() {
                 const canvas = document.getElementById('capture-canvas');
                 const ctx = canvas.getContext('2d');
-                
-                // Set canvas size to match image aspect ratio, capped at a sensible width
-                const MAX_WIDTH = 400;
+                const MAX_WIDTH = 300;
                 const scaleSize = MAX_WIDTH / img.width;
                 canvas.width = MAX_WIDTH;
                 canvas.height = img.height * scaleSize;
-                
-                // Draw the uploaded image onto the canvas
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                 
-                // Display the canvas and go straight to Step 3 (Results)
                 canvas.style.display = 'block';
-                showStep(3);
-
-                // For backend dev: You can now extract canvas.toDataURL() and send to AI
+                sendToBackend(canvas.toDataURL('image/jpeg', 0.8));
             }
             img.src = e.target.result;
         }
         reader.readAsDataURL(file);
     });
 
-    // ==========================================
-    // PATH B: LIVE CAMERA LOGIC
-    // ==========================================
+    // --- CAMERA LOGIC ---
     async function startCamera() {
         showStep(2);
         document.getElementById('camera-container').style.display = 'block';
         const videoElement = document.getElementById('camera-stream');
-        
-        // Request the rear camera
-        const constraints = { video: { facingMode: 'environment', width: { ideal: 1920 } } };
-
         try {
-            videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+            videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } } });
             videoElement.srcObject = videoStream;
         } catch (error) {
-            alert("Camera access denied. Please ensure you are on HTTPS or use the Upload option instead.");
+            alert("Camera access denied. Please use the Upload option instead.");
             showStep(1);
         }
     }
@@ -241,18 +217,50 @@
     function captureFromVideo() {
         const video = document.getElementById('camera-stream');
         const canvas = document.getElementById('capture-canvas');
-        const ctx = canvas.getContext('2d');
-
-        // Draw the current video frame to the canvas
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
+        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+        
         stopCamera();
         canvas.style.display = 'block';
-        showStep(3);
+        sendToBackend(canvas.toDataURL('image/jpeg', 0.8));
+    }
+
+    // --- API COMMUNICATION ---
+    async function sendToBackend(base64Image) {
+        showStep('loading');
+        
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ finger: selectedHand, image: base64Image })
+            });
+
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                // Populate DOM with real backend data
+                document.getElementById('res-finger').innerText = data.analysis.finger;
+                document.getElementById('res-pattern').innerText = data.analysis.pattern;
+                document.getElementById('res-pattern-sk').innerText = `(${data.analysis.pattern_sanskrit})`;
+                document.getElementById('res-nabhi').innerText = data.analysis.nabhi;
+                document.getElementById('res-nabhi-sk').innerText = `(${data.analysis.nabhi_sanskrit})`;
+                document.getElementById('res-texture').innerText = data.analysis.texture;
+                document.getElementById('res-texture-sk').innerText = `(${data.analysis.texture_sanskrit})`;
+                document.getElementById('res-synthesis').innerText = data.analysis.synthesis_desc;
+                
+                showStep('results');
+            } else {
+                alert("Analysis Error: " + data.message);
+                showStep(1);
+            }
+        } catch (error) {
+            console.error("Fetch Error:", error);
+            alert("Could not connect to the backend server. Make sure your Python app is running on PythonAnywhere.");
+            showStep(1);
+        }
     }
 </script>
-
 </body>
 </html>
