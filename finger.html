@@ -53,9 +53,11 @@
         .loader { border: 6px solid #F3F4F6; border-top: 6px solid var(--accent); border-radius: 50%; width: 55px; height: 55px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
+        /* Deep AI Markdown Styles */
         .ai-content { font-family: 'Segoe UI', sans-serif; text-align: left; line-height: 1.8; font-size: 15.5px; padding: 20px; background: var(--white); border-radius: 12px; border: 1px solid #E5E7EB; margin-top: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05);}
         .ai-content h2 { color: var(--primary); margin-top: 25px; margin-bottom: 15px; font-family: 'Georgia', serif; font-size: 22px; border-bottom: 2px solid #F3F4F6; padding-bottom: 8px;}
         .ai-content h3 { color: var(--accent); margin-top: 20px; margin-bottom: 10px; font-size: 18px;}
+        .ai-content h4 { color: var(--secondary); margin-top: 15px; margin-bottom: 5px; font-size: 16px; background: #F9FAFB; padding: 10px; border-radius: 6px;}
         .ai-content strong { color: var(--primary); }
         .ai-content ul { padding-left: 20px; margin-bottom: 15px; }
         .toolbar { display: flex; justify-content: center; align-items: center; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; background: #F3F4F6; padding: 15px; border-radius: 12px;}
@@ -211,7 +213,6 @@
     let isSpeaking = false;
     let userData = { name: '', age: '', handSide: '', finalReportHTML: '', currentLanguageHTML: '' };
     
-    // The Batch Array
     let collectedFingers = [];
     
     const fingerSequence = [
@@ -314,7 +315,6 @@
         ctx.drawImage(source, sX, sY, cropW, cropH, 0, 0, canvas.width, canvas.height);
         canvas.style.display = 'block';
         
-        // 1. INSTANT JAVASCRIPT BLUR/CLARITY CHECK
         const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
         let brightnessSum = 0;
         for (let i = 0; i < imgData.length; i += 4) {
@@ -333,7 +333,7 @@
         analyzeWithOpenCV(base64);
     }
 
-    // --- 2. LOCAL OPENCV EXTRACTION ---
+    // --- LOCAL OPENCV EXTRACTION ---
     async function analyzeWithOpenCV(base64Image) {
         showStep('loading-local');
         const currentFinger = fingerSequence[currentFingerIdx];
@@ -366,11 +366,10 @@
             showStep('progress');
 
         } catch (error) {
-            // Fallback so pipeline continues
             collectedFingers.push({
-                fingerData: currentFinger, pattern: "Concentric Whorl", nabhi: "Perfectly Centered", image: base64Image.split(',')[1]
+                fingerData: currentFinger, pattern: "Pending AI Verification", nabhi: "Pending", image: base64Image.split(',')[1]
             });
-            document.getElementById('reports-list').innerHTML += `<div class="report-card"><h2>✅ ${currentFinger.name} Captured (Fallback)</h2></div>`;
+            document.getElementById('reports-list').innerHTML += `<div class="report-card"><h2>✅ ${currentFinger.name} Captured (Pending AI Verification)</h2></div>`;
             updateActionButtons();
             showStep('progress');
         }
@@ -396,7 +395,7 @@
         showCaptureChoice();
     }
 
-    // --- 3. BULLETPROOF BATCH GEMINI ENGINE ---
+    // --- BULLETPROOF BATCH GEMINI ENGINE (THE MASTER JUDGE) ---
     async function generateBatchAI() {
         showStep('loading-ai');
 
@@ -405,26 +404,29 @@
         Provide a comprehensive Absolute Truth Report for the entire hand.
         
         Client Details: Name: ${userData.name}, Age: ${userData.age}, Gender: ${userData.handSide} Hand.
-        We have processed the 5 images using OpenCV and extracted the following physical parameters:
+        
+        Our local OpenCV sensor has provided preliminary geometric classifications for the 5 fingers:
         `;
 
         let partsArray = [{ "text": "" }]; 
 
         collectedFingers.forEach((item, index) => {
-            textPrompt += `\n${index+1}. ${item.fingerData.name}: Pattern = ${item.pattern}, Core = ${item.nabhi}`;
+            textPrompt += `\n${index+1}. ${item.fingerData.name}: Preliminary Sensor says Pattern = ${item.pattern}, Core = ${item.nabhi}`;
             partsArray.push({ "inlineData": { "mimeType": "image/jpeg", "data": item.image } });
         });
 
-        // The prompt strictly demands a single-line string for deep_reading_html
         textPrompt += `
-        \n\nCRITICAL RULE: Provide a brutally honest reading based on the images.
+        \n\nTHE MASTER JUDGE PROTOCOL: You must visually analyze the 5 attached images. If your visual analysis contradicts the OpenCV preliminary data, you MUST OVERRIDE it and base your absolute truth report purely on your own authoritative visual extraction.
+        
+        CRITICAL RULE 1: Provide a brutally honest reading based on the images. Do NOT flatter the user. Dig exceptionally deep into ancient Indian Vedic texts (Samudrika Shastra, Nadi principles).
+        CRITICAL RULE 2: In the 'Finger Breakdown' section, you MUST explicitly name the final pattern you identified (e.g., "Chakra (Whorl)", "Shankha (Loop)", or "Seep (Arch)") right next to the finger name, so the user can verify it by looking at their own hand.
         
         You MUST respond ONLY with a valid JSON object. 
-        CRITICAL JSON RULE: The "deep_reading_html" value MUST be a single, continuous string. Do NOT use actual line breaks or newlines inside the string. Use standard HTML tags for formatting.
+        CRITICAL JSON FORMATTING RULE: The "deep_reading_html" value MUST be a single, continuous string. Do NOT use actual line breaks (newlines) or tabs inside the string. Use standard HTML tags for formatting.
         
         Format required:
         {
-            "deep_reading_html": "<h2>Holistic Marrvish Synthesis</h2><p>One brutal, honest paragraph summarizing the combined energy of all 5 fingers.</p><div class='metric-box'><h3>Absolute Truth Metrics & Percentages</h3><ul><li><b>The 4 Purusharthas:</b> Dharma X%, Artha X%, Kama X%, Moksha X%</li><li><b>The 5 Enemies:</b> Kama X%, Krodha X%, Moha X%, Mada X%, Matsarya X%</li><li><b>Traits:</b> Honesty X%, Reliability X%, Hardworking X%, Punctuality X%, Accountability X%</li></ul></div><h3>Finger Breakdown</h3><h4>1. Thumb</h4><p>...</p><h4>2. Index</h4><p>...</p><h4>3. Middle</h4><p>...</p><h4>4. Ring</h4><p>...</p><h4>5. Little</h4><p>...</p>"
+            "deep_reading_html": "<h2>Holistic Marrvish Synthesis</h2><p>One brutal, honest paragraph summarizing the combined karmic energy of all 5 fingers based on ancient Vedic texts.</p><div class='metric-box'><h3>Absolute Truth Metrics & Percentages</h3><ul><li><b>The 4 Purusharthas:</b> Dharma X%, Artha X%, Kama X%, Moksha X%</li><li><b>The 5 Enemies:</b> Kama X%, Krodha X%, Moha X%, Mada X%, Matsarya X%</li><li><b>Traits:</b> Honesty X%, Reliability X%, Hardworking X%, Punctuality X%, Accountability X%</li></ul></div><h3>Finger-by-Finger Vedic Breakdown</h3><h4>1. Thumb (Pattern: [Insert Pattern Here])</h4><p>Deep Vedic analysis...</p><h4>2. Index Finger (Pattern: [Insert Pattern Here])</h4><p>Deep Vedic analysis...</p><h4>3. Middle Finger (Pattern: [Insert Pattern Here])</h4><p>Deep Vedic analysis...</p><h4>4. Ring Finger (Pattern: [Insert Pattern Here])</h4><p>Deep Vedic analysis...</p><h4>5. Little Finger (Pattern: [Insert Pattern Here])</h4><p>Deep Vedic analysis...</p>"
         }
         `;
 
@@ -451,11 +453,16 @@
             if (data.candidates && data.candidates[0].content) {
                 let aiText = data.candidates[0].content.parts[0].text;
                 
-                // BULLETPROOF FIX: Strip all markdown and completely squash literal newlines/tabs that break JSON
+                // BULLETPROOF PARSING FIX
                 let cleanText = aiText.replace(/```json/g, '').replace(/```html/g, '').replace(/```/g, '').trim();
                 cleanText = cleanText.replace(/[\r\n\t]+/g, ' '); 
 
-                const resultObj = JSON.parse(cleanText);
+                let resultObj;
+                try {
+                    resultObj = JSON.parse(cleanText);
+                } catch (e) {
+                    throw new Error("API Intercept: " + cleanText);
+                }
                 
                 if (!resultObj.deep_reading_html) {
                     throw new Error("Missing 'deep_reading_html' in AI response.");
@@ -468,7 +475,7 @@
                 document.getElementById('deep-content').innerHTML = userData.currentLanguageHTML;
                 showStep('deep-ai');
             } else {
-                throw new Error("Gemini AI timeout. Try using a custom API Key in Settings.");
+                throw new Error("Gemini AI timeout or rate limit reached. Try using a custom API Key in Settings.");
             }
         } catch (error) {
             alert("DIAGNOSTIC ERROR:\n" + error.message);
