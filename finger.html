@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Vedic Fingerprint Scanner - Gemini 3.1 Edition</title>
+    <title>Vedic Fingerprint Scanner - Complete Hand Analysis</title>
     <style>
         :root {
             --primary: #2A1B38; --secondary: #5A3A5E; --accent: #E5B25D; 
@@ -19,10 +19,11 @@
 
         input[type="text"], input[type="number"] { width: 100%; max-width: 280px; padding: 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
         
-        .btn { background-color: var(--primary); color: var(--accent); border: 2px solid var(--accent); padding: 15px 25px; font-size: 16px; border-radius: 8px; cursor: pointer; margin: 10px 5px; width: 100%; max-width: 280px; font-weight: bold; transition: all 0.3s ease; }
+        .btn { background-color: var(--primary); color: var(--accent); border: 2px solid var(--accent); padding: 15px 25px; font-size: 16px; border-radius: 8px; cursor: pointer; margin: 10px 5px; width: 100%; max-width: 280px; font-weight: bold; transition: all 0.3s ease; display: inline-flex; justify-content: center; align-items: center; }
         .btn:active { transform: scale(0.97); background-color: var(--secondary); }
         .btn-upload { background-color: var(--bg); color: var(--primary); border: 2px dashed var(--primary); }
         .btn-ai { background: linear-gradient(135deg, #2A1B38, #E5B25D); color: white; border: none; }
+        .btn-print { background-color: #1a1a1a; color: white; border: none; }
 
         .step { display: none; width: 100%; }
         .step.active { display: block; animation: fadeIn 0.4s ease-out; }
@@ -38,95 +39,112 @@
         .cutout { width: 130px; height: 190px; border: 2px dashed var(--accent); border-radius: 50% 50% 45% 45%; box-shadow: 0 0 0 9999px rgba(0,0,0,0.6); position: relative; }
         .cutout::after { content: ''; position: absolute; top: 50%; left: -15px; right: -15px; height: 1px; background: rgba(229, 178, 93, 0.8); } 
 
-        .report-card { background: var(--white); border: 1px solid #E0D5C1; border-radius: 12px; padding: 25px; text-align: left; margin-top: 15px; border-top: 6px solid var(--accent); }
-        .param-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #E0D5C1; }
+        /* Report Cards List */
+        #reports-list { display: flex; flex-direction: column; gap: 20px; margin-bottom: 20px; }
+        .report-card { background: var(--white); border: 1px solid #E0D5C1; border-radius: 12px; padding: 20px; text-align: left; border-top: 6px solid var(--accent); box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .report-card h2 { color: var(--primary); font-size: 20px; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; display: flex; justify-content: space-between;}
+        .report-card h2 span { color: var(--secondary); font-style: italic; font-size: 16px; font-weight: normal;}
+        
+        .param-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
         .param-item { background: #FDFBF7; padding: 10px; border-radius: 6px; border-left: 3px solid var(--secondary); }
         .param-label { font-size: 11px; text-transform: uppercase; color: #888; font-family: 'Segoe UI', sans-serif; }
-        .param-value { font-size: 16px; font-weight: bold; color: var(--primary); margin-top: 4px; }
-        
+        .param-value { font-size: 15px; font-weight: bold; color: var(--primary); margin-top: 4px; }
+        .synthesis-text { font-family: 'Segoe UI', sans-serif; font-size: 14px; color: #444; line-height: 1.5; background: #f9f9f9; padding: 10px; border-radius: 6px;}
+
         #capture-canvas { display: none; width: 100%; max-width: 180px; border-radius: 12px; margin: 0 auto; border: 3px solid var(--accent); }
         input[type="file"] { display: none; }
         
         .loader { border: 6px solid #f3f3f3; border-top: 6px solid var(--accent); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Deep AI Markdown Styles */
         .ai-content { font-family: 'Segoe UI', sans-serif; text-align: left; line-height: 1.7; font-size: 15px; padding: 15px; background: #fff; border-radius: 8px; border: 1px solid #eee; margin-top: 15px;}
         .ai-content h2, .ai-content h3 { color: var(--primary); margin-top: 15px; margin-bottom: 10px; font-family: 'Georgia', serif;}
         .ai-content strong { color: var(--secondary); }
+
+        /* PRINT STYLES */
+        @media print {
+            body { background: white; color: black; font-size: 12pt; }
+            .container { max-width: 100%; padding: 0; display: block; }
+            .btn, .instruction-box, #camera-container { display: none !important; }
+            .report-card { break-inside: avoid; border: 1px solid #000; box-shadow: none; margin-bottom: 20px; border-top: 4px solid #000; }
+            .param-item { border-left: 2px solid #000; }
+            h1 { text-align: center; font-size: 24pt; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px;}
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
     
-    <div id="step-1" class="step active">
+    <div id="step-intake" class="step active">
         <h1>Hasta Rekha Pro</h1>
-        <p>Enter your details to calibrate the planetary alignments.</p>
+        <p>Complete Hand Analysis Pipeline</p>
         
         <input type="text" id="user-name" placeholder="Enter your Name" required>
         <input type="number" id="user-age" placeholder="Enter your Age" required>
 
-        <h3 style="margin-top: 10px;">Select Gender:</h3>
+        <h3 style="margin-top: 10px;">Select Active Hand:</h3>
+        <p style="font-size: 12px; margin-top: -10px; margin-bottom: 15px;">(Male = Right, Female = Left)</p>
         <div style="display: flex; justify-content: center; gap: 10px; margin-bottom: 20px;">
-            <button class="btn" style="padding: 10px 20px; max-width: 150px;" onclick="setGender('Male')">Male (Right)</button>
-            <button class="btn" style="padding: 10px 20px; max-width: 150px;" onclick="setGender('Female')">Female (Left)</button>
-        </div>
-
-        <div id="capture-instructions" style="display: none;">
-            <h3 id="hand-target" style="color: var(--danger); font-weight: bold; font-size: 20px;"></h3>
-            <div class="instruction-box">
-                <ul>
-                    <li><strong>Upload:</strong> Rub ink on thumb, press on paper, upload photo.</li>
-                    <li><strong>Camera:</strong> Hold 4 inches away in good side-lighting.</li>
-                </ul>
-            </div>
-            <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
-                <label for="file-upload" class="btn btn-upload">📁 Upload Impression</label>
-                <input type="file" id="file-upload" accept="image/*">
-                <button class="btn" onclick="startCamera()">📷 Open Scanner</button>
-            </div>
+            <button class="btn" style="padding: 10px 20px; max-width: 150px;" onclick="initializeScanner('Male')">Male (Right)</button>
+            <button class="btn" style="padding: 10px 20px; max-width: 150px;" onclick="initializeScanner('Female')">Female (Left)</button>
         </div>
     </div>
 
-    <div id="step-2" class="step">
-        <h1>Align Print</h1>
+    <div id="step-capture-choice" class="step">
+        <h1 id="header-user-info">Scanner Preparation</h1>
+        <h3 id="hand-target" style="color: var(--danger); font-weight: bold; font-size: 22px; margin: 20px 0;"></h3>
+        
+        <div class="instruction-box">
+            <ul>
+                <li><strong>Upload:</strong> Rub ink on finger, press on paper, upload photo.</li>
+                <li><strong>Camera:</strong> Hold 4 inches away in good side-lighting.</li>
+            </ul>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
+            <label for="file-upload" class="btn btn-upload">📁 Upload Impression</label>
+            <input type="file" id="file-upload" accept="image/*">
+            <button class="btn" onclick="startCamera()">📷 Open Live Scanner</button>
+        </div>
+    </div>
+
+    <div id="step-camera" class="step">
+        <h1 id="cam-target-title">Align Print</h1>
         <div id="camera-container">
             <video id="camera-stream" autoplay playsinline></video>
             <div class="overlay-guide"><div class="cutout"></div></div>
         </div>
         <button class="btn" onclick="captureFromVideo()">Extract Biometrics</button>
-        <button class="btn btn-upload" style="border: none; margin-top: 5px;" onclick="stopCamera(); showStep(1);">Cancel</button>
+        <button class="btn btn-upload" style="border: none; margin-top: 5px;" onclick="stopCamera(); showStep('capture-choice');">Cancel</button>
     </div>
 
     <div id="step-loading" class="step">
-        <h1>Analyzing with Gemini 3.1...</h1>
+        <h1>Gemini 3.1 AI</h1>
         <div class="loader"></div>
-        <p>Transmitting image to the AI proxy for biometric extraction and astrological synthesis...</p>
+        <p id="loading-target-text">Transmitting impression to the AI proxy for mathematical extraction...</p>
         <canvas id="capture-canvas"></canvas>
     </div>
 
     <div id="step-results" class="step">
-        <h1>Biometrics Extracted</h1>
-        <div class="report-card">
-            <div class="param-grid">
-                <div class="param-item"><div class="param-label">Name</div><div class="param-value" id="res-name"></div></div>
-                <div class="param-item"><div class="param-label">Finger</div><div class="param-value" id="res-finger"></div></div>
-                <div class="param-item"><div class="param-label">Pattern</div><div class="param-value" id="res-pattern"></div></div>
-                <div class="param-item"><div class="param-label">Center</div><div class="param-value" id="res-nabhi"></div></div>
-            </div>
-            <p id="res-synthesis" style="font-family: 'Segoe UI', sans-serif; font-size: 14px; font-style: italic; color: #555;"></p>
-        </div>
+        <h1 id="print-header">Hasta Rekha Report</h1>
+        <p style="font-weight: bold; font-size: 16px; margin-bottom: 20px;" id="results-user-info"></p>
         
-        <button class="btn btn-ai" style="margin-top:20px; width:100%; max-width: 100%;" onclick="showDeepAI()">🔮 View Deep AI Astrological Reading</button>
-        <button class="btn btn-upload" style="margin-top:10px;" onclick="location.reload()">Start Over</button>
+        <div id="reports-list"></div>
+        
+        <div id="action-buttons-container" style="margin-top: 25px; border-top: 1px solid #ccc; padding-top: 20px;">
+            <button id="btn-next" class="btn" onclick="prepareNextFinger()"></button>
+            
+            <button id="btn-print" class="btn btn-print" style="display:none;" onclick="window.print()">🖨️ Print Complete Report</button>
+            <button id="btn-deep-ai" class="btn btn-ai" style="display:none; width: 100%; max-width: 100%; margin-top: 10px;" onclick="showDeepAI()">🔮 View Deep AI Astrological Synthesis</button>
+        </div>
     </div>
 
     <div id="step-deep-ai" class="step">
-        <h1>Cosmic Blueprint</h1>
+        <h1>Complete Cosmic Blueprint</h1>
         <h3 id="deep-title" style="color: var(--secondary);"></h3>
         <div class="ai-content" id="deep-content"></div>
-        <button class="btn" style="margin-top:20px;" onclick="location.reload()">Scan Another Person</button>
+        <button class="btn btn-print" style="margin-top:20px;" onclick="window.print()">🖨️ Print Cosmic Blueprint</button>
+        <button class="btn btn-upload" style="margin-top:10px;" onclick="location.reload()">Start New Scan</button>
     </div>
 
 </div>
@@ -136,25 +154,46 @@
     const API_URL = 'https://eprashala.pythonanywhere.com/api/chat';
     
     let videoStream = null;
-    let userData = { name: '', age: '', gender: '', finger: '', base64Image: '', deepHTML: '' };
+    let userData = { name: '', age: '', handSide: '', base64Image: '', cumulativeDeepHTML: '' };
+    
+    // The sequence of fingers according to Vedic Palmistry
+    const fingerSequence = [
+        { name: "Thumb", sanskrit: "Angustha", planet: "Willpower & Logic" },
+        { name: "Index Finger", sanskrit: "Tarjani", planet: "Jupiter (Ego/Leadership)" },
+        { name: "Middle Finger", sanskrit: "Madhyama", planet: "Saturn (Career/Karma)" },
+        { name: "Ring Finger", sanskrit: "Anamika", planet: "Sun (Fame/Vitality)" },
+        { name: "Little Finger", sanskrit: "Kanishthika", planet: "Mercury (Intellect/Business)" }
+    ];
+    let currentFingerIdx = 0;
 
     function showStep(stepId) {
         document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
         document.getElementById('step-' + stepId).classList.add('active');
     }
 
-    function setGender(gender) {
+    // Initialize the loop
+    function initializeScanner(gender) {
         const nameVal = document.getElementById('user-name').value.trim();
         const ageVal = document.getElementById('user-age').value.trim();
         if(!nameVal || !ageVal) { alert("Please enter Name and Age first."); return; }
         
         userData.name = nameVal;
         userData.age = ageVal;
-        userData.gender = gender;
-        userData.finger = gender === 'Male' ? 'Right Thumb' : 'Left Thumb';
+        userData.handSide = gender === 'Male' ? 'Right' : 'Left';
         
-        document.getElementById('hand-target').innerText = `TARGET: ${userData.finger.toUpperCase()}`;
-        document.getElementById('capture-instructions').style.display = 'block';
+        document.getElementById('results-user-info').innerText = `Client: ${userData.name} | Age: ${userData.age} | Active Hand: ${userData.handSide}`;
+        
+        currentFingerIdx = 0;
+        document.getElementById('reports-list').innerHTML = ''; // Clear past reports
+        userData.cumulativeDeepHTML = '';
+        
+        showCaptureChoice();
+    }
+
+    function showCaptureChoice() {
+        const targetFinger = fingerSequence[currentFingerIdx];
+        document.getElementById('hand-target').innerText = `SCAN TARGET:\n${userData.handSide.toUpperCase()} ${targetFinger.name.toUpperCase()}`;
+        showStep('capture-choice');
     }
 
     // --- FILE UPLOAD LOGIC ---
@@ -167,7 +206,7 @@
             img.onload = function() {
                 const canvas = document.getElementById('capture-canvas');
                 const ctx = canvas.getContext('2d');
-                canvas.width = 400; // Optimal for AI vision
+                canvas.width = 400; 
                 canvas.height = img.height * (400 / img.width);
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                 canvas.style.display = 'block';
@@ -177,11 +216,13 @@
             img.src = e.target.result;
         }
         reader.readAsDataURL(file);
+        // Reset input so they can upload again if needed
+        event.target.value = '';
     });
 
-    // --- ADVANCED CAMERA CROP LOGIC ---
+    // --- CAMERA LOGIC ---
     async function startCamera() {
-        showStep(2);
+        showStep('camera');
         document.getElementById('camera-container').style.display = 'block';
         const videoElement = document.getElementById('camera-stream');
         try {
@@ -191,7 +232,7 @@
             videoElement.srcObject = videoStream;
         } catch (error) { 
             alert("Camera access denied. Please upload a photo instead."); 
-            showStep(1); 
+            showCaptureChoice();
         }
     }
 
@@ -205,7 +246,6 @@
         const canvas = document.getElementById('capture-canvas');
         const ctx = canvas.getContext('2d');
 
-        // Execute exact 2x mathematical crop based on sensor size
         const sensorWidth = video.videoWidth;
         const sensorHeight = video.videoHeight;
         const cropWidth = sensorWidth / 2;
@@ -227,17 +267,19 @@
         analyzeWithGemini();
     }
 
-    // --- GEMINI 3.1 AI PROXY CONNECTION ---
+    // --- GEMINI 3.1 AI CONNECTION ---
     async function analyzeWithGemini() {
-        showStep('loading');
+        const currentFinger = fingerSequence[currentFingerIdx];
         
-        // Strip base64 header for Gemini API
+        showStep('loading');
+        document.getElementById('loading-target-text').innerText = `Analyzing the ridges of the ${currentFinger.name}...`;
+        
         let cleanBase64 = userData.base64Image.split(',')[1];
 
-        // We ask Gemini to do BOTH the extraction and the reading in one shot to save time.
         const systemPrompt = `
-        You are a master of Samudrika Shastra and Vedic Astrology. 
-        Analyze this fingerprint image for: Name: ${userData.name}, Age: ${userData.age}, Gender: ${userData.gender}, Finger: ${userData.finger}.
+        You are a master of Samudrika Shastra and Vedic Palmistry. 
+        Analyze this fingerprint image for: Name: ${userData.name}, Age: ${userData.age}, Gender: ${userData.handSide} Hand.
+        Target Finger: ${currentFinger.name} (${currentFinger.sanskrit}), representing ${currentFinger.planet}.
         
         You MUST respond ONLY with a valid JSON object. Do not wrap it in markdown code blocks.
         Format required:
@@ -245,10 +287,9 @@
             "pattern": "Concentric Whorl / Flowing Loop / Stable Arch",
             "pattern_sanskrit": "Chakra / Shankha / Seep",
             "nabhi": "High / Centered / Low",
-            "synthesis_desc": "One short sentence summarizing the pattern.",
-            "deep_reading_html": "<h3>1. Core Personality & Prakriti</h3><p>...</p><h3>2. Career & Wealth</h3><p>...</p><h3>3. Future Guidance</h3><p>...</p>"
+            "synthesis_desc": "One powerful sentence summarizing the meaning of this pattern SPECIFICALLY on the ${currentFinger.name}.",
+            "deep_reading_html": "<p>A detailed 2-paragraph astrological deep dive into what this pattern means for their ${currentFinger.planet}.</p>"
         }
-        Provide deep, accurate, empathetic insights in the deep_reading_html based on their age, gender, and the visual pattern of the fingerprint. Use HTML tags for formatting.
         `;
 
         const payload = {
@@ -270,41 +311,78 @@
 
             const data = await response.json();
             
-            // Extract text from your app.py's Gemini response format
             if (data.candidates && data.candidates[0].content) {
                 let aiText = data.candidates[0].content.parts[0].text;
-                
-                // Clean the text in case Gemini wraps it in ```json ... ```
                 aiText = aiText.replace(/```json/g, '').replace(/```/g, '').trim();
-                
                 const resultObj = JSON.parse(aiText);
                 
-                // Populate Basic Results Screen
-                document.getElementById('res-name').innerText = userData.name;
-                document.getElementById('res-finger').innerText = userData.finger;
-                document.getElementById('res-pattern').innerText = `${resultObj.pattern} (${resultObj.pattern_sanskrit})`;
-                document.getElementById('res-nabhi').innerText = resultObj.nabhi;
-                document.getElementById('res-synthesis').innerText = resultObj.synthesis_desc;
+                // Build the HTML Card for this finger
+                const cardHTML = `
+                    <div class="report-card">
+                        <h2>${currentFinger.name} <span>(${currentFinger.sanskrit})</span></h2>
+                        <div class="param-grid">
+                            <div class="param-item"><div class="param-label">Pattern</div><div class="param-value">${resultObj.pattern} <br><span style="font-weight:normal; font-size:13px; color:#5A3A5E;">${resultObj.pattern_sanskrit}</span></div></div>
+                            <div class="param-item"><div class="param-label">Core/Nabhi</div><div class="param-value">${resultObj.nabhi}</div></div>
+                        </div>
+                        <div class="synthesis-text"><strong>Analysis:</strong> ${resultObj.synthesis_desc}</div>
+                    </div>
+                `;
                 
-                // Save the deep reading HTML for the next screen
-                userData.deepHTML = resultObj.deep_reading_html;
+                // Append card to the running list
+                document.getElementById('reports-list').innerHTML += cardHTML;
                 
+                // Append the deep reading to the hidden cumulative string
+                userData.cumulativeDeepHTML += `
+                    <div style="margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px dashed #ccc;">
+                        <h2 style="color: #2A1B38;">${currentFinger.name} (${currentFinger.planet})</h2>
+                        ${resultObj.deep_reading_html}
+                    </div>
+                `;
+                
+                updateActionButtons();
                 showStep('results');
+                
             } else {
-                alert("Gemini returned an unexpected response. Please try again.");
-                showStep(1);
+                alert("Gemini returned an unexpected format. Please capture again.");
+                showCaptureChoice();
             }
 
         } catch (error) {
             console.error("API Error:", error);
-            alert("AI Connection failed. Please ensure your PythonAnywhere server is running.");
-            showStep(1);
+            alert("AI Connection failed. Ensure server is running.");
+            showCaptureChoice();
         }
     }
 
+    function updateActionButtons() {
+        const btnNext = document.getElementById('btn-next');
+        const btnPrint = document.getElementById('btn-print');
+        const btnDeepAI = document.getElementById('btn-deep-ai');
+        
+        if (currentFingerIdx < 4) {
+            // Still have fingers left
+            btnNext.style.display = 'inline-flex';
+            btnNext.innerText = `Scan Next: ${fingerSequence[currentFingerIdx + 1].name}`;
+            btnPrint.style.display = 'none';
+            btnDeepAI.style.display = 'none';
+        } else {
+            // All 5 fingers complete
+            btnNext.style.display = 'none';
+            btnPrint.style.display = 'inline-flex';
+            btnDeepAI.style.display = 'inline-flex';
+        }
+    }
+
+    function prepareNextFinger() {
+        currentFingerIdx++;
+        // Clear canvas for next capture
+        document.getElementById('capture-canvas').style.display = 'none';
+        showCaptureChoice();
+    }
+
     function showDeepAI() {
-        document.getElementById('deep-title').innerText = `Reading for ${userData.name} (Age: ${userData.age})`;
-        document.getElementById('deep-content').innerHTML = userData.deepHTML;
+        document.getElementById('deep-title').innerText = `Synthesis for ${userData.name} (Age: ${userData.age})`;
+        document.getElementById('deep-content').innerHTML = userData.cumulativeDeepHTML;
         showStep('deep-ai');
     }
 </script>
