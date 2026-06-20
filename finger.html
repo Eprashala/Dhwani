@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Vedic Fingerprint Scanner - Pro AI</title>
+    <title>Vedic Fingerprint Scanner - Gemini 3.1 Edition</title>
     <style>
         :root {
             --primary: #2A1B38; --secondary: #5A3A5E; --accent: #E5B25D; 
@@ -17,7 +17,7 @@
         h3 { color: var(--secondary); margin-bottom: 15px; font-size: 18px; }
         p { margin-bottom: 20px; line-height: 1.6; font-family: 'Segoe UI', Tahoma, sans-serif; font-size: 15px; }
 
-        input[type="text"], input[type="number"] { width: 100%; max-width: 280px; padding: 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 8px; font-family: 'Segoe UI', sans-serif; font-size: 16px; }
+        input[type="text"], input[type="number"] { width: 100%; max-width: 280px; padding: 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
         
         .btn { background-color: var(--primary); color: var(--accent); border: 2px solid var(--accent); padding: 15px 25px; font-size: 16px; border-radius: 8px; cursor: pointer; margin: 10px 5px; width: 100%; max-width: 280px; font-weight: bold; transition: all 0.3s ease; }
         .btn:active { transform: scale(0.97); background-color: var(--secondary); }
@@ -29,8 +29,9 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 
         .instruction-box { background: #FFF9F0; border-left: 5px solid var(--accent); padding: 20px; text-align: left; margin-bottom: 25px; border-radius: 0 8px 8px 0; }
-        .instruction-box li { margin-bottom: 10px; font-family: 'Segoe UI', sans-serif; font-size: 14.5px; color: #444; }
+        .instruction-box li { margin-bottom: 10px; font-family: 'Segoe UI', sans-serif; font-size: 14px; color: #444; }
 
+        /* Camera Layout */
         #camera-container { position: relative; width: 100%; max-width: 350px; aspect-ratio: 3/4; margin: 0 auto 20px auto; background: #000; border-radius: 12px; overflow: hidden; border: 3px solid var(--accent); display: none; }
         #camera-stream { width: 100%; height: 100%; object-fit: cover; transform: scale(2); }
         .overlay-guide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.65); display: flex; align-items: center; justify-content: center; pointer-events: none; }
@@ -45,12 +46,13 @@
         
         #capture-canvas { display: none; width: 100%; max-width: 180px; border-radius: 12px; margin: 0 auto; border: 3px solid var(--accent); }
         input[type="file"] { display: none; }
+        
         .loader { border: 6px solid #f3f3f3; border-top: 6px solid var(--accent); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         /* Deep AI Markdown Styles */
-        .ai-content { font-family: 'Segoe UI', sans-serif; text-align: left; line-height: 1.7; font-size: 15px; padding: 15px; background: #fff; border-radius: 8px; border: 1px solid #eee; }
-        .ai-content h2, .ai-content h3 { color: var(--primary); margin-top: 15px; margin-bottom: 10px; }
+        .ai-content { font-family: 'Segoe UI', sans-serif; text-align: left; line-height: 1.7; font-size: 15px; padding: 15px; background: #fff; border-radius: 8px; border: 1px solid #eee; margin-top: 15px;}
+        .ai-content h2, .ai-content h3 { color: var(--primary); margin-top: 15px; margin-bottom: 10px; font-family: 'Georgia', serif;}
         .ai-content strong { color: var(--secondary); }
     </style>
 </head>
@@ -94,17 +96,18 @@
             <div class="overlay-guide"><div class="cutout"></div></div>
         </div>
         <button class="btn" onclick="captureFromVideo()">Extract Biometrics</button>
+        <button class="btn btn-upload" style="border: none; margin-top: 5px;" onclick="stopCamera(); showStep(1);">Cancel</button>
     </div>
 
     <div id="step-loading" class="step">
-        <h1 id="loading-title">Analyzing...</h1>
+        <h1>Analyzing with Gemini 3.1...</h1>
         <div class="loader"></div>
-        <p id="loading-text">Extracting mathematical parameters...</p>
+        <p>Transmitting image to the AI proxy for biometric extraction and astrological synthesis...</p>
         <canvas id="capture-canvas"></canvas>
     </div>
 
     <div id="step-results" class="step">
-        <h1>Initial Extraction</h1>
+        <h1>Biometrics Extracted</h1>
         <div class="report-card">
             <div class="param-grid">
                 <div class="param-item"><div class="param-label">Name</div><div class="param-value" id="res-name"></div></div>
@@ -112,10 +115,10 @@
                 <div class="param-item"><div class="param-label">Pattern</div><div class="param-value" id="res-pattern"></div></div>
                 <div class="param-item"><div class="param-label">Center</div><div class="param-value" id="res-nabhi"></div></div>
             </div>
-            <p id="res-synthesis" style="font-family: 'Segoe UI', sans-serif; font-size: 14px;"></p>
+            <p id="res-synthesis" style="font-family: 'Segoe UI', sans-serif; font-size: 14px; font-style: italic; color: #555;"></p>
         </div>
         
-        <button class="btn btn-ai" style="margin-top:20px; width:100%; max-width: 100%;" onclick="requestDeepAI()">🔮 Get Deep AI Astrological Reading</button>
+        <button class="btn btn-ai" style="margin-top:20px; width:100%; max-width: 100%;" onclick="showDeepAI()">🔮 View Deep AI Astrological Reading</button>
         <button class="btn btn-upload" style="margin-top:10px;" onclick="location.reload()">Start Over</button>
     </div>
 
@@ -129,11 +132,11 @@
 </div>
 
 <script>
-    const API_URL_BASIC = 'https://eprashala.pythonanywhere.com/api/analyze_fingerprint';
-    const API_URL_DEEP = 'https://eprashala.pythonanywhere.com/api/deep_astrology';
+    // Pointing directly to your existing locked chat endpoint
+    const API_URL = 'https://eprashala.pythonanywhere.com/api/chat';
     
     let videoStream = null;
-    let userData = { name: '', age: '', gender: '', finger: '', base64Image: '', basicAnalysis: null };
+    let userData = { name: '', age: '', gender: '', finger: '', base64Image: '', deepHTML: '' };
 
     function showStep(stepId) {
         document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
@@ -154,6 +157,7 @@
         document.getElementById('capture-instructions').style.display = 'block';
     }
 
+    // --- FILE UPLOAD LOGIC ---
     document.getElementById('file-upload').addEventListener('change', function(event) {
         const file = event.target.files[0];
         if (!file) return;
@@ -163,134 +167,145 @@
             img.onload = function() {
                 const canvas = document.getElementById('capture-canvas');
                 const ctx = canvas.getContext('2d');
-                canvas.width = 300; canvas.height = img.height * (300 / img.width);
+                canvas.width = 400; // Optimal for AI vision
+                canvas.height = img.height * (400 / img.width);
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                 canvas.style.display = 'block';
-                userData.base64Image = canvas.toDataURL('image/jpeg', 0.8);
-                sendToBasicBackend();
+                userData.base64Image = canvas.toDataURL('image/jpeg', 0.9);
+                analyzeWithGemini();
             }
             img.src = e.target.result;
         }
         reader.readAsDataURL(file);
     });
 
-async function startCamera() {
+    // --- ADVANCED CAMERA CROP LOGIC ---
+    async function startCamera() {
         showStep(2);
         document.getElementById('camera-container').style.display = 'block';
         const videoElement = document.getElementById('camera-stream');
-        
         try {
-            // Request the best possible rear camera with specific advanced constraints
             videoStream = await navigator.mediaDevices.getUserMedia({ 
-                video: { 
-                    facingMode: 'environment', 
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 },
-                    advanced: [{ focusMode: "continuous" }] // Suggests macro focus if available
-                } 
+                video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } 
             });
             videoElement.srcObject = videoStream;
-            
-            // Note: We leave the CSS transform: scale(2) in place for the UI,
-            // but we will handle the actual crop mathematically during capture.
         } catch (error) { 
-            alert("Camera access denied or unsupported."); 
+            alert("Camera access denied. Please upload a photo instead."); 
             showStep(1); 
         }
     }
+
     function stopCamera() {
         if (videoStream) { videoStream.getTracks().forEach(track => track.stop()); videoStream = null; }
         document.getElementById('camera-container').style.display = 'none';
     }
-	
-function captureFromVideo() {
+
+    function captureFromVideo() {
         const video = document.getElementById('camera-stream');
         const canvas = document.getElementById('capture-canvas');
         const ctx = canvas.getContext('2d');
 
-        // 1. Get the true hardware resolution of the video sensor
+        // Execute exact 2x mathematical crop based on sensor size
         const sensorWidth = video.videoWidth;
         const sensorHeight = video.videoHeight;
-
-        // 2. The Math of the 2x Zoom Crop
-        // Because the UI is zoomed 2x from the center, the user is only looking at
-        // the central 50% of the raw video frame. We must extract only that specific box.
         const cropWidth = sensorWidth / 2;
         const cropHeight = sensorHeight / 2;
-        
-        // Calculate the starting X and Y coordinates to hit the exact center
         const startX = (sensorWidth - cropWidth) / 2;
         const startY = (sensorHeight - cropHeight) / 2;
 
-        // 3. Set the canvas output size (Standardizing to 400px wide for AI efficiency)
         const OUTPUT_WIDTH = 400;
         const OUTPUT_HEIGHT = OUTPUT_WIDTH * (cropHeight / cropWidth);
-        
+
         canvas.width = OUTPUT_WIDTH;
         canvas.height = OUTPUT_HEIGHT;
 
-        // 4. Draw ONLY the cropped central frame onto the canvas
-        // Syntax: drawImage(image, sourceX, sourceY, sourceW, sourceH, destX, destY, destW, destH)
-        ctx.drawImage(
-            video, 
-            startX, startY, cropWidth, cropHeight, // Source (The exact center crop)
-            0, 0, canvas.width, canvas.height      // Destination (Stretch to fill our canvas)
-        );
+        ctx.drawImage(video, startX, startY, cropWidth, cropHeight, 0, 0, canvas.width, canvas.height);
         
         stopCamera();
         canvas.style.display = 'block';
-        
-        // 5. Extract with max quality (1.0) to preserve the ridge data
-        userData.base64Image = canvas.toDataURL('image/jpeg', 1.0);
-        sendToBasicBackend();
+        userData.base64Image = canvas.toDataURL('image/jpeg', 0.9);
+        analyzeWithGemini();
     }
-	
-    async function sendToBasicBackend() {
+
+    // --- GEMINI 3.1 AI PROXY CONNECTION ---
+    async function analyzeWithGemini() {
         showStep('loading');
-        document.getElementById('loading-title').innerText = "Analyzing Print...";
-        document.getElementById('loading-text').innerText = "Running OpenCV Extraction...";
         
+        // Strip base64 header for Gemini API
+        let cleanBase64 = userData.base64Image.split(',')[1];
+
+        // We ask Gemini to do BOTH the extraction and the reading in one shot to save time.
+        const systemPrompt = `
+        You are a master of Samudrika Shastra and Vedic Astrology. 
+        Analyze this fingerprint image for: Name: ${userData.name}, Age: ${userData.age}, Gender: ${userData.gender}, Finger: ${userData.finger}.
+        
+        You MUST respond ONLY with a valid JSON object. Do not wrap it in markdown code blocks.
+        Format required:
+        {
+            "pattern": "Concentric Whorl / Flowing Loop / Stable Arch",
+            "pattern_sanskrit": "Chakra / Shankha / Seep",
+            "nabhi": "High / Centered / Low",
+            "synthesis_desc": "One short sentence summarizing the pattern.",
+            "deep_reading_html": "<h3>1. Core Personality & Prakriti</h3><p>...</p><h3>2. Career & Wealth</h3><p>...</p><h3>3. Future Guidance</h3><p>...</p>"
+        }
+        Provide deep, accurate, empathetic insights in the deep_reading_html based on their age, gender, and the visual pattern of the fingerprint. Use HTML tags for formatting.
+        `;
+
+        const payload = {
+            "contents": [{
+                "parts": [
+                    { "text": systemPrompt },
+                    { "inlineData": { "mimeType": "image/jpeg", "data": cleanBase64 } }
+                ]
+            }],
+            "generationConfig": { "temperature": 0.7 }
+        };
+
         try {
-            const response = await fetch(API_URL_BASIC, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ finger: userData.finger, image: userData.base64Image })
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
             });
+
             const data = await response.json();
-            if (data.status === 'success') {
-                userData.basicAnalysis = data.analysis;
+            
+            // Extract text from your app.py's Gemini response format
+            if (data.candidates && data.candidates[0].content) {
+                let aiText = data.candidates[0].content.parts[0].text;
+                
+                // Clean the text in case Gemini wraps it in ```json ... ```
+                aiText = aiText.replace(/```json/g, '').replace(/```/g, '').trim();
+                
+                const resultObj = JSON.parse(aiText);
+                
+                // Populate Basic Results Screen
                 document.getElementById('res-name').innerText = userData.name;
                 document.getElementById('res-finger').innerText = userData.finger;
-                document.getElementById('res-pattern').innerText = data.analysis.pattern;
-                document.getElementById('res-nabhi').innerText = data.analysis.nabhi;
-                document.getElementById('res-synthesis').innerText = data.analysis.synthesis_desc;
+                document.getElementById('res-pattern').innerText = `${resultObj.pattern} (${resultObj.pattern_sanskrit})`;
+                document.getElementById('res-nabhi').innerText = resultObj.nabhi;
+                document.getElementById('res-synthesis').innerText = resultObj.synthesis_desc;
+                
+                // Save the deep reading HTML for the next screen
+                userData.deepHTML = resultObj.deep_reading_html;
+                
                 showStep('results');
-            } else { alert("Error: " + data.message); showStep(1); }
-        } catch (e) { alert("Connection failed."); showStep(1); }
+            } else {
+                alert("Gemini returned an unexpected response. Please try again.");
+                showStep(1);
+            }
+
+        } catch (error) {
+            console.error("API Error:", error);
+            alert("AI Connection failed. Please ensure your PythonAnywhere server is running.");
+            showStep(1);
+        }
     }
 
-    // THE NEW FUNCTION TO CALL THE AI PROXY
-    async function requestDeepAI() {
-        showStep('loading');
-        document.getElementById('loading-title').innerText = "Consulting AI Oracle...";
-        document.getElementById('loading-text').innerText = "Synthesizing Astrological & Biometric data into a profound reading...";
-
-        try {
-            const response = await fetch(API_URL_DEEP, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(userData) // Send everything: image, name, age, gender, basic metrics
-            });
-            const data = await response.json();
-            if (data.status === 'success') {
-                document.getElementById('deep-title').innerText = `Reading for ${userData.name} (Age: ${userData.age})`;
-                
-                // Convert simple markdown to HTML (Bold and newlines)
-                let formattedText = data.reading.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-                formattedText = formattedText.replace(/\n/g, '<br>');
-                
-                document.getElementById('deep-content').innerHTML = formattedText;
-                showStep('deep-ai');
-            } else { alert("AI Error: " + data.message); showStep('results'); }
-        } catch (e) { alert("AI Connection failed."); showStep('results'); }
+    function showDeepAI() {
+        document.getElementById('deep-title').innerText = `Reading for ${userData.name} (Age: ${userData.age})`;
+        document.getElementById('deep-content').innerHTML = userData.deepHTML;
+        showStep('deep-ai');
     }
 </script>
 </body>
