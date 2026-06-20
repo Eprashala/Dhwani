@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Marrvish - Absolute Truth Scanner</title>
+    <title>Marrvish - Absolute Truth Scanner v2</title>
     <style>
         :root {
             --primary: #1F2937; --secondary: #4B5563; --accent: #D97706; 
@@ -53,7 +53,6 @@
         .loader { border: 6px solid #F3F4F6; border-top: 6px solid var(--accent); border-radius: 50%; width: 55px; height: 55px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Deep AI Markdown Styles */
         .ai-content { font-family: 'Segoe UI', sans-serif; text-align: left; line-height: 1.8; font-size: 15.5px; padding: 20px; background: var(--white); border-radius: 12px; border: 1px solid #E5E7EB; margin-top: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05);}
         .ai-content h2 { color: var(--primary); margin-top: 25px; margin-bottom: 15px; font-family: 'Georgia', serif; font-size: 22px; border-bottom: 2px solid #F3F4F6; padding-bottom: 8px;}
         .ai-content h3 { color: var(--accent); margin-top: 20px; margin-bottom: 10px; font-size: 18px;}
@@ -135,14 +134,14 @@
     <div id="step-loading-local" class="step">
         <h1>Local Extraction</h1>
         <div class="loader"></div>
-        <p style="font-weight: bold; color: var(--secondary);">Running Image Clarity & OpenCV Extraction...</p>
+        <p style="font-weight: bold; color: var(--secondary);">Running Image Clarity & Preliminary Extraction...</p>
         <canvas id="capture-canvas"></canvas>
     </div>
     
     <div id="step-loading-ai" class="step">
         <h1>Marrvish AI Core</h1>
         <div class="loader"></div>
-        <p style="font-weight: bold; color: var(--accent);">Transmitting all 5 fingers for Absolute Truth holistic synthesis...</p>
+        <p style="font-weight: bold; color: var(--accent);">Transmitting all 5 macro images for Absolute Truth visual synthesis...</p>
     </div>
 
     <div id="step-progress" class="step">
@@ -153,7 +152,7 @@
         
         <div id="action-buttons-container" style="margin-top: 25px; border-top: 1px solid #E5E7EB; padding-top: 25px;">
             <button id="btn-next" class="btn" onclick="prepareNextFinger()"></button>
-            <button id="btn-deep-ai" class="btn btn-ai" style="display:none; width: 100%; max-width: 100%;" onclick="generateBatchAI()">🔮 Generate Full Marrvish Reading</button>
+            <button id="btn-deep-ai" class="btn btn-ai" style="display:none; width: 100%; max-width: 100%;" onclick="generateBatchAI()">🔮 Generate Absolute Truth Report</button>
         </div>
     </div>
 
@@ -269,14 +268,14 @@
         showStep('capture-choice');
     }
 
-    // --- CAPTURE & LOCAL QUALITY CHECK ---
+    // --- CAPTURE LOGIC ---
     document.getElementById('file-upload').addEventListener('change', function(event) {
         const file = event.target.files[0];
         if (!file) return;
         const reader = new FileReader();
         reader.onload = function(e) {
             const img = new Image();
-            img.onload = function() { processImageCapture(img); }
+            img.onload = function() { processImageCapture(img, false); }
             img.src = e.target.result;
         }
         reader.readAsDataURL(file);
@@ -300,18 +299,32 @@
         processImageCapture(document.getElementById('camera-stream'), true);
     }
 
-    function processImageCapture(source, isVideo = false) {
+    // NEW MICRO-MACRO CROP LOGIC
+    function processImageCapture(source, isVideo) {
         const canvas = document.getElementById('capture-canvas');
         const ctx = canvas.getContext('2d');
         let sWidth = isVideo ? source.videoWidth : source.width;
         let sHeight = isVideo ? source.videoHeight : source.height;
 
-        const cropW = isVideo ? sWidth/2 : sWidth;
-        const cropH = isVideo ? sHeight/2 : sHeight;
-        const sX = isVideo ? (sWidth - cropW)/2 : 0;
-        const sY = isVideo ? (sHeight - cropH)/2 : 0;
+        let cropW, cropH, sX, sY;
 
-        canvas.width = 400; canvas.height = 400 * (cropH / cropW);
+        if (isVideo) {
+            // TIGHT CROP FOR CAMERA: Captures only the central 35% bounding box of the sensor 
+            // This perfectly matches the UI oval and prevents background noise
+            cropW = sWidth * 0.35;
+            cropH = sHeight * 0.35;
+            sX = (sWidth - cropW) / 2;
+            sY = (sHeight - cropH) / 2;
+        } else {
+            // UPLOAD METHOD: User uploads their own pre-cropped ink print photo.
+            cropW = sWidth;
+            cropH = sHeight;
+            sX = 0;
+            sY = 0;
+        }
+
+        canvas.width = 400; 
+        canvas.height = 400 * (cropH / cropW);
         ctx.drawImage(source, sX, sY, cropW, cropH, 0, 0, canvas.width, canvas.height);
         canvas.style.display = 'block';
         
@@ -333,7 +346,7 @@
         analyzeWithOpenCV(base64);
     }
 
-    // --- LOCAL OPENCV EXTRACTION ---
+    // --- LOCAL OPENCV EXTRACTION (UI Only) ---
     async function analyzeWithOpenCV(base64Image) {
         showStep('loading-local');
         const currentFinger = fingerSequence[currentFingerIdx];
@@ -344,20 +357,18 @@
                 body: JSON.stringify({ finger: currentFinger.name, image: base64Image })
             });
 
-            if(!response.ok) throw new Error("OpenCV Server Offline.");
+            if(!response.ok) throw new Error("OpenCV Offline");
             const data = await response.json();
 
             collectedFingers.push({
                 fingerData: currentFinger,
-                pattern: data.analysis.pattern,
-                nabhi: data.analysis.nabhi,
                 image: base64Image.split(',')[1] 
             });
 
             const cardHTML = `
                 <div class="report-card">
                     <h2 style="font-size:14px; margin:0;">✅ ${currentFinger.name} Captured 
-                    <span style="font-size:12px; color:var(--accent);">(${data.analysis.pattern})</span></h2>
+                    <span style="font-size:12px; color:var(--accent);">(Preliminary: ${data.analysis.pattern})</span></h2>
                 </div>
             `;
             document.getElementById('reports-list').innerHTML += cardHTML;
@@ -367,9 +378,9 @@
 
         } catch (error) {
             collectedFingers.push({
-                fingerData: currentFinger, pattern: "Pending AI Verification", nabhi: "Pending", image: base64Image.split(',')[1]
+                fingerData: currentFinger, image: base64Image.split(',')[1]
             });
-            document.getElementById('reports-list').innerHTML += `<div class="report-card"><h2>✅ ${currentFinger.name} Captured (Pending AI Verification)</h2></div>`;
+            document.getElementById('reports-list').innerHTML += `<div class="report-card"><h2>✅ ${currentFinger.name} Captured</h2></div>`;
             updateActionButtons();
             showStep('progress');
         }
@@ -395,38 +406,42 @@
         showCaptureChoice();
     }
 
-    // --- BULLETPROOF BATCH GEMINI ENGINE (THE MASTER JUDGE) ---
+    // --- BULLETPROOF BLIND-TEST GEMINI ENGINE ---
     async function generateBatchAI() {
         showStep('loading-ai');
 
         let textPrompt = `
         You are a brutally honest, uncompromising master of Samudrika Shastra acting as the core engine for Marrvish.com.
-        Provide a comprehensive Absolute Truth Report for the entire hand.
         
         Client Details: Name: ${userData.name}, Age: ${userData.age}, Gender: ${userData.handSide} Hand.
         
-        Our local OpenCV sensor has provided preliminary geometric classifications for the 5 fingers:
+        Attached are 5 highly-detailed, tightly cropped macro images of the user's actual fingertips in this specific order:
         `;
 
         let partsArray = [{ "text": "" }]; 
 
         collectedFingers.forEach((item, index) => {
-            textPrompt += `\n${index+1}. ${item.fingerData.name}: Preliminary Sensor says Pattern = ${item.pattern}, Core = ${item.nabhi}`;
+            textPrompt += `\n${index+1}. ${item.fingerData.name} (${item.fingerData.planet}): [Image Attached]`;
             partsArray.push({ "inlineData": { "mimeType": "image/jpeg", "data": item.image } });
         });
 
+        // THE BLIND JUSTICE FIX
         textPrompt += `
-        \n\nTHE MASTER JUDGE PROTOCOL: You must visually analyze the 5 attached images. If your visual analysis contradicts the OpenCV preliminary data, you MUST OVERRIDE it and base your absolute truth report purely on your own authoritative visual extraction.
+        \n\nTHE FORENSIC PROTOCOL:
+        You must visually analyze the 5 attached images WITHOUT any bias. DO NOT GUESS. Apply these strict forensic definitions:
+        1. CHAKRA (Whorl): Ridges form complete, closed concentric circles or spirals.
+        2. SHANKHA (Loop): Ridges enter from one side, curve around a core, and exit towards the SAME side they entered.
+        3. SEEP (Arch): Ridges flow from one side to the other, rising slightly in the middle like a wave or tent.
         
-        CRITICAL RULE 1: Provide a brutally honest reading based on the images. Do NOT flatter the user. Dig exceptionally deep into ancient Indian Vedic texts (Samudrika Shastra, Nadi principles).
-        CRITICAL RULE 2: In the 'Finger Breakdown' section, you MUST explicitly name the final pattern you identified (e.g., "Chakra (Whorl)", "Shankha (Loop)", or "Seep (Arch)") right next to the finger name, so the user can verify it by looking at their own hand.
+        CRITICAL RULE 1: Provide a brutally honest karmic reading based on the actual visual patterns. Do NOT flatter the user.
+        CRITICAL RULE 2: In the 'Finger Breakdown' section, you MUST explicitly declare the final pattern you identified (e.g., "Shankha (Loop)", "Chakra (Whorl)") right next to the finger name, so the user can verify it by looking at their hand.
         
         You MUST respond ONLY with a valid JSON object. 
         CRITICAL JSON FORMATTING RULE: The "deep_reading_html" value MUST be a single, continuous string. Do NOT use actual line breaks (newlines) or tabs inside the string. Use standard HTML tags for formatting.
         
         Format required:
         {
-            "deep_reading_html": "<h2>Holistic Marrvish Synthesis</h2><p>One brutal, honest paragraph summarizing the combined karmic energy of all 5 fingers based on ancient Vedic texts.</p><div class='metric-box'><h3>Absolute Truth Metrics & Percentages</h3><ul><li><b>The 4 Purusharthas:</b> Dharma X%, Artha X%, Kama X%, Moksha X%</li><li><b>The 5 Enemies:</b> Kama X%, Krodha X%, Moha X%, Mada X%, Matsarya X%</li><li><b>Traits:</b> Honesty X%, Reliability X%, Hardworking X%, Punctuality X%, Accountability X%</li></ul></div><h3>Finger-by-Finger Vedic Breakdown</h3><h4>1. Thumb (Pattern: [Insert Pattern Here])</h4><p>Deep Vedic analysis...</p><h4>2. Index Finger (Pattern: [Insert Pattern Here])</h4><p>Deep Vedic analysis...</p><h4>3. Middle Finger (Pattern: [Insert Pattern Here])</h4><p>Deep Vedic analysis...</p><h4>4. Ring Finger (Pattern: [Insert Pattern Here])</h4><p>Deep Vedic analysis...</p><h4>5. Little Finger (Pattern: [Insert Pattern Here])</h4><p>Deep Vedic analysis...</p>"
+            "deep_reading_html": "<h2>Holistic Marrvish Synthesis</h2><p>One brutal, honest paragraph summarizing the combined energy.</p><div class='metric-box'><h3>Absolute Truth Metrics & Percentages</h3><ul><li><b>The 4 Purusharthas:</b> Dharma X%, Artha X%, Kama X%, Moksha X%</li><li><b>The 5 Enemies:</b> Kama X%, Krodha X%, Moha X%, Mada X%, Matsarya X%</li><li><b>Traits:</b> Honesty X%, Reliability X%, Hardworking X%, Punctuality X%, Accountability X%</li></ul></div><h3>Finger-by-Finger Breakdown</h3><h4>1. Thumb - Pattern Found: [Insert Pattern Here]</h4><p>Deep Vedic analysis based on the pattern...</p><h4>2. Index Finger - Pattern Found: [Insert Pattern Here]</h4><p>Deep Vedic analysis...</p><h4>3. Middle Finger - Pattern Found: [Insert Pattern Here]</h4><p>Deep Vedic analysis...</p><h4>4. Ring Finger - Pattern Found: [Insert Pattern Here]</h4><p>Deep Vedic analysis...</p><h4>5. Little Finger - Pattern Found: [Insert Pattern Here]</h4><p>Deep Vedic analysis...</p>"
         }
         `;
 
@@ -434,7 +449,7 @@
 
         const payload = {
             "contents": [{ "parts": partsArray }],
-            "generationConfig": { "temperature": 0.2 } 
+            "generationConfig": { "temperature": 0.1 } 
         };
 
         try {
@@ -453,7 +468,6 @@
             if (data.candidates && data.candidates[0].content) {
                 let aiText = data.candidates[0].content.parts[0].text;
                 
-                // BULLETPROOF PARSING FIX
                 let cleanText = aiText.replace(/```json/g, '').replace(/```html/g, '').replace(/```/g, '').trim();
                 cleanText = cleanText.replace(/[\r\n\t]+/g, ' '); 
 
@@ -464,9 +478,7 @@
                     throw new Error("API Intercept: " + cleanText);
                 }
                 
-                if (!resultObj.deep_reading_html) {
-                    throw new Error("Missing 'deep_reading_html' in AI response.");
-                }
+                if (!resultObj.deep_reading_html) throw new Error("Missing 'deep_reading_html' in AI response.");
 
                 userData.finalReportHTML = resultObj.deep_reading_html;
                 userData.currentLanguageHTML = userData.finalReportHTML;
