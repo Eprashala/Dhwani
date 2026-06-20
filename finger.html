@@ -17,13 +17,14 @@
         h3 { color: var(--secondary); margin-bottom: 15px; font-size: 18px; }
         p { margin-bottom: 20px; line-height: 1.6; font-family: 'Segoe UI', Tahoma, sans-serif; font-size: 15px; }
 
-        input[type="text"], input[type="number"] { width: 100%; max-width: 280px; padding: 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
+        input[type="text"], input[type="number"], select { width: 100%; max-width: 280px; padding: 12px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; font-family: 'Segoe UI', sans-serif;}
         
         .btn { background-color: var(--primary); color: var(--accent); border: 2px solid var(--accent); padding: 15px 25px; font-size: 16px; border-radius: 8px; cursor: pointer; margin: 10px 5px; width: 100%; max-width: 280px; font-weight: bold; transition: all 0.3s ease; display: inline-flex; justify-content: center; align-items: center; }
         .btn:active { transform: scale(0.97); background-color: var(--secondary); }
         .btn-upload { background-color: var(--bg); color: var(--primary); border: 2px dashed var(--primary); }
         .btn-ai { background: linear-gradient(135deg, #2A1B38, #E5B25D); color: white; border: none; }
         .btn-print { background-color: #1a1a1a; color: white; border: none; }
+        .btn-listen { background-color: #3b82f6; color: white; border: none; width: auto; padding: 12px 20px; }
 
         .step { display: none; width: 100%; }
         .step.active { display: block; animation: fadeIn 0.4s ease-out; }
@@ -60,12 +61,14 @@
         .ai-content { font-family: 'Segoe UI', sans-serif; text-align: left; line-height: 1.7; font-size: 15px; padding: 15px; background: #fff; border-radius: 8px; border: 1px solid #eee; margin-top: 15px;}
         .ai-content h2, .ai-content h3 { color: var(--primary); margin-top: 15px; margin-bottom: 10px; font-family: 'Georgia', serif;}
         .ai-content strong { color: var(--secondary); }
+        
+        .toolbar { display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;}
 
         /* PRINT STYLES */
         @media print {
             body { background: white; color: black; font-size: 12pt; }
             .container { max-width: 100%; padding: 0; display: block; }
-            .btn, .instruction-box, #camera-container { display: none !important; }
+            .btn, .instruction-box, #camera-container, .toolbar { display: none !important; }
             .report-card { break-inside: avoid; border: 1px solid #000; box-shadow: none; margin-bottom: 20px; border-top: 4px solid #000; }
             .param-item { border-left: 2px solid #000; }
             h1 { text-align: center; font-size: 24pt; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px;}
@@ -133,7 +136,6 @@
         
         <div id="action-buttons-container" style="margin-top: 25px; border-top: 1px solid #ccc; padding-top: 20px;">
             <button id="btn-next" class="btn" onclick="prepareNextFinger()"></button>
-            
             <button id="btn-print" class="btn btn-print" style="display:none;" onclick="window.print()">🖨️ Print Complete Report</button>
             <button id="btn-deep-ai" class="btn btn-ai" style="display:none; width: 100%; max-width: 100%; margin-top: 10px;" onclick="showDeepAI()">🔮 View Deep AI Astrological Synthesis</button>
         </div>
@@ -141,22 +143,36 @@
 
     <div id="step-deep-ai" class="step">
         <h1>Complete Cosmic Blueprint</h1>
-        <h3 id="deep-title" style="color: var(--secondary);"></h3>
+        <h3 id="deep-title" style="color: var(--secondary); margin-bottom: 15px;"></h3>
+        
+        <div class="toolbar">
+            <select id="language-selector" onchange="translateDeepAI()" style="margin: 0; width: auto; min-width: 150px;">
+                <option value="English">English</option>
+                <option value="Hindi">Hindi (हिंदी)</option>
+                <option value="Sanskrit">Sanskrit (संस्कृतम्)</option>
+                <option value="Spanish">Spanish (Español)</option>
+                <option value="French">French (Français)</option>
+            </select>
+            <button id="btn-listen" class="btn btn-listen" onclick="toggleSpeech('deep-content')">🔊 Listen</button>
+        </div>
+
         <div class="ai-content" id="deep-content"></div>
-        <button class="btn btn-print" style="margin-top:20px;" onclick="window.print()">🖨️ Print Cosmic Blueprint</button>
-        <button class="btn btn-upload" style="margin-top:10px;" onclick="location.reload()">Start New Scan</button>
+        
+        <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+            <button class="btn btn-print" onclick="window.print()">🖨️ Print Blueprint</button>
+            <button class="btn btn-upload" onclick="location.reload()">Start New Scan</button>
+        </div>
     </div>
 
 </div>
 
 <script>
-    // Pointing directly to your existing locked chat endpoint
     const API_URL = 'https://eprashala.pythonanywhere.com/api/chat';
     
     let videoStream = null;
-    let userData = { name: '', age: '', handSide: '', base64Image: '', cumulativeDeepHTML: '' };
+    let isSpeaking = false;
+    let userData = { name: '', age: '', handSide: '', base64Image: '', cumulativeDeepHTML: '', currentLanguageHTML: '' };
     
-    // The sequence of fingers according to Vedic Palmistry
     const fingerSequence = [
         { name: "Thumb", sanskrit: "Angustha", planet: "Willpower & Logic" },
         { name: "Index Finger", sanskrit: "Tarjani", planet: "Jupiter (Ego/Leadership)" },
@@ -171,7 +187,6 @@
         document.getElementById('step-' + stepId).classList.add('active');
     }
 
-    // Initialize the loop
     function initializeScanner(gender) {
         const nameVal = document.getElementById('user-name').value.trim();
         const ageVal = document.getElementById('user-age').value.trim();
@@ -184,7 +199,7 @@
         document.getElementById('results-user-info').innerText = `Client: ${userData.name} | Age: ${userData.age} | Active Hand: ${userData.handSide}`;
         
         currentFingerIdx = 0;
-        document.getElementById('reports-list').innerHTML = ''; // Clear past reports
+        document.getElementById('reports-list').innerHTML = ''; 
         userData.cumulativeDeepHTML = '';
         
         showCaptureChoice();
@@ -196,7 +211,7 @@
         showStep('capture-choice');
     }
 
-    // --- FILE UPLOAD LOGIC ---
+    // --- UPLOAD LOGIC ---
     document.getElementById('file-upload').addEventListener('change', function(event) {
         const file = event.target.files[0];
         if (!file) return;
@@ -216,7 +231,6 @@
             img.src = e.target.result;
         }
         reader.readAsDataURL(file);
-        // Reset input so they can upload again if needed
         event.target.value = '';
     });
 
@@ -267,7 +281,7 @@
         analyzeWithGemini();
     }
 
-    // --- GEMINI 3.1 AI CONNECTION ---
+    // --- GEMINI 3.1 AI CONNECTION & CLARITY GATEKEEPER ---
     async function analyzeWithGemini() {
         const currentFinger = fingerSequence[currentFingerIdx];
         
@@ -281,14 +295,18 @@
         Analyze this fingerprint image for: Name: ${userData.name}, Age: ${userData.age}, Gender: ${userData.handSide} Hand.
         Target Finger: ${currentFinger.name} (${currentFinger.sanskrit}), representing ${currentFinger.planet}.
         
+        FIRST RULE: Evaluate image clarity. Can you clearly see the ridge patterns (Whorl, Loop, or Arch)? If it is completely blurry, completely dark, or unrecognizable, mark it as invalid.
+        
         You MUST respond ONLY with a valid JSON object. Do not wrap it in markdown code blocks.
         Format required:
         {
+            "is_clear_impression": "Yes or No",
+            "clarity_error": "If No, strictly explain why (e.g. 'Image is too blurry or dark.'). If Yes, leave empty.",
             "pattern": "Concentric Whorl / Flowing Loop / Stable Arch",
             "pattern_sanskrit": "Chakra / Shankha / Seep",
             "nabhi": "High / Centered / Low",
             "synthesis_desc": "One powerful sentence summarizing the meaning of this pattern SPECIFICALLY on the ${currentFinger.name}.",
-            "deep_reading_html": "<p>A detailed 2-paragraph astrological deep dive into what this pattern means for their ${currentFinger.planet}.</p>"
+            "deep_reading_html": "<p>A perfectly accurate, highly detailed 2-paragraph astrological deep dive into what this pattern means for their ${currentFinger.planet}. Base this solely on authentic ancient fingerprint reading science.</p>"
         }
         `;
 
@@ -299,7 +317,7 @@
                     { "inlineData": { "mimeType": "image/jpeg", "data": cleanBase64 } }
                 ]
             }],
-            "generationConfig": { "temperature": 0.7 }
+            "generationConfig": { "temperature": 0.5 }
         };
 
         try {
@@ -316,7 +334,14 @@
                 aiText = aiText.replace(/```json/g, '').replace(/```/g, '').trim();
                 const resultObj = JSON.parse(aiText);
                 
-                // Build the HTML Card for this finger
+                // --- THE CLARITY GATEKEEPER CHECK ---
+                if (resultObj.is_clear_impression.toLowerCase().includes("no")) {
+                    alert("Image Quality Error: " + resultObj.clarity_error + "\n\nPlease ensure good lighting and rescan the " + currentFinger.name + ".");
+                    document.getElementById('capture-canvas').style.display = 'none';
+                    showCaptureChoice();
+                    return;
+                }
+                
                 const cardHTML = `
                     <div class="report-card">
                         <h2>${currentFinger.name} <span>(${currentFinger.sanskrit})</span></h2>
@@ -328,16 +353,17 @@
                     </div>
                 `;
                 
-                // Append card to the running list
                 document.getElementById('reports-list').innerHTML += cardHTML;
                 
-                // Append the deep reading to the hidden cumulative string
                 userData.cumulativeDeepHTML += `
                     <div style="margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px dashed #ccc;">
                         <h2 style="color: #2A1B38;">${currentFinger.name} (${currentFinger.planet})</h2>
                         ${resultObj.deep_reading_html}
                     </div>
                 `;
+                
+                // Save English as base state
+                userData.currentLanguageHTML = userData.cumulativeDeepHTML;
                 
                 updateActionButtons();
                 showStep('results');
@@ -360,13 +386,11 @@
         const btnDeepAI = document.getElementById('btn-deep-ai');
         
         if (currentFingerIdx < 4) {
-            // Still have fingers left
             btnNext.style.display = 'inline-flex';
             btnNext.innerText = `Scan Next: ${fingerSequence[currentFingerIdx + 1].name}`;
             btnPrint.style.display = 'none';
             btnDeepAI.style.display = 'none';
         } else {
-            // All 5 fingers complete
             btnNext.style.display = 'none';
             btnPrint.style.display = 'inline-flex';
             btnDeepAI.style.display = 'inline-flex';
@@ -375,16 +399,113 @@
 
     function prepareNextFinger() {
         currentFingerIdx++;
-        // Clear canvas for next capture
         document.getElementById('capture-canvas').style.display = 'none';
         showCaptureChoice();
     }
 
     function showDeepAI() {
         document.getElementById('deep-title').innerText = `Synthesis for ${userData.name} (Age: ${userData.age})`;
-        document.getElementById('deep-content').innerHTML = userData.cumulativeDeepHTML;
+        document.getElementById('deep-content').innerHTML = userData.currentLanguageHTML;
+        
+        // Reset language and speech states if opening fresh
+        document.getElementById('language-selector').value = "English";
+        if(isSpeaking) toggleSpeech('deep-content'); 
+        
         showStep('deep-ai');
     }
+
+    // --- LANGUAGE TRANSLATOR PROXY ---
+    async function translateDeepAI() {
+        const targetLang = document.getElementById('language-selector').value;
+        
+        // Stop audio if they switch language while reading
+        if(isSpeaking) toggleSpeech('deep-content');
+
+        if (targetLang === 'English') {
+            userData.currentLanguageHTML = userData.cumulativeDeepHTML;
+            document.getElementById('deep-content').innerHTML = userData.currentLanguageHTML;
+            return;
+        }
+
+        const contentBox = document.getElementById('deep-content');
+        contentBox.innerHTML = `<div class="loader"></div><p style="text-align:center;">Translating ancient wisdom into ${targetLang}...</p>`;
+
+        const prompt = `Translate the following astrological HTML report into ${targetLang}. 
+        CRITICAL: Preserve all HTML tags exactly. Only translate the text content inside the tags. Do not wrap the response in markdown code blocks.
+        
+        HTML TO TRANSLATE:
+        ${userData.cumulativeDeepHTML}`;
+
+        const payload = {
+            "contents": [{ "parts": [{ "text": prompt }] }],
+            "generationConfig": { "temperature": 0.2 } // Low temp for accurate translation
+        };
+
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            
+            if (data.candidates && data.candidates[0].content) {
+                let translatedText = data.candidates[0].content.parts[0].text;
+                translatedText = translatedText.replace(/```html/g, '').replace(/```/g, '').trim();
+                
+                userData.currentLanguageHTML = translatedText;
+                contentBox.innerHTML = userData.currentLanguageHTML;
+            } else {
+                alert("Translation failed. Restoring English.");
+                document.getElementById('language-selector').value = "English";
+                contentBox.innerHTML = userData.cumulativeDeepHTML;
+            }
+        } catch (e) {
+            alert("Translation connection failed.");
+            document.getElementById('language-selector').value = "English";
+            contentBox.innerHTML = userData.cumulativeDeepHTML;
+        }
+    }
+
+    // --- TEXT TO SPEECH (LISTEN) ---
+    function toggleSpeech(elementId) {
+        if (isSpeaking) {
+            window.speechSynthesis.cancel();
+            isSpeaking = false;
+            document.getElementById('btn-listen').innerText = '🔊 Listen';
+            return;
+        }
+
+        const textToRead = document.getElementById(elementId).innerText;
+        if (!textToRead) return;
+
+        const targetLang = document.getElementById('language-selector').value;
+        let langCode = 'en-US';
+        if(targetLang === 'Hindi') langCode = 'hi-IN';
+        if(targetLang === 'Spanish') langCode = 'es-ES';
+        if(targetLang === 'French') langCode = 'fr-FR';
+
+        const utterance = new SpeechSynthesisUtterance(textToRead);
+        utterance.lang = langCode;
+        utterance.rate = 0.95; 
+
+        utterance.onend = () => {
+            isSpeaking = false;
+            document.getElementById('btn-listen').innerText = '🔊 Listen';
+        };
+        
+        utterance.onerror = () => {
+            isSpeaking = false;
+            document.getElementById('btn-listen').innerText = '🔊 Listen';
+        }
+
+        window.speechSynthesis.speak(utterance);
+        isSpeaking = true;
+        document.getElementById('btn-listen').innerText = '⏹ Stop Listening';
+    }
+
+    // Stop speaking if user closes tab
+    window.onbeforeunload = () => {
+        window.speechSynthesis.cancel();
+    };
 </script>
 </body>
 </html>
