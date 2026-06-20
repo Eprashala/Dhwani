@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Vedic Fingerprint Scanner</title>
+    <style>
+        :root {
+            --primary: #4A154B;
+            --accent: #E0A96D;
+            --bg: #F9F6F0;
+            --text: #333;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+
+        body { background-color: var(--bg); color: var(--text); overflow-x: hidden; }
+
+        .container { max-width: 500px; margin: 0 auto; padding: 20px; text-align: center; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; }
+
+        h1 { color: var(--primary); margin-bottom: 10px; font-size: 24px; }
+        p { margin-bottom: 20px; line-height: 1.5; color: #555; }
+
+        .btn { background-color: var(--primary); color: white; border: none; padding: 15px 30px; font-size: 16px; border-radius: 8px; cursor: pointer; margin: 10px 5px; width: 100%; max-width: 300px; transition: 0.3s; }
+        .btn:active { transform: scale(0.98); background-color: #360f36; }
+        .btn-outline { background-color: transparent; color: var(--primary); border: 2px solid var(--primary); }
+
+        /* Step Containers */
+        .step { display: none; width: 100%; }
+        .step.active { display: block; animation: fadeIn 0.4s ease-in-out; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Camera UI Layout */
+        #camera-container { position: relative; width: 100%; max-width: 400px; aspect-ratio: 3/4; margin: 0 auto 20px auto; background: #000; border-radius: 12px; overflow: hidden; }
+        
+        /* The Video Stream with 2x Digital Zoom Trick */
+        #camera-stream { width: 100%; height: 100%; object-fit: cover; transform: scale(2); /* Digital zoom to force user 4-5 inches back */ transform-origin: center center; }
+
+        /* The Guide Overlay (Darkness with an Oval Cutout) */
+        .overlay-guide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.6); }
+
+        /* The clear cutout using CSS clip-path or a masked element */
+        .cutout { width: 120px; height: 180px; border: 2px dashed rgba(255, 255, 255, 0.8); border-radius: 50% 50% 45% 45%; position: relative; box-shadow: 0 0 0 9999px rgba(0,0,0,0.5); /* Fills the rest of the screen with dark */ }
+
+        /* Nabhi (Center) Alignment Line */
+        .cutout::after { content: ''; position: absolute; top: 50%; left: -10px; right: -10px; height: 1px; background: rgba(224, 169, 109, 0.8); }
+        .guide-text { position: absolute; bottom: 20px; left: 0; width: 100%; color: white; font-size: 14px; text-shadow: 1px 1px 2px black; font-weight: bold; }
+
+        /* Results Canvas */
+        #capture-canvas { display: none; width: 100%; max-width: 200px; border-radius: 12px; margin: 0 auto 20px auto; border: 3px solid var(--accent); }
+        .reading-box { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: left; border-top: 4px solid var(--primary); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    
+    <div id="step-1" class="step active">
+        <h1>Vedic Fingerprint Scanner</h1>
+        <p>In Samudrika Shastra, the active energy (Purusha) and receptive energy (Prakriti) dictate which hand reveals your core destiny.</p>
+        <h3>Please select your gender:</h3>
+        <button class="btn" onclick="setGender('Male')">Male (Right Hand)</button>
+        <button class="btn" onclick="setGender('Female')">Female (Left Hand)</button>
+    </div>
+
+    <div id="step-2" class="step">
+        <h1>Preparation</h1>
+        <p id="hand-instruction" style="font-size: 18px; font-weight: bold; color: var(--primary);"></p>
+        <div style="background: white; padding: 15px; border-radius: 8px; text-align: left; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+            <p><strong>1. Keep Distance:</strong> Hold phone 4 to 5 inches away from your thumb. (The camera is zoomed automatically).</p>
+            <p><strong>2. Side Lighting:</strong> Face a lamp or window. Side-light reveals the ridges best.</p>
+            <p><strong>3. Align:</strong> Place the center of your print inside the oval guide.</p>
+        </div>
+        <button class="btn" onclick="startCamera()">Open Camera</button>
+    </div>
+
+    <div id="step-3" class="step">
+        <h1>Scan Thumb</h1>
+        <div id="camera-container">
+            <video id="camera-stream" autoplay playsinline></video>
+            <div class="overlay-guide">
+                <div class="cutout"></div>
+                <div class="guide-text">Align print inside oval</div>
+            </div>
+        </div>
+        <button class="btn" onclick="captureImage()">Capture Print</button>
+        <button class="btn btn-outline" onclick="stopCamera(); showStep(2);">Cancel</button>
+    </div>
+
+    <div id="step-4" class="step">
+        <h1>Destiny Revealed</h1>
+        <canvas id="capture-canvas"></canvas>
+        <div class="reading-box">
+            <h3 style="color: var(--primary); margin-bottom: 10px;">Identified Pattern: Chakra (Whorl)</h3>
+            <p><strong>Samudrika Shastra Reading:</strong> Based on the structural integrity of your thumbprint, you possess a highly independent and leadership-oriented Prakriti (nature). Like the Chakra, your energy is concentric and focused. You are destined to carve your own path rather than follow the crowd.</p>
+        </div>
+        <button class="btn" style="margin-top:20px;" onclick="location.reload()">Scan Another Person</button>
+    </div>
+
+</div>
+
+<script>
+    let currentGender = '';
+    let videoStream = null;
+
+    // UI Routing
+    function showStep(stepNumber) {
+        document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
+        document.getElementById('step-' + stepNumber).classList.add('active');
+    }
+
+    // Step 1 -> 2
+    function setGender(gender) {
+        currentGender = gender;
+        const hand = gender === 'Male' ? 'RIGHT' : 'LEFT';
+        document.getElementById('hand-instruction').innerText = `Please prepare your ${hand} THUMB.`;
+        showStep(2);
+    }
+
+    // Step 2 -> 3 (Initialize Camera)
+    async function startCamera() {
+        showStep(3);
+        const videoElement = document.getElementById('camera-stream');
+
+        // Request rear camera with high resolution
+        const constraints = {
+            video: {
+                facingMode: 'environment',
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
+            }
+        };
+
+        try {
+            videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+            videoElement.srcObject = videoStream;
+        } catch (error) {
+            console.error("Camera access denied or unavailable:", error);
+            alert("Error: Camera access is required. Please ensure you are on HTTPS and have granted permissions.");
+            showStep(2); // Go back to instructions
+        }
+    }
+
+    // Stop Camera helper
+    function stopCamera() {
+        if (videoStream) {
+            videoStream.getTracks().forEach(track => track.stop());
+            videoStream = null;
+        }
+    }
+
+    // Step 3 -> 4 (Capture & Process)
+    function captureImage() {
+        const video = document.getElementById('camera-stream');
+        const canvas = document.getElementById('capture-canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Set canvas resolution to match the video's natural resolution
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        // Draw the current video frame to the canvas
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Turn off camera
+        stopCamera();
+
+        // Show canvas and step 4
+        canvas.style.display = 'block';
+        showStep(4);
+
+        // NOTE FOR BACKEND INTEGRATION:
+        // Here you would extract the image data and send it to your AI model:
+        // const base64Image = canvas.toDataURL('image/jpeg');
+        // fetch('/api/analyze', { method: 'POST', body: JSON.stringify({ image: base64Image }) }) ...
+    }
+</script>
+
+</body>
+</html>
