@@ -115,10 +115,33 @@
                 <li><strong>Camera Method:</strong> Hold phone 4 inches away. Use bright side-lighting.</li>
             </ul>
         </div>
+        
         <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
             <label for="file-upload" class="btn btn-upload">📁 Upload Impression</label>
             <input type="file" id="file-upload" accept="image/*">
             <button class="btn" onclick="startCamera()">📷 Open Live Scanner</button>
+            
+            <div style="margin-top: 20px; width: 100%; max-width: 300px; border-top: 1px solid #E5E7EB; padding-top: 20px;">
+                <h4 style="color: var(--secondary); margin-bottom: 10px; font-size: 14px;">Manual Override (If Scan Fails):</h4>
+                <select id="manual-pattern-select">
+                    <option value="" disabled selected>Select Pattern Manually...</option>
+                    <optgroup label="Chakra (Whorls)">
+                        <option value="Plain Whorl">🎯 Plain Whorl (Concentric Circles)</option>
+                        <option value="Central Pocket Whorl">🌀 Central Pocket Whorl</option>
+                        <option value="Double Loop Whorl">☯️ Double Loop Whorl (Yin-Yang)</option>
+                        <option value="Accidental Whorl">🧩 Accidental Whorl (Complex)</option>
+                    </optgroup>
+                    <optgroup label="Shankha (Loops)">
+                        <option value="Ulnar Loop">🌊 Ulnar Loop (Opens to Pinky)</option>
+                        <option value="Radial Loop">🔙 Radial Loop (Opens to Thumb)</option>
+                    </optgroup>
+                    <optgroup label="Seep (Arches)">
+                        <option value="Plain Arch">丘 Plain Arch (Gentle Hill)</option>
+                        <option value="Tented Arch">⛺ Tented Arch (Sharp Spike)</option>
+                    </optgroup>
+                </select>
+                <button class="btn" style="background-color: var(--secondary); border-color: var(--secondary);" onclick="submitManualPattern()">Verify Manually</button>
+            </div>
         </div>
     </div>
 
@@ -384,6 +407,41 @@
         }
     }
 
+    // --- MANUAL OVERRIDE LOGIC ---
+    function submitManualPattern() {
+        const selectElement = document.getElementById('manual-pattern-select');
+        const selectedPattern = selectElement.value;
+        
+        if (!selectedPattern) {
+            alert("Please select a pattern from the dropdown first.");
+            return;
+        }
+
+        const currentFinger = fingerSequence[currentFingerIdx];
+
+        // Push data WITHOUT an image, but WITH the manual override string
+        collectedFingers.push({
+            fingerData: currentFinger,
+            image: null, 
+            manualOverride: selectedPattern
+        });
+
+        // Add to UI log
+        const cardHTML = `
+            <div class="report-card">
+                <h2 style="font-size:14px; margin:0; color: var(--accent);">✍️ ${currentFinger.name} (Manual Override)
+                <span style="font-size:12px; color:var(--secondary); display:block; margin-top:4px;">Pattern: ${selectedPattern}</span></h2>
+            </div>
+        `;
+        document.getElementById('reports-list').innerHTML += cardHTML;
+        
+        // Reset dropdown for the next finger
+        selectElement.selectedIndex = 0; 
+
+        updateActionButtons();
+        showStep('progress');
+    }
+
     function updateActionButtons() {
         const btnNext = document.getElementById('btn-next');
         const btnDeepAI = document.getElementById('btn-deep-ai');
@@ -419,8 +477,14 @@
         let partsArray = [{ "text": "" }]; 
 
         collectedFingers.forEach((item, index) => {
-            textPrompt += `\n${index+1}. ${item.fingerData.name} (${item.fingerData.planet}): [Image Attached]`;
-            partsArray.push({ "inlineData": { "mimeType": "image/jpeg", "data": item.image } });
+            if (item.manualOverride) {
+                // If user bypassed the scanner, force Gemini to use their exact text
+                textPrompt += `\n${index+1}. ${item.fingerData.name} (${item.fingerData.planet}): [USER MANUALLY OVERRODE SCANNER - THE PATTERN IS STRICTLY: "${item.manualOverride}"]`;
+            } else {
+                // Standard image processing
+                textPrompt += `\n${index+1}. ${item.fingerData.name} (${item.fingerData.planet}): [Image Attached]`;
+                partsArray.push({ "inlineData": { "mimeType": "image/jpeg", "data": item.image } });
+            }
         });
 
         // THE ADVANCED FORENSIC PROTOCOL
