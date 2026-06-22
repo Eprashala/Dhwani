@@ -273,7 +273,8 @@
                     </div>
 
                     <div class="filter-pill-container">
-                        <label class="filter-pill active"><input type="checkbox" id="k_grahas" checked onchange="togglePill(this)"> 🪐 Grahas</label>
+                        <button class="filter-pill active" id="degreeToggle" onclick="cycleDegreeMode()" style="background: #34495e; color: white; border-color: #2c3e50; min-width: 130px; justify-content: center;">📐 Deg: Relative</button>
+						<label class="filter-pill active"><input type="checkbox" id="k_grahas" checked onchange="togglePill(this)"> 🪐 Grahas</label>
                         <label class="filter-pill active"><input type="checkbox" id="k_nodes" checked onchange="togglePill(this)"> 🐉 Rahu/Ketu</label>
                         <label class="filter-pill"><input type="checkbox" id="k_outer" onchange="togglePill(this)"> 🔭 Outer</label>
                         <label class="filter-pill"><input type="checkbox" id="k_upagrahas" onchange="togglePill(this)"> ☄️ Upagrahas</label>
@@ -457,6 +458,34 @@ let natalSkyData = null;
 let natalAscSign = null;
 let natalAscDegree = null;
 let natalScores = null;
+let degreeMode = 1;
+
+function cycleDegreeMode() {
+    degreeMode = (degreeMode + 1) % 3;
+    const btn = document.getElementById('degreeToggle');
+    
+    if (degreeMode === 0) {
+        btn.innerHTML = '📐 Deg: Off';
+        btn.classList.remove('active');
+        btn.style.background = '#f1f5f9';
+        btn.style.color = '#475569';
+    } else if (degreeMode === 1) {
+        btn.innerHTML = '📐 Deg: Relative';
+        btn.classList.add('active');
+        btn.style.background = '#34495e';
+        btn.style.color = 'white';
+    } else if (degreeMode === 2) {
+        btn.innerHTML = '📐 Deg: Absolute';
+        btn.classList.add('active');
+        btn.style.background = '#8e44ad';
+        btn.style.color = 'white';
+    }
+    
+    // Re-draw the canvas with the new degree settings
+    if (skyData && skyData.length > 0) {
+        populateKundali(skyData, asc_sign_global);
+    }
+}
 
 let activeGrahaHitboxes = []; 
 const popupObj = document.getElementById('grahaPopup');
@@ -1263,36 +1292,38 @@ function populateKundali(houses, ascSign) {
 		displayHouses[house_idx].push(b);
 	});
 
-    // --- PASS 1: DRAW RASHI BACKGROUNDS (Lower Layer) ---
+// --- PASS 1: DRAW RASHI BACKGROUNDS (Lower Layer) ---
     // Universal Lord Mapping (Index 0 = Aries / 1st House Kaal Purusha)
     const lordMapping = ['Mangal', 'Shukra', 'Budh', 'Chandra', 'Surya', 'Budh', 'Shukra', 'Mangal', 'Guru', 'Shani', 'Shani', 'Guru'];
 
     displayHouses.forEach((bodies, idx) => {
         const cx = coords[idx].x; const cy = coords[idx].y;
         
+        const safeAsc = Number(effectiveAscSign);
+        const rashiIdx = (safeAsc + idx - 1 + 12) % 12; 
+        const rashiNum = rashiIdx + 1;
+        
+        const rashiNameFull = i18n[currentLang] && i18n[currentLang].rashis ? i18n[currentLang].rashis[rashiIdx] : i18n['en'].rashis[rashiIdx];
+        const rashiSymbol = rashiNameFull.split(' ')[0]; 
+        const rashiText = rashiNameFull.substring(rashiNameFull.indexOf(' ') + 1); 
+
+        const rawDynamicLord = lordMapping[rashiIdx];
+        const localDynamicLord = (i18n[currentLang] && i18n[currentLang].names[rawDynamicLord]) ? i18n[currentLang].names[rawDynamicLord] : rawDynamicLord;
+        const rawFixedLord = lordMapping[idx];
+        const localFixedLord = (i18n[currentLang] && i18n[currentLang].names[rawFixedLord]) ? i18n[currentLang].names[rawFixedLord] : rawFixedLord;
+
+        kCtx.save();
+        kCtx.shadowColor = currentChartType === 'D1' ? "rgba(211, 84, 0, 0.3)" : "rgba(41, 128, 185, 0.3)"; 
+        kCtx.shadowBlur = 4;
+        kCtx.textAlign = "center";
+        
+        // REVISION: Always draw the Rashi Number. Only append symbol if showRashis is true.
+        kCtx.fillStyle = currentChartType === 'D1' ? "#d35400" : "#2980b9";   
+        kCtx.font = "bold 16px Arial"; 
+        kCtx.fillText(rashiNum + (showRashis ? " " + rashiSymbol : ""), cx, cy + 24); 
+        
+        // REVISION: Hide the metadata when showRashis is unchecked
         if (showRashis) {
-            const safeAsc = Number(effectiveAscSign);
-            const rashiIdx = (safeAsc + idx - 1 + 12) % 12; 
-            const rashiNum = rashiIdx + 1;
-            
-            const rashiNameFull = i18n[currentLang] && i18n[currentLang].rashis ? i18n[currentLang].rashis[rashiIdx] : i18n['en'].rashis[rashiIdx];
-            const rashiSymbol = rashiNameFull.split(' ')[0]; 
-            const rashiText = rashiNameFull.substring(rashiNameFull.indexOf(' ') + 1); 
-
-            const rawDynamicLord = lordMapping[rashiIdx];
-            const localDynamicLord = (i18n[currentLang] && i18n[currentLang].names[rawDynamicLord]) ? i18n[currentLang].names[rawDynamicLord] : rawDynamicLord;
-            const rawFixedLord = lordMapping[idx];
-            const localFixedLord = (i18n[currentLang] && i18n[currentLang].names[rawFixedLord]) ? i18n[currentLang].names[rawFixedLord] : rawFixedLord;
-
-            kCtx.save();
-            kCtx.shadowColor = currentChartType === 'D1' ? "rgba(211, 84, 0, 0.3)" : "rgba(41, 128, 185, 0.3)"; 
-            kCtx.shadowBlur = 4;
-            kCtx.textAlign = "center";
-            
-            kCtx.fillStyle = currentChartType === 'D1' ? "#d35400" : "#2980b9";   
-            kCtx.font = "bold 16px Arial"; 
-            kCtx.fillText(rashiNum + " " + rashiSymbol, cx, cy + 24); 
-            
             kCtx.font = "11px Arial";
             kCtx.fillStyle = currentChartType === 'D1' ? "rgba(211, 84, 0, 0.8)" : "rgba(41, 128, 185, 0.8)";
             kCtx.fillText(rashiText, cx, cy + 36);
@@ -1304,9 +1335,9 @@ function populateKundali(houses, ascSign) {
             kCtx.font = "italic 9.5px Arial";
             kCtx.fillStyle = "#7f8c8d"; 
             kCtx.fillText("H" + (idx + 1) + " Sthir: " + localFixedLord, cx, cy + 60);
-
-            kCtx.restore();
         }
+
+        kCtx.restore();
     });
 
 // --- PASS 2: DRAW PLANETS & HITBOXES ---
@@ -1348,7 +1379,7 @@ function populateKundali(houses, ascSign) {
             if (!showGrahas && isGraha && !isNode && !isOuter && b.name !== 'Surya') return false;
             if (!showOuter && isOuter) return false;
             if (!showNodes && isNode) return false;
-            if (!showUpagrahas && !isGraha) return false;
+            if (!showUpagrahas && !isGraha && !isOuter) return false;
             return true;
         });
         
@@ -1392,27 +1423,34 @@ function populateKundali(houses, ascSign) {
             kCtx.strokeStyle = "rgba(255, 255, 255, 0.95)"; 
             kCtx.lineJoin = "round";
             
-			if (b.type === 'graha') {
-            kCtx.font = `bold ${gFontSize}px Arial`;
-            kCtx.lineWidth = haloWidth;
-            
-            let karakaLabel = "";
-            // Jaimini Karakas strictly belong to the D9 Navamsha analysis (Karakamsha)
-            if (currentChartType === 'D9' && karakaMap[b.name] && count <= 4) {
-                karakaLabel = ` {${karakaMap[b.name]}}`;
+// --- NEW: DYNAMIC DEGREE RESOLUTION ---
+            let degreeLabel = "";
+            if (degreeMode === 1) {
+                // House Relative: Use b.deg if exists, otherwise fallback to modulo math
+                let relDeg = b.deg !== undefined ? b.deg : b.abs_deg % 30;
+                degreeLabel = ` ${formatDegree(relDeg)}`;
+            } else if (degreeMode === 2) {
+                // Absolute: Raw 360 map degree
+                degreeLabel = ` ${formatDegree(b.abs_deg)}`;
             }
 
-            // Spatial Degrees are only valid for absolute-degree charts (D1, Chalit, Gochar, Sun/Moon)
-            let degreeLabel = "";
-            let coreCharts = ['D1', 'DS', 'DM', 'CC', 'PRASHNA', 'GOCHAR'];
-            if (coreCharts.includes(currentChartType)) {
-                degreeLabel = ` ${formatDegree(b.deg)}`;
-            }
+            kCtx.strokeStyle = "rgba(255, 255, 255, 0.95)"; 
+            kCtx.lineJoin = "round";
             
-            // Build the text object without applying D1 degrees to Vargas
-            let textObj = `${symbols[b.name]||''} ${localName}${degreeLabel}${nakShort}${karakaLabel}`;
+            if (b.type === 'graha') {
+                kCtx.font = `bold ${gFontSize}px Arial`;
+                kCtx.lineWidth = haloWidth;
                 
-                // Sync the interactive hitboxes to the new dynamic font sizes
+                let karakaLabel = "";
+                // Jaimini Karakas strictly belong to the D9 Navamsha analysis
+                if (currentChartType === 'D9' && karakaMap[b.name] && count <= 4) {
+                    karakaLabel = ` {${karakaMap[b.name]}}`;
+                }
+
+                // Append the dynamic degree label instead of restricting it to coreCharts
+                let textObj = `${symbols[b.name]||''} ${localName}${degreeLabel}${nakShort}${karakaLabel}`;
+                
+                // Sync the interactive hitboxes
                 let tMetrics = kCtx.measureText(textObj);
                 activeGrahaHitboxes.push({
                     name: b.name, localName: localName,
@@ -1427,7 +1465,10 @@ function populateKundali(houses, ascSign) {
             } else {
                 kCtx.font = `italic ${uFontSize}px Arial`;
                 kCtx.lineWidth = haloWidth;
-                let textObj = `•${localName}${nakShort}`;
+                
+                // REVISION: Attach degreeLabel to Upagrahas & Outer Planets
+                let textObj = `•${localName}${degreeLabel}${nakShort}`;
+                
                 kCtx.strokeText(textObj, cx, textY); 
                 kCtx.fillStyle = "#8e44ad";          
                 kCtx.fillText(textObj, cx, textY);
