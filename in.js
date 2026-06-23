@@ -2,20 +2,13 @@
 function closeDisclaimer() {
     const checkbox = document.getElementById('dontShowAgain');
     const modal = document.getElementById('disclaimerModal');
-    
-    // If user checked the box, save their preference to local storage
-    if (checkbox && checkbox.checked) {
-        localStorage.setItem('hideLibraryDisclaimer', 'true');
-    }
-    
-    // Hide the modal
-    modal.classList.add('hidden-modal');
+    if (checkbox && checkbox.checked) localStorage.setItem('hideLibraryDisclaimer', 'true');
+    if (modal) modal.classList.add('hidden-modal');
 }
 
-// Check local storage as soon as the page loads
 document.addEventListener("DOMContentLoaded", () => {
     const modal = document.getElementById('disclaimerModal');
-    if (localStorage.getItem('hideLibraryDisclaimer') === 'true') {
+    if (modal && localStorage.getItem('hideLibraryDisclaimer') === 'true') {
         modal.classList.add('hidden-modal');
     }
 });
@@ -23,26 +16,17 @@ document.addEventListener("DOMContentLoaded", () => {
 // --- 1. SECURITY, KIOSK MODE & WAKE LOCK ---
 document.addEventListener('contextmenu', event => event.preventDefault());
 document.addEventListener('keydown', (e) => {
-    if (e.key === 'F12' || 
-       (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J')) || 
-       (e.ctrlKey && e.key === 'U')) {
-        e.preventDefault();
-    }
+    if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J')) || (e.ctrlKey && e.key === 'U')) e.preventDefault();
 });
 
 let wakeLock = null;
 async function acquireWakeLock() {
     if ('wakeLock' in navigator) {
-        try {
-            wakeLock = await navigator.wakeLock.request('screen');
-        } catch (err) {}
+        try { wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
     }
 }
 async function releaseWakeLock() {
-    if (wakeLock !== null) {
-        await wakeLock.release();
-        wakeLock = null;
-    }
+    if (wakeLock !== null) { await wakeLock.release(); wakeLock = null; }
 }
 
 document.addEventListener('click', () => {
@@ -51,68 +35,60 @@ document.addEventListener('click', () => {
     }
 });
 
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') {
-        if (synth.speaking && !synth.paused) {
-            synth.pause();
-            togglePlayIcon(true);
-        }
-        if (recognition && isListening) recognition.stop();
-    } else {
-        acquireWakeLock();
-    }
-});
-
 // --- 2. THE ANCIENT LIBRARY CONFIGURATION ---
 const PROXY_URL = "https://eprashala.pythonanywhere.com/api/chat"; 
 
-// Generates the massive Maharishi list easily
 const sagesList = ["Bhrigu", "Atri", "Angiras", "Vasistha", "Vishvamitra", "Gautama", "Kashyapa", "Bharadvaja", "Jamadagni", "Agastya", "Narada", "Parashara", "Vyasa", "Shukracharya", "Brihaspati", "Markandeya", "Yajnavalkya", "Patanjali", "Kapila", "Kanada", "Valmiki", "Shandilya", "Devala", "Asita", "Durvasa", "Dadhichi", "Lomasha", "Paila", "Jaimini", "Sumantu", "Vaishampayana", "Shaunaka", "Garga", "Panini", "Pingala", "Charaka", "Sushruta", "Apastamba", "Baudhayana", "Katyayana", "Gobhila", "Harita", "Yaska", "Narayana", "Sanaka", "Sanandana", "Sanatana", "Sanatkumara", "Ribhu", "Nidagha", "Vamadeva", "Kahola", "Uddalaka", "Svetaketu", "Astavakra", "Raikva", "Maitreya", "Parvata", "Galava", "Mudgala", "Rishyasringa", "Vibhandaka", "Chyavana", "Pramiti", "Medhatithi", "Trita", "Aruni", "Upamanyu", "Dhaumya", "Kratu", "Pulaha", "Pulastya", "Marichi", "Daksha", "Shakti", "Romaharshana", "Suta", "Saubhari", "Mandavya", "Vatsyayana", "Bharata", "Shibi", "Janaka"];
 const maharishiObject = {};
-sagesList.forEach(sage => { maharishiObject[sage] = { persona: `Maharishi ${sage}`, texts: `Ancient texts and wisdom of Sage ${sage}`, greeting: "Hari Om" }; });
+sagesList.forEach(sage => { 
+    maharishiObject[sage] = { 
+        persona: `Maharishi ${sage}`, 
+        texts: `Ancient texts and wisdom of Sage ${sage}`, 
+        greeting: "Hari Om",
+        desc: `Timeless wisdom of Maharishi ${sage}`
+    }; 
+});
 
 const LIBRARY_CONFIG = {
-    "Bhagavad Gita": {
-        "Bhagavad Gita": { persona: "Lord Krishna", texts: "Bhagavad Gita", greeting: "Jai Shri Krishna" }
-    },
+    "Bhagavad Gita": { "Bhagavad Gita": { persona: "Lord Krishna", texts: "Bhagavad Gita", greeting: "Jai Shri Krishna", desc: "The divine song of God" } },
     "Gods": {
-        "Shiv": { persona: "Lord Shiva", texts: "Shiva Purana, Linga Purana", greeting: "Om Namah Shivaya" },
-        "Vishnu": { persona: "Lord Vishnu", texts: "Vishnu Purana", greeting: "Om Namo Bhagavate Vasudevaya" },
-        "Brahma": { persona: "Lord Brahma", texts: "Brahma Purana", greeting: "Aham Brahmasmi" },
-        "Ganesh": { persona: "Lord Ganesha", texts: "Ganesha Purana", greeting: "Om Gam Ganapataye Namaha" },
-        "Rama": { persona: "Lord Rama", texts: "Ramayana", greeting: "Jai Shri Ram" },
-        "Krishna": { persona: "Lord Krishna", texts: "Bhagavata Purana", greeting: "Jai Shri Krishna" },
-        "Durga": { persona: "Goddess Durga", texts: "Devi Mahatmyam", greeting: "Ya Devi Sarvabhuteshu" },
-        "Kali": { persona: "Goddess Kali", texts: "Kalika Purana", greeting: "Om Krim Kalikayai Namaha" },
-        "Saraswati": { persona: "Goddess Saraswati", texts: "Saraswati Purana", greeting: "Om Aim Saraswatyai Namaha" },
-        "Lakshmi": { persona: "Goddess Lakshmi", texts: "Lakshmi Tantra", greeting: "Om Shreem Mahalakshmiyei Namaha" },
-        "Hanuman": { persona: "Lord Hanuman", texts: "Hanuman Chalisa", greeting: "Om Hanumate Namaha" },
-        "Surya": { persona: "Lord Surya", texts: "Aditya Hrudayam", greeting: "Om Suryaya Namaha" },
-        "Dattatreya": { persona: "Lord Dattatreya", texts: "Avadhuta Gita", greeting: "Hari Om Tat Sat" }
+        "Shiv": { persona: "Lord Shiva", texts: "Shiva Purana, Linga Purana", greeting: "Om Namah Shivaya", desc: "Wisdom of the Auspicious One" },
+        "Vishnu": { persona: "Lord Vishnu", texts: "Vishnu Purana", greeting: "Om Namo Bhagavate Vasudevaya", desc: "Wisdom of the Preserver" },
+        "Brahma": { persona: "Lord Brahma", texts: "Brahma Purana", greeting: "Aham Brahmasmi", desc: "Wisdom of the Creator" },
+        "Ganesh": { persona: "Lord Ganesha", texts: "Ganesha Purana", greeting: "Om Gam Ganapataye Namaha", desc: "Remover of obstacles" },
+        "Rama": { persona: "Lord Rama", texts: "Ramayana", greeting: "Jai Shri Ram", desc: "The embodiment of Dharma" },
+        "Krishna": { persona: "Lord Krishna", texts: "Bhagavata Purana", greeting: "Jai Shri Krishna", desc: "The supreme teacher" },
+        "Durga": { persona: "Goddess Durga", texts: "Devi Mahatmyam", greeting: "Ya Devi Sarvabhuteshu", desc: "Divine Mother's power" },
+        "Kali": { persona: "Goddess Kali", texts: "Kalika Purana", greeting: "Om Krim Kalikayai Namaha", desc: "Destroyer of illusions" },
+        "Saraswati": { persona: "Goddess Saraswati", texts: "Saraswati Purana", greeting: "Om Aim Saraswatyai Namaha", desc: "Goddess of knowledge and arts" },
+        "Lakshmi": { persona: "Goddess Lakshmi", texts: "Lakshmi Tantra", greeting: "Om Shreem Mahalakshmiyei Namaha", desc: "Goddess of wealth and purity" },
+        "Hanuman": { persona: "Lord Hanuman", texts: "Hanuman Chalisa", greeting: "Om Hanumate Namaha", desc: "Epitome of devotion and strength" },
+        "Surya": { persona: "Lord Surya", texts: "Aditya Hrudayam", greeting: "Om Suryaya Namaha", desc: "The dispeller of darkness" },
+        "Dattatreya": { persona: "Lord Dattatreya", texts: "Avadhuta Gita", greeting: "Hari Om Tat Sat", desc: "The supreme ascetic" }
     },
     "Vedas": {
-        "Rig Veda": { persona: "Vedic Seer", texts: "Rig Veda", greeting: "Hari Om" },
-        "Yajur Veda": { persona: "Vedic Seer", texts: "Yajur Veda", greeting: "Hari Om" },
-        "Sama Veda": { persona: "Vedic Seer", texts: "Sama Veda", greeting: "Hari Om" },
-        "Atharva Veda": { persona: "Vedic Seer", texts: "Atharva Veda", greeting: "Hari Om" }
+        "Rig Veda": { persona: "Vedic Seer", texts: "Rig Veda", greeting: "Hari Om", desc: "The oldest scripture of hymns" },
+        "Yajur Veda": { persona: "Vedic Seer", texts: "Yajur Veda", greeting: "Hari Om", desc: "The Veda of rituals and mantras" },
+        "Sama Veda": { persona: "Vedic Seer", texts: "Sama Veda", greeting: "Hari Om", desc: "The Veda of melodies and chants" },
+        "Atharva Veda": { persona: "Vedic Seer", texts: "Atharva Veda", greeting: "Hari Om", desc: "The Veda of spells and incantations" }
     },
     "Upanishads": {
         "Isha": { persona: "Upanishadic Sage", texts: "Isha Upanishad (Yajur Veda)", greeting: "Hari Om Tat Sat" },
         "Kena": { persona: "Upanishadic Sage", texts: "Kena Upanishad (Sama Veda)", greeting: "Hari Om" },
-        "Katha": { persona: "Lord Yama", texts: "Katha Upanishad (Yajur Veda)", greeting: "Hari Om" },
+        "Katha": { persona: "Lord Yama", texts: "Katha Upanishad (Yajur Veda)", greeting: "Hari Om", desc: "Dialogue with Death" },
         "Prashna": { persona: "Sage Pippalada", texts: "Prashna Upanishad (Atharva Veda)", greeting: "Hari Om" },
         "Mundaka": { persona: "Upanishadic Sage", texts: "Mundaka Upanishad (Atharva Veda)", greeting: "Hari Om" },
-        "Mandukya": { persona: "Upanishadic Sage", texts: "Mandukya Upanishad (Atharva Veda)", greeting: "Hari Om" },
+        "Mandukya": { persona: "Upanishadic Sage", texts: "Mandukya Upanishad (Atharva Veda)", greeting: "Hari Om", desc: "Analysis of the Om mantra" },
         "Taittiriya": { persona: "Upanishadic Sage", texts: "Taittiriya Upanishad (Yajur Veda)", greeting: "Hari Om" },
         "Aitareya": { persona: "Sage Aitareya", texts: "Aitareya Upanishad (Rig Veda)", greeting: "Hari Om" },
         "Chandogya": { persona: "Upanishadic Sage", texts: "Chandogya Upanishad (Sama Veda)", greeting: "Hari Om" },
-        "Brihadaranyaka": { persona: "Sage Yajnavalkya", texts: "Brihadaranyaka Upanishad (Yajur Veda)", greeting: "Hari Om" }
+        "Brihadaranyaka": { persona: "Sage Yajnavalkya", texts: "Brihadaranyaka Upanishad (Yajur Veda)", greeting: "Hari Om", desc: "The greatest Upanishad" }
     },
     "Puranas": {
         "Agni Purana": { persona: "Sage Vyasa", texts: "Agni Purana", greeting: "Hari Om" },
-        "Bhagavata Purana": { persona: "Sage Shuka", texts: "Bhagavata Purana", greeting: "Hari Om" },
+        "Bhagavata Purana": { persona: "Sage Shuka", texts: "Bhagavata Purana", greeting: "Hari Om", desc: "Stories of Lord Krishna" },
         "Brahma Purana": { persona: "Sage Vyasa", texts: "Brahma Purana", greeting: "Hari Om" },
-        "Garuda Purana": { persona: "Lord Vishnu", texts: "Garuda Purana", greeting: "Hari Om" },
+        "Garuda Purana": { persona: "Lord Vishnu", texts: "Garuda Purana", greeting: "Hari Om", desc: "Journey after death" },
         "Matsya Purana": { persona: "Lord Matsya", texts: "Matsya Purana", greeting: "Hari Om" },
         "Padma Purana": { persona: "Sage Vyasa", texts: "Padma Purana", greeting: "Hari Om" },
         "Shiva Purana": { persona: "Sage Romaharshana", texts: "Shiva Purana", greeting: "Om Namah Shivaya" },
@@ -120,9 +96,9 @@ const LIBRARY_CONFIG = {
         "Vishnu Purana": { persona: "Sage Parashara", texts: "Vishnu Purana", greeting: "Om Namo Narayana" }
     },
     "Samhitas": {
-        "Bhrigu Samhita": { persona: "Maharishi Bhrigu", texts: "Bhrigu Samhita (Astrology)", greeting: "Hari Om" },
+        "Bhrigu Samhita": { persona: "Maharishi Bhrigu", texts: "Bhrigu Samhita (Astrology)", greeting: "Hari Om", desc: "Ancient astrological science" },
         "Garga Samhita": { persona: "Maharishi Garga", texts: "Garga Samhita", greeting: "Jai Shri Krishna" },
-        "Gheranda Samhita": { persona: "Sage Gheranda", texts: "Gheranda Samhita (Hatha Yoga)", greeting: "Hari Om" },
+        "Gheranda Samhita": { persona: "Sage Gheranda", texts: "Gheranda Samhita (Hatha Yoga)", greeting: "Hari Om", desc: "Classic text on Hatha Yoga" },
         "Shiva Samhita": { persona: "Lord Shiva", texts: "Shiva Samhita (Hatha Yoga)", greeting: "Om Namah Shivaya" },
         "Brihat Samhita": { persona: "Varahamihira", texts: "Brihat Samhita", greeting: "Hari Om" },
         "Kashyap Samhita": { persona: "Maharishi Kashyapa", texts: "Kashyap Samhita (Ayurveda)", greeting: "Hari Om" },
@@ -131,52 +107,59 @@ const LIBRARY_CONFIG = {
         "Parashara Samhita": { persona: "Maharishi Parashara", texts: "Parashara Samhita (Astrology)", greeting: "Hari Om" }
     },
     "Epics": {
-        "Ramayana": { persona: "Maharishi Valmiki", texts: "Valmiki Ramayana", greeting: "Jai Shri Ram" },
-        "Mahabharata": { persona: "Maharishi Vyasa", texts: "Mahabharata", greeting: "Hari Om" }
+        "Ramayana": { persona: "Maharishi Valmiki", texts: "Valmiki Ramayana", greeting: "Jai Shri Ram", desc: "The journey of Lord Rama" },
+        "Mahabharata": { persona: "Maharishi Vyasa", texts: "Mahabharata", greeting: "Hari Om", desc: "The great epic of India" }
     },
     "Philosophical Sutras": {
-        "Patanjali Yoga Sutras": { persona: "Maharishi Patanjali", texts: "Yoga Sutras of Patanjali", greeting: "Hari Om" },
-        "Samkhya Sutras": { persona: "Maharishi Kapila", texts: "Samkhya Sutras", greeting: "Hari Om" },
-        "Nyaya Sutras": { persona: "Maharishi Gautama", texts: "Nyaya Sutras", greeting: "Hari Om" },
-        "Vaisheshika Sutras": { persona: "Maharishi Kanada", texts: "Vaisheshika Sutras", greeting: "Hari Om" },
-        "Purva Mimamsa": { persona: "Maharishi Jaimini", texts: "Purva Mimamsa Sutras", greeting: "Hari Om" },
-        "Brahma Sutras": { persona: "Maharishi Badarayana (Vyasa)", texts: "Brahma Sutras", greeting: "Hari Om" }
+        "Patanjali Yoga Sutras": { persona: "Maharishi Patanjali", texts: "Yoga Sutras of Patanjali", greeting: "Hari Om", desc: "Foundations of classical Yoga" },
+        "Samkhya Sutras": { persona: "Maharishi Kapila", texts: "Samkhya Sutras", greeting: "Hari Om", desc: "Dualistic philosophy" },
+        "Nyaya Sutras": { persona: "Maharishi Gautama", texts: "Nyaya Sutras", greeting: "Hari Om", desc: "Rules of logic and epistemology" },
+        "Vaisheshika Sutras": { persona: "Maharishi Kanada", texts: "Vaisheshika Sutras", greeting: "Hari Om", desc: "Ancient atomic theory" },
+        "Purva Mimamsa": { persona: "Maharishi Jaimini", texts: "Purva Mimamsa Sutras", greeting: "Hari Om", desc: "Philosophy of Vedic rituals" },
+        "Brahma Sutras": { persona: "Maharishi Badarayana (Vyasa)", texts: "Brahma Sutras", greeting: "Hari Om", desc: "Core text of Vedanta" }
     },
     "Ayurveda": {
-        "Charaka Samhita": { persona: "Maharishi Charaka", texts: "Charaka Samhita", greeting: "Hari Om" },
-        "Sushruta Samhita": { persona: "Maharishi Sushruta", texts: "Sushruta Samhita", greeting: "Hari Om" },
-        "Ashtanga Hridayam": { persona: "Vagbhata", texts: "Ashtanga Hridayam", greeting: "Hari Om" },
-        "Madhava Nidana": { persona: "Madhava", texts: "Madhava Nidana", greeting: "Hari Om" },
+        "Charaka Samhita": { persona: "Maharishi Charaka", texts: "Charaka Samhita", greeting: "Hari Om", desc: "Foundational Ayurvedic medicine" },
+        "Sushruta Samhita": { persona: "Maharishi Sushruta", texts: "Sushruta Samhita", greeting: "Hari Om", desc: "Ancient surgical science" },
+        "Ashtanga Hridayam": { persona: "Vagbhata", texts: "Ashtanga Hridayam", greeting: "Hari Om", desc: "Core Ayurvedic synthesis" },
+        "Madhava Nidana": { persona: "Madhava", texts: "Madhava Nidana", greeting: "Hari Om", desc: "Clinical diagnosis in Ayurveda" },
         "Sharangadhara": { persona: "Sharangadhara", texts: "Sharangadhara Samhita", greeting: "Hari Om" },
         "Bhava Prakasha": { persona: "Bhava Mishra", texts: "Bhava Prakasha", greeting: "Hari Om" }
     },
     "Jyotish": {
-        "Surya Siddhanta": { persona: "Ancient Astronomer", texts: "Surya Siddhanta", greeting: "Hari Om" },
-        "Brihat Parashara": { persona: "Maharishi Parashara", texts: "Brihat Parashara Hora Shastra", greeting: "Hari Om" },
+        "Surya Siddhanta": { persona: "Ancient Astronomer", texts: "Surya Siddhanta", greeting: "Hari Om", desc: "Vedic astronomical calculations" },
+        "Brihat Parashara": { persona: "Maharishi Parashara", texts: "Brihat Parashara Hora Shastra", greeting: "Hari Om", desc: "Comprehensive Vedic astrology" },
         "Brihat Samhita": { persona: "Varahamihira", texts: "Brihat Samhita", greeting: "Hari Om" },
-        "Aryabhatiya": { persona: "Aryabhata", texts: "Aryabhatiya", greeting: "Hari Om" }
+        "Aryabhatiya": { persona: "Aryabhata", texts: "Aryabhatiya", greeting: "Hari Om", desc: "Ancient mathematics and astronomy" },
+        "Siddhanta Shiromani": { persona: "Bhaskaracharya", texts: "Siddhanta Shiromani (Grahaganita and Goladhyaya)", greeting: "Namaskar", desc: "Advanced astronomical and mathematical treatises" }
+    },
+    "Classical Literature": {
+        "Tirukkural": { persona: "Thiruvalluvar", texts: "Tirukkural", greeting: "Vanakkam", desc: "Ancient Tamil masterpiece of ethics and morality" },
+        "Natyashastra": { persona: "Bharata Muni", texts: "Natyashastra", greeting: "Hari Om", desc: "The ultimate ancient treatise on performing arts and aesthetics" }
     },
     "Ancient & Vedic": {
-            "Rig Veda": { "persona": "Maharishi Vishvamitra", "texts": "Rig Veda (Mandala 3)", "greeting": "Hari Om" },
-            "Ramayana": { "persona": "Maharishi Valmiki", "texts": "Valmiki Ramayana", "greeting": "Jai Shri Ram" },
-            "Mahabharata": { "persona": "Maharishi Vyasa", "texts": "Mahabharata, Bhagavad Gita", "greeting": "Hari Om" },
-            "Yoga Sutras": { "persona": "Maharishi Patanjali", "texts": "Yoga Sutras", "greeting": "Namaste" },
-            "Upanishads": { "persona": "Sage Yajnavalkya", "texts": "Brihadaranyaka Upanishad", "greeting": "Om Shanti" },
-            "Nyaya Shastra": { "persona": "Sage Gautama", "texts": "Nyaya Sutras", "greeting": "Hari Om" }
+        "Rig Veda": { "persona": "Maharishi Vishvamitra", "texts": "Rig Veda (Mandala 3)", "greeting": "Hari Om" },
+        "Ramayana": { "persona": "Maharishi Valmiki", "texts": "Valmiki Ramayana", "greeting": "Jai Shri Ram" },
+        "Mahabharata": { "persona": "Maharishi Vyasa", "texts": "Mahabharata, Bhagavad Gita", "greeting": "Hari Om" },
+        "Yoga Sutras": { "persona": "Maharishi Patanjali", "texts": "Yoga Sutras", "greeting": "Namaste" },
+        "Upanishads": { "persona": "Sage Yajnavalkya", "texts": "Brihadaranyaka Upanishad", "greeting": "Om Shanti" },
+        "Nyaya Shastra": { "persona": "Sage Gautama", "texts": "Nyaya Sutras", "greeting": "Hari Om" }
     },
     "Classical & Vedanta": {
-        "Advaita Vedanta": { "persona": "Adi Shankara", "texts": "Vivekachudamani, Brahma Sutra Bhashya", "greeting": "Namo Narayana" },
-        "Vishishtadvaita": { "persona": "Ramanujacharya", "texts": "Sri Bhashya, Vedartha Sangraha", "greeting": "Ohm Namo Narayana" },
-        "Dvaita Vedanta": { "persona": "Madhvacharya", "texts": "Anuvyakhyana, Gita Bhashya", "greeting": "Hari Sarvothama" },
-        "Shuddhadvaita": { "persona": "Vallabhacharya", "texts": "Anubhashya, Shodasha Granthas", "greeting": "Jai Shri Krishna" }
+        "Advaita Vedanta": { "persona": "Adi Shankara", "texts": "Vivekachudamani, Brahma Sutra Bhashya", "greeting": "Namo Narayana", desc: "Philosophy of non-dualism" },
+        "Vishishtadvaita": { "persona": "Ramanujacharya", "texts": "Sri Bhashya, Vedartha Sangraha", "greeting": "Ohm Namo Narayana", desc: "Qualified non-dualism" },
+        "Dvaita Vedanta": { "persona": "Madhvacharya", "texts": "Anuvyakhyana, Gita Bhashya", "greeting": "Hari Sarvothama", desc: "Dualistic philosophy" },
+        "Shuddhadvaita": { "persona": "Vallabhacharya", "texts": "Anubhashya, Shodasha Granthas", "greeting": "Jai Shri Krishna", desc: "Pure non-dualism" },
+        "Shiva Sutras": { "persona": "Vasugupta", "texts": "Shiva Sutras", "greeting": "Om Namah Shivaya", desc: "Foundational text of Kashmir Shaivism" }
     },
     "Shastra": {
+        "Shiva Swarodaya": { "persona": "Lord Shiva", "texts": "Shiva Swarodaya", "greeting": "Om Namah Shivaya", desc: "The ancient science of breath and timing" },
         "Agama Shastra": { "persona": "Agamic Acharya", "texts": "Agamashashtra", "greeting": "Hari Om" },
         "Brihat Parashar Hora Shastra": { "persona": "Ancient vedic Astrology", "texts": "Brihat Parashar Hora Shastra", "greeting": "Hari Om" },
-        "Vastu Shastra": { "persona": "Bhagawan Vishwakarma", "texts": "Vastu Shastram by Vishwakarma Prakash, Mayamatam, Samarangan Sutradhar, Bhrigu Samhita, Brihat Samhita, Manushyalaya Chandrika", "greeting": "Om Vishwakarmaya Namaha" },
-        "Tantra Shastra": { "persona": "Acharya Abhinavagupta", "texts": "Vijnana Bhairava Tantra, Tantra Aloka (Abhinavagupta), Kulachudamani Nigama, Bhootadamar Tantra & Damar Tantras, Mahanirvana Tantra, Shakti/Shakta Tantra, Shaiva Tantra, Panchamakara, Atharvaveda & Asuri Kalpa, Rudra Yamala Tantra, Mahakala Samhita, Kubjika Tantra, Tantraraja Tantra", "greeting": "Om Namah Shivaya" },
-        "Lal Kitab Astrological Science": { "persona": "Pandit Roop Chand Joshi", "texts": "Lal Kitab Ke Farman, Lal Kitab Ke Arman, Gutka (Ilm Samudrik Ki Lal Kitab), Lal Kitab – Tarmeem Shuda, Ilm-e-Samudrik Ki Buniyad Par Ki Lal Kitab", "greeting": "Namaskar" },
-        "Kama Shastra": { "persona": "Maharishi Vatsyayana", "texts": "The Kama Sutra (Vatsyayana), Ananga Ranga (Kalyana Malla), Koka Shastra (Koka Pandita), Brihadaranyaka & Chandogya Upanishads, Gita Govindam (Jayadeva)", "greeting": "Swagatam" }
+        "Vastu Shastra": { "persona": "Bhagawan Vishwakarma", "texts": "Vastu Shastram by Vishwakarma Prakash, Mayamatam, Samarangan Sutradhar, Bhrigu Samhita, Brihat Samhita, Manushyalaya Chandrika", "greeting": "Om Vishwakarmaya Namaha", desc: "Science of architecture" },
+        "Tantra Shastra": { "persona": "Acharya Abhinavagupta", "texts": "Vijnana Bhairava Tantra, Tantra Aloka (Abhinavagupta), Kulachudamani Nigama, Bhootadamar Tantra & Damar Tantras, Mahanirvana Tantra, Shakti/Shakta Tantra, Shaiva Tantra, Panchamakara, Atharvaveda & Asuri Kalpa, Rudra Yamala Tantra, Mahakala Samhita, Kubjika Tantra, Tantraraja Tantra", "greeting": "Om Namah Shivaya", desc: "Esoteric traditions and texts" },
+        "Lal Kitab Astrological Science": { "persona": "Pandit Roop Chand Joshi", "texts": "Lal Kitab Ke Farman, Lal Kitab Ke Arman, Gutka (Ilm Samudrik Ki Lal Kitab), Lal Kitab – Tarmeem Shuda, Ilm-e-Samudrik Ki Buniyad Par Ki Lal Kitab", "greeting": "Namaskar", desc: "Astro-palmistry and remedies" },
+        "Kama Shastra": { "persona": "Maharishi Vatsyayana", "texts": "The Kama Sutra (Vatsyayana), Ananga Ranga (Kalyana Malla), Koka Shastra (Koka Pandita), Brihadaranyaka & Chandogya Upanishads, Gita Govindam (Jayadeva)", "greeting": "Swagatam", desc: "Science of pleasure and aesthetics" }
     },
     "Medieval Bhakti Movement": {
         "Ram Bhakti": { "persona": "Goswami Tulsidas", "texts": "Ramcharitmanas, Vinaya Patrika", "greeting": "Sita Ram" },
@@ -254,6 +237,24 @@ const LIBRARY_CONFIG = {
         "Baliraja - Agricultural Science (Krishi Shastra)": { "persona": "Agricultural Science (Krishi Shastra)", "texts": "Krishi-Parashara, Vrikshayurveda, Kashyapiyakrishisukti, Arthashastra", "greeting": "Ram Ram" },
         "Paramahansa Yogananda Spiritual Science & Kriya Yoga": { "persona": "Paramahansa Yogananda", "texts": "Autobiography of a Yogi", "greeting": "Jai Guru" }
     },
+    "Sports Science & Mindset": {
+        "Sachin Tendulkar": { persona: "Sachin Tendulkar", texts: "Playing It My Way", greeting: "Namaste", desc: "The journey of the Master Blaster" },
+        "Sunil Gavaskar": { persona: "Sunil Gavaskar", texts: "Sunny Days", greeting: "Namaste", desc: "Mindset of a legendary opening batsman" },
+        "Kapil Dev": { persona: "Kapil Dev", texts: "Straight from the Heart", greeting: "Namaste", desc: "Insights from the World Cup-winning captain" },
+        "VVS Laxman": { persona: "VVS Laxman", texts: "281 and Beyond", greeting: "Namaste", desc: "Playing under pressure with elegant technique" },
+        "Yuvraj Singh": { persona: "Yuvraj Singh", texts: "The Test of My Life", greeting: "Namaste", desc: "Overcoming cancer and conquering the pitch" },
+        "Sourav Ganguly": { persona: "Sourav Ganguly", texts: "A Century is Not Enough", greeting: "Namaste", desc: "Leadership and navigating sports politics" },
+        "R. Ashwin": { persona: "Ravichandran Ashwin", texts: "I Have the Streets", greeting: "Vanakkam", desc: "A modern, analytical perspective on cricket" },
+        "Shane Warne": { persona: "Shane Warne", texts: "No Spin", greeting: "G'day mate", desc: "The tactical mind of the greatest leg-spinner" },
+        "Ricky Ponting": { persona: "Ricky Ponting", texts: "At the Close of Play", greeting: "G'day", desc: "Relentless drive and fierce focus" },
+        "AB de Villiers": { persona: "AB de Villiers", texts: "AB: The Autobiography", greeting: "Hello", desc: "Innovation and 360-degree batting" },
+        "Andre Agassi": { persona: "Andre Agassi", texts: "Open", greeting: "Hello", desc: "The psychological toll of extreme expectations" },
+        "Abhinav Bindra": { persona: "Abhinav Bindra", texts: "A Shot at History", greeting: "Namaste", desc: "Obsessive focus and Olympic perfection" },
+        "Mary Kom": { persona: "Mary Kom", texts: "Unbreakable", greeting: "Namaste", desc: "Raw determination and fighting barriers" },
+        "Milkha Singh": { persona: "Milkha Singh", texts: "The Race of My Life", greeting: "Namaste", desc: "A legendary tale of discipline and endurance" },
+        "Viswanathan Anand": { persona: "Viswanathan Anand", texts: "Mind Master", greeting: "Vanakkam", desc: "Strategic foresight and mental pressure" },
+        "Usain Bolt": { persona: "Usain Bolt", texts: "Faster than Lightning", greeting: "Hello", desc: "Athletic training and competitive mindset" }
+    },
     "Laws In India": {
         "Constitution": { "persona": "The Constituent Assembly", "texts": "The Constitution of India, 1950", "greeting": "Satyameva Jayate" },
         "Substantive Criminal Law": { "persona": "Republic of India", "texts": "Bharatiya Nyaya Sanhita (BNS), 2023", "greeting": "Satyameva Jayate" },
@@ -280,93 +281,179 @@ const LIBRARY_CONFIG = {
     "Maharishis": maharishiObject
 };
 
-// --- 3. DOM & STATE ---
-const UI = {
-    overlay: document.getElementById('start-overlay'),
-    log: document.getElementById('conversation-log'),
-    itemSel: document.getElementById('item-selector'),
-    lang: document.getElementById('language-selector'),
-    status: document.getElementById('status-indicator'),
-    textIn: document.getElementById('text-input'),
-    btnSend: document.getElementById('btn-send'),
-    btnMic: document.getElementById('btn-mic'),
-    iconMicDefault: document.getElementById('icon-mic-default'),
-    iconMicThinking: document.getElementById('icon-mic-thinking'),
-    btnRepeat: document.getElementById('btn-repeat'),
-    btnPlayPause: document.getElementById('btn-play-pause'),
-    btnStop: document.getElementById('btn-stop'),
-    btnMute: document.getElementById('btn-mute'),
-    btnRestart: document.getElementById('btn-restart'),
-    btnShare: document.getElementById('btn-share'),
-    btnPasteKey: document.getElementById('btn-paste-key'),
-    iconPlay: document.getElementById('icon-play'),
-    iconPause: document.getElementById('icon-pause'),
-    iconVol: document.getElementById('icon-vol'),
-    iconMute: document.getElementById('icon-mute'),
-    
-    advToggle: document.getElementById('adv-toggle'),
-    settingsModal: document.getElementById('settings-modal'),
-    btnCloseSet: document.getElementById('btn-close-settings'),
-    btnSaveSet: document.getElementById('btn-save-settings'),
-    name: document.getElementById('manual-name'),
-    age: document.getElementById('manual-age'),
-    remember: document.getElementById('remember-checkbox'),
-    keyIn: document.getElementById('custom-api-key-input'),
-    welcome: document.getElementById('welcome-msg'),
-    ratioSlider: document.getElementById('ratio-slider'),
-    modelSlider: document.getElementById('model-slider'),
-    ratioVal: document.getElementById('ratio-val'),
-    modelVal: document.getElementById('model-val')
-};
-
+// --- 3. DOM & STATE (SAFE INITIALIZATION) ---
+let UI = {};
 let chatHistory = [];
 let recognition = null;
 let synth = window.speechSynthesis;
 let isListening = false; 
-
+let selectedLibraryItem = "Bhagavad Gita|Bhagavad Gita";
 let state = { isProcessing: false, isMuted: false, lastAIMessage: "", sessionActive: false };
 
-// --- 4. INITIALIZATION ---
-window.onload = () => {
-    // Populate Single Dropdown with Groups as Headers
-    UI.itemSel.innerHTML = '';
+// Wait for HTML to be fully painted before finding elements
+document.addEventListener("DOMContentLoaded", () => {
+    UI = {
+        overlay: document.getElementById('start-overlay'),
+        log: document.getElementById('conversation-log'),
+        lang: document.getElementById('language-selector'),
+        status: document.getElementById('status-indicator'),
+        textIn: document.getElementById('text-input'),
+        btnSend: document.getElementById('btn-send'),
+        btnMic: document.getElementById('btn-mic'),
+        iconMicDefault: document.getElementById('icon-mic-default'),
+        iconMicThinking: document.getElementById('icon-mic-thinking'),
+        btnRepeat: document.getElementById('btn-repeat'),
+        btnPlayPause: document.getElementById('btn-play-pause'),
+        btnStop: document.getElementById('btn-stop'),
+        btnMute: document.getElementById('btn-mute'),
+        btnRestart: document.getElementById('btn-restart'),
+        btnShare: document.getElementById('btn-share'),
+        btnPasteKey: document.getElementById('btn-paste-key'),
+        iconPlay: document.getElementById('icon-play'),
+        iconPause: document.getElementById('icon-pause'),
+        iconVol: document.getElementById('icon-vol'),
+        iconMute: document.getElementById('icon-mute'),
+        
+        advToggle: document.getElementById('adv-toggle'),
+        settingsModal: document.getElementById('settings-modal'),
+        btnCloseSet: document.getElementById('btn-close-settings'),
+        btnSaveSet: document.getElementById('btn-save-settings'),
+        name: document.getElementById('manual-name'),
+        age: document.getElementById('manual-age'),
+        remember: document.getElementById('remember-checkbox'),
+        keyIn: document.getElementById('custom-api-key-input'),
+        welcome: document.getElementById('welcome-msg'),
+        ratioSlider: document.getElementById('ratio-slider'),
+        modelSlider: document.getElementById('model-slider'),
+        ratioVal: document.getElementById('ratio-val'),
+        modelVal: document.getElementById('model-val'),
+        
+        // Custom Dropdown Elements
+        ddBtn: document.getElementById('dropdown-btn'),
+        ddMenu: document.getElementById('dropdown-menu'),
+        ddSearch: document.getElementById('dropdown-search'),
+        ddList: document.getElementById('dropdown-list'),
+        ddText: document.getElementById('dropdown-selected-text'),
+        
+        btnCloseApp: document.getElementById('btn-close-app')
+    };
+
+    // Initialize Dropdown only if it exists on the page (e.g. index.html)
+    if (UI.ddBtn) {
+        initCustomDropdown();
+    }
+
+    // Initialize the main app UI if overlay exists
+    if (UI.overlay) {
+        loadData();
+        initSpeechRecognition();
+        setupEventListeners();
+
+        UI.overlay.addEventListener('click', () => {
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            }
+            acquireWakeLock();
+            const silent = new SpeechSynthesisUtterance('');
+            silent.volume = 0; synth.speak(silent);
+            UI.overlay.style.display = 'none';
+        });
+    }
+});
+
+
+// --- CUSTOM DROPDOWN LOGIC ---
+function initCustomDropdown() {
+    renderDropdownList(); 
+
+    // Explicitly handle open/close bypassing Tailwind conflict issues
+    UI.ddBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (UI.ddMenu.style.display === 'flex') {
+            UI.ddMenu.style.display = 'none';
+            UI.ddMenu.classList.add('hidden');
+        } else {
+            UI.ddMenu.style.display = 'flex';
+            UI.ddMenu.classList.remove('hidden');
+            UI.ddSearch.focus(); 
+        }
+    });
+
+    UI.ddSearch.addEventListener('input', (e) => {
+        renderDropdownList(e.target.value);
+    });
+
+    // Close when clicking anywhere outside
+    document.addEventListener('click', (e) => {
+        if (UI.ddBtn && UI.ddMenu) {
+            if (!UI.ddBtn.contains(e.target) && !UI.ddMenu.contains(e.target)) {
+                UI.ddMenu.style.display = 'none';
+                UI.ddMenu.classList.add('hidden');
+            }
+        }
+    });
+}
+
+function renderDropdownList(filterText = "") {
+    if (!UI.ddList) return;
+    
+    UI.ddList.innerHTML = '';
+    const lowerFilter = filterText.toLowerCase();
+
     for (const groupName in LIBRARY_CONFIG) {
-        const optGroup = document.createElement('optgroup');
-        optGroup.label = `--- ${groupName} ---`;
+        let hasVisibleItems = false;
+        
+        const groupDiv = document.createElement('div');
+        groupDiv.innerHTML = `<div class="text-[10px] uppercase text-cyan-600 font-bold px-3 py-1.5 mt-1 bg-slate-900 sticky top-0 z-10 shadow-sm">${groupName}</div>`;
         
         for (const itemName in LIBRARY_CONFIG[groupName]) {
-            const option = document.createElement('option');
-            // Store both group and item in the value to retrieve it later easily
-            option.value = `${groupName}|${itemName}`;
-            option.text = itemName;
-            optGroup.appendChild(option);
+            const config = LIBRARY_CONFIG[groupName][itemName];
+            const desc = config.desc || `Wisdom of ${config.persona}`;
+            
+            if (itemName.toLowerCase().includes(lowerFilter) || desc.toLowerCase().includes(lowerFilter) || config.persona.toLowerCase().includes(lowerFilter)) {
+                hasVisibleItems = true;
+                
+                const itemDiv = document.createElement('div');
+                itemDiv.className = "px-3 py-2 cursor-pointer hover:bg-slate-700 rounded-lg transition-colors flex flex-col mx-1 my-0.5";
+                itemDiv.innerHTML = `
+                    <span class="text-sm font-bold text-yellow-400 leading-tight">${itemName}</span>
+                    <span class="text-[10px] text-slate-400 mt-0.5 leading-tight">${desc}</span>
+                `;
+                
+                itemDiv.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    selectedLibraryItem = `${groupName}|${itemName}`;
+                    UI.ddText.innerText = itemName;
+                    
+                    // Force Hide
+                    UI.ddMenu.style.display = 'none';
+                    UI.ddMenu.classList.add('hidden');
+                    
+                    UI.ddSearch.value = ''; 
+                    renderDropdownList();   
+                };
+                
+                groupDiv.appendChild(itemDiv);
+            }
         }
-        UI.itemSel.appendChild(optGroup);
+        
+        if (hasVisibleItems) {
+            UI.ddList.appendChild(groupDiv);
+        }
     }
-
-    loadData();
-    initSpeechRecognition();
-};
-
-UI.overlay.addEventListener('click', () => {
-    if (document.documentElement.requestFullscreen) {
-        document.documentElement.requestFullscreen().catch(() => {});
-    }
-    acquireWakeLock();
-    const silent = new SpeechSynthesisUtterance('');
-    silent.volume = 0; synth.speak(silent);
-    UI.overlay.style.display = 'none';
-    setupEventListeners();
-});
+}
 
 // --- 5. CORE FUNCTIONS ---
 function getSelectedConfig() {
-    const [group, item] = UI.itemSel.value.split('|');
+    const [group, item] = selectedLibraryItem.split('|');
     return LIBRARY_CONFIG[group][item];
 }
 
 function getSelectedItemName() {
-    return UI.itemSel.value.split('|')[1];
+    return selectedLibraryItem.split('|')[1];
 }
 
 function getModelInfo(val) {
@@ -381,13 +468,11 @@ function getModelInfo(val) {
 function updateSliderLabels() {
     const rVal = UI.ratioSlider.value;
     UI.ratioVal.innerText = `${rVal}% Book / ${100 - rVal}% AI`;
-    
     const mVal = UI.modelSlider.value;
     UI.modelVal.innerText = `${getModelInfo(mVal).name} (${mVal}%)`;
 }
 
 function updateSliderAvailability() {
-    // Check if user has entered a plausible API key (min 10 chars)
     const hasKey = UI.keyIn.value.trim().length > 10;
     const container = document.getElementById('advanced-sliders-container');
     const warning = document.getElementById('api-key-warning');
@@ -409,8 +494,6 @@ function updateSliderAvailability() {
         UI.ratioSlider.classList.remove('cursor-pointer');
         UI.modelSlider.classList.add('cursor-not-allowed');
         UI.modelSlider.classList.remove('cursor-pointer');
-        
-        // Force reset to default safe values if they delete their key
         UI.ratioSlider.value = "80";
         UI.modelSlider.value = "40";
         updateSliderLabels();
@@ -432,13 +515,14 @@ function saveData() {
 }
 
 function loadData() {
+    if(!UI.name) return;
     UI.name.value = localStorage.getItem('darshan_name') || "";
     UI.age.value = localStorage.getItem('darshan_age') || "";
     UI.remember.checked = localStorage.getItem('darshan_remember') === 'true';
     
     UI.ratioSlider.value = localStorage.getItem('darshan_ratio') || "80";
     UI.modelSlider.value = localStorage.getItem('darshan_model') || "40";
-    updateSliderLabels(); // Initialize the text visually
+    updateSliderLabels(); 
     
     if (UI.remember.checked) {
         const savedHist = localStorage.getItem('darshan_history');
@@ -454,8 +538,6 @@ function loadData() {
             } catch (e) { }
         }
     }
-
-    // Lock or unlock based on saved/auto-filled key
     updateSliderAvailability();
 }
 
@@ -472,20 +554,16 @@ function setupEventListeners() {
 
     const openSettings = (e) => { e.stopPropagation(); UI.settingsModal.classList.remove('hidden'); };
     const closeSettings = (e) => { e.stopPropagation(); UI.settingsModal.classList.add('hidden'); };
+    
     const fabContainer = document.getElementById('mainFab');
     const fabToggle = document.getElementById('fabToggle');
     
-    fabToggle.addEventListener('click', (e) => {
-        e.stopPropagation();
-        fabContainer.classList.toggle('active');
-    });
-
-    // Close the widget if clicking anywhere outside of it
-    document.addEventListener('click', (e) => {
-        if (fabContainer.classList.contains('active') && !fabContainer.contains(e.target)) {
-            fabContainer.classList.remove('active');
-        }
-    });
+    if (fabToggle) {
+        fabToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            fabContainer.classList.toggle('active');
+        });
+    }
 
     // --- NEW PASTE BUTTON LOGIC ---
     UI.btnPasteKey.addEventListener('click', async (e) => {
@@ -494,12 +572,10 @@ function setupEventListeners() {
             const text = await navigator.clipboard.readText();
             if (text) {
                 UI.keyIn.value = text;
-                updateSliderAvailability(); // Unlock immediately
-                
+                updateSliderAvailability(); 
                 const originalText = UI.btnPasteKey.innerText;
                 UI.btnPasteKey.innerText = "Pasted!";
                 UI.btnPasteKey.classList.replace('bg-slate-700', 'bg-green-600');
-                
                 setTimeout(() => { 
                     UI.btnPasteKey.innerText = originalText; 
                     UI.btnPasteKey.classList.replace('bg-green-600', 'bg-slate-700');
@@ -509,6 +585,7 @@ function setupEventListeners() {
             alert('Could not access clipboard. Please paste manually.');
         }
     });
+
     UI.advToggle.onclick = openSettings;
     UI.btnCloseSet.onclick = closeSettings;
     UI.btnSaveSet.onclick = (e) => { e.stopPropagation(); saveData(); closeSettings(e); };
@@ -522,35 +599,26 @@ function setupEventListeners() {
     UI.btnRestart.onclick = (e) => { e.stopPropagation(); clearData(); };
     UI.btnShare.onclick = async (e) => { e.stopPropagation(); if(chatHistory.length === 0) return; let text = chatHistory.map(m => `${m.role === 'user' ? 'User' : getSelectedItemName()}: ${m.parts[0].text}`).join("\n\n"); try { await navigator.share({ title: 'Ancient Library Wisdom', text: text }); } catch(err) {} };
     
-    // Close App Logic (Top Left Button)
-    document.getElementById('btn-close-app').addEventListener('click', (e) => {
-        e.stopPropagation();
-        
-        if(confirm("Are you sure you want to depart from the ancient library?")) {
-            // Attempt to close mobile browsers
-            window.open('', '_self', '');
-            window.close();
+    if (UI.btnCloseApp) {
+        UI.btnCloseApp.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if(confirm("Are you sure you want to depart from the ancient library?")) {
+                window.open('', '_self', ''); window.close();
+                try { if (window.Android && window.Android.closeApp) window.Android.closeApp(); } catch(err) {}
+                setTimeout(() => {
+                    window.speechSynthesis.cancel();
+                    if (typeof recognition !== 'undefined' && recognition && isListening) recognition.stop();
+                    document.body.innerHTML = `
+                        <div style="height:100vh; width:100vw; display:flex; flex-direction:column; align-items:center; justify-content:center; background-color:#020617; color:#fbbf24; font-family:'Cinzel', serif; z-index:9999; position:fixed; top:0; left:0; text-align:center; padding: 20px;">
+                            <div style="font-size: 4rem; margin-bottom: 10px; text-shadow: 0 0 20px rgba(251, 191, 36, 0.5);">ॐ</div>
+                            <div style="font-size: 1.5rem; letter-spacing: 2px; margin-bottom: 15px;">Session Concluded.</div>
+                            <div style="font-size: 0.9rem; color:#64748b; font-family:'Inter', sans-serif;">The library has been sealed.<br>You may safely close this browser tab.</div>
+                        </div>`;
+                }, 200); 
+            }
+        });
+    }
 
-            // If wrapped in an Android App
-            try { if (window.Android && window.Android.closeApp) window.Android.closeApp(); } catch(err) {}
-
-            // The Guaranteed Fallback: Graceful "Deep Sleep" Visual Shutdown
-            setTimeout(() => {
-                window.speechSynthesis.cancel();
-                if (typeof recognition !== 'undefined' && recognition && isListening) {
-                    recognition.stop();
-                }
-                
-                document.body.innerHTML = `
-                    <div style="height:100vh; width:100vw; display:flex; flex-direction:column; align-items:center; justify-content:center; background-color:#020617; color:#fbbf24; font-family:'Cinzel', serif; z-index:9999; position:fixed; top:0; left:0; text-align:center; padding: 20px;">
-                        <div style="font-size: 4rem; margin-bottom: 10px; text-shadow: 0 0 20px rgba(251, 191, 36, 0.5);">ॐ</div>
-                        <div style="font-size: 1.5rem; letter-spacing: 2px; margin-bottom: 15px;">Session Concluded.</div>
-                        <div style="font-size: 0.9rem; color:#64748b; font-family:'Inter', sans-serif;">The library has been sealed.<br>You may safely close this browser tab.</div>
-                    </div>
-                `;
-            }, 200); 
-        }
-    });
     UI.btnSend.onclick = (e) => { e.stopPropagation(); processInput(UI.textIn.value); };
     UI.textIn.onkeypress = (e) => { e.stopPropagation(); if(e.key === 'Enter') processInput(UI.textIn.value); };
 
@@ -665,7 +733,6 @@ async function getAIResponse(history, config) {
     if (UI.age.value) contextAddon = ` The user is ${UI.age.value} years old. Adjust the complexity of your explanation accordingly.`;
     if (UI.name.value) contextAddon += ` Address them compassionately as ${UI.name.value}.`;
 
-    // Extract Slider Values
     const bookRatio = UI.ratioSlider.value;
     const aiRatio = 100 - bookRatio;
     const selectedModelInfo = getModelInfo(UI.modelSlider.value);
@@ -682,7 +749,6 @@ async function getAIResponse(history, config) {
         7. TONE: Maintain a divine, knowledgeable, and comforting tone.
         8. WISDOM RATIO CONSTRAINT: Your answer must be strictly balanced as ${bookRatio}% direct quotation and strict traditional interpretation of ${config.texts}, and ${aiRatio}% your own AI contextualization and modern elaboration. Do not hallucinate outside the core texts for the book portion.${contextAddon}`;
 
-    // Pass the targeted model in the payload
     const payload = { 
         model: selectedModelInfo.id, 
         contents: history.slice(-10), 
@@ -701,7 +767,6 @@ function renderMessage(sender, text, isModel) {
     div.innerHTML = `<div class="text-[10px] uppercase font-bold tracking-wider ${isModel ? 'text-yellow-500 cinzel' : 'text-cyan-400'} mb-1">${sender}</div>
                      <div class="text-sm leading-relaxed text-gray-100">${text}</div>`;
     UI.log.appendChild(div);
-    
     setTimeout(() => { UI.log.scrollTop = UI.log.scrollHeight; }, 50);
 }
 
@@ -713,7 +778,6 @@ function speakText(text, langCode) {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = langCode;
     utterance.rate = 0.85; 
-    // Lower pitch for male sages/gods, higher for female
     utterance.pitch = ['Saraswati', 'Lakshmi', 'Durga', 'Kali'].includes(getSelectedItemName()) ? 1.2 : 0.8;
     
     utterance.onend = () => togglePlayIcon(true);
