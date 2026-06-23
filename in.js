@@ -104,7 +104,8 @@ const LIBRARY_CONFIG = {
         "Kashyap Samhita": { persona: "Maharishi Kashyapa", texts: "Kashyap Samhita (Ayurveda)", greeting: "Hari Om" },
         "Yogayajnavalkya": { persona: "Sage Yajnavalkya", texts: "Yogayajnavalkya Samhita (Yoga)", greeting: "Hari Om" },
         "Shandilya Samhita": { persona: "Sage Shandilya", texts: "Shandilya Samhita (Bhakti)", greeting: "Hari Om" },
-        "Parashara Samhita": { persona: "Maharishi Parashara", texts: "Parashara Samhita (Astrology)", greeting: "Hari Om" }
+        "Parashara Samhita": { persona: "Maharishi Parashara", texts: "Parashara Samhita (Astrology)", greeting: "Hari Om" },
+		"Hatha Yoga Pradipika": { persona: "Swami Svatmarama", texts: "Hatha Yoga Pradipika", greeting: "Hari Om", desc: "The defining text of classical Hatha Yoga" }
     },
     "Epics": {
         "Ramayana": { persona: "Maharishi Valmiki", texts: "Valmiki Ramayana", greeting: "Jai Shri Ram", desc: "The journey of Lord Rama" },
@@ -183,6 +184,23 @@ const LIBRARY_CONFIG = {
         "Clinical Diagnosis": { "persona": "Madhava", "texts": "Madhava Nidana", "greeting": "Hari Om" },
         "General Medicine": { "persona": "Vagbhata", "texts": "Ashtanga Hridayam", "greeting": "Hari Om" }
     },
+	"Linguistics & Mathematics": {
+        "Ashtadhyayi": { persona: "Maharishi Panini", texts: "Ashtadhyayi", greeting: "Hari Om", desc: "The algorithmic science of Sanskrit grammar" },
+        "Chhandas Shastra": { persona: "Maharishi Pingala", texts: "Chhandas Shastra", greeting: "Hari Om", desc: "The ancient mathematics of binary and rhythm" },
+        "Sulba Sutras": { persona: "Maharishi Baudhayana", texts: "Baudhayana Sulba Sutras", greeting: "Hari Om", desc: "Vedic geometry and the mathematics of altars" }
+    },
+	"Sramana Traditions": {
+        "Dhammapada": { persona: "Gautama Buddha", texts: "Dhammapada (Pali Canon)", greeting: "Namo Buddhaya", desc: "The path of wisdom and mental discipline" },
+        "Tattvartha Sutra": { persona: "Acharya Umaswati", texts: "Tattvartha Sutra", greeting: "Jai Jinendra", desc: "The nature of reality and non-violence in Jainism" },
+        "Milinda Panha": { persona: "Nagasena", texts: "Milinda Panha", greeting: "Namo Buddhaya", desc: "Philosophical dialogues of Buddhism" }
+    },
+	"Arts & Applied Sciences": {
+        "Sangita Ratnakara": { persona: "Sharngadeva", texts: "Sangita Ratnakara", greeting: "Hari Om", desc: "The definitive treatise on Indian classical music" },
+        "Abhijnanasakuntalam": { persona: "Kalidasa", texts: "Abhijnanasakuntalam", greeting: "Namaskar", desc: "The pinnacle of classical Indian drama and emotion" },
+        "Dhanurveda": { persona: "Sage Parashurama", texts: "Dhanurveda", greeting: "Jai Parashuram", desc: "The ancient science of archery and warfare" },
+        "Shalihotra Samhita": { persona: "Sage Shalihotra", texts: "Shalihotra Samhita", greeting: "Hari Om", desc: "Ancient veterinary science and animal care" }
+    },
+	
     "Warid-Varkari Tradition": {
         "Sant Dnyaneshwar": { "persona": "Dnyaneshwar Mauli", "texts": "Dnyaneshwari (Bhavarth Deepika), Amrutanubhav, Changdev Pasashti, Haripath", "greeting": "Ram Krishna Hari" },
         "Sant Namdev": { "persona": "Sant Namdev", "texts": "Namdev Gatha (Abhangas), Mukhbani (included in Guru Granth Sahib)", "greeting": "Ram Krishna Hari" },
@@ -193,6 +211,19 @@ const LIBRARY_CONFIG = {
     },
     "Samarth Tradition": {
         "Samarth Ramdas": { "persona": "Samarth Ramdas Swami", "texts": "Dasbodh, Manache Shlok, Atmaram, Karunashtakas, Maruti Stotra", "greeting": "Jai Jai Raghuveer Samarth" }
+    },
+	"Tamil Sangam Literature": {
+        "Tolkappiyam": { persona: "Tholkappiyar", texts: "Tolkappiyam", greeting: "Vanakkam", desc: "The oldest surviving Tamil grammar, poetics, and psychology" },
+        "Silappatikaram": { persona: "Ilango Adigal", texts: "Silappatikaram", greeting: "Vanakkam", desc: "The great epic of justice, fate, and chastity" },
+        "Manimekalai": { persona: "Chithalai Chathanar", texts: "Manimekalai", greeting: "Vanakkam", desc: "A Buddhist Tamil epic of logic, charity, and philosophy" },
+        "Purananuru": { persona: "Sangam Poet", texts: "Purananuru (Ettuthogai)", greeting: "Vanakkam", desc: "Heroic poetry on kings, war, and public life" },
+        "Akananuru": { persona: "Sangam Poet", texts: "Akananuru (Ettuthogai)", greeting: "Vanakkam", desc: "Classical poetry on love and internal emotions" }
+    },
+	"Ancient Medical Nighantus": {
+        "Dhanvantari Nighantu": { persona: "Lord Dhanvantari", texts: "Dhanvantari Nighantu", greeting: "Hari Om", desc: "The oldest Ayurvedic glossary of medicinal herbs and minerals" },
+        "Bhavaprakasha Nighantu": { persona: "Bhava Mishra", texts: "Bhavaprakasha Nighantu", greeting: "Hari Om", desc: "Comprehensive 16th-century lexicon of herbs, dietetics, and lifestyle" },
+        "Raja Nighantu": { persona: "Narahari", texts: "Raja Nighantu (Abhidhana Chudamani)", greeting: "Hari Om", desc: "A royal text on pharmacology and synonyms of medicinal plants" },
+        "Madanapala Nighantu": { persona: "King Madanapala", texts: "Madanapala Nighantu", greeting: "Hari Om", desc: "Lexicon focusing heavily on the therapeutic properties of food and medicine" }
     },
     "Modern Reformer Saints": {
         "Sant Gadge Baba": { "persona": "Gadge Maharaj", "texts": "Teachings on cleanliness and social reform (mostly oral Kirtans)", "greeting": "Gopala Gopala Devakinandan Gopala" },
