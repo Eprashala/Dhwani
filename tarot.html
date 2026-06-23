@@ -3,357 +3,278 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Traditional Tarot Oracle</title>
+    <title>True Cryptographic Tarot Oracle</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
     <style>
         :root {
-            --bg-color: #f4ece6; 
-            --text-main: #2c3e50;
-            --text-muted: #5c6c7b;
-            --accent: #8b2c2c; 
-            --gold: #c5a059;
+            --gold: #d4af37;
+            --dark: #12121a;
+            --surface: #1e1e28;
+            --light: #e0e0e5;
+            --accent: #8a2be2;
         }
-
         body {
-            font-family: 'Georgia', serif; 
-            background-color: var(--bg-color);
-            background-image: radial-gradient(#e5d9c5 1px, transparent 1px);
-            background-size: 20px 20px;
-            color: var(--text-main);
-            margin: 0;
-            padding: 2rem;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .header-section {
+            background-color: var(--dark);
+            color: var(--light);
+            font-family: 'Georgia', serif;
             text-align: center;
-            margin-bottom: 2rem;
-            max-width: 700px;
-            width: 100%;
-            background: rgba(255, 255, 255, 0.8);
-            padding: 2rem;
-            border-radius: 8px;
-            border: 1px solid #dcd3c6;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            margin: 0;
+            padding: 20px;
         }
-
-        h2 { color: var(--accent); font-size: 2rem; margin-top: 0; text-transform: uppercase; letter-spacing: 2px;}
-
-        .question-box { margin: 1.5rem 0; text-align: left; }
-        .question-box label { display: block; margin-bottom: 0.5rem; color: var(--accent); font-weight: bold; font-style: italic; }
-        .question-box input { 
-            width: 100%; padding: 1rem; border: 1px solid #c5a059; border-radius: 4px; 
-            font-family: 'Georgia', serif; font-size: 1.1rem; box-sizing: border-box; background: #fffdfa;
+        h1 { color: var(--gold); letter-spacing: 2px; font-weight: normal; margin-bottom: 5px; }
+        .subtitle { color: #888; font-style: italic; margin-top: 0; margin-bottom: 30px; font-size: 0.9rem; }
+        
+        /* Input Section */
+        .intention-box { margin: 0 auto 30px auto; max-width: 600px; }
+        textarea {
+            width: 100%; height: 80px; background: var(--surface); color: var(--light);
+            border: 1px solid #333; border-radius: 8px; padding: 15px;
+            font-family: 'Arial', sans-serif; font-size: 1rem; resize: none; margin-bottom: 15px; box-sizing: border-box;
         }
+        textarea:focus { outline: none; border-color: var(--gold); }
 
         button {
-            background-color: var(--accent);
-            color: white;
-            border: 2px solid var(--gold);
-            padding: 1rem 2.5rem;
-            font-size: 1.1rem;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-family: 'Georgia', serif;
-            text-transform: uppercase;
-            letter-spacing: 1px;
+            background-color: transparent; color: var(--gold); border: 1px solid var(--gold);
+            padding: 12px 24px; font-size: 1rem; font-family: 'Georgia', serif;
+            cursor: pointer; transition: all 0.3s ease; border-radius: 5px; margin: 5px;
         }
+        button:hover:not(:disabled) { background-color: var(--gold); color: var(--dark); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; border-color: #555; color: #555; background: transparent; }
+        
+        .btn-primary { border: 2px solid var(--gold); font-weight: bold; }
+        .btn-action { font-size: 0.9rem; padding: 8px 16px; border-color: #888; color: #ddd; }
 
-        button:hover { background-color: #6b2222; transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
-
-        .active-question-display {
-            font-size: 1.5rem; color: var(--accent); font-style: italic; text-align: center; 
-            margin-bottom: 3rem; width: 100%; display: none; border-bottom: 1px solid var(--gold); padding-bottom: 1rem;
+        /* Tarot Spread */
+        .tarot-spread { display: flex; flex-wrap: wrap; gap: 30px; justify-content: center; margin-top: 40px; }
+        .card-container {
+            width: 200px; background: var(--surface); padding: 15px; border-radius: 10px;
+            border: 1px solid #333; box-shadow: 0 10px 20px rgba(0,0,0,0.5);
         }
+        .card-image { width: 100%; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); display: block; }
+        .reversed { transform: rotate(180deg); }
+        .card-title { color: var(--gold); font-size: 1.1rem; margin: 15px 0 5px 0; }
+        .orientation { font-size: 0.85rem; color: #aaa; font-style: italic; margin: 0; }
+        .position-label { color: var(--gold); margin-bottom: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; font-size: 0.9rem;}
 
-        .spread-container {
-            display: none;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 3rem;
-            width: 100%;
-            max-width: 1400px;
+        /* Analysis Report Section */
+        #analysisSection { margin-top: 50px; display: none; }
+        .report-card {
+            background: var(--surface); border-top: 4px solid var(--gold);
+            max-width: 800px; margin: 20px auto; padding: 30px; border-radius: 8px;
+            text-align: left; line-height: 1.6; font-family: 'Arial', sans-serif;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.6); display: none;
         }
-
-        .card-slot {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .position-header { text-align: center; margin-bottom: 1rem; height: 80px; }
-        .position-title { font-size: 1.2rem; font-weight: bold; color: var(--accent); margin-bottom: 0.5rem; border-bottom: 1px solid var(--gold); display: inline-block;}
-        .position-desc { font-size: 0.9rem; color: var(--text-muted); font-style: italic; }
-
-        /* 3D Card Styling */
-        .tarot-card-container {
-            width: 200px;
-            height: 340px;
-            perspective: 1000px;
-            cursor: pointer;
-            margin-bottom: 1.5rem;
-            position: relative;
-        }
-
-        /* The Magnifying Glass Hint */
-        .zoom-hint {
-            position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,0.9);
-            color: var(--accent); border-radius: 50%; width: 30px; height: 30px;
-            display: flex; justify-content: center; align-items: center;
-            font-size: 1.2rem; opacity: 0; transition: opacity 0.3s; z-index: 10;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3); pointer-events: none;
-        }
-        .tarot-card-container:hover .zoom-hint.visible { opacity: 1; }
-
-        .tarot-card {
-            width: 100%; height: 100%; position: relative;
-            transform-style: preserve-3d;
-            transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.3); border-radius: 10px;
-        }
-
-        .tarot-card.is-flipped { transform: rotateY(180deg); }
-        .tarot-card.is-flipped.is-reversed { transform: rotateY(180deg) rotateZ(180deg); }
-
-        .card-face {
-            position: absolute; width: 100%; height: 100%; backface-visibility: hidden;
-            border-radius: 8px; overflow: hidden; border: 2px solid #2c3e50;
-        }
-
-        .card-back {
-            background-color: #1a252f;
-            background-image: repeating-linear-gradient(45deg, #2c3e50 25%, transparent 25%, transparent 75%, #2c3e50 75%, #2c3e50), repeating-linear-gradient(45deg, #2c3e50 25%, #1a252f 25%, #1a252f 75%, #2c3e50 75%, #2c3e50);
-            background-position: 0 0, 10px 10px; background-size: 20px 20px;
-        }
-
-        .card-front { transform: rotateY(180deg); background: #fff; }
-        .card-front img { width: 100%; height: 100%; object-fit: cover; }
-
-        .interpretation-box {
-            background: white; padding: 1.5rem; border-radius: 4px; border-left: 4px solid var(--gold);
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05); opacity: 0; transition: opacity 1s ease 0.3s;
-            width: 100%; box-sizing: border-box; text-align: left;
-        }
-        .interpretation-box.visible { opacity: 1; }
-        .card-name-display { font-weight: bold; color: var(--accent); font-size: 1.2rem; margin-bottom: 0.3rem; }
-        .orientation-display { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 1rem; }
-        .meaning-display { font-size: 0.95rem; line-height: 1.6; }
-
-        #resetBtn { display: none; margin-top: 4rem; }
-
-        /* Fullscreen Lightbox Zoom CSS */
-        .lightbox {
-            display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(15, 23, 42, 0.9); z-index: 9999; justify-content: center; align-items: center;
-            backdrop-filter: blur(5px); cursor: zoom-out;
-        }
-        .lightbox img {
-            max-height: 90vh; max-width: 90vw; border-radius: 12px;
-            box-shadow: 0 0 40px rgba(0,0,0,0.8); transition: transform 0.3s ease;
-        }
-        .lightbox-reversed { transform: rotateZ(180deg); }
-
+        .report-card h2, .report-card h3 { color: var(--gold); font-family: 'Georgia', serif; }
+        .action-bar { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; border-top: 1px solid #333; padding-top: 15px; }
+        
+        .loader { display: none; margin: 20px auto; border: 4px solid #333; border-top: 4px solid var(--gold); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
-    <!-- Lightbox Element -->
-    <div id="lightbox" class="lightbox" onclick="closeLightbox()">
-        <img id="lightboxImg" src="" alt="Zoomed Tarot Card">
-    </div>
+    <h1>True Tarot Oracle</h1>
+    <p class="subtitle">Cryptographic Entropy & AI Synthesis</p>
 
-    <div class="header-section" id="setupSection">
-        <h2>The Traditional Oracle</h2>
-        <p style="color: var(--text-muted); font-style: italic; margin-bottom: 2rem;">Seek guidance on your trajectory. Formulate a specific question regarding your current path.</p>
+    <div class="intention-box">
+        <textarea id="userQuestion" placeholder="Focus your mind. What guidance do you seek? (e.g., 'What do I need to know about my career path right now?')"></textarea>
+        <button id="drawBtn" class="btn-primary">Shuffle & Draw 3 Cards</button>
+    </div>
+    
+    <div class="tarot-spread" id="spreadContainer"></div>
+
+    <div id="analysisSection">
+        <button id="analyzeBtn" class="btn-primary" style="padding: 15px 30px; font-size: 1.2rem;">👁️ Channel the Oracle (Analyze Spread)</button>
+        <div class="loader" id="loadingSpinner"></div>
         
-        <div class="question-box">
-            <label for="querentQuestion">What wisdom do you seek?</label>
-            <input type="text" id="querentQuestion" placeholder="e.g., 'What must I understand about my career trajectory?'" autocomplete="off">
+        <div id="pdfExportArea">
+            <div class="report-card" id="reportCard">
+                <div id="reportContent"></div>
+                <div class="action-bar" data-html2canvas-ignore="true">
+                    <button id="readAloudBtn" class="btn-action">🔊 Read Aloud</button>
+                    <button id="exportPdfBtn" class="btn-action">📄 Export to PDF</button>
+                </div>
+            </div>
         </div>
-
-        <button id="drawBtn" onclick="drawSpread()">Draw The Cards</button>
     </div>
 
-    <div id="displayQuestion" class="active-question-display"></div>
-
-    <div class="spread-container" id="spreadContainer">
-        <!-- DOM Injected Here -->
-    </div>
-
-    <button id="resetBtn" onclick="resetReading()">Clear the Table</button>
-
-<script>
-const majorArcana = [
-    { name: "0. The Fool", img: "https://upload.wikimedia.org/wikipedia/commons/9/90/RWS_Tarot_00_Fool.jpg", meanings: { upright: "Represents untouched innocence, infinite potential, and spontaneity. The Fool acts as the catalyst, jumping into the void without the constraints of societal expectations. A call to experience life directly.", reversed: "The energy of the leap is present but internalized or blocked. You may be resisting a necessary adventure out of fear, or acting recklessly in a way that attempts to simulate freedom without doing the actual spiritual work." } },
-    { name: "I. The Magician", img: "https://upload.wikimedia.org/wikipedia/commons/d/de/RWS_Tarot_01_Magician.jpg", meanings: { upright: "The archetype of active, conscious power and action. The Magician takes pure potential and grounds it into reality, utilizing willpower, focus, and the tools available to manifest change.", reversed: "A blockage in expressing your will. You have the tools, but self-doubt or a disconnect from your inner power is preventing manifestation. Beware of manipulation or scattered focus." } },
-    { name: "II. The High Priestess", img: "https://upload.wikimedia.org/wikipedia/commons/8/88/RWS_Tarot_02_High_Priestess.jpg", meanings: { upright: "The archetype of passivity, intuition, and the subconscious. She represents unmanifested potential and hidden knowledge that cannot be accessed through logic alone, requiring stillness to comprehend.", reversed: "An internalized intuition you are refusing to listen to. The outer world's noise is drowning out your inner knowing. You must sit with your shadow rather than fleeing into external action." } },
-    { name: "III. The Empress", img: "https://upload.wikimedia.org/wikipedia/commons/d/d2/RWS_Tarot_03_Empress.jpg", meanings: { upright: "The mother archetype. Represents nature, abundance, sensuality, and creative gestation. Life is nurturing you, and you are called to nurture your creations into reality with love and patience.", reversed: "Creative or emotional stagnation. You may be experiencing dependence, feeling smothered, or neglecting your own self-care. Reconnect with the natural world to unblock this energy." } },
-    { name: "IV. The Emperor", img: "https://upload.wikimedia.org/wikipedia/commons/c/c3/RWS_Tarot_04_Emperor.jpg", meanings: { upright: "The father archetype. Represents structure, rules, authority, and logical foundation. The wildness of nature is tamed to build society. You are called to establish order and claim sovereignty over your life.", reversed: "Rigidity and tyranny. You are relying too heavily on strict rules, creating a brittle environment. Alternatively, it signifies an utter lack of discipline causing chaos. Balance your structure." } },
-    { name: "V. The Hierophant", img: "https://upload.wikimedia.org/wikipedia/commons/8/8d/RWS_Tarot_05_Hierophant.jpg", meanings: { upright: "Tradition, education, and institutional belief systems. It is the transmission of orthodox knowledge. A time to learn the established rules of the game before you attempt to break them.", reversed: "A necessary rebellion against dogma. The traditional structures are no longer serving your spiritual or practical growth. You are called to find your own internal belief system rather than following the crowd." } },
-    { name: "VI. The Lovers", img: "https://upload.wikimedia.org/wikipedia/commons/3/3a/RWS_Tarot_06_Lovers.jpg", meanings: { upright: "Deep, conscious alignment. Beyond just romance, it represents a crucial choice of values, and the integration of opposites (masculine/feminine, conscious/unconscious) to create a higher harmony.", reversed: "Disharmony and fear of commitment. A failure to take responsibility for your choices, or a severing of connection due to a misalignment of internal values." } },
-    { name: "VII. The Chariot", img: "https://upload.wikimedia.org/wikipedia/commons/9/9b/RWS_Tarot_07_Chariot.jpg", meanings: { upright: "Triumph of the ego and willpower. You are successfully steering opposing forces (light and dark instincts) toward a single goal through sheer determination and focus.", reversed: "A loss of direction or control. The opposing forces are tearing you apart, resulting in aggression or complete stalling. Reassess your goal and reign in your emotional extremes." } },
-    { name: "VIII. Strength", img: "https://upload.wikimedia.org/wikipedia/commons/f/f5/RWS_Tarot_08_Strength.jpg", meanings: { upright: "Quiet, inner courage. Instead of suppressing your animal instincts (the lion) with armor and weapons, you are taming them through compassion, love, and gentle spiritual fortitude.", reversed: "Self-doubt and weakness. You are letting your base instincts (fear, anger, lust) overpower your higher self, or you are exhausting yourself by trying to violently suppress them." } },
-    { name: "IX. The Hermit", img: "https://upload.wikimedia.org/wikipedia/commons/4/4d/RWS_Tarot_09_Hermit.jpg", meanings: { upright: "Intentional withdrawal from society to seek inner wisdom. The lantern represents the light of consciousness guiding you through the dark unconscious. A period of profound introspection is required.", reversed: "Unhealthy isolation. What began as introspection has turned into hiding from the world. A fear of engaging with others, or returning from the inner journey empty-handed." } },
-    { name: "X. Wheel of Fortune", img: "https://upload.wikimedia.org/wikipedia/commons/3/3c/RWS_Tarot_10_Wheel_of_Fortune.jpg", meanings: { upright: "The turning point. An understanding that life operates in cycles. External forces and fate are bringing a shift in fortune. The task is to remain centered at the hub, not thrown around the rim.", reversed: "Resistance to necessary change. A period of bad luck or feeling trapped in a downward cycle. You cannot stop the wheel; you must surrender to the turning to eventually rise again." } },
-    { name: "XI. Justice", img: "https://upload.wikimedia.org/wikipedia/commons/e/e0/RWS_Tarot_11_Justice.jpg", meanings: { upright: "Objective truth, cause and effect, and karma. You are seeing reality exactly as it is, stripped of illusions. Decisions must be made with absolute honesty and balance.", reversed: "Imbalance and denial. You are refusing to accept the consequences of your past actions, or dealing with a fundamentally unfair situation. Honesty with yourself is the only remedy." } },
-    { name: "XII. The Hanged Man", img: "https://upload.wikimedia.org/wikipedia/commons/2/2b/RWS_Tarot_12_Hanged_Man.jpg", meanings: { upright: "Voluntary suspension and surrender. By giving up the struggle for control, you gain enlightenment and a completely new perspective on the world. Action through non-action.", reversed: "Stalling and useless sacrifice. You are playing the martyr or resisting the surrender required to gain clarity. Holding onto a false sense of control is causing immense spiritual pain." } },
-    { name: "XIII. Death", img: "https://upload.wikimedia.org/wikipedia/commons/d/d7/RWS_Tarot_13_Death.jpg", meanings: { upright: "Profound transformation. The ego-death. A necessary clearing away of the old structures, relationships, or beliefs so that new life can grow in the fertilized soil.", reversed: "Stagnation and fear of endings. You are desperately holding onto a decaying situation, refusing to let it die. This clinging prevents any new growth and prolongs the suffering." } },
-    { name: "XIV. Temperance", img: "https://upload.wikimedia.org/wikipedia/commons/f/f8/RWS_Tarot_14_Temperance.jpg", meanings: { upright: "Spiritual alchemy and healing. The blending of opposites to create a perfect, balanced third state. Navigating life with one foot in the physical world and one in the unconscious.", reversed: "Severe imbalance. You are engaging in extremes, excess, or failing to reconcile opposing parts of your life. A warning to find the middle path before physical or emotional burnout." } },
-    { name: "XV. The Devil", img: "https://upload.wikimedia.org/wikipedia/commons/5/55/RWS_Tarot_15_Devil.jpg", meanings: { upright: "Material bondage and the shadow self. You are chained to unhealthy attachments, addictions, or toxic cycles by your own ignorance. Look closely: the chains are loose enough to remove at any time.", reversed: "The breaking of chains. A powerful, sometimes painful realization of your own shadow. You are finally throwing off the bonds of materialism or toxic behavior and reclaiming your freedom." } },
-    { name: "XVI. The Tower", img: "https://upload.wikimedia.org/wikipedia/commons/5/53/RWS_Tarot_16_Tower.jpg", meanings: { upright: "Sudden, unavoidable upheaval. The destruction of false premises and structures built on lies. Though violent and shocking, this collapse is an act of grace, clearing the way for truth.", reversed: "A prolonged disaster. You are trying to patch up a structure that is fundamentally doomed, delaying the necessary explosion. The longer you delay the collapse, the worse it will be." } },
-    { name: "XVII. The Star", img: "https://upload.wikimedia.org/wikipedia/commons/d/cd/RWS_Tarot_17_Star.jpg", meanings: { upright: "Hope, healing, and spiritual guidance after the storm of the Tower. A calm connection to the cosmos. You are pouring your energy back into the earth, trusting the universe completely.", reversed: "Despair and a crisis of faith. You feel disconnected from your higher purpose, cynical, and emotionally depleted. You must actively search for the light to reconnect to your spiritual source." } },
-    { name: "XVIII. The Moon", img: "https://upload.wikimedia.org/wikipedia/commons/7/7f/RWS_Tarot_18_Moon.jpg", meanings: { upright: "The realm of illusion, dreams, and primal fears rising from the subconscious. The path forward is uncertain and shadowy. You must rely on intuition, not logic, to navigate this strange landscape.", reversed: "Overwhelming anxiety and paranoia. The subconscious fears have breached the surface and are paralyzing you. You must confront these illusions directly to dispel their power over you." } },
-    { name: "XIX. The Sun", img: "https://upload.wikimedia.org/wikipedia/commons/1/17/RWS_Tarot_19_Sun.jpg", meanings: { upright: "Joy, success, and pure vitality. The inner child is free. Everything is brought into the light of consciousness, bringing absolute clarity, warmth, and unburdened happiness.", reversed: "A temporary clouding of joy. The success is still there, but you are struggling to feel it due to pessimism or lingering doubts. Reconnect with your inner child to clear the clouds." } },
-    { name: "XX. Judgement", img: "https://upload.wikimedia.org/wikipedia/commons/d/dd/RWS_Tarot_20_Judgment.jpg", meanings: { upright: "The Great Awakening. Hearing a higher calling that demands you rise up from your old life. Absolution of past mistakes and a profound inner rebirth into your true self.", reversed: "Self-criticism and ignoring the call. You hear the trumpet, but fear or deep-seated guilt is preventing you from rising. You are judging yourself too harshly to allow rebirth." } },
-    { name: "XX1. The World", img: "https://upload.wikimedia.org/wikipedia/commons/f/ff/RWS_Tarot_21_World.jpg", meanings: { upright: "Ultimate completion, wholeness, and integration. The Fool's journey concludes successfully. The inner and outer worlds are in perfect sync, bringing deep fulfillment and readiness for the next cycle.", reversed: "A lack of closure. You are inches away from completion but stalling. An inability to tie up loose ends or integrate the final lessons is keeping you from true wholeness." } }
-];
-
-const predictiveSpread = [
-    { title: '1. The State', desc: 'The psychological reality of your situation.' },
-    { title: '2. The Duality', desc: 'The internal block that must be reconciled.' },
-    { title: '3. The Work', desc: 'The specific action required to move forward.' },
-    { title: '4. The Outcome', desc: 'The natural trajectory if you do the Work.' }
-];
-
-function secureShuffle(deck) {
-    let shuffled = [...deck];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-        const randomBuffer = new Uint32Array(1);
-        window.crypto.getRandomValues(randomBuffer);
-        const j = randomBuffer[0] % (i + 1);
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
-}
-
-function drawSpread() {
-    const input = document.getElementById('querentQuestion').value.trim();
-    const finalQuestion = input === "" ? "A Reading for Current Trajectory" : `"${input}"`;
-
-    let shuffledDeck = secureShuffle(majorArcana);
-
-    document.getElementById('setupSection').style.display = 'none';
-    const container = document.getElementById('spreadContainer');
-    container.innerHTML = '';
-    container.style.display = 'grid';
-
-    document.getElementById('displayQuestion').innerText = finalQuestion;
-    document.getElementById('displayQuestion').style.display = 'block';
-
-    for (let i = 0; i < predictiveSpread.length; i++) {
-        const drawnCard = shuffledDeck.pop(); 
-        const flipBuffer = new Uint8Array(1);
-        window.crypto.getRandomValues(flipBuffer);
-        const isUpright = (flipBuffer[0] % 2) === 0;
-        const orientation = isUpright ? 'upright' : 'reversed';
+    <script>
+        // 1. HOSTED ENGINE CONFIGURATION (From your uploaded file)
+        const PROXY_API_ENDPOINT = "https://eprashala.pythonanywhere.com/api/chat";
+        let customApiKey = localStorage.getItem('tarot_api_key') || ""; 
         
-        buildCardDOM({
-            positionTitle: predictiveSpread[i].title,
-            positionDesc: predictiveSpread[i].desc,
-            name: drawnCard.name,
-            img: drawnCard.img,
-            orientation: orientation,
-            meaning: drawnCard.meanings[orientation]
-        }); 
-    }
-
-    document.getElementById('resetBtn').style.display = 'block';
-}
-
-function buildCardDOM(cardData) {
-    const container = document.getElementById('spreadContainer');
-    const slot = document.createElement('div');
-    slot.className = 'card-slot';
-    
-    const header = document.createElement('div');
-    header.className = 'position-header';
-    header.innerHTML = `
-        <div class="position-title">${cardData.positionTitle}</div>
-        <div class="position-desc">${cardData.positionDesc}</div>
-    `;
-
-    const cardContainer = document.createElement('div');
-    cardContainer.className = 'tarot-card-container';
-    
-    // Magnifying glass hint
-    const zoomHint = document.createElement('div');
-    zoomHint.className = 'zoom-hint';
-    zoomHint.innerHTML = '🔍';
-
-    const card = document.createElement('div');
-    card.className = 'tarot-card';
-    
-    card.innerHTML = `
-        <div class="card-face card-back"></div>
-        <div class="card-face card-front">
-            <img src="${cardData.img}" alt="${cardData.name}">
-        </div>
-    `;
-
-    const interpretation = document.createElement('div');
-    interpretation.className = 'interpretation-box';
-    interpretation.innerHTML = `
-        <div class="card-name-display">${cardData.name}</div>
-        <div class="orientation-display">Drawn ${cardData.orientation}</div>
-        <div class="meaning-display">${cardData.meaning}</div>
-    `;
-
-    cardContainer.appendChild(zoomHint);
-    cardContainer.appendChild(card);
-
-    // Dynamic Interaction Logic
-    cardContainer.addEventListener('click', function() {
-        // If it's face down, flip it over
-        if (!card.classList.contains('is-flipped')) {
-            card.classList.add('is-flipped');
-            if (cardData.orientation === 'reversed') {
-                card.classList.add('is-reversed');
-            }
-            // Show the zoom hint and text after flip animation finishes
-            setTimeout(() => {
-                zoomHint.classList.add('visible');
-                interpretation.classList.add('visible');
-            }, 800);
-        } 
-        // If it's already flipped, open the full-screen zoom
-        else {
-            openLightbox(cardData.img, cardData.orientation);
+        // Dynamic routing: Go direct to Google if local key exists, else use the PythonAnywhere proxy
+        function getActiveEndpoint() {
+            return customApiKey ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${customApiKey}` : PROXY_API_ENDPOINT;
         }
-    });
 
-    slot.appendChild(header);
-    slot.appendChild(cardContainer);
-    slot.appendChild(interpretation);
-    container.appendChild(slot);
-}
+        let currentSpread = [];
+        let synth = window.speechSynthesis;
 
-// Lightbox Functions
-function openLightbox(imgSrc, orientation) {
-    const lightbox = document.getElementById('lightbox');
-    const img = document.getElementById('lightboxImg');
-    
-    img.src = imgSrc;
-    if (orientation === 'reversed') {
-        img.classList.add('lightbox-reversed');
-    } else {
-        img.classList.remove('lightbox-reversed');
-    }
-    
-    lightbox.style.display = 'flex';
-}
+        // 2. BUILD DECK
+        const majorNames = ["The Fool", "The Magician", "The High Priestess", "The Empress", "The Emperor", "The Hierophant", "The Lovers", "The Chariot", "Strength", "The Hermit", "Wheel of Fortune", "Justice", "The Hanged Man", "Death", "Temperance", "The Devil", "The Tower", "The Star", "The Moon", "The Sun", "Judgement", "The World"];
+        const suits = ['cups', 'pents', 'swords', 'wands'];
+        const suitNames = ['Cups', 'Pentacles', 'Swords', 'Wands'];
+        const court = ['Page', 'Knight', 'Queen', 'King'];
+        const tarotDeck = [];
 
-function closeLightbox() {
-    document.getElementById('lightbox').style.display = 'none';
-}
+        for(let i = 0; i <= 21; i++) tarotDeck.push({ name: majorNames[i], image: `maj${i<10?'0'+i:i}.jpg` });
+        suits.forEach((suitPrefix, index) => {
+            for(let i = 1; i <= 14; i++) {
+                let cardName = i === 1 ? "Ace" : i <= 10 ? i.toString() : court[i - 11];
+                tarotDeck.push({ name: `${cardName} of ${suitNames[index]}`, image: `${suitPrefix}${i<10?'0'+i:i}.jpg` });
+            }
+        });
 
-function resetReading() {
-    document.getElementById('setupSection').style.display = 'block';
-    document.getElementById('spreadContainer').style.display = 'none';
-    document.getElementById('displayQuestion').style.display = 'none';
-    document.getElementById('resetBtn').style.display = 'none';
-    document.getElementById('querentQuestion').value = '';
-}
-</script>
+        // 3. CRYPTOGRAPHIC RANDOMNESS
+        function getSecureRandomInt(min, max) {
+            const buffer = new Uint32Array(1);
+            window.crypto.getRandomValues(buffer);
+            return Math.floor((buffer[0] / (0xffffffff + 1)) * (max - min + 1)) + min;
+        }
+
+        // 4. UI INTERACTIONS (Shuffle & Draw)
+        document.getElementById('drawBtn').addEventListener('click', () => {
+            let deck = [...tarotDeck];
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = getSecureRandomInt(0, i);
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+
+            currentSpread = [];
+            for (let i = 0; i < 3; i++) {
+                currentSpread.push({
+                    ...deck[i],
+                    position: i === 0 ? "Past" : i === 1 ? "Present" : "Future",
+                    isReversed: getSecureRandomInt(0, 1) === 1
+                });
+            }
+
+            const container = document.getElementById('spreadContainer');
+            container.innerHTML = '';
+            currentSpread.forEach(drawn => {
+                const rotationClass = drawn.isReversed ? 'reversed' : '';
+                container.innerHTML += `
+                    <div class="card-container">
+                        <div class="position-label">${drawn.position}</div>
+                        <img src="${drawn.image}" class="card-image ${rotationClass}" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'200\\' height=\\'350\\'><rect width=\\'100%\\' height=\\'100%\\' fill=\\'%23333\\'/></svg>'">
+                        <h3 class="card-title">${drawn.name}</h3>
+                        <p class="orientation">${drawn.isReversed ? 'Reversed' : 'Upright'}</p>
+                    </div>
+                `;
+            });
+
+            document.getElementById('analysisSection').style.display = 'block';
+            document.getElementById('reportCard').style.display = 'none';
+            if(synth.speaking) synth.cancel(); 
+        });
+
+        // 5. API CALL TO HOSTED PROXY
+        document.getElementById('analyzeBtn').addEventListener('click', async () => {
+            const question = document.getElementById('userQuestion').value.trim() || "General reading for my current life path.";
+            const btn = document.getElementById('analyzeBtn');
+            const spinner = document.getElementById('loadingSpinner');
+            const reportCard = document.getElementById('reportCard');
+            const reportContent = document.getElementById('reportContent');
+
+            btn.disabled = true;
+            spinner.style.display = 'block';
+            reportCard.style.display = 'none';
+
+            let promptText = `You are an expert, empathetic, and profound Tarot Reader. 
+The user is asking: "${question}"
+
+The cryptographic engine has drawn the following 3-card spread:
+1. Past: ${currentSpread[0].name} (${currentSpread[0].isReversed ? 'Reversed' : 'Upright'})
+2. Present: ${currentSpread[1].name} (${currentSpread[1].isReversed ? 'Reversed' : 'Upright'})
+3. Future: ${currentSpread[2].name} (${currentSpread[2].isReversed ? 'Reversed' : 'Upright'})
+
+Please provide a highly professional, cohesive reading. Do not just list card definitions; synthesize how they interact with each other and the user's specific question. Use beautiful, mystical, yet grounded language. Structure the response clearly with headings.`;
+
+            const payload = {
+                contents: [{ parts: [{ text: promptText }] }]
+            };
+
+            try {
+                // Using the dynamic endpoint function from your logic
+                const response = await fetch(getActiveEndpoint(), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Custom-Api-Key': customApiKey // Passes the key to the proxy if needed
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+                
+                let readingText = "The Oracle is silent.";
+                if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+                    readingText = data.candidates[0].content.parts[0].text;
+                } else if (data.error) {
+                    throw new Error(data.error.message);
+                }
+
+                reportContent.innerHTML = marked.parse(readingText);
+                reportContent.dataset.rawtext = readingText; 
+
+                spinner.style.display = 'none';
+                reportCard.style.display = 'block';
+                btn.disabled = false;
+
+            } catch (error) {
+                console.error("API Error:", error);
+                spinner.style.display = 'none';
+                reportContent.innerHTML = `<p style='color:red;'>The connection to the ethereal plane was disrupted. (${error.message || 'Server unreachable'}) Please ensure your PythonAnywhere server is active.</p>`;
+                reportCard.style.display = 'block';
+                btn.disabled = false;
+            }
+        });
+
+        // 6. READ ALOUD FUNCTIONALITY
+        document.getElementById('readAloudBtn').addEventListener('click', () => {
+            if (synth.speaking) {
+                synth.cancel();
+                document.getElementById('readAloudBtn').innerText = "🔊 Read Aloud";
+                return;
+            }
+
+            const textToSpeak = document.getElementById('reportContent').dataset.rawtext;
+            if (!textToSpeak) return;
+
+            const cleanText = textToSpeak.replace(/\*/g, '').replace(/#/g, '');
+            const utterance = new SpeechSynthesisUtterance(cleanText);
+            
+            const voices = synth.getVoices();
+            const preferredVoice = voices.find(v => v.name.includes('Google UK English Female') || v.name.includes('Samantha') || v.lang === 'en-GB');
+            if (preferredVoice) utterance.voice = preferredVoice;
+
+            utterance.rate = 0.9;
+            utterance.pitch = 0.9;
+
+            utterance.onend = () => { document.getElementById('readAloudBtn').innerText = "🔊 Read Aloud"; };
+            
+            document.getElementById('readAloudBtn').innerText = "🔇 Stop Reading";
+            synth.speak(utterance);
+        });
+
+        window.speechSynthesis.onvoiceschanged = () => { synth.getVoices(); };
+
+        // 7. EXPORT TO PDF FUNCTIONALITY
+        document.getElementById('exportPdfBtn').addEventListener('click', () => {
+            const element = document.getElementById('pdfExportArea');
+            const opt = {
+                margin:       0.5,
+                filename:     'Tarot_Reading.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#1e1e28' },
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+            
+            html2pdf().set(opt).from(element).save();
+        });
+    </script>
 </body>
 </html>
