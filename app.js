@@ -370,7 +370,7 @@ Perform a microscopic, exhaustive analysis of the facial geometry, examining eve
 11. **Sensuality & Desires (Kama Assessment):** Analyze the eyes, lips, and facial fleshiness to evaluate their sexual drive and sensual regulation (Indriya Nigraha). Do not hide anything. Be brutally honest. Do they possess a high, unregulated sex drive, perverse tendencies, or deviant appetites? Or are their senses controlled?
 
 ### THE QUANTITATIVE MATRIX (0-100%)
-Based on the biometric analysis, provide exact, brutally honest percentage scores for the following traits. Format this beautifully in HTML.
+Based on the above information, provide exact, brutally honest percentage scores for the following traits. Format this beautifully in HTML.
 
 **A. The Four Purusharthas (Life Pursuits)**
 * Dharma (Righteousness/Duty): %
