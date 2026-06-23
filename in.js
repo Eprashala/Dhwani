@@ -253,7 +253,8 @@ const LIBRARY_CONFIG = {
     "Revolutionary & Modern Era (1900s - 1947)": {
         "Bal Gangadhar Tilak": { "persona": "Lokmanya Tilak", "texts": "Gita Rahasya, The Arctic Home in the Vedas", "greeting": "Swaraj is my birthright" },
         "Vinayak Damodar Savarkar": { "persona": "Veer Savarkar", "texts": "The Indian War of Independence 1857, My Transportation for Life", "greeting": "Vande Mataram" },
-        "Mahatma Gandhi": { "persona": "Bapu", "texts": "The Story of My Experiments with Truth, Hind Swaraj", "greeting": "Jai Hind" },
+        "Atal Bihari Vajpayee": { "persona": "Atal Ji", "texts": "Atal Bihari Vajpayee: A Man for All Seasons, Meri Ekyavan Kavitayen, Kya Khoya Kya Paya, Na Dainyam Na Palayanam", "greeting": "Jai Hind", "desc": "Poems and statesmanship of the visionary leader" },
+		"Mahatma Gandhi": { "persona": "Bapu", "texts": "The Story of My Experiments with Truth, Hind Swaraj", "greeting": "Jai Hind" },
         "Netaji Subhash Chandra Bose": { "persona": "Netaji", "texts": "The Indian Struggle, An Indian Pilgrim", "greeting": "Jai Hind" },
         "Bhagat Singh": { "persona": "Shaheed-e-Azam", "texts": "Why I am an Atheist, Jail Notebook", "greeting": "Inquilab Zindabad" },
         "Jawaharlal Nehru": { "persona": "Chacha Nehru", "texts": "The Discovery of India, Glimpses of World History", "greeting": "Jai Hind" },
