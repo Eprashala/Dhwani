@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>True Cryptographic Tarot Oracle</title>
+    
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="card.js"></script> 
     
     <style>
         :root {
@@ -13,7 +15,6 @@
             --dark: #12121a;
             --surface: #1e1e28;
             --light: #e0e0e5;
-            --accent: #8a2be2;
         }
         body {
             background-color: var(--dark);
@@ -24,9 +25,13 @@
             padding: 20px;
         }
         h1 { color: var(--gold); letter-spacing: 2px; font-weight: normal; margin-bottom: 5px; }
-        .subtitle { color: #888; font-style: italic; margin-top: 0; margin-bottom: 30px; font-size: 0.9rem; }
         
-        /* Input Section */
+        .ritual-box {
+            background: rgba(212, 175, 55, 0.05); border: 1px solid rgba(212, 175, 55, 0.3);
+            border-radius: 8px; max-width: 600px; margin: 20px auto 30px auto;
+            padding: 20px; font-style: italic; color: #aaa; line-height: 1.6;
+        }
+
         .intention-box { margin: 0 auto 30px auto; max-width: 600px; }
         textarea {
             width: 100%; height: 80px; background: var(--surface); color: var(--light);
@@ -44,31 +49,53 @@
         button:disabled { opacity: 0.5; cursor: not-allowed; border-color: #555; color: #555; background: transparent; }
         
         .btn-primary { border: 2px solid var(--gold); font-weight: bold; }
-        .btn-action { font-size: 0.9rem; padding: 8px 16px; border-color: #888; color: #ddd; }
 
-        /* Tarot Spread */
-        .tarot-spread { display: flex; flex-wrap: wrap; gap: 30px; justify-content: center; margin-top: 40px; }
+        .tarot-spread { display: flex; flex-wrap: wrap; gap: 30px; justify-content: center; margin-top: 40px; min-height: 550px; }
+        
+        /* UPDATED CARD CONTAINER FOR LONG TEXT */
         .card-container {
-            width: 200px; background: var(--surface); padding: 15px; border-radius: 10px;
+            width: 260px; /* Slightly wider to accommodate reading */
+            background: var(--surface); padding: 15px; border-radius: 10px;
             border: 1px solid #333; box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            opacity: 0; transform: translateY(30px); animation: riseUp 0.8s forwards;
+            display: flex; flex-direction: column;
         }
-        .card-image { width: 100%; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); display: block; }
-        .reversed { transform: rotate(180deg); }
-        .card-title { color: var(--gold); font-size: 1.1rem; margin: 15px 0 5px 0; }
-        .orientation { font-size: 0.85rem; color: #aaa; font-style: italic; margin: 0; }
-        .position-label { color: var(--gold); margin-bottom: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; font-size: 0.9rem;}
 
-        /* Analysis Report Section */
-        #analysisSection { margin-top: 50px; display: none; }
+        @keyframes riseUp { to { opacity: 1; transform: translateY(0); } }
+
+        .card-image { width: 100%; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); display: block; transition: transform 0.6s; }
+        .reversed { transform: rotate(180deg); }
+        
+        .card-title { color: var(--gold); font-size: 1.1rem; margin: 15px 0 5px 0; }
+        .position-label { color: var(--gold); margin-bottom: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; font-size: 0.9rem;}
+        
+        /* STYLING FOR THE DEEP EXPLANATION */
+        .deep-meaning { 
+            font-size: 0.85rem; 
+            color: #ccc; 
+            margin-top: 10px; 
+            line-height: 1.5; 
+            border-top: 1px solid #333; 
+            padding-top: 10px; 
+            text-align: left;
+            flex-grow: 1;
+            overflow-y: auto; /* Adds a scrollbar if the text is too long */
+            max-height: 200px; /* Prevents the card from growing infinitely long */
+            padding-right: 5px;
+        }
+        
+        /* Custom Scrollbar for the deep meaning box */
+        .deep-meaning::-webkit-scrollbar { width: 5px; }
+        .deep-meaning::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 5px; }
+        .deep-meaning::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 5px; }
+
+        #analysisSection { margin-top: 50px; display: none; opacity: 0; transition: opacity 1s; }
         .report-card {
             background: var(--surface); border-top: 4px solid var(--gold);
             max-width: 800px; margin: 20px auto; padding: 30px; border-radius: 8px;
-            text-align: left; line-height: 1.6; font-family: 'Arial', sans-serif;
-            box-shadow: 0 15px 30px rgba(0,0,0,0.6); display: none;
+            text-align: left; line-height: 1.6; font-family: 'Arial', sans-serif; display: none;
         }
         .report-card h2, .report-card h3 { color: var(--gold); font-family: 'Georgia', serif; }
-        .action-bar { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; border-top: 1px solid #333; padding-top: 15px; }
-        
         .loader { display: none; margin: 20px auto; border: 4px solid #333; border-top: 4px solid var(--gold); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
@@ -76,102 +103,124 @@
 <body>
 
     <h1>True Tarot Oracle</h1>
-    <p class="subtitle">Cryptographic Entropy & AI Synthesis</p>
+    
+    <div class="ritual-box">
+        "Before parting the veil, close your eyes. Take a deep, cleansing breath. 
+        Hold your question in your conscious mind, visualize it clearly, 
+        and only when you are ready, command the Oracle to draw."
+    </div>
 
     <div class="intention-box">
-        <textarea id="userQuestion" placeholder="Focus your mind. What guidance do you seek? (e.g., 'What do I need to know about my career path right now?')"></textarea>
-        <button id="drawBtn" class="btn-primary">Shuffle & Draw 3 Cards</button>
+        <textarea id="userQuestion" placeholder="Enter your focused question here..."></textarea>
+        <button id="drawBtn" class="btn-primary">Part the Veil (Draw 3 Cards)</button>
     </div>
     
     <div class="tarot-spread" id="spreadContainer"></div>
 
     <div id="analysisSection">
-        <button id="analyzeBtn" class="btn-primary" style="padding: 15px 30px; font-size: 1.2rem;">👁️ Channel the Oracle (Analyze Spread)</button>
+        <button id="analyzeBtn" class="btn-primary" style="padding: 15px 30px; font-size: 1.2rem;">👁️ Channel the Oracle (Full Synthesis)</button>
         <div class="loader" id="loadingSpinner"></div>
         
         <div id="pdfExportArea">
             <div class="report-card" id="reportCard">
                 <div id="reportContent"></div>
-                <div class="action-bar" data-html2canvas-ignore="true">
-                    <button id="readAloudBtn" class="btn-action">🔊 Read Aloud</button>
-                    <button id="exportPdfBtn" class="btn-action">📄 Export to PDF</button>
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; border-top: 1px solid #333; padding-top: 15px;" data-html2canvas-ignore="true">
+                    <button id="readAloudBtn">🔊 Read Aloud</button>
+                    <button id="exportPdfBtn">📄 Export to PDF</button>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        // 1. HOSTED ENGINE CONFIGURATION (From your uploaded file)
         const PROXY_API_ENDPOINT = "https://eprashala.pythonanywhere.com/api/chat";
         let customApiKey = localStorage.getItem('tarot_api_key') || ""; 
-        
-        // Dynamic routing: Go direct to Google if local key exists, else use the PythonAnywhere proxy
-        function getActiveEndpoint() {
-            return customApiKey ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${customApiKey}` : PROXY_API_ENDPOINT;
-        }
+        function getActiveEndpoint() { return customApiKey ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${customApiKey}` : PROXY_API_ENDPOINT; }
 
         let currentSpread = [];
         let synth = window.speechSynthesis;
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-        // 2. BUILD DECK
-        const majorNames = ["The Fool", "The Magician", "The High Priestess", "The Empress", "The Emperor", "The Hierophant", "The Lovers", "The Chariot", "Strength", "The Hermit", "Wheel of Fortune", "Justice", "The Hanged Man", "Death", "Temperance", "The Devil", "The Tower", "The Star", "The Moon", "The Sun", "Judgement", "The World"];
-        const suits = ['cups', 'pents', 'swords', 'wands'];
-        const suitNames = ['Cups', 'Pentacles', 'Swords', 'Wands'];
-        const court = ['Page', 'Knight', 'Queen', 'King'];
-        const tarotDeck = [];
-
-        for(let i = 0; i <= 21; i++) tarotDeck.push({ name: majorNames[i], image: `maj${i<10?'0'+i:i}.jpg` });
-        suits.forEach((suitPrefix, index) => {
-            for(let i = 1; i <= 14; i++) {
-                let cardName = i === 1 ? "Ace" : i <= 10 ? i.toString() : court[i - 11];
-                tarotDeck.push({ name: `${cardName} of ${suitNames[index]}`, image: `${suitPrefix}${i<10?'0'+i:i}.jpg` });
-            }
-        });
-
-        // 3. CRYPTOGRAPHIC RANDOMNESS
         function getSecureRandomInt(min, max) {
             const buffer = new Uint32Array(1);
             window.crypto.getRandomValues(buffer);
             return Math.floor((buffer[0] / (0xffffffff + 1)) * (max - min + 1)) + min;
         }
 
-        // 4. UI INTERACTIONS (Shuffle & Draw)
-        document.getElementById('drawBtn').addEventListener('click', () => {
-            let deck = [...tarotDeck];
-            for (let i = deck.length - 1; i > 0; i--) {
-                const j = getSecureRandomInt(0, i);
-                [deck[i], deck[j]] = [deck[j], deck[i]];
-            }
-
-            currentSpread = [];
-            for (let i = 0; i < 3; i++) {
-                currentSpread.push({
-                    ...deck[i],
-                    position: i === 0 ? "Past" : i === 1 ? "Present" : "Future",
-                    isReversed: getSecureRandomInt(0, 1) === 1
-                });
-            }
-
+        document.getElementById('drawBtn').addEventListener('click', async () => {
+            const drawBtn = document.getElementById('drawBtn');
             const container = document.getElementById('spreadContainer');
-            container.innerHTML = '';
-            currentSpread.forEach(drawn => {
-                const rotationClass = drawn.isReversed ? 'reversed' : '';
-                container.innerHTML += `
-                    <div class="card-container">
-                        <div class="position-label">${drawn.position}</div>
-                        <img src="${drawn.image}" class="card-image ${rotationClass}" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'200\\' height=\\'350\\'><rect width=\\'100%\\' height=\\'100%\\' fill=\\'%23333\\'/></svg>'">
-                        <h3 class="card-title">${drawn.name}</h3>
-                        <p class="orientation">${drawn.isReversed ? 'Reversed' : 'Upright'}</p>
-                    </div>
-                `;
-            });
+            const analysisSection = document.getElementById('analysisSection');
+            
+            try {
+                drawBtn.disabled = true;
+                
+                if (typeof window.tarotDatabase === 'undefined' || window.tarotDatabase.length === 0) {
+                    alert("ERROR: The card database could not be found. Please ensure you have created 'card.js'.");
+                    drawBtn.disabled = false;
+                    return; 
+                }
 
-            document.getElementById('analysisSection').style.display = 'block';
-            document.getElementById('reportCard').style.display = 'none';
-            if(synth.speaking) synth.cancel(); 
+                container.innerHTML = '';
+                analysisSection.style.display = 'none';
+                analysisSection.style.opacity = '0';
+                document.getElementById('reportCard').style.display = 'none';
+                if(synth.speaking) synth.cancel();
+
+                let deck = [...window.tarotDatabase];
+                for (let i = deck.length - 1; i > 0; i--) {
+                    const j = getSecureRandomInt(0, i);
+                    [deck[i], deck[j]] = [deck[j], deck[i]];
+                }
+
+                currentSpread = [];
+                const positions = ["Past", "Present", "Future"];
+
+                for (let i = 0; i < 3; i++) {
+                    let isReversed = getSecureRandomInt(0, 1) === 1;
+                    let drawnCard = deck[i];
+                    
+                    // Pull the correct meaning based on orientation
+                    let meaning = isReversed ? drawnCard.reversed : drawnCard.upright;
+                    let orientationTxt = isReversed ? "(Reversed)" : "(Upright)";
+                    let rotationClass = isReversed ? 'reversed' : '';
+
+                    currentSpread.push({
+                        ...drawnCard,
+                        position: positions[i],
+                        isReversed: isReversed,
+                        activeMeaning: meaning
+                    });
+
+                    // INJECT HTML WITH DEEP EXPLANATION
+                    container.innerHTML += `
+                        <div class="card-container">
+                            <div class="position-label">${positions[i]}</div>
+                            <img src="${drawnCard.img}" class="card-image ${rotationClass}" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'200\\' height=\\'300\\'><rect width=\\'100%\\' height=\\'100%\\' fill=\\'%23333\\'/></svg>'">
+                            <h3 class="card-title">${drawnCard.name} <br><span style="font-size:0.8rem; color:#888;">${orientationTxt}</span></h3>
+                            
+                            <div class="deep-meaning">
+                                <strong style="color: var(--gold);">The Imagery:</strong><br>${drawnCard.description}<br><br>
+                                <strong style="color: var(--gold);">The Energy:</strong><br>${meaning}
+                            </div>
+                        </div>
+                    `;
+
+                    await sleep(1000); 
+                }
+
+                drawBtn.disabled = false;
+                analysisSection.style.display = 'block';
+                setTimeout(() => analysisSection.style.opacity = '1', 50);
+
+            } catch (error) {
+                console.error("Engine Crash:", error);
+                alert("A mystical disturbance occurred: " + error.message);
+                drawBtn.disabled = false; 
+            }
         });
 
-        // 5. API CALL TO HOSTED PROXY
+        // The Oracle API Call
         document.getElementById('analyzeBtn').addEventListener('click', async () => {
             const question = document.getElementById('userQuestion').value.trim() || "General reading for my current life path.";
             const btn = document.getElementById('analyzeBtn');
@@ -183,97 +232,67 @@
             spinner.style.display = 'block';
             reportCard.style.display = 'none';
 
-            let promptText = `You are an expert, empathetic, and profound Tarot Reader. 
-The user is asking: "${question}"
+				let promptText = `You are an ancient, esoteric Tarot Oracle who speaks with poetic, mystical, and profound empathy. The seeker has approached the veil with this intention: "${question}"
 
-The cryptographic engine has drawn the following 3-card spread:
-1. Past: ${currentSpread[0].name} (${currentSpread[0].isReversed ? 'Reversed' : 'Upright'})
-2. Present: ${currentSpread[1].name} (${currentSpread[1].isReversed ? 'Reversed' : 'Upright'})
-3. Future: ${currentSpread[2].name} (${currentSpread[2].isReversed ? 'Reversed' : 'Upright'})
+				The cryptographic cosmic engine has drawn:
+				1. Past: ${currentSpread[0].name} (${currentSpread[0].isReversed ? 'Reversed' : 'Upright'})
+				Imagery: ${currentSpread[0].description}
+				Core energy: ${currentSpread[0].activeMeaning}
 
-Please provide a highly professional, cohesive reading. Do not just list card definitions; synthesize how they interact with each other and the user's specific question. Use beautiful, mystical, yet grounded language. Structure the response clearly with headings.`;
+				2. Present: ${currentSpread[1].name} (${currentSpread[1].isReversed ? 'Reversed' : 'Upright'})
+				Imagery: ${currentSpread[1].description}
+				Core energy: ${currentSpread[1].activeMeaning}
 
-            const payload = {
-                contents: [{ parts: [{ text: promptText }] }]
-            };
+				3. Future: ${currentSpread[2].name} (${currentSpread[2].isReversed ? 'Reversed' : 'Upright'})
+				Imagery: ${currentSpread[2].description}
+				Core energy: ${currentSpread[2].activeMeaning}
+
+				Speak directly to the seeker's soul. Weave the specific visual imagery of the cards into a rich, symbolic narrative that gracefully answers their intention. Do not just list definitions; channel a true, cohesive, and deeply insightful reading. Structure the response cleanly with elegant headings.`;
+
 
             try {
-                // Using the dynamic endpoint function from your logic
                 const response = await fetch(getActiveEndpoint(), {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Custom-Api-Key': customApiKey // Passes the key to the proxy if needed
-                    },
-                    body: JSON.stringify(payload)
+                    headers: { 'Content-Type': 'application/json', 'X-Custom-Api-Key': customApiKey },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
                 });
 
                 const data = await response.json();
-                
-                let readingText = "The Oracle is silent.";
-                if (data.candidates && data.candidates[0] && data.candidates[0].content) {
-                    readingText = data.candidates[0].content.parts[0].text;
-                } else if (data.error) {
-                    throw new Error(data.error.message);
-                }
+                let readingText = data.candidates?.[0]?.content?.parts?.[0]?.text || "The Oracle is silent.";
+                if (data.error) throw new Error(data.error.message);
 
                 reportContent.innerHTML = marked.parse(readingText);
                 reportContent.dataset.rawtext = readingText; 
-
                 spinner.style.display = 'none';
                 reportCard.style.display = 'block';
                 btn.disabled = false;
 
             } catch (error) {
-                console.error("API Error:", error);
                 spinner.style.display = 'none';
-                reportContent.innerHTML = `<p style='color:red;'>The connection to the ethereal plane was disrupted. (${error.message || 'Server unreachable'}) Please ensure your PythonAnywhere server is active.</p>`;
+                reportContent.innerHTML = `<p style='color:red;'>Connection disrupted. (${error.message})</p>`;
                 reportCard.style.display = 'block';
                 btn.disabled = false;
             }
         });
 
-        // 6. READ ALOUD FUNCTIONALITY
+        // Speech & PDF logic
         document.getElementById('readAloudBtn').addEventListener('click', () => {
-            if (synth.speaking) {
-                synth.cancel();
-                document.getElementById('readAloudBtn').innerText = "🔊 Read Aloud";
-                return;
-            }
-
+            if (synth.speaking) { synth.cancel(); document.getElementById('readAloudBtn').innerText = "🔊 Read Aloud"; return; }
             const textToSpeak = document.getElementById('reportContent').dataset.rawtext;
             if (!textToSpeak) return;
-
-            const cleanText = textToSpeak.replace(/\*/g, '').replace(/#/g, '');
-            const utterance = new SpeechSynthesisUtterance(cleanText);
-            
+            const utterance = new SpeechSynthesisUtterance(textToSpeak.replace(/[*#]/g, ''));
             const voices = synth.getVoices();
-            const preferredVoice = voices.find(v => v.name.includes('Google UK English Female') || v.name.includes('Samantha') || v.lang === 'en-GB');
+            const preferredVoice = voices.find(v => v.name.includes('Female') || v.lang === 'en-GB');
             if (preferredVoice) utterance.voice = preferredVoice;
-
             utterance.rate = 0.9;
-            utterance.pitch = 0.9;
-
-            utterance.onend = () => { document.getElementById('readAloudBtn').innerText = "🔊 Read Aloud"; };
-            
+            utterance.onend = () => document.getElementById('readAloudBtn').innerText = "🔊 Read Aloud";
             document.getElementById('readAloudBtn').innerText = "🔇 Stop Reading";
             synth.speak(utterance);
         });
+        window.speechSynthesis.onvoiceschanged = () => synth.getVoices();
 
-        window.speechSynthesis.onvoiceschanged = () => { synth.getVoices(); };
-
-        // 7. EXPORT TO PDF FUNCTIONALITY
         document.getElementById('exportPdfBtn').addEventListener('click', () => {
-            const element = document.getElementById('pdfExportArea');
-            const opt = {
-                margin:       0.5,
-                filename:     'Tarot_Reading.pdf',
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#1e1e28' },
-                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-            };
-            
-            html2pdf().set(opt).from(element).save();
+            html2pdf().set({ margin: 0.5, filename: 'Tarot_Reading.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true, backgroundColor: '#1e1e28' }, jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' } }).from(document.getElementById('pdfExportArea')).save();
         });
     </script>
 </body>
