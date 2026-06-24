@@ -283,12 +283,12 @@
                         
                         dst.data[i] = dst.data[i+1] = dst.data[i+2] = diff * 7; // Amplify
                         dst.data[i+3] = 255;
-                        // Increased threshold to account for smartphone JPEG compression
-                        if(diff > 50) highVarCount++; // Localized spike threshold
+                        // Increased threshold to account for modern smartphone aggressive JPEG compression
+                        if(diff > 55) highVarCount++; // Localized spike threshold
                     }
                     resolve({ img: dst, score: (highVarCount / (w*h)) * 1000 });
                 };
-                compImg.src = canvas.toDataURL('image/jpeg', 0.90); // Adjusted to standard phone compression
+                compImg.src = canvas.toDataURL('image/jpeg', 0.90); 
             });
         }
 
@@ -472,59 +472,64 @@
 
             // 1. Evaluate AI Synthetics (Weight: HEAVY)
             metricsHTML += createMetricHTML("Spatial Periodic Grids (GANs)", ai.score, 25);
-            if(ai.score > 18) {
+            if(ai.score > 20) {
                 authScore -= 80;
                 reasons.push(`<span class="text-rose-400 font-bold">100% Synthetic:</span> Severe neural network upscaling grids detected. Matches transposed convolution layers used in Generative AI. Mathematically impossible for optical camera sensors.`);
-            } else if (ai.score > 8) {
-                authScore -= 10;
-                reasons.push(`<span class="text-sky-400 font-bold">Computational Photo:</span> Minor repeating grids suggest smartphone AI processing (Deep Fusion, Smart HDR, or heavy sharpening) rather than pure generation.`);
+            } else if (ai.score > 7) {
+                authScore -= 5; // Minor penalty for smartphone AI
+                reasons.push(`<span class="text-sky-400 font-bold">Computational Photo (Phone AI):</span> Minor repeating grids suggest smartphone built-in AI processing (e.g., Apple Deep Fusion, Android Smart Sharpening) rather than pure malicious generation.`);
             } else {
                 reasons.push(`<span class="text-emerald-400 font-bold">Spatial Grid Clear:</span> No generative upscaling matrices (checkerboard artifacts) found in the high-frequency domain.`);
             }
 
-            // 2. Evaluate Chroma Integrity
+            // 2. Evaluate Chroma Integrity (HDR Recognition)
             metricsHTML += createMetricHTML("CbCr Color-Space Bleed", chroma.score, 25);
-            if(chroma.score > 18 && ai.score <= 18) {
-                authScore -= 25;
-                reasons.push(`<span class="text-amber-400 font-bold">Color Synthesis:</span> High-frequency chroma noise indicates severe digital interpolation. Color channels exhibit sub-pixel bleeding that deviates from natural Bayer filter interpolation.`);
-            } else if (chroma.score <= 18) {
-                reasons.push(`<span class="text-emerald-400 font-bold">Chroma Integrity Pass:</span> Color-space boundaries are sharp and consistent with physical lens optics.`);
+            if(chroma.score > 25 && ai.score <= 20) {
+                authScore -= 20;
+                reasons.push(`<span class="text-amber-400 font-bold">Severe Color Synthesis:</span> High-frequency chroma noise indicates severe digital interpolation or generative fill artifacts.`);
+            } else if (chroma.score > 12 && ai.score <= 20) {
+                authScore -= 2; // Nominal penalty for HDR
+                reasons.push(`<span class="text-sky-400 font-bold">HDR / Scene Optimizer:</span> Elevated chroma variance typical of built-in smartphone High Dynamic Range (HDR) processing or automated color-boosting.`);
+            } else if (chroma.score <= 12) {
+                reasons.push(`<span class="text-emerald-400 font-bold">Chroma Integrity Pass:</span> Color-space boundaries are sharp and consistent with natural physical lens optics.`);
             }
 
             // 3. Evaluate Morphs & Splicing (ELA)
             metricsHTML += createMetricHTML("ELA Quantization Errors", ela.score, 25);
-            if(ela.score > 20 && ai.score <= 18) {
+            if(ela.score > 22 && ai.score <= 20) {
                 authScore -= 35;
-                reasons.push(`<span class="text-rose-400 font-bold">Digital Morphing:</span> Irregular JPEG blocks detected. Quantization tables show localized rewriting, highly indicative of clone-stamping, liquify tools, or spliced insertions.`);
-            } else if (ela.score <= 20) {
+                reasons.push(`<span class="text-rose-400 font-bold">Digital Morphing / Splicing:</span> Irregular JPEG blocks detected. Quantization tables show localized rewriting, highly indicative of clone-stamping, liquify tools, or spliced insertions.`);
+            } else if (ela.score <= 22) {
                 reasons.push(`<span class="text-emerald-400 font-bold">Compression Uniformity:</span> JPEG quantization tables are uniform across the image, suggesting no localized pixel warping or splicing.`);
             }
 
-            // 4. Background Swaps & Airbrushing (Adjusted for Phone Portrait Mode)
-            let noiseMismatch = Math.abs(topo.ratio - 1.0) * 10; // Normalize
+            // 4. Background Swaps vs. Portrait Mode
+            let noiseMismatch = Math.abs(topo.ratio - 1.0) * 10; 
             metricsHTML += createMetricHTML("Background Noise Variance", noiseMismatch, 20);
             
-            if(topo.ratio > 3.0 && ai.score <= 18) {
-                authScore -= 20;
-                if(topo.faceSmoothness < 5) {
-                    reasons.push(`<span class="text-amber-400 font-bold">Heavy Filtering:</span> Facial topology lacks sensor noise (extreme beauty filtering or airbrushing applied).`);
+            if(topo.ratio > 3.5 && ai.score <= 20) {
+                // Cross-verification: If ELA is high, it's a Photoshop composite. If ELA is low, it's just Portrait Mode.
+                if (ela.score > 18) {
+                    authScore -= 25;
+                    reasons.push(`<span class="text-rose-400 font-bold">Composite Swap:</span> Background noise signature severely mismatches the subject with harsh boundaries, indicating a manual composite or background replacement.`);
                 } else {
-                    reasons.push(`<span class="text-amber-400 font-bold">Depth Effect / Composite:</span> Severe background noise mismatch. Could be a composite swap OR heavy smartphone 'Portrait Mode' (artificial bokeh).`);
+                    authScore -= 3; // Very minor penalty
+                    reasons.push(`<span class="text-sky-400 font-bold">Portrait Mode / Depth Effect:</span> Severe background noise drop-off detected, but boundary compression is clean. Highly indicative of a smartphone's artificial background blur (Portrait Mode/Bokeh).`);
                 }
-            } else if (topo.ratio <= 3.0) {
-                reasons.push(`<span class="text-emerald-400 font-bold">Noise Floor Uniform:</span> Electronic sensor noise is consistent between the subject and background, indicating a single, un-composited exposure.`);
+            } else if (topo.ratio <= 3.5) {
+                reasons.push(`<span class="text-emerald-400 font-bold">Noise Floor Uniform:</span> Electronic sensor noise is consistent between the subject and background, indicating a standard single exposure.`);
             }
 
             // 5. Exposure Tweaks
             if(lum.blownRatio > 25) {
-                authScore -= 5;
-                reasons.push(`<span class="text-sky-400 font-bold">Post-Processing:</span> Histogram analysis shows severe clipping at the extremes, typical of destructive contrast pushing or global exposure adjustments.`);
+                authScore -= 4;
+                reasons.push(`<span class="text-sky-400 font-bold">Post-Processing:</span> Histogram analysis shows clipping at the extremes, typical of destructive contrast pushing, Instagram filters, or global exposure adjustments.`);
             }
 
-            // 6. Resolution Resampling (Informational Only - Does not affect score)
+            // 6. Resolution Resampling
             metricsHTML += createMetricHTML("Digital Resampling (Scale)", upscale.score, 15);
             if(upscale.score > 8) {
-                reasons.push(`<span class="text-sky-400 font-bold">Resolution Altered:</span> High levels of linear pixel interpolation detected. The image has likely been digitally upscaled or downscaled (resampled) from its native sensor resolution.`);
+                reasons.push(`<span class="text-sky-400 font-bold">Resolution Altered:</span> Linear pixel interpolation detected. The image was digitally upscaled or downscaled (e.g., social media compression or digital zoom).`);
             } else {
                 reasons.push(`<span class="text-slate-400 font-bold">Native Resolution:</span> Pixel gradients appear natural without heavy digital resizing or resampling artifacts.`);
             }
@@ -539,9 +544,8 @@
                     <div class="flex items-center gap-2 text-rose-400 font-bold text-[13px] tracking-wide uppercase">
                         <i data-lucide="shield-alert" class="w-5 h-5"></i> Critical AI Advisory
                     </div>
-                    <p class="text-[11px] leading-relaxed">While this image scored <strong class="text-white">${authScore}% Authentic</strong> and passed all mathematical pixel-level forensic tests, <strong>extreme caution is still required.</strong></p>
-                    <p class="text-[11px] leading-relaxed">Modern state-of-the-art Generative AI (e.g., Midjourney v6, advanced Flux/Diffusion models) can perfectly mimic physical camera sensor noise, optical lens distortion, and uniform compression arrays, effectively rendering heuristic mathematics blind.</p>
-                    <p class="text-[11px] leading-relaxed text-rose-300">Never trust an image solely based on pixel forensics. Always verify cryptographic metadata (C2PA standard) and verify the semantic context of the source.</p>
+                    <p class="text-[11px] leading-relaxed">While this image scored <strong class="text-white">${authScore}% Authentic</strong> and passed mathematical pixel forensics, <strong>caution is required.</strong></p>
+                    <p class="text-[11px] leading-relaxed">Modern state-of-the-art Generative AI can perfectly mimic physical camera sensor noise, optical lens distortion, and uniform compression arrays, effectively rendering heuristic mathematics blind.</p>
                 </div>`);
             }
 
@@ -549,7 +553,6 @@
             document.getElementById('metricsArea').innerHTML = metricsHTML;
             document.getElementById('reasonList').innerHTML = reasons.map(r => r.startsWith('<div') ? `<li class="list-none">${r}</li>` : `<li class="mb-1.5 leading-relaxed">• ${r}</li>`).join('');
             
-            // Re-initialize icons for newly injected HTML
             setTimeout(() => lucide.createIcons(), 10);
             
             const vHeader = document.getElementById('verdictHeader');
@@ -558,7 +561,8 @@
 
             scDisplay.innerText = `${authScore}%`;
 
-            if(authScore > 85) {
+            // Updated Threshold for "Authentic Capture" mapping better to smartphones
+            if(authScore >= 80) {
                 vHeader.className = 'p-6 border-b relative overflow-hidden bg-emerald-950/40 border-emerald-500/30 text-emerald-400';
                 vLabel.innerText = "Authentic Capture";
             } else if (authScore > 40) {
