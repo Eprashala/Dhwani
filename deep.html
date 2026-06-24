@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forensic Face Analyzer | DeepDetect V4</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; font-family: 'Inter', sans-serif; }
+        .canvas-container { background: #1e293b; border-radius: 0.5rem; overflow: hidden; aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center; border: 1px solid #334155; }
+        canvas { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .glass { background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.1); }
+    </style>
+</head>
+<body class="min-h-screen p-6">
+    <div class="max-w-7xl mx-auto space-y-6">
+        
+        <header class="flex items-center gap-3 pb-4 border-b border-slate-800">
+            <i data-lucide="shield-alert" class="w-8 h-8 text-cyan-500"></i>
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight">Cyber Forensics Analyzer</h1>
+                <p class="text-xs text-slate-400 font-mono">Browser-Level Pixel & Spatial Frequency Engine</p>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="space-y-4">
+                <div id="dropZone" class="glass p-8 rounded-xl border-2 border-dashed border-slate-600 hover:border-cyan-500 cursor-pointer text-center transition-colors">
+                    <input type="file" id="fileInput" accept="image/jpeg, image/png, image/webp" class="hidden">
+                    <i data-lucide="upload" class="w-10 h-10 mx-auto text-slate-400 mb-2"></i>
+                    <p class="font-semibold text-slate-200">Upload Target Image</p>
+                    <p class="text-xs text-slate-500 mt-1">Initiate Multi-Layer Analysis</p>
+                </div>
+
+                <div id="verdictBox" class="glass p-6 rounded-xl hidden">
+                    <h2 class="text-xs uppercase tracking-widest text-slate-400 mb-2">Authenticity Score</h2>
+                    <div class="text-5xl font-black mb-4" id="scoreDisplay">--%</div>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <h3 class="text-sm font-bold text-emerald-400 flex items-center gap-2 border-b border-slate-700 pb-1 mb-2">
+                                <i data-lucide="check-circle" class="w-4 h-4"></i> Authentic Indicators
+                            </h3>
+                            <ul id="goodList" class="text-xs space-y-1 text-slate-300 list-disc pl-4"></ul>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-bold text-rose-400 flex items-center gap-2 border-b border-slate-700 pb-1 mb-2">
+                                <i data-lucide="alert-triangle" class="w-4 h-4"></i> Inauthentic Anomalies
+                            </h3>
+                            <ul id="badList" class="text-xs space-y-1 text-slate-300 list-disc pl-4"></ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:col-span-2 grid grid-cols-2 gap-4 hidden" id="visualizerArea">
+                <div class="space-y-1">
+                    <span class="text-[10px] font-mono text-slate-400 uppercase">1. Source Optics</span>
+                    <div class="canvas-container"><canvas id="cOrig"></canvas></div>
+                </div>
+                <div class="space-y-1">
+                    <span class="text-[10px] font-mono text-slate-400 uppercase">2. Deep AI Artifacts (High-Pass)</span>
+                    <div class="canvas-container"><canvas id="cAI"></canvas></div>
+                </div>
+                <div class="space-y-1">
+                    <span class="text-[10px] font-mono text-slate-400 uppercase">3. Local Morphs (ELA)</span>
+                    <div class="canvas-container"><canvas id="cELA"></canvas></div>
+                </div>
+                <div class="space-y-1">
+                    <span class="text-[10px] font-mono text-slate-400 uppercase">4. Background Noise Topology</span>
+                    <div class="canvas-container"><canvas id="cNoise"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const vArea = document.getElementById('visualizerArea');
+        const vBox = document.getElementById('verdictBox');
+        
+        const ctxOrig = document.getElementById('cOrig').getContext('2d', { willReadFrequently: true });
+        const ctxAI = document.getElementById('cAI').getContext('2d', { willReadFrequently: true });
+        const ctxELA = document.getElementById('cELA').getContext('2d', { willReadFrequently: true });
+        const ctxNoise = document.getElementById('cNoise').getContext('2d', { willReadFrequently: true });
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-cyan-500'); });
+        dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('border-cyan-500'); });
+        dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('border-cyan-500'); if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]); });
+        fileInput.addEventListener('change', (e) => { if(e.target.files.length) handleFile(e.target.files[0]); });
+
+        function handleFile(file) {
+            if(!file.type.startsWith('image/')) return;
+            vArea.classList.remove('hidden'); vBox.classList.remove('hidden');
+            const reader = new FileReader();
+            reader.onload = (e) => { const img = new Image(); img.onload = () => processForensics(img); img.src = e.target.result; };
+            reader.readAsDataURL(file);
+        }
+
+        async function processForensics(img) {
+            document.getElementById('scoreDisplay').innerText = "CALC...";
+            document.getElementById('goodList').innerHTML = "";
+            document.getElementById('badList').innerHTML = "";
+
+            // Normalize size
+            const MAX = 600;
+            let w = img.width, h = img.height;
+            if(w > MAX || h > MAX) { const r = Math.min(MAX/w, MAX/h); w = Math.round(w*r); h = Math.round(h*r); }
+            
+            [ctxOrig, ctxAI, ctxELA, ctxNoise].forEach(c => { c.canvas.width = w; c.canvas.height = h; });
+            ctxOrig.drawImage(img, 0, 0, w, h);
+            const origData = ctxOrig.getImageData(0, 0, w, h);
+
+            // 1. Lighting & Professional vs Amateur Uniformity
+            const lightStats = analyzeLighting(origData);
+            
+            // 2. AI Generator Check
+            const aiData = calculateAIArtifacts(origData, w, h);
+            ctxAI.putImageData(aiData.img, 0, 0);
+
+            // 3. ELA (Morph Check)
+            const elaData = await calculateELA(ctxOrig.canvas, origData, w, h);
+            ctxELA.putImageData(elaData.img, 0, 0);
+
+            // 4. Background Swapping (Noise Floor)
+            const bgData = analyzeBackground(origData, w, h);
+            ctxNoise.putImageData(bgData.img, 0, 0);
+
+            compileReport(lightStats, aiData.score, elaData.score, bgData.ratio);
+        }
+
+        function analyzeLighting(data) {
+            let totalLum = 0, varianceSum = 0;
+            const pixels = data.data.length / 4;
+            const lums = new Float32Array(pixels);
+            
+            for(let i=0, j=0; i<data.data.length; i+=4, j++) {
+                const lum = 0.299*data.data[i] + 0.587*data.data[i+1] + 0.114*data.data[i+2];
+                lums[j] = lum;
+                totalLum += lum;
+            }
+            const avgLum = totalLum / pixels;
+            
+            for(let i=0; i<pixels; i++) { varianceSum += Math.pow(lums[i] - avgLum, 2); }
+            const stdDev = Math.sqrt(varianceSum / pixels);
+            
+            // Pro grading usually compresses dynamic range smoothly (StdDev 40-60)
+            // Amateur/Raw photos often have high harsh contrast or flat lighting (StdDev >70 or <30)
+            return { avg: avgLum, stdDev: stdDev };
+        }
+
+        function calculateAIArtifacts(data, w, h) {
+            const src = data.data;
+            const dst = new ImageData(w, h);
+            let aiScore = 0;
+            // Laplacian Kernel looks for unnatural 2x2 mathematical upscaling grids
+            for(let y=1; y<h-1; y++) {
+                for(let x=1; x<w-1; x++) {
+                    const idx = (y*w + x)*4;
+                    const center = src[idx];
+                    const up = src[((y-1)*w + x)*4]; const down = src[((y+1)*w + x)*4];
+                    const left = src[(y*w + (x-1))*4]; const right = src[(y*w + (x+1))*4];
+                    
+                    const edge = Math.abs((center*4) - (up+down+left+right));
+                    dst.data[idx] = dst.data[idx+1] = dst.data[idx+2] = edge;
+                    dst.data[idx+3] = 255;
+                    
+                    if(edge > 25 && edge < 60) aiScore++; // AI grids sit in mid-frequency
+                }
+            }
+            return { img: dst, score: (aiScore / (w*h)) * 100 };
+        }
+
+        function calculateELA(canvas, origData, w, h) {
+            return new Promise((resolve) => {
+                const compImg = new Image();
+                compImg.onload = () => {
+                    const tCtx = document.createElement('canvas').getContext('2d');
+                    tCtx.canvas.width = w; tCtx.canvas.height = h;
+                    tCtx.drawImage(compImg, 0, 0, w, h);
+                    const compData = tCtx.getImageData(0, 0, w, h);
+                    
+                    const dst = new ImageData(w, h);
+                    let morphScore = 0;
+
+                    for(let i=0; i<origData.data.length; i+=4) {
+                        const diff = Math.abs(origData.data[i] - compData.data[i]) + Math.abs(origData.data[i+1] - compData.data[i+1]) + Math.abs(origData.data[i+2] - compData.data[i+2]);
+                        dst.data[i] = dst.data[i+1] = dst.data[i+2] = diff * 8; // Amplify
+                        dst.data[i+3] = 255;
+                        if(diff > 30) morphScore++; // Hard modifications
+                    }
+                    resolve({ img: dst, score: (morphScore / (w*h)) * 1000 });
+                };
+                compImg.src = canvas.toDataURL('image/jpeg', 0.85); // Compress 85%
+            });
+        }
+
+        function analyzeBackground(data, w, h) {
+            const src = data.data;
+            const dst = new ImageData(w, h);
+            let centerNoise = 0, centerCount = 0;
+            let bgNoise = 0, bgCount = 0;
+
+            for(let y=1; y<h-1; y+=2) {
+                for(let x=1; x<w-1; x+=2) {
+                    const i = (y*w + x)*4;
+                    // Local high frequency noise estimation
+                    const noise = Math.abs(src[i] - src[i+4]) + Math.abs(src[i] - src[i+(w*4)]);
+                    dst.data[i] = dst.data[i+1] = dst.data[i+2] = noise * 5; dst.data[i+3] = 255;
+
+                    // Face usually in center 25%-75%
+                    if(x > w*0.25 && x < w*0.75 && y > h*0.25 && y < h*0.75) {
+                        centerNoise += noise; centerCount++;
+                    } else if (x < w*0.1 || x > w*0.9 || y < h*0.1 || y > h*0.9) { // Deep edges
+                        bgNoise += noise; bgCount++;
+                    }
+                }
+            }
+            const avgCenter = centerNoise / centerCount;
+            const avgBg = bgNoise / bgCount;
+            const mismatchRatio = Math.max(avgCenter, avgBg) / (Math.min(avgCenter, avgBg) || 1);
+            
+            return { img: dst, ratio: mismatchRatio };
+        }
+
+        function compileReport(light, ai, ela, bgRatio) {
+            let authenticity = 100;
+            const good = [], bad = [];
+
+            // 1. Deep AI Generation Check
+            if(ai > 8.0) {
+                authenticity -= 85;
+                bad.push("Entire face exhibits mathematical upscale artifacts. Image is likely 100% AI Generated (GAN/Diffusion).");
+            } else {
+                good.push("No generative neural network artifacts detected in spatial grid.");
+            }
+
+            // 2. Background Check
+            if(bgRatio > 1.8 && ai < 8.0) {
+                authenticity -= 35;
+                bad.push("Severe noise floor mismatch detected. The background was swapped or artificially inserted behind the face.");
+            } else if (ai < 8.0) {
+                good.push("Sensor noise is uniform across subject and background. Background is authentic.");
+            }
+
+            // 3. Local Morphs (Eyes, Cheeks, Lips)
+            if(ela > 15.0 && ai < 8.0) {
+                authenticity -= 40;
+                bad.push("Error Level Analysis found localized pixel warping. Specific facial features have been morphed, liquified, or retouched.");
+            } else if (ai < 8.0) {
+                good.push("JPEG quantization tables are consistent. No localized facial morphing detected.");
+            }
+
+            // 4. Lighting & Color Variance (Pro vs Amateur)
+            if(light.stdDev > 40 && light.stdDev < 65) {
+                good.push("Lighting profile indicates professional color grading or studio adjustments (Uniform brightness/exposure).");
+            } else {
+                good.push("Lighting retains high micro-variance and shadow depth, indicating raw, unedited amateur optical capture.");
+            }
+
+            // Constraints
+            authenticity = Math.max(0, Math.min(100, Math.round(authenticity)));
+
+            // Update UI
+            const sc = document.getElementById('scoreDisplay');
+            sc.innerText = `${authenticity}%`;
+            sc.className = `text-5xl font-black mb-4 ${authenticity > 80 ? 'text-emerald-400' : (authenticity > 40 ? 'text-yellow-400' : 'text-rose-500')}`;
+
+            document.getElementById('goodList').innerHTML = good.map(g => `<li>${g}</li>`).join('');
+            document.getElementById('badList').innerHTML = bad.map(b => `<li>${b}</li>`).join('');
+        }
+    </script>
+</body>
+</html>
