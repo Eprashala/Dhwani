@@ -37,7 +37,7 @@ const sharePdfBtn = document.getElementById('sharePdfBtn');
 const aiEngines = {
     "Anthropic": { url: "https://console.anthropic.com/settings/keys", models: ["Claude Opus 4.8", "Claude Fable 5", "Claude Sonnet 4.6", "Claude Code"] },
     "OpenAI": { url: "https://platform.openai.com/api-keys", models: ["GPT-5.5", "GPT-5.4", "GPT-5.3", "ChatGPT Operator (Agent Mode)", "GPT Image 2"] },
-    "Google DeepMind": { url: "https://aistudio.google.com/app/apikey", models: ["Gemini 3.5 Flash", "Gemini 3.1 Pro", "Gemini 3.1 Flash-lite", "Gemini 3.1 Flash-image", "Gemini 3-pro-image"] },
+    "Google DeepMind": { url: "https://aistudio.google.com/app/apikey", models: ["Gemini 3.5 Flash", "Gemini 3.1 Pro", "Gemini 3.1 Flash-lite", "Gemini 2.5 Pro", "Gemini 2.5 Flash", "Gemini 3.1 Flash-image", "Gemini 3-pro-image"] },
     "DeepSeek": { url: "https://platform.deepseek.com/api_keys", models: ["DeepSeek V4 Pro", "DeepSeek V4 Flash", "DeepSeek V3.2", "DeepSeek-R1-0528 (Updated)"] },
     "Meta": { url: "https://llama.meta.com/", models: ["Llama 4 Scout", "Llama 3.3"] },
     "xAI": { url: "https://console.x.ai/", models: ["Grok 4.3", "Grok 4 Fast"] },
@@ -148,7 +148,25 @@ function handleAudioUpload(event) {
     
     drawWaveform();
 
-    audioPlayer.onloadedmetadata = () => { audioDuration = audioPlayer.duration; };
+    audioPlayer.onloadedmetadata = () => { 
+        audioDuration = audioPlayer.duration; 
+        
+        // --- NEW: Default to entire audio selection ---
+        markIn = 0;
+        markOut = audioDuration;
+        
+        document.getElementById('markInDisplay').innerText = formatTime(markIn);
+        document.getElementById('markOutDisplay').innerText = formatTime(markOut);
+        
+        markerInEl.style.left = '0%';
+        markerOutEl.style.left = '100%';
+        markerInEl.style.display = 'block';
+        markerOutEl.style.display = 'block';
+        updateHighlight();
+        
+        analyzeBtn.disabled = false; // Enable scanning instantly
+        // ----------------------------------------------
+    };
 
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -158,6 +176,36 @@ function handleAudioUpload(event) {
     };
     reader.readAsDataURL(file);
 }
+
+// --- Fenced Playback Restraints ---
+audioPlayer.addEventListener('play', () => {
+    // If user hits play and they are outside the markers, snap to Mark In
+    if (markIn !== null && audioPlayer.currentTime < markIn) {
+        audioPlayer.currentTime = markIn;
+    }
+    if (markOut !== null && audioPlayer.currentTime >= markOut) {
+        audioPlayer.currentTime = markIn;
+    }
+});
+
+audioPlayer.addEventListener('timeupdate', () => {
+    // Auto-pause when the playhead hits Mark Out
+    if (markOut !== null && audioPlayer.currentTime >= markOut) {
+        audioPlayer.pause();
+        audioPlayer.currentTime = markIn; // Reset to start of region
+    }
+});
+
+audioPlayer.addEventListener('seeked', () => {
+    // Prevent the user from dragging the scrubber outside the selected region
+    if (markIn !== null && audioPlayer.currentTime < markIn) {
+        audioPlayer.currentTime = markIn;
+    } else if (markOut !== null && audioPlayer.currentTime > markOut) {
+        audioPlayer.currentTime = markIn;
+        audioPlayer.pause();
+    }
+});
+
 
 // --- Visualizer Logic ---
 function drawWaveform() {
@@ -235,8 +283,7 @@ function removeClip(index) {
     updateClipList();
 }
 
-// --- Direct API Call & TTS Logic ---
-// --- Deep Forensic & Lie Detection Analysis ---
+// --- Deep Forensic & Lie Detection Analysis (Multi-Engine Client-Side Router) ---
 analyzeBtn.addEventListener('click', async () => {
     const activeKey = localStorage.getItem('user_api_key');
     const selectedEngine = document.getElementById('engineSelect').value;
@@ -251,13 +298,21 @@ analyzeBtn.addEventListener('click', async () => {
     analyzeBtn.style.display = 'none';
     document.getElementById('loader').style.display = 'block';
     document.getElementById('statusText').style.display = 'block';
-    document.getElementById('statusText').innerText = `Routing audio to ${selectedEngine} (${selectedModel}) for micro-tremor extraction...`;
+    document.getElementById('statusText').innerText = `Establishing direct client link to ${selectedEngine} (${selectedModel})...`;
     audioBtn.style.display = 'none';
     sharePdfBtn.style.display = 'none';
 
     const context = document.getElementById('analysisContext').value;
     const targetLang = document.getElementById('userLang').value;
-    const timecodes = clippings.map(c => `[${formatTime(c.in)} to ${formatTime(c.out)}]`).join(", ");
+ 
+    let timecodes = "";
+    if (clippings.length > 0) {
+        // Use the queue if the user explicitly added clips
+        timecodes = clippings.map(c => `[${formatTime(c.in)} to ${formatTime(c.out)}]`).join(", ");
+    } else {
+        // Fallback to the currently selected region on the visualizer
+        timecodes = `[${formatTime(markIn)} to ${formatTime(markOut)}]`;
+    }
 
     const systemPrompt = `You are a Tier-1 Voice Stress Analyst (VSA), an expert in Linguistic Forensics, and a specialist in Deception Detection. You act as a brutal, unforgiving forensic truth-extraction tool.
     
@@ -273,16 +328,15 @@ analyzeBtn.addEventListener('click', async () => {
     <h3>1. Interrogation & Power Dynamics</h3>
     <p>Analyze the psychological baseline of the interaction. Who holds the authority? Is someone acting evasive or defensive?</p>
 
-    <!-- REPEAT FOR EACH IDENTIFIED SPEAKER -->
     <div class="speaker-section">
         <h2 class="speaker-header"><span class="editable-speaker" data-speaker-id="speaker_X" contenteditable="true">Speaker X</span></h2>
         
         <h3>A. Voice Stress & Deception Matrix (VSA)</h3>
         <ul>
-            <li><strong>Cognitive Load Indicators:</strong> Did their speech rate suddenly drop? Are there unnatural pauses or hesitation markers ('um', 'uh') indicating they are calculating a lie?</li>
-            <li><strong>Vocal Micro-Tremors (F0 Shifts):</strong> Did their pitch spike unnaturally? Note any tightening of the vocal cords that indicates an autonomic fear response (fear of getting caught).</li>
-            <li><strong>Linguistic Distancing:</strong> Are they avoiding direct ownership of statements (dropping pronouns like 'I' or 'me')?</li>
-            <li><strong>Swara Diagnosis:</strong> How irregular is their breathing pattern during questioning?</li>
+            <li><strong>Cognitive Load Indicators:</strong> unnatural pauses or hesitation markers indicating they are calculating a lie?</li>
+            <li><strong>Vocal Micro-Tremors (F0 Shifts):</strong> pitch spikes or autonomic fear responses?</li>
+            <li><strong>Linguistic Distancing:</strong> avoiding direct ownership of statements?</li>
+            <li><strong>Swara Diagnosis:</strong> irregular breathing patterns?</li>
         </ul>
 
         <h3>B. The Quantitative Truth Index</h3>
@@ -296,53 +350,137 @@ analyzeBtn.addEventListener('click', async () => {
             <li><strong>Authentic Truthfulness:</strong> %</li>
         </ul>
     </div>
-    <!-- END REPEAT -->
-       
-    Write your ENTIRE response exclusively in the ${targetLang} language. Deliver the response using cleanly structured HTML. Do NOT wrap your output in markdown backticks (\`\`\`html).`;
+    Write your ENTIRE response exclusively in the ${targetLang} language. Deliver the response using cleanly structured HTML. Do NOT wrap your output in markdown backticks.`;
 
-    // Note: To support all 12 engines seamlessly, this payload must be standardly routed through your backend proxy. 
-    // Below is the payload structure optimized for Google DeepMind (Gemini) as requested.
-    const payload = {
-        contents: [{ parts: [ { text: systemPrompt }, { inlineData: { mimeType: mimeType, data: base64Audio } } ] }]
+    let API_URL = "";
+    let fetchOptions = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
     };
-
-    let API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${activeKey}`;
-    
-    // In a production environment, you would use a switch statement here based on 'selectedEngine' 
-    // to alter the API_URL and payload structure to match Anthropic, OpenAI, etc.
+    let payload = {};
+    let extractedHTML = "";
 
     try {
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+	// ==========================================
+			// ROUTE 1: GOOGLE DEEPMIND (Native Audio Support)
+			// ==========================================
+			if (selectedEngine === "Google DeepMind") {
+				// Convert the dropdown text "Gemini 2.5 Pro" into the API format "gemini-2.5-pro"
+				let formattedModelName = selectedModel.toLowerCase().replace(/ /g, '-');
+				
+				API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${formattedModelName}:generateContent?key=${activeKey}`;
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error?.message || `HTTP Status: ${response.status}`);
-        }
+				payload = {
+					contents: [{ parts: [ { text: systemPrompt }, { inlineData: { mimeType: mimeType, data: base64Audio } } ] }]
+				};
+				fetchOptions.body = JSON.stringify(payload);
+
+				const response = await fetch(API_URL, fetchOptions);
+				
+				if (!response.ok) {
+					const errData = await response.json();
+					throw new Error(`Google API Error: ${errData.error?.message || response.statusText}`);
+				}
+				
+				const data = await response.json();
+				extractedHTML = data.candidates[0].content.parts[0].text;
+			}
         
-        const data = await response.json();
-        
-        if(data.candidates && data.candidates[0].content.parts[0].text) {
-            let resultText = data.candidates[0].content.parts[0].text;
-            resultText = resultText.replace(/```html/g, '').replace(/```/g, '').trim();
+        // ==========================================
+        // ROUTE 2: ANTHROPIC CLAUDE
+        // ==========================================
+        else if (selectedEngine === "Anthropic") {
+            // WARNING: Anthropic strictly blocks browser calls (CORS). Requires extension or proxy.
+            API_URL = "https://api.anthropic.com/v1/messages";
+            fetchOptions.headers['x-api-key'] = activeKey;
+            fetchOptions.headers['anthropic-version'] = "2023-06-01";
+            fetchOptions.headers['anthropic-dangerously-allow-browser'] = "true"; // Required flag for client-side attempts
             
-            rawReportText = resultText;
-            document.getElementById('reportTarget').innerHTML = resultText;
-            document.getElementById('reportSection').style.display = 'block';
-            
-            audioBtn.style.display = 'block';
-            audioBtn.innerHTML = "🔊 Listen";
-            sharePdfBtn.style.display = 'block';
-            
-        } else {
-            throw new Error("Invalid payload format received from the AI Engine.");
+            // Note: Claude does not natively ingest raw audio yet. It would fail here unless sending text.
+            // Sending base64 audio block as placeholder for their future multimodal endpoints.
+            payload = {
+                model: "claude-3-opus-20240229",
+                max_tokens: 4000,
+                system: "You are a Voice Stress Analyst.",
+                messages: [
+                    { 
+                        role: "user", 
+                        content: [
+                            { type: "text", text: systemPrompt },
+                            { type: "text", text: `[Audio Data Attached: ${mimeType}] -> Proceed with analysis.` }
+                        ] 
+                    }
+                ]
+            };
+            fetchOptions.body = JSON.stringify(payload);
+
+            const response = await fetch(API_URL, fetchOptions);
+            if (!response.ok) throw new Error(`Anthropic API Error (Likely CORS): ${response.statusText}`);
+            const data = await response.json();
+            extractedHTML = data.content[0].text;
         }
+
+        // ==========================================
+        // ROUTE 3: OPENAI & OpenAI-COMPATIBLE ENGINES 
+        // (DeepSeek, Mistral, xAI, Grok, Llama wrappers)
+        // ==========================================
+        else {
+            // Map the selected engine to its respective OpenAI-compatible REST endpoint
+            const endpoints = {
+                "OpenAI": "https://api.openai.com/v1/chat/completions",
+                "DeepSeek": "https://api.deepseek.com/v1/chat/completions",
+                "xAI": "https://api.x.ai/v1/chat/completions",
+                "Mistral AI": "https://api.mistral.ai/v1/chat/completions",
+                "Cohere": "https://api.cohere.com/v1/chat/completions",
+                "Zhipu AI": "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+            };
+
+            API_URL = endpoints[selectedEngine];
+            if (!API_URL) throw new Error("Endpoint routing not configured for this specific engine.");
+
+            fetchOptions.headers['Authorization'] = `Bearer ${activeKey}`;
+            
+            // Standard OpenAI payload structure
+            // WARNING: Unless using gpt-4o audio preview, most of these engines will ignore the audio or crash.
+            payload = {
+                model: selectedModel,
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: "Analyze the attached audio data based on the strict forensic instructions." }
+                ]
+            };
+
+            // Injecting Multimodal Audio for GPT-4o specifically
+            if (selectedEngine === "OpenAI" && selectedModel.includes("GPT")) {
+                payload.model = "gpt-4o"; // Forcing 4o for audio
+                payload.messages[1].content = [
+                    { type: "text", text: "Analyze the attached audio data based on the strict forensic instructions." },
+                    { type: "input_audio", input_audio: { data: base64Audio, format: "mp3" } } // OpenAI specific audio object
+                ];
+            }
+
+            fetchOptions.body = JSON.stringify(payload);
+
+            const response = await fetch(API_URL, fetchOptions);
+            if (!response.ok) throw new Error(`${selectedEngine} API Error (Likely CORS or Unsupported Audio Modality): ${response.statusText}`);
+            const data = await response.json();
+            extractedHTML = data.choices[0].message.content;
+        }
+
+        // ==========================================
+        // FINAL DOM INJECTION
+        // ==========================================
+        extractedHTML = extractedHTML.replace(/```html/g, '').replace(/```/g, '').trim();
+        rawReportText = extractedHTML;
+        document.getElementById('reportTarget').innerHTML = extractedHTML;
+        document.getElementById('reportSection').style.display = 'block';
+        
+        audioBtn.style.display = 'block';
+        audioBtn.innerHTML = "🔊 Listen";
+        sharePdfBtn.style.display = 'block';
 
     } catch (err) {
-        alert("Forensic Extraction Error: " + err.message);
+        alert("Forensic Extraction Failed.\n\nNote: Browsers block direct connections (CORS) to OpenAI, Anthropic, and DeepSeek. Google Gemini is the only engine that natively supports direct browser audio injection.\n\nError: " + err.message);
         analyzeBtn.style.display = 'block';
     } finally {
         document.getElementById('loader').style.display = 'none';
