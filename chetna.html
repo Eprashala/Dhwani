@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chetna - Ekagrachita Test</title>
+    <style>
+        :root {
+            --bg-color: #f4f4f9;
+            --text-color: #333;
+            --primary: #2c3e50;
+            --accent: #3498db;
+            --success: #2ecc71;
+            --danger: #e74c3c;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+        h1, h2, h3 { color: var(--primary); }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        
+        #flash-area {
+            font-size: 3rem;
+            font-weight: bold;
+            letter-spacing: 5px;
+            min-height: 80px;
+            margin: 30px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .input-area {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        input[type="text"] {
+            font-size: 1.5rem;
+            padding: 10px;
+            border: 2px solid #bdc3c7;
+            border-radius: 6px;
+            text-align: center;
+            text-transform: uppercase;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        
+        button {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 1.1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover { background-color: #2980b9; }
+        button:disabled { background-color: #95a5a6; cursor: not-allowed; }
+        
+        .expert-btn { background-color: var(--primary); margin-top: 20px;}
+        .expert-btn:hover { background-color: #1a252f; }
+
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            font-weight: bold;
+            color: #7f8c8d;
+        }
+        
+        #instruction-text {
+            font-size: 1.2rem;
+            color: var(--danger);
+            font-weight: bold;
+            min-height: 30px;
+        }
+
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .results-table th, .results-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .results-table th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="screen-welcome" class="screen active">
+        <h1>Chetna</h1>
+        <h2>Test Your Ekagrachita (Concentration)</h2>
+        <p>This diagnostic tool measures your level of one-pointed concentration. The test consists of up to 10 rounds.</p>
+        <p><strong>Instructions:</strong> Please keep everything aside. Pay 100% attention. You will be asked to recall numbers, recall words, correct misspelled words, or type misspelled words exactly as shown.</p>
+        <p>Your speed (in milliseconds) and accuracy will be recorded for Expert AI Analysis.</p>
+        <button onclick="startGame()">I am ready. Start Test.</button>
+    </div>
+
+    <div id="screen-game" class="screen">
+        <div class="stats">
+            <span id="round-display">Round: 1</span>
+            <span id="question-display">Question: 1/10</span>
+        </div>
+        <div id="instruction-text"></div>
+        <div id="flash-area"></div>
+        
+        <div id="input-section" class="input-area" style="display: none;">
+            <input type="text" id="user-input" autocomplete="off" onkeypress="handleEnter(event)">
+            <button id="submit-btn" onclick="submitAnswer()">Submit</button>
+        </div>
+    </div>
+
+    <div id="screen-round-result" class="screen">
+        <h2>Round Complete</h2>
+        <p id="round-summary-text"></p>
+        <button id="next-round-btn" onclick="startNextRound()">Start Next Round</button>
+        <button id="end-test-btn" onclick="showFinalResults()" style="background-color: var(--danger); margin-top: 10px;">End Test Now</button>
+    </div>
+
+    <div id="screen-final-result" class="screen">
+        <h2>Final Report</h2>
+        <div id="final-summary"></div>
+        <button class="expert-btn" id="expert-btn" onclick="sendToExpertAnalysis()">Get Expert AI Analysis</button>
+        <p id="api-status" style="margin-top: 15px; font-weight: bold;"></p>
+    </div>
+</div>
+
+<script>
+    <script>
+    // --- AI PROXY CONFIG ---
+    const PROXY_URL = "https://eprashala.pythonanywhere.com/api/chat";
+    let synth = window.speechSynthesis;
+
+    // --- State Variables ---
+    let gameHistory = []; // Your existing data
+    let isProcessing = false;
+
+    // --- Core AI Analysis Logic (From your provided file) ---
+    async function sendToExpertAnalysis() {
+        const btn = document.getElementById('expert-btn');
+        const status = document.getElementById('api-status');
+        
+        btn.disabled = true;
+        status.innerText = "Analyzing your Ekagrachita with AI...";
+        
+        try {
+            // Prepare the structured payload
+            const payload = {
+                model: "gemini-2.0-flash", // Use your preferred model
+                systemInstruction: {
+                    parts: [{ text: "You are an expert cognitive performance coach. Analyze the provided test data (accuracy, speed per round, and task complexity). Identify the user's concentration trend (Ekagrachita). Provide a concise, encouraging, and scientific breakdown of their focus levels and tips for improvement." }]
+                },
+                contents: [{
+                    role: "user",
+                    parts: [{ text: `Analyze this concentration test data: ${JSON.stringify(gameHistory)}` }]
+                }]
+            };
+
+            const response = await fetch(PROXY_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) throw new Error("Proxy connection failed");
+
+            const data = await response.json();
+            const analysis = data.candidates[0].content.parts[0].text;
+            
+            // Display the result
+            document.getElementById('final-summary').innerHTML += `
+                <div style="margin-top:20px; padding:15px; background:#f0f7ff; border-left: 5px solid #3498db; text-align:left;">
+                    <h4>🧠 Expert AI Insights:</h4>
+                    <p>${analysis}</p>
+                </div>
+            `;
+            
+            // Optional: Speak the result
+            speakAnalysis(analysis);
+
+        } catch (error) {
+            status.innerText = "Error: Could not reach the AI Server.";
+            status.style.color = "red";
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    // --- Speech Synthesis (From your provided file) ---
+    function speakAnalysis(text) {
+        synth.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'en-US';
+        utterance.rate = 0.9;
+        synth.speak(utterance);
+    }	
+	
+	// --- Dictionary and Data Generators ---
+    // A compact dictionary to pull words from for lengths 3 to 12.
+    const baseDictionary = {
+        3: ['CAT','DOG','SUN','BAT','PEN','HAT','BOX','CUP','MAP','RUN','SKY','CAR'],
+        4: ['BIRD','TREE','BOOK','FISH','STAR','MOON','DOOR','WIND','FIRE','SNOW','TIME','MIND'],
+        5: ['WATER','LIGHT','EARTH','SPACE','PLANT','RIVER','STONE','CLOUD','HEART','SOUND'],
+        6: ['NATURE','ENERGY','FOREST','ANIMAL','GARDEN','SPRING','SUMMER','WINTER','AUTUMN','PLANET'],
+        7: ['SCIENCE','JOURNEY','MORNING','EVENING','FREEDOM','SILENCE','COURAGE','WISDOM','VICTORY','MYSTERY'],
+        8: ['MOUNTAIN','UNIVERSE','PEACEFUL','STRENGTH','DISCOVER','CREATION','KNOWLEDGE','BEAUTIFUL'],
+        9: ['BRILLIANT','WONDERFUL','CHALLENGE','ADVENTURE','BUTTERFLY','SUNFLOWER','LANDSCAPE'],
+        10: ['PERFECTION','EXPERIENCE','LEADERSHIP','FRIENDSHIP','TECHNOLOGY','CONNECTION'],
+        11: ['IMAGINATION','ENVIRONMENT','FASCINATING','INSPIRATION','MASTERPIECE'],
+        12: ['INTELLIGENCE','ARCHITECTURE','CONSERVATION','INDEPENDENCE','APPRECIATION']
+    };
+
+    // Deep copy and shuffle for non-repeating questions
+    let availableWords = {};
+    for (let key in baseDictionary) {
+        availableWords[key] = [...baseDictionary[key]].sort(() => Math.random() - 0.5);
+    }
+
+    // --- State Variables ---
+    const MAX_ROUNDS = 10;
+    const QUESTIONS_PER_ROUND = 10;
+    const FLASH_DURATION = 2000; // 2 seconds
+
+    let currentRound = 1;
+    let currentQuestion = 1;
+    let gameHistory = []; // Stores all data for the AI
+    let roundStats = { correct: 0, total: 0 };
+    
+    let currentTask = {}; // { type, flashed, expected, startTime }
+
+    // --- Core Logic ---
+    function startGame() {
+        switchScreen('screen-game');
+        startQuestion();
+    }
+
+    function switchScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(screenId).classList.add('active');
+    }
+
+    function generateTask(length) {
+        // Types: 0 = Number, 1 = Word, 2 = Typo Correction, 3 = Exact Typo
+        const type = Math.floor(Math.random() * 4);
+        let flashed = "";
+        let expected = "";
+        let instruction = "";
+
+        if (type === 0) {
+            // Random Number
+            for(let i=0; i<length; i++) flashed += Math.floor(Math.random() * 10);
+            expected = flashed;
+            instruction = "Memorize the number";
+        } else {
+            // Get a word of exact length (fallback to random letters if we run out)
+            let word = "";
+            if (availableWords[length] && availableWords[length].length > 0) {
+                word = availableWords[length].pop();
+            } else {
+                for(let i=0; i<length; i++) word += String.fromCharCode(65 + Math.floor(Math.random() * 26));
+            }
+
+            if (type === 1) {
+                flashed = word;
+                expected = word;
+                instruction = "Memorize the word";
+            } else {
+                // Generate a typo (swap two adjacent characters)
+                let arr = word.split('');
+                if (arr.length > 1) {
+                    let idx = Math.floor(Math.random() * (arr.length - 1));
+                    let temp = arr[idx];
+                    arr[idx] = arr[idx+1];
+                    arr[idx+1] = temp;
+                }
+                let typo = arr.join('');
+                
+                if (type === 2) {
+                    flashed = typo;
+                    expected = word; // User must correct it
+                    instruction = "Correct the spelling";
+                } else {
+                    flashed = typo;
+                    expected = typo; // User must type the typo exactly
+                    instruction = "Type exactly as shown (even if wrong)";
+                }
+            }
+        }
+        return { type, flashed, expected, instruction };
+    }
+
+    function startQuestion() {
+        document.getElementById('round-display').innerText = `Round: ${currentRound}`;
+        document.getElementById('question-display').innerText = `Question: ${currentQuestion}/${QUESTIONS_PER_ROUND}`;
+        
+        const length = currentRound + 2; // R1=3, R2=4, etc.
+        currentTask = generateTask(length);
+        
+        const flashArea = document.getElementById('flash-area');
+        const inputSection = document.getElementById('input-section');
+        const instructionText = document.getElementById('instruction-text');
+        const userInput = document.getElementById('user-input');
+
+        // Reset UI
+        userInput.value = '';
+        inputSection.style.display = 'none';
+        instructionText.innerText = currentTask.instruction;
+        flashArea.innerText = currentTask.flashed;
+
+        // Flash sequence
+        setTimeout(() => {
+            flashArea.innerText = "???";
+            instructionText.innerText = "Type your answer now!";
+            inputSection.style.display = 'flex';
+            userInput.focus();
+            currentTask.startTime = performance.now(); // Start millisecond timer
+        }, FLASH_DURATION);
+    }
+
+    function handleEnter(e) {
+        if (e.key === 'Enter') submitAnswer();
+    }
+
+    function submitAnswer() {
+        const endTime = performance.now();
+        const timeTakenMs = Math.round(endTime - currentTask.startTime);
+        const userAnswer = document.getElementById('user-input').value.trim().toUpperCase();
+        
+        const isCorrect = userAnswer === currentTask.expected;
+        
+        if (isCorrect) roundStats.correct++;
+        roundStats.total++;
+
+        // Save to history
+        gameHistory.push({
+            round: currentRound,
+            question: currentQuestion,
+            taskType: currentTask.instruction,
+            length: currentRound + 2,
+            flashed: currentTask.flashed,
+            expected: currentTask.expected,
+            userAnswer: userAnswer,
+            isCorrect: isCorrect,
+            timeTakenMs: timeTakenMs
+        });
+
+        if (currentQuestion < QUESTIONS_PER_ROUND) {
+            currentQuestion++;
+            startQuestion();
+        } else {
+            endRound();
+        }
+		// Add this to your existing submitAnswer logic
+		if (timeTakenMs > 5000) {
+			// Flag potential distraction
+			gameHistory[gameHistory.length - 1].attentionFlag = "Slow Response";
+		}
+    }
+
+    function endRound() {
+        const percentage = Math.round((roundStats.correct / QUESTIONS_PER_ROUND) * 100);
+        document.getElementById('round-summary-text').innerHTML = 
+            `You got <strong>${roundStats.correct}</strong> out of ${QUESTIONS_PER_ROUND} correct.<br>
+            Accuracy: <strong>${percentage}%</strong>`;
+        
+        if (currentRound >= MAX_ROUNDS) {
+            document.getElementById('next-round-btn').style.display = 'none';
+        }
+
+        switchScreen('screen-round-result');
+    }
+
+    function startNextRound() {
+        currentRound++;
+        currentQuestion = 1;
+        roundStats = { correct: 0, total: 0 };
+        switchScreen('screen-game');
+        startQuestion();
+    }
+
+    function showFinalResults() {
+        let totalCorrect = 0;
+        let totalQuestions = gameHistory.length;
+        let totalTime = 0;
+        let html = '<table class="results-table"><tr><th>Round</th><th>Correct</th><th>Accuracy</th><th>Avg Speed</th></tr>';
+
+        // Group by round
+        let roundData = {};
+        gameHistory.forEach(q => {
+            if (!roundData[q.round]) roundData[q.round] = { correct: 0, total: 0, time: 0 };
+            if (q.isCorrect) roundData[q.round].correct++;
+            roundData[q.round].total++;
+            roundData[q.round].time += q.timeTakenMs;
+            
+            if (q.isCorrect) totalCorrect++;
+            totalTime += q.timeTakenMs;
+        });
+
+        for (let r in roundData) {
+            let data = roundData[r];
+            let acc = Math.round((data.correct / data.total) * 100);
+            let avgSpd = Math.round(data.time / data.total);
+            html += `<tr><td>${r}</td><td>${data.correct}/${data.total}</td><td>${acc}%</td><td>${avgSpd} ms</td></tr>`;
+        }
+        html += '</table>';
+
+        let overallAcc = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
+        
+        html = `<h3>Overall Accuracy: ${overallAcc}%</h3>` + html;
+        
+        document.getElementById('final-summary').innerHTML = html;
+        switchScreen('screen-final-result');
+    }
+
+    async function sendToExpertAnalysis() {
+        const btn = document.getElementById('expert-btn');
+        const status = document.getElementById('api-status');
+        
+        btn.disabled = true;
+        status.innerText = "Transmitting data to AI Server...";
+        status.style.color = "var(--text-color)";
+
+        try {
+            // NOTE: Replace this URL with your actual Python API endpoint
+            const response = await fetch('https://eprashala.pythonanywhere.com/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    testType: "Ekagrachita",
+                    totalRounds: currentRound,
+                    details: gameHistory
+                })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                status.innerText = "Report analyzed successfully! Check console or render UI here.";
+                status.style.color = "var(--success)";
+                console.log("AI Response:", data);
+            } else {
+                throw new Error("Server returned " + response.status);
+            }
+        } catch (error) {
+            status.innerText = "Note: API connection failed. Ensure your Python proxy server is running at '/api/analyze'.";
+            status.style.color = "var(--danger)";
+            console.error(error);
+        } finally {
+            btn.disabled = false;
+        }
+    }
+</script>
+</body>
+</html>
