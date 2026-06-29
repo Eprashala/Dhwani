@@ -256,7 +256,8 @@
                 <div class="flex flex-wrap justify-center gap-4 text-sm md:text-base font-semibold text-gray-800">
                     <span class="bg-white px-4 py-2 rounded-lg shadow-sm border border-orange-100">विक्रम संवत: <span id="r-vikram" class="text-orange-700"></span></span>
                     <span class="bg-white px-4 py-2 rounded-lg shadow-sm border border-orange-100">शक संवत: <span id="r-shaka" class="text-orange-700"></span></span>
-                    <span class="bg-white px-4 py-2 rounded-lg shadow-sm border border-orange-100">अयन: <span id="r-ayana" class="text-orange-700"></span></span>
+                    <span class="bg-white px-4 py-2 rounded-lg shadow-sm border border-orange-100">संवत्सर (वर्ष): <span id="r-samvatsara" class="text-orange-700 font-bold"></span></span>
+					<span class="bg-white px-4 py-2 rounded-lg shadow-sm border border-orange-100">अयन: <span id="r-ayana" class="text-orange-700"></span></span>
                     <span class="bg-white px-4 py-2 rounded-lg shadow-sm border border-orange-100">ऋतू: <span id="r-ritu" class="text-orange-700"></span></span>
                    	<span class="bg-white px-4 py-2 rounded-lg shadow-sm border border-orange-100 text-center">
     <span class="block text-orange-800 font-bold"><span id="r-maas-north"></span> (उत्तर भारतीय)</span>
@@ -512,7 +513,14 @@
         const MONTHS = ["चैत्र", "वैशाख", "ज्येष्ठ", "आषाढ", "श्रावण", "भाद्रपद", "अश्विन", "कार्तिक", "मार्गशीर्ष", "पौष", "माघ", "फाल्गुन"];
         const CHOGHADIYA_NAMES = ["उद्वेग", "चल", "लाभ", "अमृत", "काळ", "शुभ", "रोग"];
         const GANDMOOL_NAKSHATRAS = ["अश्विनी", "आश्लेषा", "मघा", "ज्येष्ठा", "मूळ", "रेवती"];
-        
+        const SAMVATSARAS = [
+			"प्रभव", "विभव", "शुक्ल", "प्रमोद", "प्रजापती", "अंगिरा", "श्रीमुख", "भाव", "युवा", "धाता",
+			"ईश्वर", "बहुधान्य", "प्रमाथी", "विक्रम", "वृष", "चित्रभानू", "सुभानू", "तारण", "पार्थिव", "व्यय",
+			"सर्वजित", "सर्वधारी", "विरोधी", "विकृती", "खर", "नंदन", "विजय", "जय", "मन्मथ", "दुर्मुख",
+			"हेमलंब", "विलंब", "विकारी", "शर्वरी", "प्लव", "शुभकृत", "शोभन", "क्रोधी", "विश्वावसु", "पराभव",
+			"प्लवंग", "कीलक", "सौम्य", "साधारण", "विरोधकृत", "परिधावी", "प्रमादी", "आनंद", "राक्षस", "नल",
+			"पिंगल", "कालयुक्त", "सिद्धार्थी", "रौद्र", "दुर्मती", "दुंदुभी", "रुधिरोद्गारी", "रक्ताक्षी", "क्रोधन", "क्षय"
+		];
         const CHOGHADIYA_BENEFITS = {
             "अमृत": "वाहने खरेदी, प्रवास, विद्यारंभ आणि शुभ कामे करण्यासाठी सर्वोत्तम.",
             "शुभ": "विवाह, वास्तू शांती, देवकार्य, आणि नवीन घर खरेदीसाठी लाभदायक.",
@@ -1257,8 +1265,26 @@
                 else if (sayanaSunSignIdx === 7 || sayanaSunSignIdx === 8) ritu = "हेमंत";   // वृश्चिक, धनु
                 else if (sayanaSunSignIdx === 9 || sayanaSunSignIdx === 10) ritu = "शिशिर"; // मकर, कुंभ
 
-                document.getElementById('r-vikram').innerText = targetDate.getFullYear() + 57;
-                document.getElementById('r-shaka').innerText = targetDate.getFullYear() - 78;
+				// --- 4.5 Samvatsara & Year Logic (Handling Chaitra overlap) ---
+					let shakaYear = targetDate.getFullYear() - 78;
+					let vikramYear = targetDate.getFullYear() + 57;
+					
+					// Vedic year changes on Chaitra. If the Gregorian month is Jan/Feb/Mar 
+					// but the Amanta month is late in the cycle (Pausha, Magha, Phalguna), 
+					// the Vedic year has not changed yet. We must hold it back.
+					let isPreChaitra = ["पौष", "माघ", "फाल्गुन"].includes(vedic.amantaMonth);
+					if (targetDate.getMonth() < 3 && isPreChaitra) {
+						shakaYear -= 1;
+						vikramYear -= 1;
+					}
+					
+					document.getElementById('r-vikram').innerText = vikramYear;
+					document.getElementById('r-shaka').innerText = shakaYear;
+					
+					// The Samvatsara calculation (60-year Jovian cycle offset mathematically)
+					let samvatsaraIndex = (shakaYear + 11) % 60;
+					document.getElementById('r-samvatsara').innerText = SAMVATSARAS[samvatsaraIndex];
+					
                 // उत्तरायण मकर संक्रांतीपासून सुरू होते (मकर ते मिथुन रास)
 				let isUttarayana = ["मकर", "कुंभ", "मीन", "मेष", "वृषभ", "मिथुन"].includes(vedic.sunSign);
 				document.getElementById('r-ayana').innerText = isUttarayana ? "उत्तरायण" : "दक्षिणायन";
