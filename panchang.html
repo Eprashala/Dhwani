@@ -258,7 +258,10 @@
                     <span class="bg-white px-4 py-2 rounded-lg shadow-sm border border-orange-100">शक संवत: <span id="r-shaka" class="text-orange-700"></span></span>
                     <span class="bg-white px-4 py-2 rounded-lg shadow-sm border border-orange-100">अयन: <span id="r-ayana" class="text-orange-700"></span></span>
                     <span class="bg-white px-4 py-2 rounded-lg shadow-sm border border-orange-100">ऋतू: <span id="r-ritu" class="text-orange-700"></span></span>
-                    <span class="bg-white px-4 py-2 rounded-lg shadow-sm border border-orange-100">अमांत मास: <span id="r-maas" class="text-orange-700"></span></span>
+                   	<span class="bg-white px-4 py-2 rounded-lg shadow-sm border border-orange-100 text-center">
+    <span class="block text-orange-800 font-bold"><span id="r-maas-north"></span> (उत्तर भारतीय)</span>
+    <span class="block text-sm text-indigo-700 font-semibold border-t border-orange-100 mt-1 pt-1"><span id="r-maas-south"></span> (दक्षिण भारतीय / अमांत)</span>
+</span>
                 </div>
             </div>
 
@@ -272,14 +275,14 @@
                 </div>
                 <div class="card p-4 rounded-xl text-center">
                     <h3 class="text-orange-600 font-bold mb-2 border-b border-orange-100 pb-1 title-font">पंचांग अंग</h3>
-                    <p class="text-sm mb-1">पक्ष: <span id="r-paksha" class="font-bold text-gray-900"></span></p>
-                    <p class="text-sm mb-1">तिथी: <span id="r-tithi" class="font-bold text-gray-900"></span></p>
+                    <p class="text-sm mb-1">तिथी: <span id="r-tithi" class="font-bold text-gray-900"></span> पक्ष: <span id="r-paksha" class="font-bold text-gray-900"></span></p>
+                    <p class="text-sm">वार: <span id="r-vaar" class="font-bold text-gray-900"></span></p>
 					<p class="text-sm mb-1 flex flex-wrap items-center gap-1">
 					नक्षत्र: <span id="r-nakshatra" class="font-bold text-gray-900"></span>
 					<span id="r-rain-vahan" class="hidden text-[11px] px-1.5 py-0.5 rounded border shadow-sm ml-1 transition-all"></span>
 					</p>
                     <p class="text-sm mb-1">योग: <span id="r-yoga" class="font-bold text-gray-900"></span></p>
-                    <p class="text-sm">वार: <span id="r-vaar" class="font-bold text-gray-900"></span></p>
+                    <p class="text-sm">२रे करण: <span id="r-karana2" class="font-bold text-gray-900"></span></p>
                 </div>
                 <div class="card p-4 rounded-xl text-center">
                     <h3 class="text-orange-600 font-bold mb-2 border-b border-orange-100 pb-1 title-font">राशी आणि करण</h3>
@@ -898,8 +901,32 @@
         k2_name = KARANAS[karanaIndex % 7];
     }
 
-    // 5. Month and Eclipse Logic
-    let amantaMonthIdx = (surya.sign + 1) % 12; 
+// 5. Exact Lunar Month Logic (Purnimanta vs Amanta)
+    // BUG FIX: We cannot use the instantaneous 'surya.sign' because the Chandramana month 
+    // is anchored to the Sun's position at the PREVIOUS New Moon (Amavasya).
+    
+    // The Moon gains approx 12.19° on the Sun per day, while the Sun moves 0.9856°.
+    // We calculate exactly how many degrees the Sun has traveled since the last Amavasya.
+    let sun_travel_since_amavasya = diff * (0.9856 / 12.19);
+    
+    // Back-project to find the Sun's exact longitude and Rashi at the last Amavasya.
+    let sun_at_last_amavasya = (sun_nirayana - sun_travel_since_amavasya + 360) % 360;
+    let rashi_at_last_amavasya = Math.floor(sun_at_last_amavasya / 30);
+    
+    // The Amanta month remains constant for all 30 tithis based on that starting Rashi.
+    let amantaMonthIdx = (rashi_at_last_amavasya + 1) % 12; 
+    let purnimantaMonthIdx = amantaMonthIdx;
+    
+    // In the Purnimanta system, the Krishna Paksha shifts forward to the next month's name.
+    if (paksha === "कृष्ण पक्ष") {
+        purnimantaMonthIdx = (amantaMonthIdx + 1) % 12;
+    }
+    
+    // In the Purnimanta system, the Krishna Paksha shifts forward to the next month's name.
+    if (paksha === "कृष्ण पक्ष") {
+        purnimantaMonthIdx = (amantaMonthIdx + 1) % 12;
+    }
+    
     let calcTime = new Date(date);
     
     // --- Tropical (Sayana) Sun for Rutu ---
@@ -938,6 +965,7 @@
         sunSign: RASHIS[surya.sign], 
         moonSign: RASHIS[chandra.sign],
         amantaMonth: MONTHS[amantaMonthIdx], 
+		purnimantaMonth: MONTHS[purnimantaMonthIdx],
         vaar: VAAR[calcTime.getDay()], 
         dayOfWeek: calcTime.getDay(),
         isBhadra: (k1_name === "विष्टी" || k2_name === "विष्टी"),
@@ -1175,7 +1203,8 @@
                 document.getElementById('r-sunset').innerHTML = formatTimeWithDate(times.sunset, targetDate);
                 document.getElementById('r-moonrise').innerHTML = formatTimeWithDate(mRise, targetDate);
                 document.getElementById('r-moonset').innerHTML = formatTimeWithDate(mSet, targetDate);
-                document.getElementById('r-maas').innerText = vedic.amantaMonth;
+                document.getElementById('r-maas-north').innerText = vedic.purnimantaMonth;
+				document.getElementById('r-maas-south').innerText = vedic.amantaMonth;
                 document.getElementById('r-paksha').innerText = vedic.paksha;
                 document.getElementById('r-tithi').innerText = vedic.tithi;
                 document.getElementById('r-nakshatra').innerText = vedic.nakshatra;
