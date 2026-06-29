@@ -773,34 +773,45 @@
             } catch (error) { return false; }
         }
 
-        function getCurrentLagna(now, lat, lon) {
+		function getCurrentLagna(now, lat, lon) {
+            // 1. Calculate exact Julian Date (JD) for the current millisecond
             const jd = (now.getTime() / 86400000) + 2440587.5;
-            const d = jd - 2451545.0;
-            
-            let L_sun = (280.459 + 0.98564736 * d) % 360;
-            let g_sun = (357.529 + 0.98560028 * d) % 360;
-            let sun_true = (L_sun + 1.915 * Math.sin(g_sun * Math.PI/180) + 0.020 * Math.sin(2 * g_sun * Math.PI/180)) % 360;
-            if(sun_true < 0) sun_true += 360;
-            const ayanamsa = 24.11 + ((now.getFullYear() - 2024) * 0.01396);
-            let sun_nirayana = (sun_true - ayanamsa + 360) % 360;
+            const d = jd - 2451545.0; // Days since J2000.0 epoch
 
-            const times = SunCalc.getTimes(now, lat, lon);
-            if (!times.sunrise) return "अज्ञात";
-            
-            let hoursSinceSunrise = (now.getTime() - times.sunrise.getTime()) / 3600000;
-            if (hoursSinceSunrise < 0) {
-                const yesterday = new Date(now.getTime() - 86400000);
-                const yTimes = SunCalc.getTimes(yesterday, lat, lon);
-                if(yTimes.sunrise) hoursSinceSunrise = (now.getTime() - yTimes.sunrise.getTime()) / 3600000;
-            }
+            // 2. Greenwich Mean Sidereal Time (GMST) in degrees
+            let gmst = (280.46061837 + 360.98564736629 * d) % 360;
+            if (gmst < 0) gmst += 360;
 
-			let ascendantDegree = (sun_nirayana + (hoursSinceSunrise * 15)) % 360;
+            // 3. Local Sidereal Time (LST) based on user's exact longitude
+            let lst = (gmst + lon) % 360;
+            if (lst < 0) lst += 360;
+
+            const rad = Math.PI / 180;
+            let lstRad = lst * rad;
+            let latRad = lat * rad;
+
+            // 4. Obliquity of the Ecliptic (Earth's exact axial tilt)
+            let ecl = (23.4392911 - 0.00000036 * d) * rad;
+
+            // 5. Exact Spherical Trigonometry for Ascendant (Oblique Ascension)
+            // This replaces the flawed "15 degrees per hour" logic and accounts for Rasimana (Sign rise times)
+            let y = Math.cos(lstRad);
+            let x = -(Math.sin(lstRad) * Math.cos(ecl) + Math.tan(latRad) * Math.sin(ecl));
             
-            // Calculate Rashi (30 degrees each)
-            let ascendantIndex = Math.floor(ascendantDegree / 30);
-            
-            // Calculate Nakshatra (13.333 degrees each)
-            let nakshatraIndex = Math.floor(ascendantDegree / (360 / 27));
+            let ascendantTropical = Math.atan2(y, x) / rad;
+            if (ascendantTropical < 0) ascendantTropical += 360;
+
+            // 6. Precise True Lahiri Ayanamsa (Chitrapaksha) Calculation
+            // This replaces the linear approximation with the polynomial formula for higher accuracy
+            const t = d / 36525; // Julian centuries since J2000
+            const ayanamsa = 23.858123 + (1.396041 * t) + (0.000308 * t * t);
+
+            // 7. Calculate Sidereal (Nirayana) Lagna
+            let ascendantSidereal = (ascendantTropical - ayanamsa + 360) % 360;
+
+            // 8. Calculate Rashi and Nakshatra boundaries
+            let ascendantIndex = Math.floor(ascendantSidereal / 30);
+            let nakshatraIndex = Math.floor(ascendantSidereal / (360 / 27));
 
             return { rashiIdx: ascendantIndex, nakIdx: nakshatraIndex };
         }
