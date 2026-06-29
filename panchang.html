@@ -279,18 +279,18 @@
                     <p class="text-sm">वार: <span id="r-vaar" class="font-bold text-gray-900"></span></p>
 					<p class="text-sm mb-1 flex flex-wrap items-center gap-1">
 					नक्षत्र: <span id="r-nakshatra" class="font-bold text-gray-900"></span>
+					<span id="r-nakshatra-tattva" class="hidden text-[11px] px-1.5 py-0.5 rounded border shadow-sm ml-1 transition-all"></span>
 					<span id="r-rain-vahan" class="hidden text-[11px] px-1.5 py-0.5 rounded border shadow-sm ml-1 transition-all"></span>
 					</p>
                     <p class="text-sm mb-1">योग: <span id="r-yoga" class="font-bold text-gray-900"></span></p>
-                    <p class="text-sm">२रे करण: <span id="r-karana2" class="font-bold text-gray-900"></span></p>
                 </div>
                 <div class="card p-4 rounded-xl text-center">
                     <h3 class="text-orange-600 font-bold mb-2 border-b border-orange-100 pb-1 title-font">राशी आणि करण</h3>
                     <p class="text-sm mb-1">सूर्य रास: <span id="r-sunsign" class="font-bold text-orange-700"></span></p>
                     <p class="text-sm mb-1">चंद्र रास: <span id="r-moonsign" class="font-bold text-blue-700"></span></p>
                     <p class="text-sm mb-1">१ले करण: <span id="r-karana1" class="font-bold text-gray-900"></span></p>
-                    <p class="text-sm">२रे करण: <span id="r-karana2" class="font-bold text-gray-900"></span></p>
-                </div>
+					<p class="text-sm">२रे करण: <span id="r-karana2" class="font-bold text-gray-900"></span></p>
+				</div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
@@ -952,6 +952,23 @@
         9: { name: "हत्ती", prediction: "जोरदार वृष्टी", style: "text-blue-700 bg-blue-100 border-blue-300" }
     };
 
+		let rashiIndex = chandra.sign;
+			let tattvaName = "";
+			let tattvaStyle = "";
+			
+			if (rashiIndex === 0 || rashiIndex === 4 || rashiIndex === 8) {
+				tattvaName = "अग्नि (Fire)";
+				tattvaStyle = "text-red-700 bg-red-100 border-red-300"; 
+			} else if (rashiIndex === 1 || rashiIndex === 5 || rashiIndex === 9) {
+				tattvaName = "पृथ्वी (Earth)";
+				tattvaStyle = "text-green-800 bg-green-100 border-green-400"; 
+			} else if (rashiIndex === 2 || rashiIndex === 6 || rashiIndex === 10) {
+				tattvaName = "वायू (Air)";
+				tattvaStyle = "text-gray-700 bg-gray-100 border-gray-300"; 
+			} else if (rashiIndex === 3 || rashiIndex === 7 || rashiIndex === 11) {
+				tattvaName = "जल (Water)";
+				tattvaStyle = "text-blue-700 bg-blue-100 border-blue-300"; 
+			}
 
 
     return {
@@ -968,6 +985,8 @@
 		purnimantaMonth: MONTHS[purnimantaMonthIdx],
         vaar: VAAR[calcTime.getDay()], 
         dayOfWeek: calcTime.getDay(),
+		nakshatraTattva: tattvaName,          
+        nakshatraTattvaStyle: tattvaStyle,
         isBhadra: (k1_name === "विष्टी" || k2_name === "विष्टी"),
         eclipseType: "none", // For absolute eclipse data, you'd need the Rahu coordinates from API
         exactLagna: RASHIS[apiData.asc_sign - 1], // Pulled directly from swe.houses_ex
@@ -1208,6 +1227,12 @@
                 document.getElementById('r-paksha').innerText = vedic.paksha;
                 document.getElementById('r-tithi').innerText = vedic.tithi;
                 document.getElementById('r-nakshatra').innerText = vedic.nakshatra;
+				const tattvaSpan = document.getElementById('r-nakshatra-tattva');
+				if (tattvaSpan && vedic.nakshatraTattva) {
+					tattvaSpan.innerHTML = `तत्त्व: ${vedic.nakshatraTattva}`;
+					tattvaSpan.className = `text-[11px] px-1.5 py-0.5 rounded border shadow-sm ml-1 font-bold flex items-center ${vedic.nakshatraTattvaStyle}`;
+					tattvaSpan.classList.remove('hidden');
+				}
 							const rainSpan = document.getElementById('r-rain-vahan');
 				if(rainSpan && vedic.rainVahan) {
 					rainSpan.innerHTML = `🌧️ पर्जन्य वाहन: ${vedic.rainVahan.name} - <strong>${vedic.rainVahan.prediction}</strong>`;
