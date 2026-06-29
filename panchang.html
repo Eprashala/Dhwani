@@ -274,17 +274,32 @@
                     <p class="text-sm text-blue-800 mb-2">चंद्रोदय: <span id="r-moonrise" class="font-bold text-base"></span></p>
                     <p class="text-sm text-blue-800">चंद्रास्त: <span id="r-moonset" class="font-bold text-base"></span></p>
                 </div>
-                <div class="card p-4 rounded-xl text-center">
-                    <h3 class="text-orange-600 font-bold mb-2 border-b border-orange-100 pb-1 title-font">पंचांग अंग</h3>
-                    <p class="text-sm mb-1">तिथी: <span id="r-tithi" class="font-bold text-gray-900"></span> पक्ष: <span id="r-paksha" class="font-bold text-gray-900"></span></p>
-                    <p class="text-sm">वार: <span id="r-vaar" class="font-bold text-gray-900"></span></p>
-					<p class="text-sm mb-1 flex flex-wrap items-center gap-1">
-					नक्षत्र: <span id="r-nakshatra" class="font-bold text-gray-900"></span>
-					<span id="r-nakshatra-tattva" class="hidden text-[11px] px-1.5 py-0.5 rounded border shadow-sm ml-1 transition-all"></span>
-					<span id="r-rain-vahan" class="hidden text-[11px] px-1.5 py-0.5 rounded border shadow-sm ml-1 transition-all"></span>
-					</p>
-                    <p class="text-sm mb-1">योग: <span id="r-yoga" class="font-bold text-gray-900"></span></p>
-                </div>
+				 <div class="card p-4 rounded-xl text-center flex flex-col justify-center h-full">
+					<h3 class="text-orange-600 font-bold mb-3 border-b border-orange-100 pb-1 title-font">पंचांग अंग</h3>
+					
+					<div class="flex justify-center items-center gap-3 mb-2">
+						<p class="text-sm text-gray-700">पक्ष: <span id="r-paksha" class="font-bold text-gray-900"></span></p>
+						<p class="text-sm text-gray-700">तिथी: <span id="r-tithi" class="font-bold text-gray-900"></span></p>
+					</div>
+					
+					<p class="text-sm mb-3 text-gray-700">वार: <span id="r-vaar" class="font-bold text-gray-900"></span></p>
+					
+					<!-- Nakshatra Cluster Box -->
+					<div class="bg-orange-50/50 rounded-lg p-3 border border-orange-100 mb-3 mx-auto w-full max-w-[260px] shadow-sm">
+						<p class="text-sm mb-2 text-gray-700">नक्षत्र: <span id="r-nakshatra" class="font-bold text-gray-900 text-base"></span></p>
+						
+						<div class="flex flex-wrap justify-center items-center gap-2 mb-2">
+							<span id="r-nakshatra-lord" class="text-[11px] px-2 py-0.5 rounded border shadow-sm text-indigo-800 bg-indigo-50 border-indigo-200 font-bold hidden transition-all"></span>
+							<span id="r-nakshatra-tattva" class="hidden transition-all"></span>
+						</div>
+						
+						<div class="flex justify-center">
+							<span id="r-rain-vahan" class="hidden transition-all"></span>
+						</div>
+					</div>
+					
+					<p class="text-sm mt-auto text-gray-700">योग: <span id="r-yoga" class="font-bold text-gray-900"></span></p>
+				</div>
                 <div class="card p-4 rounded-xl text-center">
                     <h3 class="text-orange-600 font-bold mb-2 border-b border-orange-100 pb-1 title-font">राशी आणि करण</h3>
                     <p class="text-sm mb-1">सूर्य रास: <span id="r-sunsign" class="font-bold text-orange-700"></span></p>
@@ -960,45 +975,51 @@
         9: { name: "हत्ती", prediction: "जोरदार वृष्टी", style: "text-blue-700 bg-blue-100 border-blue-300" }
     };
 
-		let rashiIndex = chandra.sign;
-			let tattvaName = "";
-			let tattvaStyle = "";
-			
-			if (rashiIndex === 0 || rashiIndex === 4 || rashiIndex === 8) {
-				tattvaName = "अग्नि (Fire)";
-				tattvaStyle = "text-red-700 bg-red-100 border-red-300"; 
-			} else if (rashiIndex === 1 || rashiIndex === 5 || rashiIndex === 9) {
-				tattvaName = "पृथ्वी (Earth)";
-				tattvaStyle = "text-green-800 bg-green-100 border-green-400"; 
-			} else if (rashiIndex === 2 || rashiIndex === 6 || rashiIndex === 10) {
-				tattvaName = "वायू (Air)";
-				tattvaStyle = "text-gray-700 bg-gray-100 border-gray-300"; 
-			} else if (rashiIndex === 3 || rashiIndex === 7 || rashiIndex === 11) {
-				tattvaName = "जल (Water)";
-				tattvaStyle = "text-blue-700 bg-blue-100 border-blue-300"; 
-			}
+// 7. BPHS Nakshatra Lord and Exact Pancha Mahabhuta (Tattva) Logic
+    const NAKSHATRA_LORDS = ["केतू", "शुक्र", "सूर्य", "चंद्र", "मंगळ", "राहू", "गुरू", "शनी", "बुध"];
+    
+    // Applying the precise elemental nature of the ruling planets.
+    // Rahu and Ketu are both 'Chhaya Grahas' (Shadows) and rule the Vayu (Air) element.
+    const NAKSHATRA_TATTVAS = [
+        { name: "वायू (Air)", style: "text-gray-700 bg-gray-100 border-gray-300" },      // Ketu
+        { name: "जल (Water)", style: "text-blue-700 bg-blue-100 border-blue-300" },     // Venus
+        { name: "अग्नि (Fire)", style: "text-red-700 bg-red-100 border-red-300" },      // Sun
+        { name: "जल (Water)", style: "text-blue-700 bg-blue-100 border-blue-300" },     // Moon
+        { name: "अग्नि (Fire)", style: "text-red-700 bg-red-100 border-red-300" },      // Mars
+        { name: "वायू (Air)", style: "text-gray-700 bg-gray-100 border-gray-300" },       // Rahu
+        { name: "आकाश (Ether)", style: "text-purple-700 bg-purple-100 border-purple-300" }, // Jupiter
+        { name: "वायू (Air)", style: "text-gray-700 bg-gray-100 border-gray-300" },       // Saturn
+        { name: "पृथ्वी (Earth)", style: "text-green-800 bg-green-100 border-green-400" } // Mercury
+    ];
 
-
+    let lordIndex = nakshatraIndex % 9;
+    let nLord = NAKSHATRA_LORDS[lordIndex];
+    let nTattva = NAKSHATRA_TATTVAS[lordIndex].name;
+    let nTattvaStyle = NAKSHATRA_TATTVAS[lordIndex].style;
+	
     return {
         sun_true: sun_true,
         tithiIndex: tithiIndex,
-        tithi: tithiName, paksha: paksha, 
+        tithi: tithiName, 
+        paksha: paksha, 
         nakshatraIndex: nakshatraIndex,
         nakshatra: NAKSHATRAS[nakshatraIndex],
         yoga: YOGAS[yogaIndex], 
-        karana1: k1_name, karana2: k2_name,
+        karana1: k1_name, 
+        karana2: k2_name,
         sunSign: RASHIS[surya.sign], 
         moonSign: RASHIS[chandra.sign],
         amantaMonth: MONTHS[amantaMonthIdx], 
-		purnimantaMonth: MONTHS[purnimantaMonthIdx],
+        purnimantaMonth: MONTHS[purnimantaMonthIdx],
         vaar: VAAR[calcTime.getDay()], 
         dayOfWeek: calcTime.getDay(),
-		nakshatraTattva: tattvaName,          
-        nakshatraTattvaStyle: tattvaStyle,
+        nakshatraLord: nLord,                 
+        nakshatraTattva: nTattva,             
+        nakshatraTattvaStyle: nTattvaStyle,   
         isBhadra: (k1_name === "विष्टी" || k2_name === "विष्टी"),
-        eclipseType: "none", // For absolute eclipse data, you'd need the Rahu coordinates from API
-        exactLagna: RASHIS[apiData.asc_sign - 1], // Pulled directly from swe.houses_ex
-		rainVahan: PARJANYA_DATA[parjanyaCalc]
+        eclipseType: "none", 
+        exactLagna: RASHIS[apiData.asc_sign - 1], 
+        rainVahan: PARJANYA_DATA[parjanyaCalc]
     };
 
 
@@ -1235,18 +1256,28 @@
                 document.getElementById('r-paksha').innerText = vedic.paksha;
                 document.getElementById('r-tithi').innerText = vedic.tithi;
                 document.getElementById('r-nakshatra').innerText = vedic.nakshatra;
+				
+				const lordSpan = document.getElementById('r-nakshatra-lord');
+				if (lordSpan && vedic.nakshatraLord) {
+					lordSpan.innerHTML = `स्वामी: ${vedic.nakshatraLord}`;
+					lordSpan.classList.remove('hidden');
+				}
+
 				const tattvaSpan = document.getElementById('r-nakshatra-tattva');
-				if (tattvaSpan && vedic.nakshatraTattva) {
-					tattvaSpan.innerHTML = `तत्त्व: ${vedic.nakshatraTattva}`;
-					tattvaSpan.className = `text-[11px] px-1.5 py-0.5 rounded border shadow-sm ml-1 font-bold flex items-center ${vedic.nakshatraTattvaStyle}`;
-					tattvaSpan.classList.remove('hidden');
-				}
-							const rainSpan = document.getElementById('r-rain-vahan');
-				if(rainSpan && vedic.rainVahan) {
-					rainSpan.innerHTML = `🌧️ पर्जन्य वाहन: ${vedic.rainVahan.name} - <strong>${vedic.rainVahan.prediction}</strong>`;
-					rainSpan.className = `text-[11px] px-1.5 py-0.5 rounded border shadow-sm ml-1 flex items-center ${vedic.rainVahan.style}`;
-					rainSpan.classList.remove('hidden');
-				}
+                if (tattvaSpan && vedic.nakshatraTattva) {
+                    tattvaSpan.innerHTML = `तत्त्व: ${vedic.nakshatraTattva}`;
+                    // Removed ml-1, added px-2 and justify-center
+                    tattvaSpan.className = `text-[11px] px-2 py-0.5 rounded border shadow-sm font-bold flex items-center justify-center ${vedic.nakshatraTattvaStyle}`;
+                    tattvaSpan.classList.remove('hidden');
+                }
+                
+                const rainSpan = document.getElementById('r-rain-vahan');
+                if(rainSpan && vedic.rainVahan) {
+                    rainSpan.innerHTML = `🌧️ पर्जन्य वाहन: ${vedic.rainVahan.name} - <strong>${vedic.rainVahan.prediction}</strong>`;
+                    // Removed ml-1, added px-2, py-1, and w-full for a neat horizontal badge
+                    rainSpan.className = `text-[11px] px-2 py-1 rounded border shadow-sm flex items-center justify-center w-full ${vedic.rainVahan.style}`;
+                    rainSpan.classList.remove('hidden');
+                }
                 document.getElementById('r-yoga').innerText = vedic.yoga;
                 document.getElementById('r-vaar').innerText = vedic.vaar;
                 document.getElementById('r-sunsign').innerText = vedic.sunSign;
