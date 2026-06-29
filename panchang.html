@@ -185,7 +185,7 @@
             <div class="text-center md:text-right w-full md:w-1/2 pl-4">
                 <h3 class="text-orange-800 font-bold text-xl mb-1">सध्याची वेळ (हिंदू वैदिक)</h3>
                 <p id="clock-hindu" class="text-lg font-bold text-red-700">लोड होत आहे...</p>
-                <p class="text-sm text-gray-600 mt-1">सूर्योदयापासून मोजलेली: घटी (२४ मि), पळे (२४ से), निमिष</p>
+			<p class="text-sm text-gray-600 mt-1">सूर्योदयापासून मोजलेली: घटी (२४ मि), पळे (२४ से), विपळे (०.४ से)</p>
 			 <div class="mt-2 bg-indigo-50 inline-block px-4 py-2 rounded-xl border border-indigo-200 text-center shadow-sm w-full max-w-sm">
 				<p class="text-md text-indigo-800 font-bold mb-1">तात्कालिक लग्न (Rashi): <span id="live-lagna" class="text-indigo-950 text-lg">...</span></p>
 				<div id="live-lagna-details" class="flex justify-center items-center gap-1 hidden flex-wrap">
@@ -945,15 +945,18 @@
                         const yTimes = SunCalc.getTimes(yesterday, currentLat, currentLon);
                         msSinceSunrise = now.getTime() - yTimes.sunrise.getTime();
                     }
-                    const totalSeconds = Math.floor(msSinceSunrise / 1000);
-                    const ghati = Math.floor(totalSeconds / 1440);
-                    const remainingSecs1 = totalSeconds % 1440;
-                    const pala = Math.floor(remainingSecs1 / 24);
-                    const remainingSecs2 = remainingSecs1 % 24;
-                    const nimisha = Math.floor(remainingSecs2 / 0.2133);
-                    const muhurta = Math.floor(totalSeconds / 2880) + 1; 
+					const ghati = Math.floor(msSinceSunrise / 1440000);
+                    const msRemainingAfterGhati = msSinceSunrise % 1440000;
+                    
+                    const pala = Math.floor(msRemainingAfterGhati / 24000);
+                    const msRemainingAfterPala = msRemainingAfterGhati % 24000;
+                    
+                    const vipala = Math.floor(msRemainingAfterPala / 400);
+                    
+                    // 1 Muhurta = 2,880,000 ms (48 minutes)
+                    const muhurta = Math.floor(msSinceSunrise / 2880000) + 1; 
 
-                    clockHindu.innerText = `${ghati} घटी, ${pala} पळे, ${nimisha} निमिष | ${muhurta} वा मुहूर्त`;
+                    clockHindu.innerText = `${ghati} घटी, ${pala} पळे, ${vipala} विपळे | ${muhurta} वा मुहूर्त`;
                 }
                 const liveLagnaElem = document.getElementById('live-lagna');
                 const liveLagnaLord = document.getElementById('live-lagna-lord');
