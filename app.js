@@ -29,6 +29,7 @@ let zoom = 1, offsetX = 0, offsetY = 0, isDragging = false, startX, startY;
 
 let currentSynthUtterance = null;
 let rawReportText = "";
+let faceModelsLoaded = false;
 
 const setupSection = document.getElementById('setupSection');
 const mainWorkspace = document.getElementById('mainWorkspace');
@@ -45,7 +46,7 @@ const audioBtn = document.getElementById('audioBtn');
 
 const shareBtn = document.getElementById('shareBtn');
 
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
     for (let i = 1; i <= 100; i++) {
         let option = document.createElement('option');
         option.value = i; option.text = i + " years old";
@@ -66,6 +67,15 @@ window.addEventListener('DOMContentLoaded', () => {
             alert("Clipboard permission denied or unavailable. Please paste manually.");
         }
     });
+
+      try {
+        // Loading weights directly from the official repo for the TinyFaceDetector
+        await faceapi.nets.tinyFaceDetector.loadFromUri('https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights');
+        faceModelsLoaded = true;
+        console.log("Client-side face validation active.");
+    } catch (err) {
+        console.warn("Could not load face validation models. App will run without pre-validation.", err);
+    }
 });
 
 async function requestWakeLock() {
@@ -207,28 +217,50 @@ function saveSettings() {
 }
 
 function captureFrameData() {
+    const targetW = 600;
+    const targetH = 750;
     const processCanvas = document.createElement('canvas');
-    processCanvas.width = 600; processCanvas.height = 750;
+    processCanvas.width = targetW; 
+    processCanvas.height = targetH;
     const pCtx = processCanvas.getContext('2d');
 
     if (activeImage) {
         const viewW = canvas.width / window.devicePixelRatio;
         const viewH = canvas.height / window.devicePixelRatio;
-        pCtx.imageSmoothingEnabled = true; pCtx.imageSmoothingQuality = 'high';
-        pCtx.translate(300, 375); pCtx.scale(zoom * (600 / viewW), zoom * (750 / viewH));
-        pCtx.translate(offsetX, offsetY);
+        
+        // Calculate the scale difference between the UI viewport and the final export canvas
+        const exportScale = targetW / viewW;
+
+        pCtx.imageSmoothingEnabled = true; 
+        pCtx.imageSmoothingQuality = 'high';
+        
+        pCtx.save();
+        
+        // 1. Translate to the center of the export canvas PLUS the user's panned offsets scaled up
+        pCtx.translate((targetW / 2) + (offsetX * exportScale), (targetH / 2) + (offsetY * exportScale));
+        
+        // 2. Apply both the user's zoom factor AND the viewport-to-export scale factor
+        pCtx.scale(zoom * exportScale, zoom * exportScale);
 
         const imgRatio = activeImage.width / activeImage.height;
         const viewRatio = viewW / viewH;
         let drawW, drawH;
-        if (imgRatio > viewRatio) { drawH = viewH; drawW = viewH * imgRatio; } 
-        else { drawW = viewW; drawH = viewW / imgRatio; }
+        
+        if (imgRatio > viewRatio) { 
+            drawH = viewH; 
+            drawW = viewH * imgRatio; 
+        } else { 
+            drawW = viewW; 
+            drawH = viewW / imgRatio; 
+        }
+        
+        // 3. Draw the image with original calculated dimensions
         pCtx.drawImage(activeImage, -drawW / 2, -drawH / 2, drawW, drawH);
+        pCtx.restore();
+        
     } else if (currentStream && video.readyState === video.HAVE_ENOUGH_DATA) {
         const videoW = video.videoWidth;
         const videoH = video.videoHeight;
-        const targetW = 600;
-        const targetH = 750;
         const targetRatio = targetW / targetH;
         const videoRatio = videoW / videoH;
         
@@ -242,16 +274,41 @@ function captureFrameData() {
             sourceY = (videoH - sourceH) / 2;
         }
         pCtx.drawImage(video, sourceX, sourceY, sourceW, sourceH, 0, 0, targetW, targetH);
-    } else { return null; }
+    } else { 
+        return null; 
+    }
+    
     return processCanvas.toDataURL('image/jpeg', 0.85);
 }
 
-function initiateScanSequence() {
+async function initiateScanSequence() {
     const base64Data = captureFrameData();
     if (!base64Data) {
         alert("Please ensure the camera is active or an image is uploaded and positioned.");
         return;
     }
+
+    // --- NEW: Client-Side Face Validation ---
+    if (faceModelsLoaded) {
+        analyzeBtn.disabled = true;
+        analyzeBtn.innerText = "Verifying Subject...";
+        
+        // Convert base64 to an Image element for face-api
+        const img = new Image();
+        img.src = base64Data;
+        await new Promise(resolve => img.onload = resolve);
+        
+        // Run the TinyFaceDetector
+        const detections = await faceapi.detectAllFaces(img, new faceapi.TinyFaceDetectorOptions());
+        
+        if (detections.length === 0) {
+            analyzeBtn.disabled = false;
+            analyzeBtn.innerText = "Commence Deep Face Scan";
+            alert("Scan Failed: No human face detected. The Samudrika matrix requires a clear facial geometry to proceed.");
+            return; // Halt execution completely
+        }
+    }
+    // -----------------------------------------
 
     window.speechSynthesis.cancel();
     audioBtn.style.display = 'none';
