@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Eprashala AI Teacher</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@300;400;600&display=swap');
         
@@ -179,7 +180,12 @@
             </div>
 
             <div class="w-full flex items-center px-1 relative mt-1">
-                <div class="flex-1"></div>
+                
+                <div class="flex-1 flex justify-start items-center pl-2">
+                    <button id="btn-share-pdf" class="text-slate-400 hover:text-sky-400 transition-colors outline-none p-1" title="Download Chat as PDF">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    </button>
+                </div>
 
                 <div class="flex items-center bg-black/60 p-1.5 rounded-full border border-white/10 shadow-inner flex-shrink-0">
                     <button id="btn-repeat" class="audio-btn p-1.5" title="Repeat Audio">
@@ -242,6 +248,7 @@
             btnMute: document.getElementById('btn-mute'),
             btnRestart: document.getElementById('btn-restart'),
             btnPasteKey: document.getElementById('btn-paste-key'),
+            btnSharePdf: document.getElementById('btn-share-pdf'),
             iconPlay: document.getElementById('icon-play'),
             iconPause: document.getElementById('icon-pause'),
             iconVol: document.getElementById('icon-vol'),
@@ -278,12 +285,11 @@
             if (document.documentElement.requestFullscreen) {
                 document.documentElement.requestFullscreen().catch(() => {});
             }
-            unlockAudio(); // Unlocks audio engine on mobile
+            unlockAudio(); 
             UI.overlay.style.display = 'none';
             setupEventListeners(); 
         });
 
-        // Function to ensure Mobile Browsers don't kill speech synthesis while waiting for AI
         function unlockAudio() {
             const silent = new SpeechSynthesisUtterance('');
             silent.volume = 0;
@@ -422,6 +428,64 @@
             }
         }
 
+        // --- PDF GENERATION LOGIC ---
+        function exportChatToPDF() {
+            if (chatHistory.length === 0) {
+                alert("No chat history to export.");
+                return;
+            }
+
+            // Create a clean, white-background container for the PDF
+            const container = document.createElement('div');
+            container.style.padding = '30px';
+            container.style.fontFamily = 'Arial, sans-serif';
+            container.style.color = '#000';
+            container.style.backgroundColor = '#FFF';
+
+            // Title
+            const title = document.createElement('h2');
+            title.innerText = `Eprashala Notes: Std ${UI.selStd.value} - ${UI.selSub.value}`;
+            title.style.textAlign = 'center';
+            title.style.borderBottom = '2px solid #ccc';
+            title.style.paddingBottom = '15px';
+            title.style.marginBottom = '20px';
+            container.appendChild(title);
+
+            // Iterate over chat and style for print
+            chatHistory.forEach(msg => {
+                const msgDiv = document.createElement('div');
+                msgDiv.style.marginBottom = '20px';
+                
+                const sender = document.createElement('div');
+                sender.innerText = msg.role === 'user' ? (UI.name.value || "Student") : "AI Teacher";
+                sender.style.fontWeight = 'bold';
+                sender.style.color = msg.role === 'user' ? '#0284c7' : '#16a34a'; // Blue for User, Green for Teacher
+                sender.style.marginBottom = '5px';
+                sender.style.fontSize = '1.1rem';
+                
+                const content = document.createElement('div');
+                content.innerText = msg.parts[0].text;
+                content.style.lineHeight = '1.6';
+                content.style.fontSize = '1rem';
+                content.style.whiteSpace = 'pre-wrap'; // Preserve line breaks
+                
+                msgDiv.appendChild(sender);
+                msgDiv.appendChild(content);
+                container.appendChild(msgDiv);
+            });
+
+            const opt = {
+                margin:       0.5,
+                filename:     `AI_Teacher_Notes_Std${UI.selStd.value}_${UI.selSub.value.replace(/[^a-zA-Z0-9]/g, '')}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2 },
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+
+            // Call html2pdf
+            html2pdf().set(opt).from(container).save();
+        }
+
         // --- 6. EVENT LISTENERS ---
         function setupEventListeners() {
             UI.selMedium.addEventListener('change', saveData);
@@ -455,10 +519,16 @@
             UI.btnRepeat.onclick = (e) => { e.stopPropagation(); if(state.lastAIMessage) speakText(state.lastAIMessage); };
             UI.btnMute.onclick = (e) => { e.stopPropagation(); state.isMuted = !state.isMuted; if(state.isMuted) { synth.cancel(); UI.iconVol.classList.add('hidden'); UI.iconMute.classList.remove('hidden'); } else { UI.iconVol.classList.remove('hidden'); UI.iconMute.classList.add('hidden'); } };
             UI.btnRestart.onclick = (e) => { e.stopPropagation(); clearData(); };
+            
+            // PDF Download Click Event
+            UI.btnSharePdf.onclick = (e) => {
+                e.stopPropagation();
+                exportChatToPDF();
+            };
 
             UI.btnSend.onclick = (e) => { 
                 e.stopPropagation(); 
-                unlockAudio(); // Keep audio engine awake
+                unlockAudio(); 
                 processInput(UI.textIn.value); 
             };
             
@@ -472,7 +542,7 @@
 
             UI.btnMic.addEventListener('click', (e) => {
                 e.stopPropagation();
-                unlockAudio(); // Keep audio engine awake
+                unlockAudio(); 
                 if (state.isProcessing || !recognition) return;
                 if (isListening) { recognition.stop(); } 
                 else { 
@@ -566,10 +636,13 @@
             let htmlContent = `<div class="text-[10px] uppercase font-bold tracking-wider ${isModel ? 'text-sky-400 cinzel' : 'text-slate-300'} mb-1">${sender}</div>
                                <div class="text-sm leading-relaxed text-gray-100">${text}</div>`;
             
-            // Add Individual Play Button for AI responses
+            // Add Individual Play & Share Buttons for AI responses
             if (isModel) {
                 htmlContent += `
-                    <div class="mt-3 flex justify-end">
+                    <div class="mt-3 flex justify-end gap-2">
+                        <button class="msg-copy-btn p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-full text-slate-400 hover:text-green-400 transition-colors shadow-sm focus:outline-none" title="Copy Answer">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                        </button>
                         <button class="msg-play-btn p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-full text-sky-400 transition-colors shadow-sm focus:outline-none" title="Play this message">
                             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                         </button>
@@ -578,12 +651,26 @@
 
             div.innerHTML = htmlContent;
 
-            // Attach event listener to the specific play button
+            // Attach event listeners to specific buttons
             if (isModel) {
                 const playBtn = div.querySelector('.msg-play-btn');
                 playBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     speakText(text);
+                });
+
+                const copyBtn = div.querySelector('.msg-copy-btn');
+                copyBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(text).then(() => {
+                        // Visual feedback that text was copied
+                        copyBtn.classList.add('text-green-400');
+                        copyBtn.classList.remove('text-slate-400');
+                        setTimeout(() => {
+                            copyBtn.classList.remove('text-green-400');
+                            copyBtn.classList.add('text-slate-400');
+                        }, 1500);
+                    });
                 });
             }
 
@@ -594,21 +681,17 @@
         function speakText(text) {
             if (state.isMuted) return;
             
-            // Cancel any currently playing audio
             synth.cancel();
             
-            // Small timeout prevents Chrome/Safari bugs where cancel immediately followed by speak is ignored
             setTimeout(() => {
                 togglePlayIcon(false);
                 
                 const utterance = new SpeechSynthesisUtterance(text);
-                
-                // Assigning to a global variable prevents garbage collection bugs on mobile browsers
-                window.currentUtterance = utterance;
+                window.currentUtterance = utterance; 
                 
                 utterance.lang = UI.selMedium.value === 'Marathi' ? 'mr-IN' : 'en-IN';
                 utterance.rate = 0.9; 
-                utterance.pitch = 1.1; // Friendly teacher voice
+                utterance.pitch = 1.1; 
                 
                 utterance.onend = () => togglePlayIcon(true);
                 utterance.onerror = () => togglePlayIcon(true);
