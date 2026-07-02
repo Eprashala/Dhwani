@@ -90,10 +90,10 @@
 <body class="bg-[#020617] text-white flex flex-col items-center h-screen overflow-hidden">
 
     <div id="start-overlay" class="cursor-pointer text-center px-4 absolute inset-0 z-[100] bg-[radial-gradient(circle_at_center,#1e293b_0%,#020617_100%)] flex flex-col items-center justify-center">
-        <div class="text-xl text-sky-400 font-bold mb-2 uppercase tracking-widest">Eprashala Digital Education</div>
+        <div class="text-xl text-sky-400 font-bold mb-2 uppercase tracking-widest">Eprashala Education</div>
         <div class="golden-om">📖</div>
         <h1 class="text-3xl cinzel text-transparent bg-clip-text bg-gradient-to-r from-sky-300 to-sky-600 mb-4 mt-4">Tap to Enter Classroom</h1>
-        <p class="text-slate-400 text-sm">Interactive AI Teacher for Maharashtra State Board</p>
+        <p class="text-slate-400 text-sm">Interactive AI Teacher for Maha Board</p>
     </div>
 
     <div id="settings-modal" class="hidden fixed inset-0 bg-black/80 z-[150] flex items-center justify-center p-4 backdrop-blur-sm">
@@ -271,7 +271,6 @@
         // --- 3. INITIALIZATION ---
         window.onload = () => {
             loadData();
-            // We initialize speech recognition strictly on load as per original file
             initSpeechRecognition(); 
         };
 
@@ -279,12 +278,17 @@
             if (document.documentElement.requestFullscreen) {
                 document.documentElement.requestFullscreen().catch(() => {});
             }
-            const silent = new SpeechSynthesisUtterance('');
-            silent.volume = 0; synth.speak(silent);
+            unlockAudio(); // Unlocks audio engine on mobile
             UI.overlay.style.display = 'none';
-            // Event listeners are set AFTER the overlay is clicked, ensuring user interaction
             setupEventListeners(); 
         });
+
+        // Function to ensure Mobile Browsers don't kill speech synthesis while waiting for AI
+        function unlockAudio() {
+            const silent = new SpeechSynthesisUtterance('');
+            silent.volume = 0;
+            synth.speak(silent);
+        }
 
         function updateSubjectsList() {
             const std = parseInt(UI.selStd.value);
@@ -420,18 +424,15 @@
 
         // --- 6. EVENT LISTENERS ---
         function setupEventListeners() {
-            // Dropdowns
             UI.selMedium.addEventListener('change', saveData);
             UI.selStd.addEventListener('change', () => { updateSubjectsList(); saveData(); });
             UI.selSub.addEventListener('change', saveData);
 
-            // Settings Modal
             UI.advToggle.onclick = (e) => { e.stopPropagation(); UI.settingsModal.classList.remove('hidden'); };
             UI.btnCloseSet.onclick = (e) => { e.stopPropagation(); UI.settingsModal.classList.add('hidden'); };
             UI.btnSaveSet.onclick = (e) => { e.stopPropagation(); saveData(); UI.settingsModal.classList.add('hidden'); };
             UI.settingsModal.addEventListener('click', e => e.stopPropagation());
             
-            // Paste Key Logic
             UI.btnPasteKey.addEventListener('click', async (e) => {
                 e.stopPropagation(); 
                 try {
@@ -449,24 +450,32 @@
                 } catch (err) { alert('Could not access clipboard. Please paste manually.'); }
             });
 
-            // Audio & Controls
             UI.btnPlayPause.onclick = (e) => { e.stopPropagation(); if(synth.paused) { synth.resume(); togglePlayIcon(false); } else if(synth.speaking) { synth.pause(); togglePlayIcon(true); } };
             UI.btnStop.onclick = (e) => { e.stopPropagation(); synth.cancel(); togglePlayIcon(true); };
             UI.btnRepeat.onclick = (e) => { e.stopPropagation(); if(state.lastAIMessage) speakText(state.lastAIMessage); };
             UI.btnMute.onclick = (e) => { e.stopPropagation(); state.isMuted = !state.isMuted; if(state.isMuted) { synth.cancel(); UI.iconVol.classList.add('hidden'); UI.iconMute.classList.remove('hidden'); } else { UI.iconVol.classList.remove('hidden'); UI.iconMute.classList.add('hidden'); } };
             UI.btnRestart.onclick = (e) => { e.stopPropagation(); clearData(); };
 
-            // Chat Input
-            UI.btnSend.onclick = (e) => { e.stopPropagation(); processInput(UI.textIn.value); };
-            UI.textIn.onkeypress = (e) => { e.stopPropagation(); if(e.key === 'Enter') processInput(UI.textIn.value); };
+            UI.btnSend.onclick = (e) => { 
+                e.stopPropagation(); 
+                unlockAudio(); // Keep audio engine awake
+                processInput(UI.textIn.value); 
+            };
+            
+            UI.textIn.onkeypress = (e) => { 
+                e.stopPropagation(); 
+                if(e.key === 'Enter') {
+                    unlockAudio();
+                    processInput(UI.textIn.value);
+                } 
+            };
 
-            // EXACT ORIGINAL MIC CLICK LOGIC
             UI.btnMic.addEventListener('click', (e) => {
                 e.stopPropagation();
+                unlockAudio(); // Keep audio engine awake
                 if (state.isProcessing || !recognition) return;
                 if (isListening) { recognition.stop(); } 
                 else { 
-                    // Set language based on dropdown just before starting
                     recognition.lang = UI.selMedium.value === 'Marathi' ? 'mr-IN' : 'en-IN'; 
                     try { recognition.start(); } catch(err) {} 
                 }
@@ -553,26 +562,59 @@
         function renderMessage(sender, text, isModel) {
             const div = document.createElement('div');
             div.className = `p-4 rounded-2xl ${isModel ? 'bg-[#0f172a]/90 border border-slate-700/50 shadow-lg ml-2 mr-8' : 'bg-sky-900/40 text-right mr-2 ml-8'} mb-4`;
-            div.innerHTML = `<div class="text-[10px] uppercase font-bold tracking-wider ${isModel ? 'text-sky-400 cinzel' : 'text-slate-300'} mb-1">${sender}</div>
-                             <div class="text-sm leading-relaxed text-gray-100">${text}</div>`;
+            
+            let htmlContent = `<div class="text-[10px] uppercase font-bold tracking-wider ${isModel ? 'text-sky-400 cinzel' : 'text-slate-300'} mb-1">${sender}</div>
+                               <div class="text-sm leading-relaxed text-gray-100">${text}</div>`;
+            
+            // Add Individual Play Button for AI responses
+            if (isModel) {
+                htmlContent += `
+                    <div class="mt-3 flex justify-end">
+                        <button class="msg-play-btn p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-full text-sky-400 transition-colors shadow-sm focus:outline-none" title="Play this message">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        </button>
+                    </div>`;
+            }
+
+            div.innerHTML = htmlContent;
+
+            // Attach event listener to the specific play button
+            if (isModel) {
+                const playBtn = div.querySelector('.msg-play-btn');
+                playBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    speakText(text);
+                });
+            }
+
             UI.log.appendChild(div);
             setTimeout(() => { UI.log.scrollTop = UI.log.scrollHeight; }, 50);
         }
 
         function speakText(text) {
             if (state.isMuted) return;
+            
+            // Cancel any currently playing audio
             synth.cancel();
-            togglePlayIcon(false);
             
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = UI.selMedium.value === 'Marathi' ? 'mr-IN' : 'en-IN';
-            utterance.rate = 0.9; 
-            utterance.pitch = 1.1; // Friendly teacher voice
-            
-            utterance.onend = () => togglePlayIcon(true);
-            utterance.onerror = () => togglePlayIcon(true);
+            // Small timeout prevents Chrome/Safari bugs where cancel immediately followed by speak is ignored
+            setTimeout(() => {
+                togglePlayIcon(false);
+                
+                const utterance = new SpeechSynthesisUtterance(text);
+                
+                // Assigning to a global variable prevents garbage collection bugs on mobile browsers
+                window.currentUtterance = utterance;
+                
+                utterance.lang = UI.selMedium.value === 'Marathi' ? 'mr-IN' : 'en-IN';
+                utterance.rate = 0.9; 
+                utterance.pitch = 1.1; // Friendly teacher voice
+                
+                utterance.onend = () => togglePlayIcon(true);
+                utterance.onerror = () => togglePlayIcon(true);
 
-            synth.speak(utterance);
+                synth.speak(utterance);
+            }, 50);
         }
     </script>
 </body>
