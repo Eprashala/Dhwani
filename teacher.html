@@ -21,7 +21,7 @@
         }
 
         /* Allow typing/selecting in inputs only */
-        input, select {
+        input, select, textarea {
             user-select: auto !important;
             -webkit-user-select: auto !important;
         }
@@ -239,7 +239,7 @@
     </div>
 
     <script>
-        // --- 0. SECURITY & ANTI-COPY MEASURES ---
+        // --- 0. SECURITY, WAKE LOCK & FULLSCREEN ---
         document.addEventListener('contextmenu', event => event.preventDefault());
 
         document.addEventListener('keydown', (e) => {
@@ -250,6 +250,27 @@
                 e.preventDefault(); return false;
             }
         });
+
+        // WAKE LOCK API (Prevents screen from sleeping)
+        let wakeLock = null;
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) {
+                console.log('Wake Lock Error:', err.message);
+            }
+        }
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') requestWakeLock();
+        });
+
+        function enforceFullscreen() {
+            if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            }
+        }
 
         // --- 1. DATA STRUCTURES & CONFIG ---
         const PROXY_URL = "https://eprashala.pythonanywhere.com/api/chat"; 
@@ -314,7 +335,7 @@
         let isListening = false; 
         let state = { isProcessing: false, isMuted: false, lastAIMessage: "" };
 
-        // --- 3. INITIALIZATION & FULLSCREEN ---
+        // --- 3. INITIALIZATION ---
         window.onload = () => {
             loadData();
             initSpeechRecognition(); 
@@ -325,19 +346,15 @@
             });
         };
 
-        function enforceFullscreen() {
-            if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-                document.documentElement.requestFullscreen().catch(() => {});
-            }
-        }
-
         UI.overlay.addEventListener('click', () => {
             enforceFullscreen();
+            requestWakeLock();
             unlockAudio(); 
             UI.overlay.style.display = 'none';
             setupEventListeners(); 
         });
 
+        // Trigger silent audio to wake up iOS/Android TTS Engines
         function unlockAudio() {
             const silent = new SpeechSynthesisUtterance('');
             silent.volume = 0;
@@ -576,7 +593,7 @@
             UI.btnSend.onclick = (e) => { 
                 e.stopPropagation(); 
                 enforceFullscreen();
-                unlockAudio(); 
+                unlockAudio(); // Safe here because user is explicitly typing, not using mic.
                 processInput(UI.textIn.value); 
             };
             
@@ -592,10 +609,12 @@
             UI.btnMic.addEventListener('click', (e) => {
                 e.stopPropagation();
                 enforceFullscreen();
-                unlockAudio(); 
+                // CRITICAL FIX: Do NOT call unlockAudio() here, as it triggers synth.speak() and kills the microphone focus.
+                
                 if (state.isProcessing || !recognition) return;
-                if (isListening) { recognition.stop(); } 
-                else { 
+                if (isListening) { 
+                    recognition.stop(); 
+                } else { 
                     recognition.lang = UI.selMedium.value === 'Marathi' ? 'mr-IN' : 'en-IN'; 
                     try { recognition.start(); } catch(err) {} 
                 }
@@ -717,7 +736,6 @@
             div.innerHTML = htmlContent;
 
             if (isModel) {
-                // Individual PDF Button Logic
                 const pdfBtn = div.querySelector('.msg-pdf-btn');
                 pdfBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -753,14 +771,12 @@
                     html2pdf().set(opt).from(container).save();
                 });
 
-                // Play Button Logic
                 const playBtn = div.querySelector('.msg-play-btn');
                 playBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     speakText(text);
                 });
 
-                // Copy Button Logic
                 const copyBtn = div.querySelector('.msg-copy-btn');
                 copyBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
