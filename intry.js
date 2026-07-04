@@ -669,7 +669,7 @@ function setupEventListeners() {
         else { recognition.lang = UI.lang.value; try { recognition.start(); } catch(err) {} }
     });
     
-    if (UI.btnSharePdf) {
+if (UI.btnSharePdf) {
         UI.btnSharePdf.addEventListener('click', (e) => {
             e.stopPropagation();
             if (typeof html2pdf === 'undefined') {
@@ -684,28 +684,31 @@ function setupEventListeners() {
             const logElement = document.getElementById('conversation-log');
             const clone = logElement.cloneNode(true);
             
-            // Remove interactive action bars and welcome message from PDF
             const actionBars = clone.querySelectorAll('.msg-action-bar');
             actionBars.forEach(bar => bar.remove());
             const welcomeMsg = clone.querySelector('#welcome-msg');
             if(welcomeMsg) welcomeMsg.remove();
             
-            // Ensure proper styling for PDF generation
-            clone.style.backgroundColor = '#020617';
+            // Force Light Mode for global chat export
+            clone.style.backgroundColor = '#ffffff';
+            clone.style.color = '#000000';
             clone.style.padding = '20px';
             clone.style.height = 'auto';
+            
+            const allTextTags = clone.querySelectorAll('*');
+            allTextTags.forEach(tag => tag.style.color = '#000000');
             
             const opt = {
                 margin:       0.5,
                 filename:     `Ancient_Library_Session_${new Date().toISOString().slice(0,10)}.pdf`,
                 image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#020617' },
+                html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
                 jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
             };
             
             html2pdf().set(opt).from(clone).save();
         });
-    }
+       }
 }
 
 function initSpeechRecognition() {
@@ -783,7 +786,7 @@ async function processInput(userText) {
     try {
         const rawRes = await getAIResponse(chatHistory, config);
         // Clean markdown characters strictly for Text-to-Speech Engine
-        const plainSpeechText = rawRes.replace(/[*#`_\[\]()]/g, '').trim(); 
+		const plainSpeechText = rawRes.replace(/[*#`_\[\](){}<>]/g, '').trim();
         
 		state.lastAIMessage = rawRes;
         chatHistory.push({ role: 'model', parts: [{ text: rawRes }] });
@@ -885,20 +888,19 @@ function renderMessage(sender, text, isModel) {
     if (isModel) {
         const safeText = encodeURIComponent(text); 
         html += `
-        <div class="mt-3 flex gap-3 border-t border-slate-700/50 pt-2 opacity-80 hover:opacity-100 transition-opacity msg-action-bar">
-            <!-- Dynamic Play/Pause Button -->
-            <button id="play-btn-${msgId}" class="text-slate-400 hover:text-green-400 flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold transition-colors" onclick="toggleSingleMessagePlay(this, decodeURIComponent('${safeText}'))">
-                <svg class="w-4 h-4 play-icon" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                <svg class="w-4 h-4 pause-icon hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-                <span class="play-text">Play</span>
-            </button>
-            <button class="text-slate-400 hover:text-blue-400 flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold transition-colors" onclick="copySingleMessage(decodeURIComponent('${safeText}'))">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg> Copy
-            </button>
-            <button class="text-slate-400 hover:text-red-400 flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold transition-colors" onclick="downloadSinglePDF(this, '${sender.replace(/[^a-zA-Z0-9]/g, '_')}')">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg> PDF
-            </button>
-        </div>`;
+		<div class="mt-3 flex gap-3 border-t border-slate-700/50 pt-2 opacity-80 hover:opacity-100 transition-opacity msg-action-bar">
+					<button id="play-btn-${msgId}" class="text-slate-400 hover:text-green-400 flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold transition-colors" data-text="${safeText}" onclick="toggleSingleMessagePlay(this)">
+						<svg class="w-4 h-4 play-icon" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+						<svg class="w-4 h-4 pause-icon hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+						<span class="play-text">Play</span>
+					</button>
+					<button class="text-slate-400 hover:text-blue-400 flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold transition-colors" data-text="${safeText}" onclick="copySingleMessage(this)">
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg> Copy
+					</button>
+					<button class="text-slate-400 hover:text-red-400 flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold transition-colors" onclick="downloadSinglePDF(this, '${sender.replace(/[^a-zA-Z0-9]/g, '_')}')">
+						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg> PDF
+					</button>
+				</div>`;
     }
     
     div.innerHTML = html;
@@ -930,16 +932,18 @@ function speakText(text, langCode, msgId) {
     synth.speak(utterance);
 }
 
-window.toggleSingleMessagePlay = (btnElem, text) => {
-    // Prevent manual play override if the library is muted (acting as normal chat)
+window.toggleSingleMessagePlay = (btnElem) => {
+    // Read and decode the text from the data attribute
+    const text = decodeURIComponent(btnElem.getAttribute('data-text'));
+    
     if (state.isMuted) {
         alert("Audio is muted. Please tap the speaker icon at the bottom to unmute and enable voice features.");
         return;
     }
 
-    const plainText = text.replace(/[*#`_\[\]()]/g, '').trim();
+    // Includes the fix for Issue 3 (stripping {} and <>)
+    const plainText = text.replace(/[*#`_\[\](){}<>]/g, '').trim();
 
-    // If tapping the currently playing button, trigger pause/resume logic
     if (currentActiveBtn === btnElem) {
         if (synth.speaking && !synth.paused) {
             synth.pause();
@@ -949,24 +953,29 @@ window.toggleSingleMessagePlay = (btnElem, text) => {
             synth.resume();
             updatePlayBtnUI(btnElem, true);
         } else {
-            // Edge case: Finished normally but UI stuck. Trigger replay.
             const msgId = btnElem.id.replace('play-btn-', '');
             speakText(plainText, UI.lang ? UI.lang.value : 'hi-IN', msgId);
         }
     } else {
-        // Tapping a different message's play button
         const msgId = btnElem.id.replace('play-btn-', '');
         speakText(plainText, UI.lang ? UI.lang.value : 'hi-IN', msgId);
     }
 };
 
-window.copySingleMessage = async (text) => {
+window.copySingleMessage = async (btnElem) => {
+    const text = decodeURIComponent(btnElem.getAttribute('data-text'));
     try {
         await navigator.clipboard.writeText(text);
+        
+        // Optional: Give the user some visual feedback
+        const originalHtml = btnElem.innerHTML;
+        btnElem.innerHTML = `<span class="text-green-400">Copied!</span>`;
+        setTimeout(() => { btnElem.innerHTML = originalHtml; }, 1500);
     } catch(e) {
         console.error("Failed to copy", e);
     }
 };
+
 
 window.downloadSinglePDF = (btnElem, sender) => {
     if (typeof html2pdf === 'undefined') {
@@ -980,17 +989,22 @@ window.downloadSinglePDF = (btnElem, sender) => {
     const actionBar = clone.querySelector('.msg-action-bar');
     if (actionBar) actionBar.remove();
     
-    clone.style.backgroundColor = '#0f172a';
-    clone.style.color = '#ffffff';
+    // Force Light Mode for the clone
+    clone.style.backgroundColor = '#ffffff';
+    clone.style.color = '#000000';
     clone.style.padding = '20px';
     clone.style.borderRadius = '0px'; 
     clone.style.width = '100%';
+    
+    // Force all inner tags to black text to override Tailwind colors
+    const allTextTags = clone.querySelectorAll('*');
+    allTextTags.forEach(tag => tag.style.color = '#000000');
     
     const opt = {
         margin:       0.5,
         filename:     `Wisdom_${sender}_${new Date().getTime()}.pdf`,
         image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#0f172a' },
+        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
         jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
     };
     
