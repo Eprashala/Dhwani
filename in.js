@@ -94,8 +94,8 @@ const LIBRARY_CONFIG = {
         "Shiva Purana": { persona: "Sage Romaharshana", texts: "Shiva Purana", greeting: "Om Namah Shivaya" },
         "Skanda Purana": { persona: "Lord Kartikeya", texts: "Skanda Purana", greeting: "Hari Om" },
         "Vishnu Purana": { persona: "Sage Parashara", texts: "Vishnu Purana", greeting: "Om Namo Narayana" },
-        "Yogeshwari Mahatmya": { persona: "Sage Vyasa", texts: "Yogeshwari Mahatmya", greeting: "Shri Kshetrapalaya Namah" },
-        "Kalbhairav Mahatmya": { persona: "Sage Vyasa", texts: "Vijnana Bhairava Tantra, Kaalbhairav Rahasyam,Shri Bhairava Upasana Manual", greeting: "Shri Kshetrapalaya Namah" }
+		"Yogeshwari Mahatmya": { persona: "Sage Vyasa", texts: "Yogeshwari Mahatmya", greeting: "Shri Kshetrapalaya Namah" },
+		"Kalbhairav Mahatmya": { persona: "Sage Vyasa", texts: "Vijnana Bhairava Tantra, Kaalbhairav Rahasyam,Shri Bhairava Upasana Manual,  ", greeting: "Shri Kshetrapalaya Namah" }
     },
     "Samhitas": {
         "Bhrigu Samhita": { persona: "Maharishi Bhrigu", texts: "Bhrigu Samhita (Astrology)", greeting: "Hari Om", desc: "Ancient astrological science" },
@@ -107,7 +107,7 @@ const LIBRARY_CONFIG = {
         "Yogayajnavalkya": { persona: "Sage Yajnavalkya", texts: "Yogayajnavalkya Samhita (Yoga)", greeting: "Hari Om" },
         "Shandilya Samhita": { persona: "Sage Shandilya", texts: "Shandilya Samhita (Bhakti)", greeting: "Hari Om" },
         "Parashara Samhita": { persona: "Maharishi Parashara", texts: "Parashara Samhita (Astrology)", greeting: "Hari Om" },
-        "Hatha Yoga Pradipika": { persona: "Swami Svatmarama", texts: "Hatha Yoga Pradipika", greeting: "Hari Om", desc: "The defining text of classical Hatha Yoga" }
+		"Hatha Yoga Pradipika": { persona: "Swami Svatmarama", texts: "Hatha Yoga Pradipika", greeting: "Hari Om", desc: "The defining text of classical Hatha Yoga" }
     },
     "Epics": {
         "Ramayana": { persona: "Maharishi Valmiki", texts: "Valmiki Ramayana", greeting: "Jai Shri Ram", desc: "The journey of Lord Rama" },
@@ -186,22 +186,23 @@ const LIBRARY_CONFIG = {
         "Clinical Diagnosis": { "persona": "Madhava", "texts": "Madhava Nidana", "greeting": "Hari Om" },
         "General Medicine": { "persona": "Vagbhata", "texts": "Ashtanga Hridayam", "greeting": "Hari Om" }
     },
-    "Linguistics & Mathematics": {
+	"Linguistics & Mathematics": {
         "Ashtadhyayi": { persona: "Maharishi Panini", texts: "Ashtadhyayi", greeting: "Hari Om", desc: "The algorithmic science of Sanskrit grammar" },
         "Chhandas Shastra": { persona: "Maharishi Pingala", texts: "Chhandas Shastra", greeting: "Hari Om", desc: "The ancient mathematics of binary and rhythm" },
         "Sulba Sutras": { persona: "Maharishi Baudhayana", texts: "Baudhayana Sulba Sutras", greeting: "Hari Om", desc: "Vedic geometry and the mathematics of altars" }
     },
-    "Sramana Traditions": {
+	"Sramana Traditions": {
         "Dhammapada": { persona: "Gautama Buddha", texts: "Dhammapada (Pali Canon)", greeting: "Namo Buddhaya", desc: "The path of wisdom and mental discipline" },
         "Tattvartha Sutra": { persona: "Acharya Umaswati", texts: "Tattvartha Sutra", greeting: "Jai Jinendra", desc: "The nature of reality and non-violence in Jainism" },
         "Milinda Panha": { persona: "Nagasena", texts: "Milinda Panha", greeting: "Namo Buddhaya", desc: "Philosophical dialogues of Buddhism" }
     },
-    "Arts & Applied Sciences": {
+	"Arts & Applied Sciences": {
         "Sangita Ratnakara": { persona: "Sharngadeva", texts: "Sangita Ratnakara", greeting: "Hari Om", desc: "The definitive treatise on Indian classical music" },
         "Abhijnanasakuntalam": { persona: "Kalidasa", texts: "Abhijnanasakuntalam", greeting: "Namaskar", desc: "The pinnacle of classical Indian drama and emotion" },
         "Dhanurveda": { persona: "Sage Parashurama", texts: "Dhanurveda", greeting: "Jai Parashuram", desc: "The ancient science of archery and warfare" },
         "Shalihotra Samhita": { persona: "Sage Shalihotra", texts: "Shalihotra Samhita", greeting: "Hari Om", desc: "Ancient veterinary science and animal care" }
     },
+	
     "Warid-Varkari Tradition": {
         "Sant Dnyaneshwar": { "persona": "Dnyaneshwar Mauli", "texts": "Dnyaneshwari (Bhavarth Deepika), Amrutanubhav, Changdev Pasashti, Haripath", "greeting": "Ram Krishna Hari" },
         "Sant Namdev": { "persona": "Sant Namdev", "texts": "Namdev Gatha (Abhangas), Mukhbani (included in Guru Granth Sahib)", "greeting": "Ram Krishna Hari" },
@@ -213,14 +214,14 @@ const LIBRARY_CONFIG = {
     "Samarth Tradition": {
         "Samarth Ramdas": { "persona": "Samarth Ramdas Swami", "texts": "Dasbodh, Manache Shlok, Atmaram, Karunashtakas, Maruti Stotra", "greeting": "Jai Jai Raghuveer Samarth" }
     },
-    "Tamil Sangam Literature": {
+	"Tamil Sangam Literature": {
         "Tolkappiyam": { persona: "Tholkappiyar", texts: "Tolkappiyam", greeting: "Vanakkam", desc: "The oldest surviving Tamil grammar, poetics, and psychology" },
         "Silappatikaram": { persona: "Ilango Adigal", texts: "Silappatikaram", greeting: "Vanakkam", desc: "The great epic of justice, fate, and chastity" },
         "Manimekalai": { persona: "Chithalai Chathanar", texts: "Manimekalai", greeting: "Vanakkam", desc: "A Buddhist Tamil epic of logic, charity, and philosophy" },
         "Purananuru": { persona: "Sangam Poet", texts: "Purananuru (Ettuthogai)", greeting: "Vanakkam", desc: "Heroic poetry on kings, war, and public life" },
         "Akananuru": { persona: "Sangam Poet", texts: "Akananuru (Ettuthogai)", greeting: "Vanakkam", desc: "Classical poetry on love and internal emotions" }
     },
-    "Ancient Medical Nighantus": {
+	"Ancient Medical Nighantus": {
         "Dhanvantari Nighantu": { persona: "Lord Dhanvantari", texts: "Dhanvantari Nighantu", greeting: "Hari Om", desc: "The oldest Ayurvedic glossary of medicinal herbs and minerals" },
         "Bhavaprakasha Nighantu": { persona: "Bhava Mishra", texts: "Bhavaprakasha Nighantu", greeting: "Hari Om", desc: "Comprehensive 16th-century lexicon of herbs, dietetics, and lifestyle" },
         "Raja Nighantu": { persona: "Narahari", texts: "Raja Nighantu (Abhidhana Chudamani)", greeting: "Hari Om", desc: "A royal text on pharmacology and synonyms of medicinal plants" },
@@ -255,7 +256,7 @@ const LIBRARY_CONFIG = {
         "Bal Gangadhar Tilak": { "persona": "Lokmanya Tilak", "texts": "Gita Rahasya, The Arctic Home in the Vedas", "greeting": "Swaraj is my birthright" },
         "Vinayak Damodar Savarkar": { "persona": "Veer Savarkar", "texts": "The Indian War of Independence 1857, My Transportation for Life", "greeting": "Vande Mataram" },
         "Atal Bihari Vajpayee": { "persona": "Atal Ji", "texts": "Atal Bihari Vajpayee: A Man for All Seasons, Meri Ekyavan Kavitayen, Kya Khoya Kya Paya, Na Dainyam Na Palayanam", "greeting": "Jai Hind", "desc": "Poems and statesmanship of the visionary leader" },
-        "Mahatma Gandhi": { "persona": "Bapu", "texts": "The Story of My Experiments with Truth, Hind Swaraj", "greeting": "Jai Hind" },
+		"Mahatma Gandhi": { "persona": "Bapu", "texts": "The Story of My Experiments with Truth, Hind Swaraj", "greeting": "Jai Hind" },
         "Netaji Subhash Chandra Bose": { "persona": "Netaji", "texts": "The Indian Struggle, An Indian Pilgrim", "greeting": "Jai Hind" },
         "Bhagat Singh": { "persona": "Shaheed-e-Azam", "texts": "Why I am an Atheist, Jail Notebook", "greeting": "Inquilab Zindabad" },
         "Jawaharlal Nehru": { "persona": "Chacha Nehru", "texts": "The Discovery of India, Glimpses of World History", "greeting": "Jai Hind" },
@@ -341,7 +342,6 @@ document.addEventListener("DOMContentLoaded", () => {
         btnMute: document.getElementById('btn-mute'),
         btnRestart: document.getElementById('btn-restart'),
         btnShare: document.getElementById('btn-share'),
-        btnSharePdf: document.getElementById('btn-share-pdf'), // Added Global PDF Button
         btnPasteKey: document.getElementById('btn-paste-key'),
         iconPlay: document.getElementById('icon-play'),
         iconPause: document.getElementById('icon-pause'),
@@ -362,6 +362,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ratioVal: document.getElementById('ratio-val'),
         modelVal: document.getElementById('model-val'),
         
+        // Custom Dropdown Elements
         ddBtn: document.getElementById('dropdown-btn'),
         ddMenu: document.getElementById('dropdown-menu'),
         ddSearch: document.getElementById('dropdown-search'),
@@ -371,8 +372,12 @@ document.addEventListener("DOMContentLoaded", () => {
         btnCloseApp: document.getElementById('btn-close-app')
     };
 
-    if (UI.ddBtn) initCustomDropdown();
+    // Initialize Dropdown only if it exists on the page (e.g. index.html)
+    if (UI.ddBtn) {
+        initCustomDropdown();
+    }
 
+    // Initialize the main app UI if overlay exists
     if (UI.overlay) {
         loadData();
         initSpeechRecognition();
@@ -657,44 +662,6 @@ function setupEventListeners() {
         if (isListening) { recognition.stop(); } 
         else { recognition.lang = UI.lang.value; try { recognition.start(); } catch(err) {} }
     });
-    
-    if (UI.btnSharePdf) {
-        UI.btnSharePdf.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (typeof html2pdf === 'undefined') {
-                alert("PDF engine is still loading. Please try again in a moment.");
-                return;
-            }
-            if (chatHistory.length === 0) {
-                alert("The library is currently empty. Seek wisdom first.");
-                return;
-            }
-            
-            const logElement = document.getElementById('conversation-log');
-            const clone = logElement.cloneNode(true);
-            
-            // Remove interactive action bars and welcome message from PDF
-            const actionBars = clone.querySelectorAll('.msg-action-bar');
-            actionBars.forEach(bar => bar.remove());
-            const welcomeMsg = clone.querySelector('#welcome-msg');
-            if(welcomeMsg) welcomeMsg.remove();
-            
-            // Ensure proper styling for PDF generation
-            clone.style.backgroundColor = '#020617';
-            clone.style.padding = '20px';
-            clone.style.height = 'auto';
-            
-            const opt = {
-                margin:       0.5,
-                filename:     `Ancient_Library_Session_${new Date().toISOString().slice(0,10)}.pdf`,
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#020617' },
-                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-            };
-            
-            html2pdf().set(opt).from(clone).save();
-        });
-    }
 }
 
 function initSpeechRecognition() {
@@ -774,16 +741,15 @@ async function processInput(userText) {
     saveData();
 
     try {
-        const rawRes = await getAIResponse(chatHistory, config);
-        // Clean markdown characters strictly for Text-to-Speech Engine
-        const plainSpeechText = rawRes.replace(/[*#`_\[\]()]/g, '').trim(); 
+        const res = await getAIResponse(chatHistory, config);
+        const cleanRes = res.replace(/[*#`_\[\]()]/g, '').trim();
         
-        state.lastAIMessage = rawRes;
-        chatHistory.push({ role: 'model', parts: [{ text: rawRes }] });
-        renderMessage(getSelectedItemName(), rawRes, true); // Send Raw Markdown to renderer
+        state.lastAIMessage = cleanRes;
+        chatHistory.push({ role: 'model', parts: [{ text: cleanRes }] });
+        renderMessage(getSelectedItemName(), cleanRes, true);
         saveData();
         
-        if (!state.isMuted) speakText(plainSpeechText, UI.lang.value);
+        if (!state.isMuted) speakText(cleanRes, UI.lang.value);
     } catch (err) {
         renderMessage("System", "⚠️ Divine connection interrupted. Please try again.", true);
     }
@@ -805,18 +771,17 @@ async function getAIResponse(history, config) {
     const aiRatio = 100 - bookRatio;
     const selectedModelInfo = getModelInfo(UI.modelSlider.value);
 
-    const prompt = `You are the embodiment of the ancient text: "${config.texts}". Assume the persona of ${config.persona}.
+const prompt = `You are the embodiment of the ancient text: "${config.texts}". Assume the persona of ${config.persona}.
     
     CRITICAL AND UNBREAKABLE RULES FOR YOUR RESPONSE:
-    1. EXCLUSIVE SOURCE MATERIAL: You MUST derive your entire answer, philosophy, and worldview EXCLUSIVELY from "${config.texts}". Do NOT mix in concepts, verses, or ideas from other texts.
-    2. EXACT VERSE/QUOTE: You MUST select a real, highly relevant, and historically accurate verse, sutra, shloka, or phrase perfectly from "${config.texts}" that directly addresses the user's query.
+    1. EXCLUSIVE SOURCE MATERIAL: You MUST derive your entire answer, philosophy, and worldview EXCLUSIVELY from "${config.texts}". Do NOT mix in concepts, verses, or ideas from other texts. If the user selected a specific Purana, Veda, or Sutra, you must answer strictly through the lens of that specific text.
+    2. EXACT VERSE/QUOTE: You MUST select a real, highly relevant, and historically accurate verse, sutra, shloka, or phrase perfectly from "${config.texts}" that directly addresses the user's query. Absolutely DO NOT hallucinate, fabricate, or misattribute verses.
     3. THE REFERENCE: State the exact structural reference clearly before reciting it (e.g., Book, Mandala, Chapter, Canto, and Verse number specific to "${config.texts}").
     4. THE RECITATION: Recite the original verse accurately in the requested language.
     5. THE EXPLANATION: Explain the profound meaning of this specific verse strictly within the context and philosophy of "${config.texts}", then apply it directly to the user's question to provide actionable guidance.
     6. LANGUAGE: Speak strictly in the language code: ${UI.lang.value}.
-    7. FORMATTING: Use rich Markdown formatting (bolding, headers, lists) to make the text beautiful and structured for the user to read.
+    7. NO MARKDOWN: Do not use any markdown characters (*, #, _, [, ]). Write in plain text so the Text-to-Speech engine can read it perfectly.
     8. TONE & RATIO: Maintain a divine, knowledgeable, and comforting tone. Your answer must be exactly ${bookRatio}% strict traditional quotation/interpretation of "${config.texts}" and ${aiRatio}% compassionate contextualization for the modern user. ${contextAddon}`;
-    
     const payload = { 
         model: selectedModelInfo.id, 
         contents: history.slice(-10), 
@@ -831,32 +796,9 @@ async function getAIResponse(history, config) {
 
 function renderMessage(sender, text, isModel) {
     const div = document.createElement('div');
-    div.className = `p-4 rounded-2xl ${isModel ? 'bg-[#0f172a]/90 border border-slate-700/50 shadow-lg ml-2 mr-8' : 'bg-cyan-900/30 text-right mr-2 ml-8'} mb-4 relative group msg-container`;
-    
-    // Parse Markdown safely if it's the model, otherwise just output standard text
-    const formattedText = (isModel && typeof marked !== 'undefined') ? marked.parse(text) : text;
-    
-    let html = `<div class="text-[10px] uppercase font-bold tracking-wider ${isModel ? 'text-yellow-500 cinzel' : 'text-cyan-400'} mb-1">${sender}</div>
-                <div class="text-sm leading-relaxed text-gray-100 ${isModel ? 'markdown-body' : ''}">${formattedText}</div>`;
-
-    // Append Per-Message Action Bar for AI replies (Play, Copy, PDF)
-    if (isModel) {
-        const safeText = encodeURIComponent(text); 
-        html += `
-        <div class="mt-3 flex gap-3 border-t border-slate-700/50 pt-2 opacity-80 hover:opacity-100 transition-opacity msg-action-bar">
-            <button class="text-slate-400 hover:text-green-400 flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold transition-colors" onclick="playSingleMessage(decodeURIComponent('${safeText}'))">
-                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> Play
-            </button>
-            <button class="text-slate-400 hover:text-blue-400 flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold transition-colors" onclick="copySingleMessage(decodeURIComponent('${safeText}'))">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg> Copy
-            </button>
-            <button class="text-slate-400 hover:text-red-400 flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold transition-colors" onclick="downloadSinglePDF(this, '${sender.replace(/[^a-zA-Z0-9]/g, '_')}')">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg> PDF
-            </button>
-        </div>`;
-    }
-    
-    div.innerHTML = html;
+    div.className = `p-4 rounded-2xl ${isModel ? 'bg-[#0f172a]/90 border border-slate-700/50 shadow-lg ml-2 mr-8' : 'bg-cyan-900/30 text-right mr-2 ml-8'} mb-4`;
+    div.innerHTML = `<div class="text-[10px] uppercase font-bold tracking-wider ${isModel ? 'text-yellow-500 cinzel' : 'text-cyan-400'} mb-1">${sender}</div>
+                     <div class="text-sm leading-relaxed text-gray-100">${text}</div>`;
     UI.log.appendChild(div);
     setTimeout(() => { UI.log.scrollTop = UI.log.scrollHeight; }, 50);
 }
@@ -876,48 +818,3 @@ function speakText(text, langCode) {
 
     synth.speak(utterance);
 }
-
-window.playSingleMessage = (text) => {
-    const plainText = text.replace(/[*#`_\[\]()]/g, '').trim(); // Remove markdown before speaking
-    speakText(plainText, UI.lang ? UI.lang.value : 'hi-IN');
-};
-
-window.copySingleMessage = async (text) => {
-    try {
-        await navigator.clipboard.writeText(text);
-        // Optional quick UI feedback if you prefer
-    } catch(e) {
-        console.error("Failed to copy", e);
-    }
-};
-
-window.downloadSinglePDF = (btnElem, sender) => {
-    if (typeof html2pdf === 'undefined') {
-        alert("PDF generator not loaded yet.");
-        return;
-    }
-    
-    const msgContainer = btnElem.closest('.msg-container');
-    const clone = msgContainer.cloneNode(true);
-    
-    // Clean out the action buttons on the PDF clone
-    const actionBar = clone.querySelector('.msg-action-bar');
-    if (actionBar) actionBar.remove();
-    
-    // Formatting explicitly for the PDF layout
-    clone.style.backgroundColor = '#0f172a';
-    clone.style.color = '#ffffff';
-    clone.style.padding = '20px';
-    clone.style.borderRadius = '0px'; 
-    clone.style.width = '100%';
-    
-    const opt = {
-        margin:       0.5,
-        filename:     `Wisdom_${sender}_${new Date().getTime()}.pdf`,
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#0f172a' },
-        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-    
-    html2pdf().set(opt).from(clone).save();
-};
