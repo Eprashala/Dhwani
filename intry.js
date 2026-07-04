@@ -889,6 +889,9 @@ async function getAIResponse(history, config) {
 
 // --- TTS STATE MANAGEMENT ---
 let currentActiveBtn = null;
+let ttsStatus = 'STOPPED';
+let lastSpokenIndex = 0;
+window.currentPlayingText = "";
 
 function updatePlayBtnUI(btn, isPlaying) {
     if (!btn) return;
@@ -917,98 +920,92 @@ function resetCurrentTTS() {
         currentActiveBtn = null;
     }
     synth.cancel();
+    ttsStatus = 'STOPPED';
+    lastSpokenIndex = 0;
+    window.currentPlayingText = "";
 }
 
-function renderMessage(sender, text, isModel) {
-    // Generate a unique ID to link the TTS engine directly to this UI element
-    const msgId = 'msg-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
-    const div = document.createElement('div');
-    div.className = `p-4 rounded-2xl ${isModel ? 'bg-[#0f172a]/90 border border-slate-700/50 shadow-lg ml-2 mr-8' : 'bg-cyan-900/30 text-right mr-2 ml-8'} mb-4 relative group msg-container`;
-    
-    const formattedText = (isModel && typeof marked !== 'undefined') ? marked.parse(text) : text;
-    
-    let html = `<div class="text-[10px] uppercase font-bold tracking-wider ${isModel ? 'text-yellow-500 cinzel' : 'text-cyan-400'} mb-1">${sender}</div>
-                <div class="text-sm leading-relaxed text-gray-100 ${isModel ? 'markdown-body' : ''}">${formattedText}</div>`;
-
-    if (isModel) {
-        const safeText = encodeURIComponent(text); 
-        html += `
-        <div class="mt-3 flex gap-3 border-t border-slate-700/50 pt-2 opacity-80 hover:opacity-100 transition-opacity msg-action-bar">
-            
-            <button type="button" id="play-btn-${msgId}" class="btn-play-msg text-slate-400 hover:text-green-400 flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold transition-colors" data-text="${safeText}">
-                <svg class="w-4 h-4 play-icon pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                <svg class="w-4 h-4 pause-icon hidden pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-                <span class="play-text pointer-events-none">Play</span>
-            </button>
-            
-            <button type="button" class="btn-pdf-msg text-slate-400 hover:text-red-400 flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold transition-colors" data-sender="${sender.replace(/[^a-zA-Z0-9]/g, '_')}">
-                <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg> PDF
-            </button>
-            
-        </div>`;
-    }
-    
-    div.innerHTML = html;
-    UI.log.appendChild(div);
-    setTimeout(() => { UI.log.scrollTop = UI.log.scrollHeight; }, 50);
-    
-    return msgId;
-}
-
+// Redirects the auto-play functionality to use the new state machine
 function speakText(text, langCode, msgId) {
-    if (state.isMuted) return; // Strict block while in Normal Chat mode
-    resetCurrentTTS();
-    
-    // 50ms delay: Crucial fix for Android Chrome TTS engine freeze
+    if (state.isMuted) return;
     setTimeout(() => {
         const btn = document.getElementById(`play-btn-${msgId}`);
         if (btn) {
-            currentActiveBtn = btn;
-            updatePlayBtnUI(btn, true);
+            window.toggleSingleMessagePlay(btn);
         }
-        
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = langCode;
-        utterance.rate = 0.85; 
-        utterance.pitch = ['Saraswati', 'Lakshmi', 'Durga', 'Kali'].includes(getSelectedItemName()) ? 1.2 : 0.8;
-        
-        // Automatically revert the UI back to play when finished speaking naturally
-        utterance.onend = () => { resetCurrentTTS(); };
-        utterance.onerror = () => { resetCurrentTTS(); };
-        
-        synth.speak(utterance);
-    }, 50); 
+    }, 50);
 }
 
 window.toggleSingleMessagePlay = (btnElem) => {
-    // Read and decode the text from the data attribute
-    const text = decodeURIComponent(btnElem.getAttribute('data-text'));
-    
     if (state.isMuted) {
         alert("Audio is muted. Please tap the speaker icon at the bottom to unmute and enable voice features.");
         return;
     }
 
-    // Includes the fix for Issue 3 (stripping {} and <>)
+    const text = decodeURIComponent(btnElem.getAttribute('data-text'));
     const plainText = text.replace(/[*#`_\[\](){}<>]/g, '').trim();
 
-    if (currentActiveBtn === btnElem) {
-        if (synth.speaking && !synth.paused) {
-            synth.pause();
-            updatePlayBtnUI(btnElem, false);
-            if (btnElem.querySelector('.play-text')) btnElem.querySelector('.play-text').innerText = "Resume";
-        } else if (synth.paused) {
-            synth.resume();
+    // Check if we are interacting with the currently playing message
+    if (currentActiveBtn === btnElem && window.currentPlayingText === plainText) {
+        if (ttsStatus === 'PAUSED') {
+            ttsStatus = 'PLAYING';
             updatePlayBtnUI(btnElem, true);
-        } else {
-            const msgId = btnElem.id.replace('play-btn-', '');
-            speakText(plainText, UI.lang ? UI.lang.value : 'hi-IN', msgId);
+            synth.cancel();
+            setTimeout(() => {
+                const remainingText = plainText.substring(lastSpokenIndex);
+                startNewUtterance(remainingText, plainText, btnElem, lastSpokenIndex);
+            }, 50);
+            return;
+        } else if (ttsStatus === 'PLAYING') {
+            ttsStatus = 'PAUSED';
+            updatePlayBtnUI(btnElem, false);
+            const textSpan = btnElem.querySelector('.play-text');
+            if (textSpan) textSpan.innerText = "Resume";
+            synth.cancel();
+            return;
         }
-    } else {
-        const msgId = btnElem.id.replace('play-btn-', '');
-        speakText(plainText, UI.lang ? UI.lang.value : 'hi-IN', msgId);
     }
+
+    // New play or clicked a different button
+    resetCurrentTTS();
+    currentActiveBtn = btnElem;
+    window.currentPlayingText = plainText;
+    ttsStatus = 'PLAYING';
+    lastSpokenIndex = 0;
+    updatePlayBtnUI(btnElem, true);
+
+    setTimeout(() => { startNewUtterance(plainText, plainText, btnElem, 0); }, 50);
 };
+
+function startNewUtterance(textToSpeak, fullOriginalText, btnElement, offsetIndex) {
+    if (!textToSpeak.trim()) {
+        resetCurrentTTS();
+        return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.lang = UI.lang ? UI.lang.value : 'hi-IN';
+    utterance.rate = 0.85; 
+    utterance.pitch = ['Saraswati', 'Lakshmi', 'Durga', 'Kali'].includes(getSelectedItemName()) ? 1.2 : 0.8;
+    
+    // Tracks current reading position for the resume function
+    utterance.onboundary = (event) => { 
+        lastSpokenIndex = offsetIndex + event.charIndex; 
+    };
+    
+    utterance.onend = () => { 
+        if (ttsStatus === 'PLAYING') resetCurrentTTS(); 
+    };
+    
+    utterance.onerror = (e) => {
+        if (e.error !== 'canceled' && e.error !== 'interrupted') {
+            resetCurrentTTS();
+        }
+    };
+    
+    synth.resume(); // Kickstarts the engine on stubborn browsers
+    synth.speak(utterance);
+}
 
 window.copySingleMessage = async (btnElem) => {
     const text = decodeURIComponent(btnElem.getAttribute('data-text'));
