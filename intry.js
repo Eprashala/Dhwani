@@ -1075,13 +1075,43 @@ window.downloadSinglePDF = (btnElem, sender) => {
     html2pdf().set(opt).from(clone).save();
 };
 
-
-window.copySingleMessage = async (text) => {
-    try {
-        await navigator.clipboard.writeText(text);
-        // Optional quick UI feedback if you prefer
-    } catch(e) {
-        console.error("Failed to copy", e);
+// --- UI RENDERING FUNCTION ---
+function renderMessage(sender, text, isModel) {
+    const msgId = 'msg-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+    const div = document.createElement('div');
+    
+    div.className = `msg-container p-4 rounded-2xl ${isModel ? 'bg-[#0f172a]/90 border border-slate-700/50 shadow-lg ml-2 mr-8' : 'bg-cyan-900/40 text-right mr-2 ml-8'} mb-4`;
+    
+    const parsedText = isModel ? marked.parse(text) : text;
+    const encodedText = encodeURIComponent(text);
+    
+    let htmlContent = `
+        <div class="text-[10px] uppercase font-bold tracking-wider ${isModel ? 'text-cyan-400 cinzel' : 'text-slate-300'} mb-1">${sender}</div>
+        <div class="text-sm leading-relaxed text-gray-100 markdown-body">${parsedText}</div>
+    `;
+    
+    if (isModel) {
+        htmlContent += `
+            <div class="msg-action-bar mt-3 flex justify-end gap-2">
+                <button class="btn-pdf-msg p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-full text-slate-400 hover:text-red-400 transition-colors shadow-sm focus:outline-none" data-sender="${sender}" title="Download Answer as PDF">
+                    <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                </button>
+                <button class="btn-copy-msg p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-full text-slate-400 hover:text-green-400 transition-colors shadow-sm focus:outline-none" onclick="window.copySingleMessage(this)" data-text="${encodedText}" title="Copy Answer">
+                    <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                </button>
+                <button id="play-btn-${msgId}" class="btn-play-msg flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-full text-slate-400 transition-colors shadow-sm focus:outline-none" data-text="${encodedText}" title="Play/Pause Audio">
+                    <svg class="play-icon w-4 h-4 pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    <svg class="pause-icon w-4 h-4 hidden pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                    <span class="play-text text-[10px] font-bold uppercase tracking-wider pointer-events-none">Play</span>
+                </button>
+            </div>`;
     }
-};
+
+    div.innerHTML = htmlContent;
+    UI.log.appendChild(div);
+    
+    setTimeout(() => { UI.log.scrollTop = UI.log.scrollHeight; }, 50);
+
+    return msgId;
+}
 
