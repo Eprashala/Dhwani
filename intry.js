@@ -668,8 +668,7 @@ function setupEventListeners() {
         if (isListening) { recognition.stop(); } 
         else { recognition.lang = UI.lang.value; try { recognition.start(); } catch(err) {} }
     });
-    
-if (UI.btnSharePdf) {
+    if (UI.btnSharePdf) {
         UI.btnSharePdf.addEventListener('click', (e) => {
             e.stopPropagation();
             if (typeof html2pdf === 'undefined') {
@@ -689,14 +688,37 @@ if (UI.btnSharePdf) {
             const welcomeMsg = clone.querySelector('#welcome-msg');
             if(welcomeMsg) welcomeMsg.remove();
             
-            // Force Light Mode for global chat export
-            clone.style.backgroundColor = '#ffffff';
-            clone.style.color = '#000000';
-            clone.style.padding = '20px';
-            clone.style.height = 'auto';
+            clone.style.setProperty('background-color', '#ffffff', 'important');
+            clone.style.setProperty('padding', '20px', 'important');
+            clone.style.setProperty('height', 'auto', 'important');
             
-            const allTextTags = clone.querySelectorAll('*');
-            allTextTags.forEach(tag => tag.style.color = '#000000');
+            const allElements = clone.querySelectorAll('*');
+            allElements.forEach(el => {
+                el.style.setProperty('color', '#000000', 'important');
+                
+                if (el.classList.contains('msg-container')) {
+                    el.style.setProperty('background-color', '#f8f9fa', 'important'); 
+                    el.style.setProperty('border-color', '#e5e7eb', 'important');
+                } else {
+                    el.style.setProperty('background-color', 'transparent', 'important');
+                }
+            });
+
+            // --- NEW: CREATE AND INJECT THE HEADER ---
+            const header = document.createElement('div');
+            header.innerText = "ai.eprashala.com";
+            header.style.setProperty('text-align', 'center', 'important');
+            header.style.setProperty('color', '#6b7280', 'important'); 
+            header.style.setProperty('font-size', '14px', 'important'); // Slightly larger for full chat
+            header.style.setProperty('font-weight', 'bold', 'important');
+            header.style.setProperty('letter-spacing', '2px', 'important');
+            header.style.setProperty('padding-bottom', '15px', 'important');
+            header.style.setProperty('margin-bottom', '20px', 'important');
+            header.style.setProperty('border-bottom', '2px solid #e5e7eb', 'important');
+            header.style.setProperty('width', '100%', 'important');
+            
+            clone.prepend(header);
+            // -----------------------------------------
             
             const opt = {
                 margin:       0.5,
@@ -708,7 +730,8 @@ if (UI.btnSharePdf) {
             
             html2pdf().set(opt).from(clone).save();
         });
-       }
+    }
+       
 }
 
 function initSpeechRecognition() {
@@ -989,16 +1012,35 @@ window.downloadSinglePDF = (btnElem, sender) => {
     const actionBar = clone.querySelector('.msg-action-bar');
     if (actionBar) actionBar.remove();
     
-    // Force Light Mode for the clone
-    clone.style.backgroundColor = '#ffffff';
-    clone.style.color = '#000000';
-    clone.style.padding = '20px';
-    clone.style.borderRadius = '0px'; 
-    clone.style.width = '100%';
+    // Force Light Mode for the main clone
+    clone.style.setProperty('background-color', '#ffffff', 'important');
+    clone.style.setProperty('padding', '20px', 'important');
+    clone.style.setProperty('border-radius', '0px', 'important'); 
+    clone.style.setProperty('width', '100%', 'important');
     
-    // Force all inner tags to black text to override Tailwind colors
-    const allTextTags = clone.querySelectorAll('*');
-    allTextTags.forEach(tag => tag.style.color = '#000000');
+    // Force all inner tags to black text and transparent backgrounds
+    const allElements = clone.querySelectorAll('*');
+    allElements.forEach(el => {
+        el.style.setProperty('color', '#000000', 'important');
+        el.style.setProperty('background-color', 'transparent', 'important');
+    });
+
+    // --- NEW: CREATE AND INJECT THE HEADER ---
+    const header = document.createElement('div');
+    header.innerText = "ai.eprashala.com";
+    header.style.setProperty('text-align', 'center', 'important');
+    header.style.setProperty('color', '#6b7280', 'important'); // Grey color for a professional look
+    header.style.setProperty('font-size', '18px', 'important');
+    header.style.setProperty('font-weight', 'bold', 'important');
+    header.style.setProperty('letter-spacing', '1px', 'important');
+    header.style.setProperty('padding-bottom', '10px', 'important');
+    header.style.setProperty('margin-bottom', '15px', 'important');
+    header.style.setProperty('border-bottom', '1px solid #e5e7eb', 'important');
+    header.style.setProperty('width', '100%', 'important');
+    
+    // Prepend puts it at the very top of the cloned container
+    clone.prepend(header); 
+    // -----------------------------------------
     
     const opt = {
         margin:       0.5,
@@ -1021,33 +1063,3 @@ window.copySingleMessage = async (text) => {
     }
 };
 
-window.downloadSinglePDF = (btnElem, sender) => {
-    if (typeof html2pdf === 'undefined') {
-        alert("PDF generator not loaded yet.");
-        return;
-    }
-    
-    const msgContainer = btnElem.closest('.msg-container');
-    const clone = msgContainer.cloneNode(true);
-    
-    // Clean out the action buttons on the PDF clone
-    const actionBar = clone.querySelector('.msg-action-bar');
-    if (actionBar) actionBar.remove();
-    
-    // Formatting explicitly for the PDF layout
-    clone.style.backgroundColor = '#0f172a';
-    clone.style.color = '#ffffff';
-    clone.style.padding = '20px';
-    clone.style.borderRadius = '0px'; 
-    clone.style.width = '100%';
-    
-    const opt = {
-        margin:       0.5,
-        filename:     `Wisdom_${sender}_${new Date().getTime()}.pdf`,
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#0f172a' },
-        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-    
-    html2pdf().set(opt).from(clone).save();
-};
