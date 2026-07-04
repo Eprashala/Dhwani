@@ -794,7 +794,6 @@ async function processInput(userText) {
         
         if (!state.isMuted) speakText(plainSpeechText, UI.lang.value, newMsgId);
         
-        if (!state.isMuted) speakText(plainSpeechText, UI.lang.value);
     } catch (err) {
         renderMessage("System", "⚠️ Divine connection interrupted. Please try again.", true);
     }
