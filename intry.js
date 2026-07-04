@@ -338,7 +338,6 @@ document.addEventListener("DOMContentLoaded", () => {
         btnRepeat: document.getElementById('btn-repeat'),
         btnMute: document.getElementById('btn-mute'),
         btnRestart: document.getElementById('btn-restart'),
-        btnShare: document.getElementById('btn-share'),
         btnSharePdf: document.getElementById('btn-share-pdf'), // Added Global PDF Button
         btnPasteKey: document.getElementById('btn-paste-key'),
         iconVol: document.getElementById('icon-vol'),
@@ -637,7 +636,7 @@ function setupEventListeners() {
     };
 	
     UI.btnRestart.onclick = (e) => { e.stopPropagation(); clearData(); };
-    UI.btnShare.onclick = async (e) => { e.stopPropagation(); if(chatHistory.length === 0) return; let text = chatHistory.map(m => `${m.role === 'user' ? 'User' : getSelectedItemName()}: ${m.parts[0].text}`).join("\n\n"); try { await navigator.share({ title: 'Ancient Library Wisdom', text: text }); } catch(err) {} };
+
     
     if (UI.btnCloseApp) {
         UI.btnCloseApp.addEventListener('click', (e) => {
@@ -911,19 +910,16 @@ function renderMessage(sender, text, isModel) {
     if (isModel) {
         const safeText = encodeURIComponent(text); 
         html += `
-		<div class="mt-3 flex gap-3 border-t border-slate-700/50 pt-2 opacity-80 hover:opacity-100 transition-opacity msg-action-bar">
-					<button id="play-btn-${msgId}" class="text-slate-400 hover:text-green-400 flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold transition-colors" data-text="${safeText}" onclick="toggleSingleMessagePlay(this)">
-						<svg class="w-4 h-4 play-icon" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-						<svg class="w-4 h-4 pause-icon hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-						<span class="play-text">Play</span>
-					</button>
-					<button class="text-slate-400 hover:text-blue-400 flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold transition-colors" data-text="${safeText}" onclick="copySingleMessage(this)">
-						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg> Copy
-					</button>
-					<button class="text-slate-400 hover:text-red-400 flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold transition-colors" onclick="downloadSinglePDF(this, '${sender.replace(/[^a-zA-Z0-9]/g, '_')}')">
-						<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg> PDF
-					</button>
-				</div>`;
+        <div class="mt-3 flex gap-3 border-t border-slate-700/50 pt-2 opacity-80 hover:opacity-100 transition-opacity msg-action-bar">
+            <button id="play-btn-${msgId}" type="button" class="text-slate-400 hover:text-green-400 flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold transition-colors" data-text="${safeText}" onclick="event.stopPropagation(); toggleSingleMessagePlay(this)">
+                <svg class="w-4 h-4 play-icon" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                <svg class="w-4 h-4 pause-icon hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                <span class="play-text">Play</span>
+            </button>
+            <button type="button" class="text-slate-400 hover:text-red-400 flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold transition-colors" onclick="event.stopPropagation(); downloadSinglePDF(this, '${sender.replace(/[^a-zA-Z0-9]/g, '_')}')">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg> PDF
+            </button>
+        </div>`;
     }
     
     div.innerHTML = html;
@@ -937,22 +933,25 @@ function speakText(text, langCode, msgId) {
     if (state.isMuted) return; // Strict block while in Normal Chat mode
     resetCurrentTTS();
     
-    const btn = document.getElementById(`play-btn-${msgId}`);
-    if (btn) {
-        currentActiveBtn = btn;
-        updatePlayBtnUI(btn, true);
-    }
-    
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = langCode;
-    utterance.rate = 0.85; 
-    utterance.pitch = ['Saraswati', 'Lakshmi', 'Durga', 'Kali'].includes(getSelectedItemName()) ? 1.2 : 0.8;
-    
-    // Automatically revert the UI back to play when finished speaking naturally
-    utterance.onend = () => { resetCurrentTTS(); };
-    utterance.onerror = () => { resetCurrentTTS(); };
-    
-    synth.speak(utterance);
+    // 50ms delay: Crucial fix for Android Chrome TTS engine freeze
+    setTimeout(() => {
+        const btn = document.getElementById(`play-btn-${msgId}`);
+        if (btn) {
+            currentActiveBtn = btn;
+            updatePlayBtnUI(btn, true);
+        }
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = langCode;
+        utterance.rate = 0.85; 
+        utterance.pitch = ['Saraswati', 'Lakshmi', 'Durga', 'Kali'].includes(getSelectedItemName()) ? 1.2 : 0.8;
+        
+        // Automatically revert the UI back to play when finished speaking naturally
+        utterance.onend = () => { resetCurrentTTS(); };
+        utterance.onerror = () => { resetCurrentTTS(); };
+        
+        synth.speak(utterance);
+    }, 50); 
 }
 
 window.toggleSingleMessagePlay = (btnElem) => {
