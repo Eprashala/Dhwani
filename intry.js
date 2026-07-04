@@ -578,6 +578,29 @@ function clearData() {
 }
 
 function setupEventListeners() {
+	
+	// --- ANDROID TOUCH EVENT DELEGATION ---
+    UI.log.addEventListener('click', (e) => {
+        // Intercept taps for the Play/Pause button
+        const playBtn = e.target.closest('.btn-play-msg');
+        if (playBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.toggleSingleMessagePlay(playBtn);
+            return;
+        }
+
+        // Intercept taps for the PDF button
+        const pdfBtn = e.target.closest('.btn-pdf-msg');
+        if (pdfBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            const sender = pdfBtn.getAttribute('data-sender');
+            window.downloadSinglePDF(pdfBtn, sender);
+            return;
+        }
+    });
+	
     UI.ratioSlider.addEventListener('input', updateSliderLabels);
     UI.modelSlider.addEventListener('input', updateSliderLabels);
     UI.keyIn.addEventListener('input', updateSliderAvailability);
@@ -911,14 +934,17 @@ function renderMessage(sender, text, isModel) {
         const safeText = encodeURIComponent(text); 
         html += `
         <div class="mt-3 flex gap-3 border-t border-slate-700/50 pt-2 opacity-80 hover:opacity-100 transition-opacity msg-action-bar">
-            <button id="play-btn-${msgId}" type="button" class="text-slate-400 hover:text-green-400 flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold transition-colors" data-text="${safeText}" onclick="event.stopPropagation(); toggleSingleMessagePlay(this)">
-                <svg class="w-4 h-4 play-icon" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                <svg class="w-4 h-4 pause-icon hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-                <span class="play-text">Play</span>
+            
+            <button type="button" id="play-btn-${msgId}" class="btn-play-msg text-slate-400 hover:text-green-400 flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold transition-colors" data-text="${safeText}">
+                <svg class="w-4 h-4 play-icon pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                <svg class="w-4 h-4 pause-icon hidden pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                <span class="play-text pointer-events-none">Play</span>
             </button>
-            <button type="button" class="text-slate-400 hover:text-red-400 flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold transition-colors" onclick="event.stopPropagation(); downloadSinglePDF(this, '${sender.replace(/[^a-zA-Z0-9]/g, '_')}')">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg> PDF
+            
+            <button type="button" class="btn-pdf-msg text-slate-400 hover:text-red-400 flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold transition-colors" data-sender="${sender.replace(/[^a-zA-Z0-9]/g, '_')}">
+                <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg> PDF
             </button>
+            
         </div>`;
     }
     
