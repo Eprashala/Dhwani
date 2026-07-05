@@ -1243,21 +1243,35 @@ window.toggleSingleMessagePlay = (btnElem) => {
 			};
 
 			// --- NEW DYNAMIC ANDROID FALLBACK ENGINE ---
+// --- NEW DYNAMIC ANDROID FALLBACK ENGINE ---
 			utterance.onstart = () => {
 				// Wait 100ms to see if native boundary events work, otherwise take over
 				setTimeout(() => {
 					if (!hasBoundaryFired && ttsStatus === 'PLAYING') {
 						
+						// ==========================================
+						// ⚙️ THE TUNING DIALS ⚙️
+						// If the highlight is LAGGING (Audio is faster), DECREASE these numbers.
+						// If the highlight is RUSHING (Audio is slower), INCREASE these numbers.
+						// ==========================================
+						const BASE_DELAY = 150;  // Base time for any word (Original was 250)
+						const CHAR_DELAY = 30;   // Extra time added per character (Original was 50)
+						const MAX_DELAY = 850;   // Maximum time it will wait on a single massive word
+						// ==========================================
+
 						const highlightNextWord = () => {
 							if (hasBoundaryFired || ttsStatus !== 'PLAYING' || estimatedWordIndex >= wordsArray.length) return;
 							
 							highlightTTSWord(msgId, estimatedWordIndex);
 							
-							// Dynamic math: Base 250ms + 50ms per character, adjusted for your 0.85 reading speed.
-							// This means long words hold the highlight longer than short words.
 							const currentWord = wordsArray[estimatedWordIndex] || "";
 							const charCount = currentWord.length;
-							const wordDuration = (250 + (charCount * 50)) / speechRate; 
+							
+							// Calculate how long to hold the highlight on this specific word
+							let wordDuration = (BASE_DELAY + (charCount * CHAR_DELAY)) / speechRate; 
+							
+							// Cap the maximum delay so the highlighter never gets "stuck" on giant compound words
+							if (wordDuration > MAX_DELAY) wordDuration = MAX_DELAY;
 							
 							estimatedWordIndex++;
 							fallbackTimer = setTimeout(highlightNextWord, wordDuration);
@@ -1267,7 +1281,6 @@ window.toggleSingleMessagePlay = (btnElem) => {
 					}
 				}, 100);
 			};
-
 			utterance.onboundary = (event) => { 
 				hasBoundaryFired = true; // Disable fallback if native events work
 				if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
