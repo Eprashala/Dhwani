@@ -1,3 +1,19 @@
+// --- GLOBAL SYSTEM STATE & VARIABLES (Safely initialized first) ---
+let UI = {};
+let chatHistory = [];
+let recognition = null;
+let synth = window.speechSynthesis;
+let isListening = false; 
+let selectedLibraryItem = "Bhagavad Gita|Bhagavad Gita";
+let state = { isProcessing: false, isMuted: false, lastAIMessage: "", sessionActive: false };
+
+let ttsStatus = 'STOPPED';
+let currentActiveBtn = null;
+let lastSpokenIndex = 0;
+window.currentPlayingText = "";
+let currentAborter = null;
+let lastHighlightedSpan = null;
+
 // --- DISCLAIMER LOGIC ---
 function closeDisclaimer() {
     const checkbox = document.getElementById('dontShowAgain');
@@ -314,18 +330,6 @@ const LIBRARY_CONFIG = {
     "Maharishis": maharishiObject
 };
 
-// --- 3. DOM & STATE (SAFE INITIALIZATION) ---
-let UI = {};
-let chatHistory = [];
-let recognition = null;
-let synth = window.speechSynthesis;
-let isListening = false; 
-let selectedLibraryItem = "Bhagavad Gita|Bhagavad Gita";
-let state = { isProcessing: false, isMuted: false, lastAIMessage: "", sessionActive: false };
-
-// --- NEW ABORT CONTROLLER (Global Scope) ---
-let currentAborter = null;
-
 // Wait for HTML to be fully painted before finding elements
 document.addEventListener("DOMContentLoaded", () => {
     UI = {
@@ -389,6 +393,9 @@ document.addEventListener("DOMContentLoaded", () => {
             silent.volume = 0; synth.speak(silent);
             UI.overlay.style.display = 'none';
         });
+        
+        // Force the right visual state for the Stop button on load
+        updateStopButtonVisibility();
     }
 });
 
@@ -600,17 +607,19 @@ function clearData() {
 }
 
 // === NEW VISIBILITY MANAGER ===
-// This seamlessly keeps the Stop button visible across all active states.
+// This seamlessly keeps the Stop button visually disabled instead of completely hiding it
 function updateStopButtonVisibility() {
     if (!UI.btnStop) return;
     
-    // Show Stop button if: AI is thinking OR Audio is playing OR Mic is listening
+    // Activate Stop button if: AI is thinking OR Audio is playing OR Mic is listening
     if (state.isProcessing || ttsStatus !== 'STOPPED' || isListening) {
-        UI.btnStop.classList.remove('hidden');
-        UI.btnStop.classList.add('flex');
+        UI.btnStop.classList.remove('opacity-30', 'cursor-not-allowed');
+        UI.btnStop.classList.add('hover:bg-red-900/30', 'hover:text-red-400');
+        UI.btnStop.disabled = false;
     } else {
-        UI.btnStop.classList.add('hidden');
-        UI.btnStop.classList.remove('flex');
+        UI.btnStop.classList.add('opacity-30', 'cursor-not-allowed');
+        UI.btnStop.classList.remove('hover:bg-red-900/30', 'hover:text-red-400');
+        UI.btnStop.disabled = true;
     }
 }
 
@@ -683,6 +692,7 @@ function setupEventListeners() {
     if (UI.btnStop) {
         UI.btnStop.onclick = (e) => {
             e.stopPropagation();
+            if (UI.btnStop.disabled) return;
             
             // 1. Halt TTS Audio entirely
             resetCurrentTTS();
@@ -1021,8 +1031,6 @@ async function getAIResponse(history, config) {
 }
 
 // --- NEW HIGHLIGHT AND TTS PREP LOGIC ---
-let lastHighlightedSpan = null;
-
 function prepareTextForTTSAndHighlighting(container, msgId) {
     const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
     const textNodes = [];
@@ -1087,10 +1095,6 @@ function clearTTSHighlight() {
 }
 
 // --- TTS STATE MANAGEMENT ---
-let currentActiveBtn = null;
-let ttsStatus = 'STOPPED';
-let lastSpokenIndex = 0;
-window.currentPlayingText = "";
 
 function updatePlayBtnUI(btn, isPlaying) {
     if (!btn) return;
