@@ -1,19 +1,3 @@
-// --- GLOBAL SYSTEM STATE & VARIABLES (Safely initialized first) ---
-let UI = {};
-let chatHistory = [];
-let recognition = null;
-let synth = window.speechSynthesis;
-let isListening = false; 
-let selectedLibraryItem = "Bhagavad Gita|Bhagavad Gita";
-let state = { isProcessing: false, isMuted: false, lastAIMessage: "", sessionActive: false };
-
-let ttsStatus = 'STOPPED';
-let currentActiveBtn = null;
-let lastSpokenIndex = 0;
-window.currentPlayingText = "";
-let currentAborter = null;
-let lastHighlightedSpan = null;
-
 // --- DISCLAIMER LOGIC ---
 function closeDisclaimer() {
     const checkbox = document.getElementById('dontShowAgain');
@@ -330,6 +314,15 @@ const LIBRARY_CONFIG = {
     "Maharishis": maharishiObject
 };
 
+// --- 3. DOM & STATE (SAFE INITIALIZATION) ---
+let UI = {};
+let chatHistory = [];
+let recognition = null;
+let synth = window.speechSynthesis;
+let isListening = false; 
+let selectedLibraryItem = "Bhagavad Gita|Bhagavad Gita";
+let state = { isProcessing: false, isMuted: false, lastAIMessage: "", sessionActive: false };
+
 // Wait for HTML to be fully painted before finding elements
 document.addEventListener("DOMContentLoaded", () => {
     UI = {
@@ -339,17 +332,13 @@ document.addEventListener("DOMContentLoaded", () => {
         status: document.getElementById('status-indicator'),
         textIn: document.getElementById('text-input'),
         btnSend: document.getElementById('btn-send'),
-        
-        btnStop: document.getElementById('btn-stop'),         
-        btnEditLast: document.getElementById('btn-edit-last'), 
-        
         btnMic: document.getElementById('btn-mic'),
         iconMicDefault: document.getElementById('icon-mic-default'),
         iconMicThinking: document.getElementById('icon-mic-thinking'),
         btnRepeat: document.getElementById('btn-repeat'),
         btnMute: document.getElementById('btn-mute'),
         btnRestart: document.getElementById('btn-restart'),
-        btnSharePdf: document.getElementById('btn-share-pdf'), 
+        btnSharePdf: document.getElementById('btn-share-pdf'), // Added Global PDF Button
         btnPasteKey: document.getElementById('btn-paste-key'),
         iconVol: document.getElementById('icon-vol'),
         iconMute: document.getElementById('icon-mute'),
@@ -393,9 +382,6 @@ document.addEventListener("DOMContentLoaded", () => {
             silent.volume = 0; synth.speak(silent);
             UI.overlay.style.display = 'none';
         });
-        
-        // Force the right visual state for the Stop button on load
-        updateStopButtonVisibility();
     }
 });
 
@@ -544,9 +530,7 @@ function saveData() {
     localStorage.setItem('darshan_remember', UI.remember.checked);
     localStorage.setItem('darshan_ratio', UI.ratioSlider.value);
     localStorage.setItem('darshan_model', UI.modelSlider.value);
-    localStorage.setItem('darshan_lang', UI.lang.value);
-    
-    localStorage.setItem('darshan_apikey', UI.keyIn.value); 
+    localStorage.setItem('darshan_lang', UI.lang.value); // Added Language Saving
     
     if (UI.remember.checked && chatHistory.length > 0) {
         localStorage.setItem('darshan_history', JSON.stringify(chatHistory));
@@ -564,10 +548,7 @@ function loadData() {
     UI.ratioSlider.value = localStorage.getItem('darshan_ratio') || "80";
     UI.modelSlider.value = localStorage.getItem('darshan_model') || "40";
     
-    if (UI.keyIn) {
-        UI.keyIn.value = localStorage.getItem('darshan_apikey') || "";
-    }
-    
+    // Load Saved Language if it exists
     if (localStorage.getItem('darshan_lang')) {
         UI.lang.value = localStorage.getItem('darshan_lang'); 
     }
@@ -589,44 +570,18 @@ function loadData() {
         }
     }
     updateSliderAvailability();
-    
-    if (chatHistory.length > 0 && UI.btnEditLast) {
-        UI.btnEditLast.classList.remove('hidden');
-        UI.btnEditLast.classList.add('flex');
-    }
 }
-
 function clearData() {
     chatHistory = []; state.lastAIMessage = ""; localStorage.removeItem('darshan_history');
     UI.log.innerHTML = `<div class="text-gray-400 text-center mt-12 cinzel"><p class="text-yellow-500 text-xl mb-2">🙏 Memory Cleared 🙏</p>Begin anew.</div>`;
     synth.cancel();
-    if (UI.btnEditLast) {
-        UI.btnEditLast.classList.add('hidden');
-        UI.btnEditLast.classList.remove('flex');
-    }
-}
-
-// === NEW VISIBILITY MANAGER ===
-// This seamlessly keeps the Stop button visually disabled instead of completely hiding it
-function updateStopButtonVisibility() {
-    if (!UI.btnStop) return;
-    
-    // Activate Stop button if: AI is thinking OR Audio is playing OR Mic is listening
-    if (state.isProcessing || ttsStatus !== 'STOPPED' || isListening) {
-        UI.btnStop.classList.remove('opacity-30', 'cursor-not-allowed');
-        UI.btnStop.classList.add('hover:bg-red-900/30', 'hover:text-red-400');
-        UI.btnStop.disabled = false;
-    } else {
-        UI.btnStop.classList.add('opacity-30', 'cursor-not-allowed');
-        UI.btnStop.classList.remove('hover:bg-red-900/30', 'hover:text-red-400');
-        UI.btnStop.disabled = true;
-    }
 }
 
 function setupEventListeners() {
 	
 	// --- ANDROID TOUCH EVENT DELEGATION ---
     UI.log.addEventListener('click', (e) => {
+        // Intercept taps for the Play/Pause button
         const playBtn = e.target.closest('.btn-play-msg');
         if (playBtn) {
             e.preventDefault();
@@ -635,6 +590,7 @@ function setupEventListeners() {
             return;
         }
 
+        // Intercept taps for the PDF button
         const pdfBtn = e.target.closest('.btn-pdf-msg');
         if (pdfBtn) {
             e.preventDefault();
@@ -688,81 +644,12 @@ function setupEventListeners() {
     UI.btnSaveSet.onclick = (e) => { e.stopPropagation(); saveData(); closeSettings(e); };
     UI.settingsModal.addEventListener('click', e => e.stopPropagation());
 
-    // --- STOP BUTTON LOGIC ---
-    if (UI.btnStop) {
-        UI.btnStop.onclick = (e) => {
-            e.stopPropagation();
-            if (UI.btnStop.disabled) return;
-            
-            // 1. Halt TTS Audio entirely
-            resetCurrentTTS();
-            
-            // 2. Halt Microphone Input
-            if (isListening && recognition) recognition.stop();
-            
-            // 3. Halt AI Fetch Request (if processing)
-            if (state.isProcessing && currentAborter) {
-                currentAborter.abort(); 
-            }
-            
-            // Re-evaluate visibility
-            setTimeout(updateStopButtonVisibility, 100); 
-        };
-    }
-
-    // --- EDIT BUTTON LOGIC ---
-    if (UI.btnEditLast) {
-        UI.btnEditLast.onclick = (e) => {
-            e.stopPropagation();
-
-            if (state.isProcessing && currentAborter) currentAborter.abort();
-            resetCurrentTTS();
-            if (isListening && recognition) recognition.stop();
-            
-            resetMicUI();
-            state.isProcessing = false;
-            updateStopButtonVisibility(); 
-            UI.status.style.backgroundColor = '#4b5563';
-
-            if (chatHistory.length > 0) {
-                let lastRole = chatHistory[chatHistory.length - 1].role;
-
-                if (lastRole === 'model') {
-                    chatHistory.pop();
-                    if (UI.log.lastElementChild && UI.log.lastElementChild.classList.contains('msg-container')) {
-                        UI.log.removeChild(UI.log.lastElementChild);
-                    }
-                    lastRole = chatHistory.length > 0 ? chatHistory[chatHistory.length - 1].role : null;
-                }
-
-                if (lastRole === 'user') {
-                    if (chatHistory.length === 1 && chatHistory[0].parts[0].text === "Pranam.") {
-                        // Do nothing
-                    } else {
-                        const userMsg = chatHistory.pop();
-                        if (UI.log.lastElementChild && UI.log.lastElementChild.classList.contains('msg-container')) {
-                            UI.log.removeChild(UI.log.lastElementChild);
-                        }
-                        
-                        UI.textIn.value = userMsg.parts[0].text;
-                        UI.textIn.focus();
-                    }
-                }
-            }
-
-            saveData();
-            
-            UI.btnEditLast.classList.add('hidden');
-            UI.btnEditLast.classList.remove('flex');
-        };
-    }
-
-    // Global Mute
+// Global Mute - Blocks all TTS functionality and acts purely as text chat when toggled
     UI.btnMute.onclick = (e) => { 
         e.stopPropagation(); 
         state.isMuted = !state.isMuted; 
         if(state.isMuted) { 
-            resetCurrentTTS(); 
+            resetCurrentTTS(); // Stops audio immediately and resets play buttons visually
             UI.iconVol.classList.add('hidden'); 
             UI.iconMute.classList.remove('hidden'); 
         } else { 
@@ -773,6 +660,7 @@ function setupEventListeners() {
 	
     UI.btnRestart.onclick = (e) => { e.stopPropagation(); clearData(); };
 
+    
     if (UI.btnCloseApp) {
         UI.btnCloseApp.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -838,11 +726,12 @@ function setupEventListeners() {
                 }
             });
 
+            // --- NEW: CREATE AND INJECT THE HEADER ---
             const header = document.createElement('div');
             header.innerText = "ai.eprashala.com";
             header.style.setProperty('text-align', 'center', 'important');
             header.style.setProperty('color', '#6b7280', 'important'); 
-            header.style.setProperty('font-size', '14px', 'important'); 
+            header.style.setProperty('font-size', '14px', 'important'); // Slightly larger for full chat
             header.style.setProperty('font-weight', 'bold', 'important');
             header.style.setProperty('letter-spacing', '2px', 'important');
             header.style.setProperty('padding-bottom', '15px', 'important');
@@ -851,6 +740,7 @@ function setupEventListeners() {
             header.style.setProperty('width', '100%', 'important');
             
             clone.prepend(header);
+            // -----------------------------------------
             
             const opt = {
                 margin:       0.5,
@@ -875,7 +765,6 @@ function initSpeechRecognition() {
     
     recognition.onstart = () => {
         isListening = true;
-        updateStopButtonVisibility(); 
         UI.btnMic.classList.add('mic-pulse');
         UI.status.style.backgroundColor = '#ef4444'; 
         UI.textIn.value = '';
@@ -888,14 +777,9 @@ function initSpeechRecognition() {
     recognition.onend = () => {
         isListening = false;
         if (!state.isProcessing) resetMicUI();
-        setTimeout(updateStopButtonVisibility, 50);
     };
     recognition.onerror = (e) => {
-        if (e.error === 'no-speech' || e.error === 'not-allowed') { 
-            isListening = false; 
-            resetMicUI(); 
-            setTimeout(updateStopButtonVisibility, 50); 
-        }
+        if (e.error === 'no-speech' || e.error === 'not-allowed') { isListening = false; resetMicUI(); }
     };
 }
 
@@ -905,6 +789,7 @@ function resetMicUI() {
     UI.textIn.placeholder = "Type your message...";
     setMicThinkingState(false);
 }
+
 
 function setMicThinkingState(isThinking) {
     if (isThinking) {
@@ -931,14 +816,6 @@ async function processInput(userText) {
     UI.status.style.backgroundColor = '#facc15'; 
     setMicThinkingState(true);
     
-    // Evaluate Visibility for processing state
-    updateStopButtonVisibility(); 
-
-    if (UI.btnEditLast) {
-        UI.btnEditLast.classList.add('hidden');
-        UI.btnEditLast.classList.remove('flex');
-    }
-    
     const config = getSelectedConfig();
 
     if (chatHistory.length === 0) {
@@ -953,36 +830,24 @@ async function processInput(userText) {
 
     try {
         const rawRes = await getAIResponse(chatHistory, config);
+        // Clean markdown characters strictly for Text-to-Speech Engine
+		const plainSpeechText = rawRes.replace(/[*#`_\[\](){}<>]/g, '').trim();
         
 		state.lastAIMessage = rawRes;
         chatHistory.push({ role: 'model', parts: [{ text: rawRes }] });
         
+        // Capture the dynamic Message ID returned by the renderer
         const newMsgId = renderMessage(getSelectedItemName(), rawRes, true); 
         saveData();
         
-        if (!state.isMuted) speakText(newMsgId);
-        
-        if (UI.btnEditLast) {
-            UI.btnEditLast.classList.remove('hidden');
-            UI.btnEditLast.classList.add('flex');
-        }
+        if (!state.isMuted) speakText(plainSpeechText, UI.lang.value, newMsgId);
         
     } catch (err) {
-        if (err.name === 'AbortError') {
-            console.log("Fetch aborted by user.");
-            chatHistory.pop(); 
-            if (UI.log.lastElementChild) UI.log.removeChild(UI.log.lastElementChild); 
-            UI.textIn.value = userText; 
-            UI.textIn.focus();
-        } else {
-            renderMessage("System", "⚠️ Divine connection interrupted. Please try again.", true);
-        }
+        renderMessage("System", "⚠️ Divine connection interrupted. Please try again.", true);
     }
 
     state.isProcessing = false;
     resetMicUI();
-    // Use timeout to allow TTS to begin picking up the visibility flag before evaluating
-    setTimeout(updateStopButtonVisibility, 100); 
 }
 
 async function getAIResponse(history, config) {
@@ -1016,85 +881,17 @@ async function getAIResponse(history, config) {
         systemInstruction: { parts: [{ text: prompt }] } 
     };
 
-    currentAborter = new AbortController();
-
-    const response = await fetch(PROXY_URL, { 
-        method: 'POST', 
-        headers: headers, 
-        body: JSON.stringify(payload),
-        signal: currentAborter.signal 
-    });
-    
+    const response = await fetch(PROXY_URL, { method: 'POST', headers: headers, body: JSON.stringify(payload) });
     if (!response.ok) throw new Error();
     const data = await response.json();
     return data.candidates[0].content.parts[0].text;
 }
 
-// --- NEW HIGHLIGHT AND TTS PREP LOGIC ---
-function prepareTextForTTSAndHighlighting(container, msgId) {
-    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
-    const textNodes = [];
-    let node;
-    
-    while (node = walker.nextNode()) {
-        if (node.nodeValue.trim() !== '') {
-            textNodes.push(node);
-        }
-    }
-
-    let wordCounter = 0;
-    let finalSpeechText = [];
-
-    textNodes.forEach(textNode => {
-        const parts = textNode.nodeValue.split(/(\s+)/); 
-        const fragment = document.createDocumentFragment();
-        
-        parts.forEach(part => {
-            if (part.trim().length > 0) {
-                const span = document.createElement('span');
-                span.id = `tts-${msgId}-${wordCounter}`;
-                span.className = 'transition-all duration-150'; 
-                span.textContent = part;
-                fragment.appendChild(span);
-                
-                finalSpeechText.push(part);
-                wordCounter++;
-            } else {
-                fragment.appendChild(document.createTextNode(part));
-            }
-        });
-        textNode.parentNode.replaceChild(fragment, textNode);
-    });
-
-    return finalSpeechText.join(' ');
-}
-
-function highlightTTSWord(msgId, wordIndex) {
-    clearTTSHighlight(); 
-
-    const span = document.getElementById(`tts-${msgId}-${wordIndex}`);
-    if (span) {
-        span.classList.add('bg-yellow-500/30', 'text-yellow-300', 'font-bold', 'rounded-[3px]', 'px-[2px]', 'shadow-[0_0_8px_rgba(234,179,8,0.4)]');
-        lastHighlightedSpan = span;
-
-        const logContainer = document.getElementById('conversation-log');
-        const spanRect = span.getBoundingClientRect();
-        const logRect = logContainer.getBoundingClientRect();
-        
-        if (spanRect.bottom > logRect.bottom - 40 || spanRect.top < logRect.top + 40) {
-            span.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-    }
-}
-
-function clearTTSHighlight() {
-    if (lastHighlightedSpan) {
-        lastHighlightedSpan.classList.remove('bg-yellow-500/30', 'text-yellow-300', 'font-bold', 'rounded-[3px]', 'px-[2px]', 'shadow-[0_0_8px_rgba(234,179,8,0.4)]');
-        lastHighlightedSpan = null;
-    }
-}
-
 // --- TTS STATE MANAGEMENT ---
+let currentActiveBtn = null;
+let ttsStatus = 'STOPPED';
+let lastSpokenIndex = 0;
+window.currentPlayingText = "";
 
 function updatePlayBtnUI(btn, isPlaying) {
     if (!btn) return;
@@ -1123,85 +920,21 @@ function resetCurrentTTS() {
         currentActiveBtn = null;
     }
     synth.cancel();
-    clearTTSHighlight(); 
     ttsStatus = 'STOPPED';
     lastSpokenIndex = 0;
     window.currentPlayingText = "";
-    
-    // --- ANDROID GC FIX: Release the lock ---
-    window.__activeUtterance = null; 
-    
-    // Evaluate Visibility for stopped state
-    setTimeout(updateStopButtonVisibility, 50); 
 }
 
-function startNewUtterance(textToSpeak, fullOriginalText, btnElement, offsetIndex) {
-    if (!textToSpeak.trim()) {
-        resetCurrentTTS();
-        return;
-    }
-
-    const msgId = btnElement.id.replace('play-btn-', ''); 
-    const utterance = new SpeechSynthesisUtterance(textToSpeak);
-    
-    // --- ANDROID GC FIX: Apply Lock ---
-    // This absolutely prevents Android from randomly killing the audio/highlight mid-sentence
-    window.__activeUtterance = utterance; 
-    
-    utterance.lang = UI.lang ? UI.lang.value : 'hi-IN';
-    utterance.rate = 0.85; 
-    utterance.pitch = ['Saraswati', 'Lakshmi', 'Durga', 'Kali'].includes(getSelectedItemName()) ? 1.2 : 0.8;
-    
-    // --- ANDROID FALLBACK ENGINE ---
-    let hasBoundaryFired = false;
-    let fallbackTimer = null;
-    
-    // Calculate where we are starting if resuming from a pause
-    const spokenSoFar = fullOriginalText.substring(0, offsetIndex);
-    const match = spokenSoFar.match(/\S+/g);
-    let estimatedWordIndex = match ? match.length : 0;
-
-    utterance.onstart = () => { 
-        // If Android fails to trigger the native boundary event, this takes over seamlessly
-        fallbackTimer = setInterval(() => {
-            if (!hasBoundaryFired && ttsStatus === 'PLAYING') {
-                highlightTTSWord(msgId, estimatedWordIndex);
-                estimatedWordIndex++;
-            }
-        }, 420); // 420ms accurately mimics the reading speed at a 0.85 rate
-    };
-
-    utterance.onboundary = (event) => { 
-        hasBoundaryFired = true; // Disable the fallback engine if native events work (Windows/iOS)
-        if (fallbackTimer) { clearInterval(fallbackTimer); fallbackTimer = null; }
-
-        lastSpokenIndex = offsetIndex + event.charIndex; 
-        
-        const currentSpoken = fullOriginalText.substring(0, lastSpokenIndex);
-        const currentMatch = currentSpoken.match(/\S+/g);
-        const currentWordIndex = currentMatch ? currentMatch.length : 0;
-        
-        highlightTTSWord(msgId, currentWordIndex);
-    };
-    
-    const cleanup = () => {
-        if (fallbackTimer) clearInterval(fallbackTimer);
-        clearTTSHighlight();
-        if (ttsStatus === 'PLAYING') resetCurrentTTS(); 
-    };
-
-    utterance.onend = cleanup;
-    
-    utterance.onerror = (e) => {
-        if (e.error !== 'canceled' && e.error !== 'interrupted') {
-            cleanup();
+// Redirects the auto-play functionality to use the new state machine
+function speakText(text, langCode, msgId) {
+    if (state.isMuted) return;
+    setTimeout(() => {
+        const btn = document.getElementById(`play-btn-${msgId}`);
+        if (btn) {
+            window.toggleSingleMessagePlay(btn);
         }
-    };
-    
-    synth.resume(); 
-    synth.speak(utterance);
+    }, 50);
 }
-
 
 window.toggleSingleMessagePlay = (btnElem) => {
     if (state.isMuted) {
@@ -1209,13 +942,14 @@ window.toggleSingleMessagePlay = (btnElem) => {
         return;
     }
 
-    const plainText = decodeURIComponent(btnElem.getAttribute('data-speech-text'));
+    const text = decodeURIComponent(btnElem.getAttribute('data-text'));
+    const plainText = text.replace(/[*#`_\[\](){}<>]/g, '').trim();
 
+    // Check if we are interacting with the currently playing message
     if (currentActiveBtn === btnElem && window.currentPlayingText === plainText) {
         if (ttsStatus === 'PAUSED') {
             ttsStatus = 'PLAYING';
             updatePlayBtnUI(btnElem, true);
-            updateStopButtonVisibility(); 
             synth.cancel();
             setTimeout(() => {
                 const remainingText = plainText.substring(lastSpokenIndex);
@@ -1232,13 +966,13 @@ window.toggleSingleMessagePlay = (btnElem) => {
         }
     }
 
+    // New play or clicked a different button
     resetCurrentTTS();
     currentActiveBtn = btnElem;
     window.currentPlayingText = plainText;
     ttsStatus = 'PLAYING';
     lastSpokenIndex = 0;
     updatePlayBtnUI(btnElem, true);
-    updateStopButtonVisibility(); 
 
     setTimeout(() => { startNewUtterance(plainText, plainText, btnElem, 0); }, 50);
 };
@@ -1249,36 +983,27 @@ function startNewUtterance(textToSpeak, fullOriginalText, btnElement, offsetInde
         return;
     }
 
-    const msgId = btnElement.id.replace('play-btn-', ''); 
     const utterance = new SpeechSynthesisUtterance(textToSpeak);
-    
     utterance.lang = UI.lang ? UI.lang.value : 'hi-IN';
     utterance.rate = 0.85; 
     utterance.pitch = ['Saraswati', 'Lakshmi', 'Durga', 'Kali'].includes(getSelectedItemName()) ? 1.2 : 0.8;
     
+    // Tracks current reading position for the resume function
     utterance.onboundary = (event) => { 
         lastSpokenIndex = offsetIndex + event.charIndex; 
-        
-        const spokenSoFar = fullOriginalText.substring(0, lastSpokenIndex);
-        const match = spokenSoFar.match(/\S+/g);
-        const currentWordIndex = match ? match.length : 0;
-        
-        highlightTTSWord(msgId, currentWordIndex);
     };
     
     utterance.onend = () => { 
-        clearTTSHighlight();
         if (ttsStatus === 'PLAYING') resetCurrentTTS(); 
     };
     
     utterance.onerror = (e) => {
         if (e.error !== 'canceled' && e.error !== 'interrupted') {
-            clearTTSHighlight();
             resetCurrentTTS();
         }
     };
     
-    synth.resume(); 
+    synth.resume(); // Kickstarts the engine on stubborn browsers
     synth.speak(utterance);
 }
 
@@ -1287,6 +1012,7 @@ window.copySingleMessage = async (btnElem) => {
     try {
         await navigator.clipboard.writeText(text);
         
+        // Optional: Give the user some visual feedback
         const originalHtml = btnElem.innerHTML;
         btnElem.innerHTML = `<span class="text-green-400">Copied!</span>`;
         setTimeout(() => { btnElem.innerHTML = originalHtml; }, 1500);
@@ -1294,6 +1020,7 @@ window.copySingleMessage = async (btnElem) => {
         console.error("Failed to copy", e);
     }
 };
+
 
 window.downloadSinglePDF = (btnElem, sender) => {
     if (typeof html2pdf === 'undefined') {
@@ -1307,21 +1034,24 @@ window.downloadSinglePDF = (btnElem, sender) => {
     const actionBar = clone.querySelector('.msg-action-bar');
     if (actionBar) actionBar.remove();
     
+    // Force Light Mode for the main clone
     clone.style.setProperty('background-color', '#ffffff', 'important');
     clone.style.setProperty('padding', '20px', 'important');
     clone.style.setProperty('border-radius', '0px', 'important'); 
     clone.style.setProperty('width', '100%', 'important');
     
+    // Force all inner tags to black text and transparent backgrounds
     const allElements = clone.querySelectorAll('*');
     allElements.forEach(el => {
         el.style.setProperty('color', '#000000', 'important');
         el.style.setProperty('background-color', 'transparent', 'important');
     });
 
+    // --- NEW: CREATE AND INJECT THE HEADER ---
     const header = document.createElement('div');
     header.innerText = "ai.eprashala.com";
     header.style.setProperty('text-align', 'center', 'important');
-    header.style.setProperty('color', '#6b7280', 'important'); 
+    header.style.setProperty('color', '#6b7280', 'important'); // Grey color for a professional look
     header.style.setProperty('font-size', '18px', 'important');
     header.style.setProperty('font-weight', 'bold', 'important');
     header.style.setProperty('letter-spacing', '1px', 'important');
@@ -1330,7 +1060,9 @@ window.downloadSinglePDF = (btnElem, sender) => {
     header.style.setProperty('border-bottom', '1px solid #e5e7eb', 'important');
     header.style.setProperty('width', '100%', 'important');
     
+    // Prepend puts it at the very top of the cloned container
     clone.prepend(header); 
+    // -----------------------------------------
     
     const opt = {
         margin:       0.5,
@@ -1355,7 +1087,7 @@ function renderMessage(sender, text, isModel) {
     
     let htmlContent = `
         <div class="text-[10px] uppercase font-bold tracking-wider ${isModel ? 'text-cyan-400 cinzel' : 'text-slate-300'} mb-1">${sender}</div>
-        <div class="text-sm leading-relaxed text-gray-100 markdown-body" id="md-${msgId}">${parsedText}</div>
+        <div class="text-sm leading-relaxed text-gray-100 markdown-body">${parsedText}</div>
     `;
     
     if (isModel) {
@@ -1377,15 +1109,9 @@ function renderMessage(sender, text, isModel) {
 
     div.innerHTML = htmlContent;
     UI.log.appendChild(div);
-
-    if (isModel) {
-        const mdBody = div.querySelector('.markdown-body');
-        const speechText = prepareTextForTTSAndHighlighting(mdBody, msgId);
-        const playBtn = div.querySelector(`#play-btn-${msgId}`);
-        playBtn.setAttribute('data-speech-text', encodeURIComponent(speechText));
-    }
     
     setTimeout(() => { UI.log.scrollTop = UI.log.scrollHeight; }, 50);
 
     return msgId;
 }
+
