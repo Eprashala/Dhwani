@@ -1223,7 +1223,7 @@ window.toggleSingleMessagePlay = (btnElem) => {
 			window.__activeUtterance = utterance; // Prevent Android GC
 
 			utterance.lang = UI.lang ? UI.lang.value : 'hi-IN';
-			const speechRate = 0.85; // Your chosen rate
+			const speechRate = 0.90; // Your chosen rate
 			utterance.rate = speechRate; 
 			utterance.pitch = ['Saraswati', 'Lakshmi', 'Durga', 'Kali'].includes(getSelectedItemName()) ? 1.2 : 0.8;
 			
