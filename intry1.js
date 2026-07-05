@@ -884,11 +884,11 @@ function setupEventListeners() {
 
 function initSpeechRecognition() {
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-    // Do not 'return' early here. Let recognition remain null so the button can throw the alert.
     if (!SpeechRec) {
         console.warn("Speech Recognition API not found in this environment.");
         return; 
     }
+    
     recognition = new SpeechRec();
     recognition.continuous = false; 
     recognition.interimResults = false; 
@@ -901,24 +901,38 @@ function initSpeechRecognition() {
         UI.textIn.value = '';
         UI.textIn.placeholder = "Listening... Speak now.";
     };
+    
     recognition.onresult = (e) => {
         const transcript = e.results[e.results.length - 1][0].transcript.trim();
         if (transcript) { UI.textIn.value = transcript; processInput(transcript); }
     };
+    
     recognition.onend = () => {
         isListening = false;
         if (!state.isProcessing) resetMicUI();
         setTimeout(updateStopButtonVisibility, 50);
     };
+    
+    // --- NEW EXPERT DIAGNOSTIC ERROR HANDLER ---
     recognition.onerror = (e) => {
-        if (e.error === 'no-speech' || e.error === 'not-allowed') { 
-            isListening = false; 
-            resetMicUI(); 
-            setTimeout(updateStopButtonVisibility, 50); 
+        console.error("Mic Error:", e.error);
+        
+        isListening = false; 
+        resetMicUI(); 
+        setTimeout(updateStopButtonVisibility, 50); 
+        
+        if (e.error === 'no-speech') {
+            // Normal timeout, user didn't speak
+            return; 
+        } else if (e.error === 'network') {
+            alert("⚠️ Network Error: Android's Google App cannot reach the speech servers. Check internet or Google App restrictions.");
+        } else if (e.error === 'not-allowed' || e.error === 'audio-capture') {
+            alert("⚠️ Mic Blocked: Please ensure BOTH Google Chrome and the 'Google' app have microphone permissions in phone settings.");
+        } else {
+            alert("⚠️ Speech Engine Error: " + e.error + ". Ensure the official Google App is enabled on this phone.");
         }
     };
 }
-
 function resetMicUI() {
     UI.btnMic.classList.remove('mic-pulse');
     UI.status.style.backgroundColor = '#4b5563'; 
