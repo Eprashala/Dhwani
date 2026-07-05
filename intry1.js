@@ -1211,69 +1211,87 @@ window.toggleSingleMessagePlay = (btnElem) => {
     startNewUtterance(plainText, plainText, btnElem, 0); 
 };
 
-function startNewUtterance(textToSpeak, fullOriginalText, btnElement, offsetIndex) {
-    if (!textToSpeak.trim()) {
-        resetCurrentTTS();
-        return;
-    }
+		function startNewUtterance(textToSpeak, fullOriginalText, btnElement, offsetIndex) {
+			if (!textToSpeak.trim()) {
+				resetCurrentTTS();
+				return;
+			}
 
-    const msgId = btnElement.getAttribute('data-msg-id'); 
-    const utterance = new SpeechSynthesisUtterance(textToSpeak);
-    
-    window.__activeUtterance = utterance; // Prevent Android GC
+			const msgId = btnElement.getAttribute('data-msg-id'); 
+			const utterance = new SpeechSynthesisUtterance(textToSpeak);
+			
+			window.__activeUtterance = utterance; // Prevent Android GC
 
-    utterance.lang = UI.lang ? UI.lang.value : 'hi-IN';
-    utterance.rate = 0.85; 
-    utterance.pitch = ['Saraswati', 'Lakshmi', 'Durga', 'Kali'].includes(getSelectedItemName()) ? 1.2 : 0.8;
-    
-    let hasBoundaryFired = false;
-    let fallbackTimer = null;
-    
-    const spokenSoFar = fullOriginalText.substring(0, offsetIndex);
-    const match = spokenSoFar.match(/\S+/g);
-    let estimatedWordIndex = match ? match.length : 0;
-    
-    const cleanup = () => {
-        if (fallbackTimer) { clearInterval(fallbackTimer); fallbackTimer = null; }
-        clearTTSHighlight();
-        if (ttsStatus === 'PLAYING') resetCurrentTTS(); 
-    };
+			utterance.lang = UI.lang ? UI.lang.value : 'hi-IN';
+			const speechRate = 0.85; // Your chosen rate
+			utterance.rate = speechRate; 
+			utterance.pitch = ['Saraswati', 'Lakshmi', 'Durga', 'Kali'].includes(getSelectedItemName()) ? 1.2 : 0.8;
+			
+			let hasBoundaryFired = false;
+			let fallbackTimer = null;
+			
+			// Arrays for dynamic word-length calculations
+			const spokenSoFar = fullOriginalText.substring(0, offsetIndex);
+			const match = spokenSoFar.match(/\S+/g);
+			let estimatedWordIndex = match ? match.length : 0;
+			const wordsArray = fullOriginalText.match(/\S+/g) || [];
+			
+			const cleanup = () => {
+				if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+				clearTTSHighlight();
+				if (ttsStatus === 'PLAYING') resetCurrentTTS(); 
+			};
 
-    // Immediately start the fallback timer for Android
-    fallbackTimer = setInterval(() => {
-        if (!hasBoundaryFired && ttsStatus === 'PLAYING') {
-            highlightTTSWord(msgId, estimatedWordIndex);
-            estimatedWordIndex++;
-        }
-    }, 400);
+			// --- NEW DYNAMIC ANDROID FALLBACK ENGINE ---
+			utterance.onstart = () => {
+				// Wait 100ms to see if native boundary events work, otherwise take over
+				setTimeout(() => {
+					if (!hasBoundaryFired && ttsStatus === 'PLAYING') {
+						
+						const highlightNextWord = () => {
+							if (hasBoundaryFired || ttsStatus !== 'PLAYING' || estimatedWordIndex >= wordsArray.length) return;
+							
+							highlightTTSWord(msgId, estimatedWordIndex);
+							
+							// Dynamic math: Base 250ms + 50ms per character, adjusted for your 0.85 reading speed.
+							// This means long words hold the highlight longer than short words.
+							const currentWord = wordsArray[estimatedWordIndex] || "";
+							const charCount = currentWord.length;
+							const wordDuration = (250 + (charCount * 50)) / speechRate; 
+							
+							estimatedWordIndex++;
+							fallbackTimer = setTimeout(highlightNextWord, wordDuration);
+						};
+						
+						highlightNextWord(); // Start the sequence
+					}
+				}, 100);
+			};
 
-    utterance.onstart = () => {};
+			utterance.onboundary = (event) => { 
+				hasBoundaryFired = true; // Disable fallback if native events work
+				if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
 
-    utterance.onboundary = (event) => { 
-        hasBoundaryFired = true; 
-        if (fallbackTimer) { clearInterval(fallbackTimer); fallbackTimer = null; }
-
-        lastSpokenIndex = offsetIndex + event.charIndex; 
-        
-        const currentSpoken = fullOriginalText.substring(0, lastSpokenIndex);
-        const currentMatch = currentSpoken.match(/\S+/g);
-        const currentWordIndex = currentMatch ? currentMatch.length : 0;
-        
-        highlightTTSWord(msgId, currentWordIndex);
-    };
-    
-    utterance.onend = cleanup;
-    
-    utterance.onerror = (e) => {
-        if (e.error !== 'canceled' && e.error !== 'interrupted') {
-            cleanup();
-        }
-    };
-    
-    synth.speak(utterance);
-    synth.resume(); // Kickstart sleepy android engine
-}
-
+				lastSpokenIndex = offsetIndex + event.charIndex; 
+				
+				const currentSpoken = fullOriginalText.substring(0, lastSpokenIndex);
+				const currentMatch = currentSpoken.match(/\S+/g);
+				const currentWordIndex = currentMatch ? currentMatch.length : 0;
+				
+				highlightTTSWord(msgId, currentWordIndex);
+			};
+			
+			utterance.onend = cleanup;
+			
+			utterance.onerror = (e) => {
+				if (e.error !== 'canceled' && e.error !== 'interrupted') {
+					cleanup();
+				}
+			};
+			
+			synth.speak(utterance);
+			synth.resume(); // Kickstart sleepy android engine
+		}
 window.copySingleMessage = async (btnElem) => {
     const msgId = btnElem.getAttribute('data-msg-id');
     const text = rawTextMap[msgId] || ""; 
