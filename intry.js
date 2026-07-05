@@ -531,6 +531,7 @@ function saveData() {
     localStorage.setItem('darshan_ratio', UI.ratioSlider.value);
     localStorage.setItem('darshan_model', UI.modelSlider.value);
     localStorage.setItem('darshan_lang', UI.lang.value); // Added Language Saving
+	localStorage.setItem('darshan_apikey', UI.keyIn.value);
     
     if (UI.remember.checked && chatHistory.length > 0) {
         localStorage.setItem('darshan_history', JSON.stringify(chatHistory));
@@ -548,6 +549,9 @@ function loadData() {
     UI.ratioSlider.value = localStorage.getItem('darshan_ratio') || "80";
     UI.modelSlider.value = localStorage.getItem('darshan_model') || "40";
     
+	if (UI.keyIn) {
+        UI.keyIn.value = localStorage.getItem('darshan_apikey') || "";
+    }
     // Load Saved Language if it exists
     if (localStorage.getItem('darshan_lang')) {
         UI.lang.value = localStorage.getItem('darshan_lang'); 
