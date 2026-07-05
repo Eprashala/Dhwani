@@ -49,11 +49,20 @@ async function releaseWakeLock() {
     if (wakeLock !== null) { await wakeLock.release(); wakeLock = null; }
 }
 
-document.addEventListener('click', () => {
+// --- EXPERT FULLSCREEN ENFORCER ---
+function enforceFullScreen() {
+    // Check if we are NOT in fullscreen, and if the browser supports it
     if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-        document.documentElement.requestFullscreen().catch(() => {});
+        document.documentElement.requestFullscreen().catch((err) => {
+            console.warn("Fullscreen enforcement delayed by browser:", err);
+        });
     }
-});
+}
+
+// By using { capture: true }, this runs first, ignoring all e.stopPropagation() calls lower in the app.
+// Adding 'touchstart' guarantees instant response on Android touchscreens before the finger even lifts.
+document.addEventListener('click', enforceFullScreen, { capture: true });
+document.addEventListener('touchstart', enforceFullScreen, { capture: true, passive: true });
 
 // --- 2. THE ANCIENT LIBRARY CONFIGURATION ---
 const PROXY_URL = "https://eprashala.pythonanywhere.com/api/chat"; 
