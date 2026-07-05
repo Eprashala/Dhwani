@@ -338,7 +338,7 @@ document.addEventListener("DOMContentLoaded", () => {
         btnRepeat: document.getElementById('btn-repeat'),
         btnMute: document.getElementById('btn-mute'),
         btnRestart: document.getElementById('btn-restart'),
-        btnSharePdf: document.getElementById('btn-share-pdf'), // Added Global PDF Button
+        btnSharePdf: document.getElementById('btn-share-pdf'), 
         btnPasteKey: document.getElementById('btn-paste-key'),
         iconVol: document.getElementById('icon-vol'),
         iconMute: document.getElementById('icon-mute'),
@@ -530,8 +530,9 @@ function saveData() {
     localStorage.setItem('darshan_remember', UI.remember.checked);
     localStorage.setItem('darshan_ratio', UI.ratioSlider.value);
     localStorage.setItem('darshan_model', UI.modelSlider.value);
-    localStorage.setItem('darshan_lang', UI.lang.value); // Added Language Saving
-	localStorage.setItem('darshan_apikey', UI.keyIn.value);
+    localStorage.setItem('darshan_lang', UI.lang.value);
+    
+    localStorage.setItem('darshan_apikey', UI.keyIn.value); 
     
     if (UI.remember.checked && chatHistory.length > 0) {
         localStorage.setItem('darshan_history', JSON.stringify(chatHistory));
@@ -549,10 +550,10 @@ function loadData() {
     UI.ratioSlider.value = localStorage.getItem('darshan_ratio') || "80";
     UI.modelSlider.value = localStorage.getItem('darshan_model') || "40";
     
-	if (UI.keyIn) {
+    if (UI.keyIn) {
         UI.keyIn.value = localStorage.getItem('darshan_apikey') || "";
     }
-    // Load Saved Language if it exists
+    
     if (localStorage.getItem('darshan_lang')) {
         UI.lang.value = localStorage.getItem('darshan_lang'); 
     }
@@ -575,6 +576,7 @@ function loadData() {
     }
     updateSliderAvailability();
 }
+
 function clearData() {
     chatHistory = []; state.lastAIMessage = ""; localStorage.removeItem('darshan_history');
     UI.log.innerHTML = `<div class="text-gray-400 text-center mt-12 cinzel"><p class="text-yellow-500 text-xl mb-2">🙏 Memory Cleared 🙏</p>Begin anew.</div>`;
@@ -648,12 +650,12 @@ function setupEventListeners() {
     UI.btnSaveSet.onclick = (e) => { e.stopPropagation(); saveData(); closeSettings(e); };
     UI.settingsModal.addEventListener('click', e => e.stopPropagation());
 
-// Global Mute - Blocks all TTS functionality and acts purely as text chat when toggled
+    // Global Mute
     UI.btnMute.onclick = (e) => { 
         e.stopPropagation(); 
         state.isMuted = !state.isMuted; 
         if(state.isMuted) { 
-            resetCurrentTTS(); // Stops audio immediately and resets play buttons visually
+            resetCurrentTTS(); 
             UI.iconVol.classList.add('hidden'); 
             UI.iconMute.classList.remove('hidden'); 
         } else { 
@@ -664,7 +666,6 @@ function setupEventListeners() {
 	
     UI.btnRestart.onclick = (e) => { e.stopPropagation(); clearData(); };
 
-    
     if (UI.btnCloseApp) {
         UI.btnCloseApp.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -735,7 +736,7 @@ function setupEventListeners() {
             header.innerText = "ai.eprashala.com";
             header.style.setProperty('text-align', 'center', 'important');
             header.style.setProperty('color', '#6b7280', 'important'); 
-            header.style.setProperty('font-size', '14px', 'important'); // Slightly larger for full chat
+            header.style.setProperty('font-size', '14px', 'important'); 
             header.style.setProperty('font-weight', 'bold', 'important');
             header.style.setProperty('letter-spacing', '2px', 'important');
             header.style.setProperty('padding-bottom', '15px', 'important');
@@ -834,8 +835,6 @@ async function processInput(userText) {
 
     try {
         const rawRes = await getAIResponse(chatHistory, config);
-        // Clean markdown characters strictly for Text-to-Speech Engine
-		const plainSpeechText = rawRes.replace(/[*#`_\[\](){}<>]/g, '').trim();
         
 		state.lastAIMessage = rawRes;
         chatHistory.push({ role: 'model', parts: [{ text: rawRes }] });
@@ -844,7 +843,7 @@ async function processInput(userText) {
         const newMsgId = renderMessage(getSelectedItemName(), rawRes, true); 
         saveData();
         
-        if (!state.isMuted) speakText(plainSpeechText, UI.lang.value, newMsgId);
+        if (!state.isMuted) speakText(newMsgId);
         
     } catch (err) {
         renderMessage("System", "⚠️ Divine connection interrupted. Please try again.", true);
@@ -891,6 +890,72 @@ async function getAIResponse(history, config) {
     return data.candidates[0].content.parts[0].text;
 }
 
+// --- NEW HIGHLIGHT AND TTS PREP LOGIC ---
+let lastHighlightedSpan = null;
+
+function prepareTextForTTSAndHighlighting(container, msgId) {
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+    const textNodes = [];
+    let node;
+    
+    while (node = walker.nextNode()) {
+        if (node.nodeValue.trim() !== '') {
+            textNodes.push(node);
+        }
+    }
+
+    let wordCounter = 0;
+    let finalSpeechText = [];
+
+    textNodes.forEach(textNode => {
+        const parts = textNode.nodeValue.split(/(\s+)/); 
+        const fragment = document.createDocumentFragment();
+        
+        parts.forEach(part => {
+            if (part.trim().length > 0) {
+                const span = document.createElement('span');
+                span.id = `tts-${msgId}-${wordCounter}`;
+                span.className = 'transition-all duration-150'; 
+                span.textContent = part;
+                fragment.appendChild(span);
+                
+                finalSpeechText.push(part);
+                wordCounter++;
+            } else {
+                fragment.appendChild(document.createTextNode(part));
+            }
+        });
+        textNode.parentNode.replaceChild(fragment, textNode);
+    });
+
+    return finalSpeechText.join(' ');
+}
+
+function highlightTTSWord(msgId, wordIndex) {
+    clearTTSHighlight(); 
+
+    const span = document.getElementById(`tts-${msgId}-${wordIndex}`);
+    if (span) {
+        span.classList.add('bg-yellow-500/30', 'text-yellow-300', 'font-bold', 'rounded-[3px]', 'px-[2px]', 'shadow-[0_0_8px_rgba(234,179,8,0.4)]');
+        lastHighlightedSpan = span;
+
+        const logContainer = document.getElementById('conversation-log');
+        const spanRect = span.getBoundingClientRect();
+        const logRect = logContainer.getBoundingClientRect();
+        
+        if (spanRect.bottom > logRect.bottom - 40 || spanRect.top < logRect.top + 40) {
+            span.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+}
+
+function clearTTSHighlight() {
+    if (lastHighlightedSpan) {
+        lastHighlightedSpan.classList.remove('bg-yellow-500/30', 'text-yellow-300', 'font-bold', 'rounded-[3px]', 'px-[2px]', 'shadow-[0_0_8px_rgba(234,179,8,0.4)]');
+        lastHighlightedSpan = null;
+    }
+}
+
 // --- TTS STATE MANAGEMENT ---
 let currentActiveBtn = null;
 let ttsStatus = 'STOPPED';
@@ -924,13 +989,13 @@ function resetCurrentTTS() {
         currentActiveBtn = null;
     }
     synth.cancel();
+    clearTTSHighlight(); 
     ttsStatus = 'STOPPED';
     lastSpokenIndex = 0;
     window.currentPlayingText = "";
 }
 
-// Redirects the auto-play functionality to use the new state machine
-function speakText(text, langCode, msgId) {
+function speakText(msgId) {
     if (state.isMuted) return;
     setTimeout(() => {
         const btn = document.getElementById(`play-btn-${msgId}`);
@@ -946,10 +1011,8 @@ window.toggleSingleMessagePlay = (btnElem) => {
         return;
     }
 
-    const text = decodeURIComponent(btnElem.getAttribute('data-text'));
-    const plainText = text.replace(/[*#`_\[\](){}<>]/g, '').trim();
+    const plainText = decodeURIComponent(btnElem.getAttribute('data-speech-text'));
 
-    // Check if we are interacting with the currently playing message
     if (currentActiveBtn === btnElem && window.currentPlayingText === plainText) {
         if (ttsStatus === 'PAUSED') {
             ttsStatus = 'PLAYING';
@@ -970,7 +1033,6 @@ window.toggleSingleMessagePlay = (btnElem) => {
         }
     }
 
-    // New play or clicked a different button
     resetCurrentTTS();
     currentActiveBtn = btnElem;
     window.currentPlayingText = plainText;
@@ -987,27 +1049,36 @@ function startNewUtterance(textToSpeak, fullOriginalText, btnElement, offsetInde
         return;
     }
 
+    const msgId = btnElement.id.replace('play-btn-', ''); 
     const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    
     utterance.lang = UI.lang ? UI.lang.value : 'hi-IN';
     utterance.rate = 0.85; 
     utterance.pitch = ['Saraswati', 'Lakshmi', 'Durga', 'Kali'].includes(getSelectedItemName()) ? 1.2 : 0.8;
     
-    // Tracks current reading position for the resume function
     utterance.onboundary = (event) => { 
         lastSpokenIndex = offsetIndex + event.charIndex; 
+        
+        const spokenSoFar = fullOriginalText.substring(0, lastSpokenIndex);
+        const match = spokenSoFar.match(/\S+/g);
+        const currentWordIndex = match ? match.length : 0;
+        
+        highlightTTSWord(msgId, currentWordIndex);
     };
     
     utterance.onend = () => { 
+        clearTTSHighlight();
         if (ttsStatus === 'PLAYING') resetCurrentTTS(); 
     };
     
     utterance.onerror = (e) => {
         if (e.error !== 'canceled' && e.error !== 'interrupted') {
+            clearTTSHighlight();
             resetCurrentTTS();
         }
     };
     
-    synth.resume(); // Kickstarts the engine on stubborn browsers
+    synth.resume(); 
     synth.speak(utterance);
 }
 
@@ -1016,7 +1087,6 @@ window.copySingleMessage = async (btnElem) => {
     try {
         await navigator.clipboard.writeText(text);
         
-        // Optional: Give the user some visual feedback
         const originalHtml = btnElem.innerHTML;
         btnElem.innerHTML = `<span class="text-green-400">Copied!</span>`;
         setTimeout(() => { btnElem.innerHTML = originalHtml; }, 1500);
@@ -1024,7 +1094,6 @@ window.copySingleMessage = async (btnElem) => {
         console.error("Failed to copy", e);
     }
 };
-
 
 window.downloadSinglePDF = (btnElem, sender) => {
     if (typeof html2pdf === 'undefined') {
@@ -1038,24 +1107,21 @@ window.downloadSinglePDF = (btnElem, sender) => {
     const actionBar = clone.querySelector('.msg-action-bar');
     if (actionBar) actionBar.remove();
     
-    // Force Light Mode for the main clone
     clone.style.setProperty('background-color', '#ffffff', 'important');
     clone.style.setProperty('padding', '20px', 'important');
     clone.style.setProperty('border-radius', '0px', 'important'); 
     clone.style.setProperty('width', '100%', 'important');
     
-    // Force all inner tags to black text and transparent backgrounds
     const allElements = clone.querySelectorAll('*');
     allElements.forEach(el => {
         el.style.setProperty('color', '#000000', 'important');
         el.style.setProperty('background-color', 'transparent', 'important');
     });
 
-    // --- NEW: CREATE AND INJECT THE HEADER ---
     const header = document.createElement('div');
     header.innerText = "ai.eprashala.com";
     header.style.setProperty('text-align', 'center', 'important');
-    header.style.setProperty('color', '#6b7280', 'important'); // Grey color for a professional look
+    header.style.setProperty('color', '#6b7280', 'important'); 
     header.style.setProperty('font-size', '18px', 'important');
     header.style.setProperty('font-weight', 'bold', 'important');
     header.style.setProperty('letter-spacing', '1px', 'important');
@@ -1064,9 +1130,7 @@ window.downloadSinglePDF = (btnElem, sender) => {
     header.style.setProperty('border-bottom', '1px solid #e5e7eb', 'important');
     header.style.setProperty('width', '100%', 'important');
     
-    // Prepend puts it at the very top of the cloned container
     clone.prepend(header); 
-    // -----------------------------------------
     
     const opt = {
         margin:       0.5,
@@ -1091,7 +1155,7 @@ function renderMessage(sender, text, isModel) {
     
     let htmlContent = `
         <div class="text-[10px] uppercase font-bold tracking-wider ${isModel ? 'text-cyan-400 cinzel' : 'text-slate-300'} mb-1">${sender}</div>
-        <div class="text-sm leading-relaxed text-gray-100 markdown-body">${parsedText}</div>
+        <div class="text-sm leading-relaxed text-gray-100 markdown-body" id="md-${msgId}">${parsedText}</div>
     `;
     
     if (isModel) {
@@ -1113,9 +1177,15 @@ function renderMessage(sender, text, isModel) {
 
     div.innerHTML = htmlContent;
     UI.log.appendChild(div);
+
+    if (isModel) {
+        const mdBody = div.querySelector('.markdown-body');
+        const speechText = prepareTextForTTSAndHighlighting(mdBody, msgId);
+        const playBtn = div.querySelector(`#play-btn-${msgId}`);
+        playBtn.setAttribute('data-speech-text', encodeURIComponent(speechText));
+    }
     
     setTimeout(() => { UI.log.scrollTop = UI.log.scrollHeight; }, 50);
 
     return msgId;
 }
-
