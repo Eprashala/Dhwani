@@ -1128,19 +1128,80 @@ function resetCurrentTTS() {
     lastSpokenIndex = 0;
     window.currentPlayingText = "";
     
+    // --- ANDROID GC FIX: Release the lock ---
+    window.__activeUtterance = null; 
+    
     // Evaluate Visibility for stopped state
     setTimeout(updateStopButtonVisibility, 50); 
 }
 
-function speakText(msgId) {
-    if (state.isMuted) return;
-    setTimeout(() => {
-        const btn = document.getElementById(`play-btn-${msgId}`);
-        if (btn) {
-            window.toggleSingleMessagePlay(btn);
+function startNewUtterance(textToSpeak, fullOriginalText, btnElement, offsetIndex) {
+    if (!textToSpeak.trim()) {
+        resetCurrentTTS();
+        return;
+    }
+
+    const msgId = btnElement.id.replace('play-btn-', ''); 
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    
+    // --- ANDROID GC FIX: Apply Lock ---
+    // This absolutely prevents Android from randomly killing the audio/highlight mid-sentence
+    window.__activeUtterance = utterance; 
+    
+    utterance.lang = UI.lang ? UI.lang.value : 'hi-IN';
+    utterance.rate = 0.85; 
+    utterance.pitch = ['Saraswati', 'Lakshmi', 'Durga', 'Kali'].includes(getSelectedItemName()) ? 1.2 : 0.8;
+    
+    // --- ANDROID FALLBACK ENGINE ---
+    let hasBoundaryFired = false;
+    let fallbackTimer = null;
+    
+    // Calculate where we are starting if resuming from a pause
+    const spokenSoFar = fullOriginalText.substring(0, offsetIndex);
+    const match = spokenSoFar.match(/\S+/g);
+    let estimatedWordIndex = match ? match.length : 0;
+
+    utterance.onstart = () => { 
+        // If Android fails to trigger the native boundary event, this takes over seamlessly
+        fallbackTimer = setInterval(() => {
+            if (!hasBoundaryFired && ttsStatus === 'PLAYING') {
+                highlightTTSWord(msgId, estimatedWordIndex);
+                estimatedWordIndex++;
+            }
+        }, 420); // 420ms accurately mimics the reading speed at a 0.85 rate
+    };
+
+    utterance.onboundary = (event) => { 
+        hasBoundaryFired = true; // Disable the fallback engine if native events work (Windows/iOS)
+        if (fallbackTimer) { clearInterval(fallbackTimer); fallbackTimer = null; }
+
+        lastSpokenIndex = offsetIndex + event.charIndex; 
+        
+        const currentSpoken = fullOriginalText.substring(0, lastSpokenIndex);
+        const currentMatch = currentSpoken.match(/\S+/g);
+        const currentWordIndex = currentMatch ? currentMatch.length : 0;
+        
+        highlightTTSWord(msgId, currentWordIndex);
+    };
+    
+    const cleanup = () => {
+        if (fallbackTimer) clearInterval(fallbackTimer);
+        clearTTSHighlight();
+        if (ttsStatus === 'PLAYING') resetCurrentTTS(); 
+    };
+
+    utterance.onend = cleanup;
+    
+    utterance.onerror = (e) => {
+        if (e.error !== 'canceled' && e.error !== 'interrupted') {
+            cleanup();
         }
-    }, 50);
+    };
+    
+    synth.resume(); 
+    synth.speak(utterance);
 }
+
 
 window.toggleSingleMessagePlay = (btnElem) => {
     if (state.isMuted) {
