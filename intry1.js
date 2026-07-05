@@ -805,9 +805,16 @@ function setupEventListeners() {
     UI.btnSend.onclick = (e) => { e.stopPropagation(); processInput(UI.textIn.value); };
     UI.textIn.onkeypress = (e) => { e.stopPropagation(); if(e.key === 'Enter') processInput(UI.textIn.value); };
 
-    UI.btnMic.addEventListener('click', (e) => {
+	UI.btnMic.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (state.isProcessing || !recognition) return;
+        if (state.isProcessing) return;
+        
+        // NEW: Alert the user if their device/browser blocks the API
+        if (!recognition) {
+            alert("⚠️ Speech Recognition is not supported by this browser or app wrapper. Please open this library directly in Google Chrome, ensure the URL starts with HTTPS, and grant Microphone permissions.");
+            return;
+        }
+
         if (isListening) { recognition.stop(); } 
         else { recognition.lang = UI.lang.value; try { recognition.start(); } catch(err) {} }
     });
@@ -877,7 +884,11 @@ function setupEventListeners() {
 
 function initSpeechRecognition() {
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRec) return;
+    // Do not 'return' early here. Let recognition remain null so the button can throw the alert.
+    if (!SpeechRec) {
+        console.warn("Speech Recognition API not found in this environment.");
+        return; 
+    }
     recognition = new SpeechRec();
     recognition.continuous = false; 
     recognition.interimResults = false; 
