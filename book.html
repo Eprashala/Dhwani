@@ -216,7 +216,11 @@
                         <svg id="icon-mic-thinking" class="w-5 h-5 text-white hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                     </button>
                     
-                    <button id="btn-mute" class="audio-btn p-1.5 ml-1" title="Mute TTS">
+                    <button id="btn-stop" class="audio-btn p-1.5 mx-0.5 text-red-500 hover:text-red-400" title="Stop AI & Audio">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+                    </button>
+
+                    <button id="btn-mute" class="audio-btn p-1.5 ml-0.5" title="Mute TTS">
                         <svg class="w-5 h-5" id="icon-vol" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
                         <svg class="w-5 h-5 hidden text-red-400" id="icon-mute" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/></svg>
                     </button>
@@ -265,9 +269,15 @@
         });
 
         function unlockAudio() {
-            const silent = new SpeechSynthesisUtterance('');
-            silent.volume = 0;
-            synth.speak(silent);
+            try {
+                if (typeof SpeechSynthesisUtterance !== 'undefined' && synth) {
+                    const silent = new SpeechSynthesisUtterance('');
+                    silent.volume = 0;
+                    synth.speak(silent);
+                }
+            } catch (err) {
+                console.warn('Audio unlock skipped:', err.message);
+            }
         }
 
         // --- 1. CONFIG & STATE ---
@@ -282,6 +292,9 @@
         let lastSpokenIndex = 0;   
         window.currentPlayingText = "";
 
+        // Abort controller for killing fetch requests
+        let currentAbortController = null;
+
         // File Attachment States
         let pendingAttachmentData = null;
         let pendingMimeType = null;
@@ -295,6 +308,7 @@
             textIn: document.getElementById('text-input'),
             btnSend: document.getElementById('btn-send'),
             btnMic: document.getElementById('btn-mic'),
+            btnStop: document.getElementById('btn-stop'),
             iconMicDefault: document.getElementById('icon-mic-default'),
             iconMicThinking: document.getElementById('icon-mic-thinking'),
             btnMute: document.getElementById('btn-mute'),
@@ -354,7 +368,7 @@
                             UI.welcome.style.display = 'none';
                             chatHistory.forEach(msg => {
                                 const textPart = msg.parts.find(p => p.text)?.text || "📎 [File Attached]";
-                                renderMessage(msg.role === 'user' ? (UI.name.value || 'User') : "Dhwani", textPart, msg.role === 'model', false); 
+                                renderMessage(msg.role === 'user' ? (UI.name.value || 'User') : "Dhwani", textPart, msg.role === 'model', false, textPart); 
                             });
                         }
                     } catch (e) {}
@@ -481,6 +495,31 @@
                 } catch (err) {}
             });
 
+            // STOP BUTTON LOGIC
+            UI.btnStop.onclick = (e) => {
+                e.stopPropagation();
+                
+                // Stop audio
+                synth.cancel();
+                ttsStatus = 'STOPPED';
+                resetAllPlayButtons();
+                window.currentPlayingText = "";
+                
+                // Kill active fetch requests
+                if (currentAbortController) {
+                    currentAbortController.abort();
+                    currentAbortController = null;
+                }
+                
+                // Stop listening
+                if (isListening && recognition) {
+                    recognition.stop();
+                }
+                
+                state.isProcessing = false;
+                resetMicUI();
+            };
+
             UI.btnMute.onclick = (e) => { 
                 e.stopPropagation(); state.isMuted = !state.isMuted; 
                 if(state.isMuted) { 
@@ -531,6 +570,7 @@
                 return;
             }
 
+            const rawUserText = userText; 
             UI.textIn.value = '';
             UI.textIn.placeholder = "Dhwani is thinking...";
             if (UI.welcome) UI.welcome.style.display = 'none';
@@ -541,7 +581,8 @@
 
             const userName = UI.name.value || "Reader";
             const displayMessage = userText || `📎 [${pendingFileName} attached for analysis]`;
-            renderMessage(userName, displayMessage, false);
+            
+            renderMessage(userName, displayMessage, false, true, rawUserText);
             
             let messageParts = [];
             if (userText) messageParts.push({ text: userText });
@@ -568,11 +609,16 @@
                 
                 if (!state.isMuted && playBtn) handleIndividualPlayPause(sanitizeForTTS(aiResRaw), playBtn);
             } catch (err) {
-                renderMessage("System", "⚠️ Network interrupted. Please check your key or internet.", true);
+                if (err.name === 'AbortError') {
+                    renderMessage("System", "🛑 Processing stopped by user.", true);
+                } else {
+                    renderMessage("System", "⚠️ Network interrupted. Please check your key or internet.", true);
+                }
+            } finally {
+                state.isProcessing = false;
+                currentAbortController = null;
+                resetMicUI();
             }
-
-            state.isProcessing = false;
-            resetMicUI();
         }
 
         async function getAIResponse(history) {
@@ -607,7 +653,16 @@
                 systemInstruction: { parts: [{ text: prompt }] } 
             };
 
-            const response = await fetch(PROXY_URL, { method: 'POST', headers: headers, body: JSON.stringify(payload) });
+            // Initialize the abort controller for this specific request
+            currentAbortController = new AbortController();
+
+            const response = await fetch(PROXY_URL, { 
+                method: 'POST', 
+                headers: headers, 
+                body: JSON.stringify(payload),
+                signal: currentAbortController.signal // Bind the abort signal here
+            });
+            
             if (!response.ok) throw new Error('API Error');
             const data = await response.json();
             return data.candidates[0].content.parts[0].text;
@@ -679,11 +734,13 @@
         }
 
         // --- 8. RENDER UI ---
-        function renderMessage(sender, text, isModel, isNewMessage = true) {
+        function renderMessage(sender, text, isModel, isNewMessage = true, rawText = "") {
             const div = document.createElement('div');
             div.className = `p-4 rounded-2xl ${isModel ? 'bg-[#0f172a]/90 border border-slate-700/50 shadow-lg ml-2 mr-8' : 'bg-orange-900/40 text-right mr-2 ml-8'} mb-4`;
             
             let displayHtml = "";
+            let senderHtml = "";
+
             if (isModel) {
                 let parsedText = text;
                 let mediaLinks = "";
@@ -701,11 +758,20 @@
 
                 displayHtml = marked.parse(parsedText);
                 if (mediaLinks) displayHtml += `<div class="mt-3 block border-t border-slate-700/50 pt-2">${mediaLinks}</div>`;
+                senderHtml = `<div class="text-[10px] uppercase font-bold tracking-wider text-orange-400 cinzel mb-1">${sender}</div>`;
             } else {
                 displayHtml = text;
+                
+                senderHtml = `
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-[10px] uppercase font-bold tracking-wider text-slate-300">${sender}</span>
+                        <button class="msg-edit-btn text-slate-400 hover:text-orange-400 transition-colors p-1 -mr-1 focus:outline-none outline-none" title="Edit Input">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                        </button>
+                    </div>`;
             }
             
-            let htmlContent = `<div class="text-[10px] uppercase font-bold tracking-wider ${isModel ? 'text-orange-400 cinzel' : 'text-slate-300'} mb-1">${sender}</div>
+            let htmlContent = `${senderHtml}
                                <div class="text-sm leading-relaxed text-gray-100 markdown-body">${displayHtml}</div>`;
             
             let playBtnElement = null;
@@ -747,6 +813,15 @@
                         setTimeout(() => { e.currentTarget.classList.replace('text-green-400', 'text-slate-400'); }, 1500);
                     });
                 });
+            } else {
+                const editBtn = div.querySelector('.msg-edit-btn');
+                if (editBtn) {
+                    editBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        UI.textIn.value = rawText || text.replace(/📎 \[.*?\]/g, '').trim();
+                        UI.textIn.focus();
+                    });
+                }
             }
 
             UI.log.appendChild(div);
@@ -757,7 +832,6 @@
 
         // --- 9. PDF EXPORT ---
 
-        // Universal Header setup
         function addPDFHeader(container) {
             const header = document.createElement('div');
             header.innerText = 'ai.eprashala.com';
@@ -771,7 +845,6 @@
             container.appendChild(header);
         }
 
-        // Export Entire Chat
         function exportChatToPDF() {
             if (chatHistory.length === 0) return alert("No chat history to export.");
             
@@ -824,7 +897,6 @@
             html2pdf().set(opt).from(container).save();
         }
 
-        // Export Single Message
         function exportSingleMessageToPDF(text) {
             const container = document.createElement('div');
             container.style.padding = '30px';
