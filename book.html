@@ -77,6 +77,10 @@
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
 
+        /* Hide scrollbar for horizontal chips */
+        #book-history-container::-webkit-scrollbar { display: none; }
+        #book-history-container { scrollbar-width: none; -ms-overflow-style: none; }
+
         .audio-btn {
             @apply p-2 rounded-full text-gray-400 hover:text-white hover:bg-slate-700/50 transition-all focus:outline-none;
         }
@@ -154,11 +158,11 @@
 
     <div class="flex flex-col w-full h-full max-w-2xl relative shadow-2xl bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]">
         
-        <header class="flex-shrink-0 pt-4 pb-4 px-4 glass-panel z-20 rounded-b-3xl relative border-b-2 border-orange-900/50">
+        <header class="flex-shrink-0 pt-4 pb-3 px-4 glass-panel z-20 rounded-b-3xl relative border-b-2 border-orange-900/50">
             <button id="adv-toggle" class="absolute top-5 right-5 z-50 text-slate-400 hover:text-white transition-colors outline-none" title="Settings">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
             </button>
-            <div class="flex flex-col items-center justify-center mb-4 relative mt-2">
+            <div class="flex flex-col items-center justify-center mb-3 relative mt-2">
                 <div id="status-indicator" class="absolute left-0 top-0 w-2.5 h-2.5 rounded-full bg-gray-600 shadow-[0_0_8px_rgba(75,85,99,0.8)]" title="Idle"></div>
                 <h1 class="text-xl md:text-2xl font-bold tracking-widest text-center uppercase mb-1">
                     <span class="text-orange-500">Dhwani</span> 
@@ -179,7 +183,9 @@
                     <option value="Kannada">Kannada (ಕನ್ನಡ)</option>
                     <option value="Malayalam">Malayalam (മലയാളം)</option>
                 </select>
-                <input type="text" id="book-input" class="custom-input !py-2 text-sm font-bold" placeholder="Enter Book Name & Details (e.g., Bhagavad Gita, Chapter 2)">
+                <input type="text" id="book-input" class="custom-input !py-2 text-sm font-bold" placeholder="Enter Book Name & Details (e.g., Bhagavad Gita)">
+                
+                <div id="book-history-container" class="flex gap-2 overflow-x-auto w-full max-w-full hidden pb-1 mt-1 scroll-smooth"></div>
             </div>
         </header>
 
@@ -247,7 +253,20 @@
 
         let wakeLock = null;
         async function requestWakeLock() {
-            try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } 
+            try { 
+                if ('wakeLock' in navigator) { 
+                    if (wakeLock !== null) return;
+                    wakeLock = await navigator.wakeLock.request('screen'); 
+                    wakeLock.addEventListener('release', () => {
+                        console.log('Wake Lock released');
+                        wakeLock = null;
+                        // Auto-renew if document is still visible
+                        if (document.visibilityState === 'visible') {
+                            requestWakeLock();
+                        }
+                    });
+                } 
+            } 
             catch (err) { console.log('Wake Lock Error:', err.message); }
         }
 
@@ -264,9 +283,14 @@
             }
         }
 
-        ['click', 'touchstart'].forEach(evt => {
-            window.addEventListener(evt, enforceFullscreen, { capture: true, passive: true });
-        });
+        // Extremely aggressive app state enforcement (Fullscreen + Wakelock on ANY interaction)
+        const enforceAppState = () => {
+            enforceFullscreen();
+            requestWakeLock();
+        };
+        document.body.addEventListener('click', enforceAppState, { capture: true, passive: true });
+        document.body.addEventListener('touchstart', enforceAppState, { capture: true, passive: true });
+        document.body.addEventListener('keydown', enforceAppState, { capture: true, passive: true });
 
         function unlockAudio() {
             try {
@@ -284,6 +308,7 @@
         const PROXY_URL = "https://eprashala.pythonanywhere.com/api/chat"; 
         
         let chatHistory = [];
+        let bookHistory = []; // Added for tracking referred books
         let recognition = null;
         let synth = window.speechSynthesis;
         let isListening = false; 
@@ -331,22 +356,67 @@
             welcome: document.getElementById('welcome-msg'),
             
             selLang: document.getElementById('lang-selector'),
-            inBook: document.getElementById('book-input')
+            inBook: document.getElementById('book-input'),
+            bookHistoryDiv: document.getElementById('book-history-container')
         };
 
         // --- 3. INITIALIZATION & DATA ---
         window.onload = () => {
             loadData();
+            loadBookHistory();
             initSpeechRecognition(); 
         };
 
         UI.overlay.addEventListener('click', () => {
-            enforceFullscreen();
-            requestWakeLock();
+            enforceAppState();
             unlockAudio(); 
             UI.overlay.style.display = 'none';
             setupEventListeners(); 
         });
+
+        // --- BOOK HISTORY LOGIC ---
+        function loadBookHistory() {
+            const saved = localStorage.getItem('dhwani_book_history');
+            if (saved) {
+                try { bookHistory = JSON.parse(saved); } catch(e) {}
+            }
+            renderBookHistory();
+        }
+
+        function saveBookToHistory(bookName) {
+            bookName = bookName.trim();
+            if (!bookName) return;
+            // Remove if exists to push to front
+            bookHistory = bookHistory.filter(b => b.toLowerCase() !== bookName.toLowerCase());
+            bookHistory.unshift(bookName);
+            if (bookHistory.length > 8) bookHistory.pop(); // keep max 8 recent books
+            localStorage.setItem('dhwani_book_history', JSON.stringify(bookHistory));
+            renderBookHistory();
+        }
+
+        function renderBookHistory() {
+            if(!UI.bookHistoryDiv) return;
+            UI.bookHistoryDiv.innerHTML = '';
+            
+            if (bookHistory.length === 0) {
+                UI.bookHistoryDiv.classList.add('hidden');
+                return;
+            }
+            
+            UI.bookHistoryDiv.classList.remove('hidden');
+            
+            bookHistory.forEach(book => {
+                const btn = document.createElement('button');
+                btn.className = 'flex-shrink-0 bg-[#0f172a] hover:bg-slate-800 text-orange-400 text-xs px-3 py-1.5 rounded-full border border-orange-900/50 transition-colors whitespace-nowrap outline-none';
+                btn.textContent = book;
+                btn.onclick = (e) => {
+                    e.stopPropagation();
+                    UI.inBook.value = book;
+                    saveData();
+                };
+                UI.bookHistoryDiv.appendChild(btn);
+            });
+        }
 
         function loadData() {
             UI.name.value = localStorage.getItem('dhwani_name') || "";
@@ -569,6 +639,9 @@
                 alert("Please enter a book name in the top input box first.");
                 return;
             }
+
+            // Save the currently referenced book into the visual history
+            saveBookToHistory(UI.inBook.value);
 
             const rawUserText = userText; 
             UI.textIn.value = '';
