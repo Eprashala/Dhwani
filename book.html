@@ -73,13 +73,38 @@
         }
         .custom-input:focus { border-color: #f97316; box-shadow: 0 0 10px rgba(249, 115, 22, 0.2); }
 
+        /* Book Autocomplete Dropdown Styles */
+        .autocomplete-list {
+            position: absolute;
+            z-index: 100;
+            width: 100%;
+            top: 100%;
+            left: 0;
+            margin-top: 0.25rem;
+            max-height: 180px;
+            overflow-y: auto;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid #475569;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            display: none;
+        }
+        .autocomplete-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            color: #fb923c;
+            font-size: 0.875rem;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        .autocomplete-item:last-child { border-bottom: none; }
+        .autocomplete-item:hover { background-color: rgba(234, 88, 12, 0.2); }
+
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
-
-        /* Hide scrollbar for horizontal chips */
-        #book-history-container::-webkit-scrollbar { display: none; }
-        #book-history-container { scrollbar-width: none; -ms-overflow-style: none; }
 
         .audio-btn {
             @apply p-2 rounded-full text-gray-400 hover:text-white hover:bg-slate-700/50 transition-all focus:outline-none;
@@ -158,11 +183,11 @@
 
     <div class="flex flex-col w-full h-full max-w-2xl relative shadow-2xl bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]">
         
-        <header class="flex-shrink-0 pt-4 pb-3 px-4 glass-panel z-20 rounded-b-3xl relative border-b-2 border-orange-900/50">
+        <header class="flex-shrink-0 pt-4 pb-4 px-4 glass-panel z-20 rounded-b-3xl relative border-b-2 border-orange-900/50">
             <button id="adv-toggle" class="absolute top-5 right-5 z-50 text-slate-400 hover:text-white transition-colors outline-none" title="Settings">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
             </button>
-            <div class="flex flex-col items-center justify-center mb-3 relative mt-2">
+            <div class="flex flex-col items-center justify-center mb-4 relative mt-2">
                 <div id="status-indicator" class="absolute left-0 top-0 w-2.5 h-2.5 rounded-full bg-gray-600 shadow-[0_0_8px_rgba(75,85,99,0.8)]" title="Idle"></div>
                 <h1 class="text-xl md:text-2xl font-bold tracking-widest text-center uppercase mb-1">
                     <span class="text-orange-500">Dhwani</span> 
@@ -183,9 +208,10 @@
                     <option value="Kannada">Kannada (ಕನ್ನಡ)</option>
                     <option value="Malayalam">Malayalam (മലയാളം)</option>
                 </select>
-                <input type="text" id="book-input" class="custom-input !py-2 text-sm font-bold" placeholder="Enter Book Name & Details (e.g., Bhagavad Gita)">
-                
-                <div id="book-history-container" class="flex gap-2 overflow-x-auto w-full max-w-full hidden pb-1 mt-1 scroll-smooth"></div>
+                <div class="relative w-full">
+                    <input type="text" id="book-input" autocomplete="off" class="custom-input !py-2 text-sm font-bold" placeholder="Enter Book Name & Details (e.g., Bhagavad Gita, Chapter 2)">
+                    <div id="book-history-list" class="autocomplete-list"></div>
+                </div>
             </div>
         </header>
 
@@ -251,30 +277,19 @@
             if (e.ctrlKey && ['U', 'S', 'P'].includes(e.key.toUpperCase())) { e.preventDefault(); return false; }
         });
 
+        // WAKE LOCK LOGIC
         let wakeLock = null;
         async function requestWakeLock() {
             try { 
                 if ('wakeLock' in navigator) { 
-                    if (wakeLock !== null) return;
+                    if (wakeLock !== null) return; 
                     wakeLock = await navigator.wakeLock.request('screen'); 
-                    wakeLock.addEventListener('release', () => {
-                        console.log('Wake Lock released');
-                        wakeLock = null;
-                        // Auto-renew if document is still visible
-                        if (document.visibilityState === 'visible') {
-                            requestWakeLock();
-                        }
-                    });
+                    wakeLock.addEventListener('release', () => { wakeLock = null; });
                 } 
-            } 
-            catch (err) { console.log('Wake Lock Error:', err.message); }
+            } catch (err) { console.log('Wake Lock Error:', err.message); }
         }
 
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') requestWakeLock();
-            else { if (ttsStatus === 'PLAYING') { ttsStatus = 'PAUSED'; synth.cancel(); resetAllPlayButtons(); } }
-        });
-
+        // FULLSCREEN LOGIC
         function enforceFullscreen() {
             if (!document.fullscreenElement && !document.webkitFullscreenElement) {
                 const docElm = document.documentElement;
@@ -283,14 +298,21 @@
             }
         }
 
-        // Extremely aggressive app state enforcement (Fullscreen + Wakelock on ANY interaction)
-        const enforceAppState = () => {
-            enforceFullscreen();
-            requestWakeLock();
-        };
-        document.body.addEventListener('click', enforceAppState, { capture: true, passive: true });
-        document.body.addEventListener('touchstart', enforceAppState, { capture: true, passive: true });
-        document.body.addEventListener('keydown', enforceAppState, { capture: true, passive: true });
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                requestWakeLock();
+                enforceFullscreen();
+            } else { 
+                if (ttsStatus === 'PLAYING') resetCurrentTTS();
+            }
+        });
+
+        ['click', 'touchstart'].forEach(evt => {
+            window.addEventListener(evt, () => {
+                enforceFullscreen();
+                requestWakeLock();
+            }, { capture: true, passive: true });
+        });
 
         function unlockAudio() {
             try {
@@ -299,25 +321,27 @@
                     silent.volume = 0;
                     synth.speak(silent);
                 }
-            } catch (err) {
-                console.warn('Audio unlock skipped:', err.message);
-            }
+            } catch (err) { console.warn('Audio unlock skipped:', err.message); }
         }
 
         // --- 1. CONFIG & STATE ---
         const PROXY_URL = "https://eprashala.pythonanywhere.com/api/chat"; 
         
         let chatHistory = [];
-        let bookHistory = []; // Added for tracking referred books
+        let bookHistory = [];
         let recognition = null;
         let synth = window.speechSynthesis;
         let isListening = false; 
         let state = { isProcessing: false, isMuted: false };
+        
+        // HIGHLIGHTER & TTS STATE
         let ttsStatus = 'STOPPED'; 
         let lastSpokenIndex = 0;   
-        window.currentPlayingText = "";
+        let currentActiveBtn = null;
+        let lastHighlightedSpan = null;
+        const speechDataMap = {}; // Maps msgId to clean TTS string
+        const rawTextMap = {}; // Maps msgId to markdown string
 
-        // Abort controller for killing fetch requests
         let currentAbortController = null;
 
         // File Attachment States
@@ -357,73 +381,30 @@
             
             selLang: document.getElementById('lang-selector'),
             inBook: document.getElementById('book-input'),
-            bookHistoryDiv: document.getElementById('book-history-container')
+            bookList: document.getElementById('book-history-list')
         };
 
         // --- 3. INITIALIZATION & DATA ---
         window.onload = () => {
             loadData();
-            loadBookHistory();
             initSpeechRecognition(); 
         };
 
         UI.overlay.addEventListener('click', () => {
-            enforceAppState();
+            enforceFullscreen();
+            requestWakeLock();
             unlockAudio(); 
             UI.overlay.style.display = 'none';
             setupEventListeners(); 
         });
-
-        // --- BOOK HISTORY LOGIC ---
-        function loadBookHistory() {
-            const saved = localStorage.getItem('dhwani_book_history');
-            if (saved) {
-                try { bookHistory = JSON.parse(saved); } catch(e) {}
-            }
-            renderBookHistory();
-        }
-
-        function saveBookToHistory(bookName) {
-            bookName = bookName.trim();
-            if (!bookName) return;
-            // Remove if exists to push to front
-            bookHistory = bookHistory.filter(b => b.toLowerCase() !== bookName.toLowerCase());
-            bookHistory.unshift(bookName);
-            if (bookHistory.length > 8) bookHistory.pop(); // keep max 8 recent books
-            localStorage.setItem('dhwani_book_history', JSON.stringify(bookHistory));
-            renderBookHistory();
-        }
-
-        function renderBookHistory() {
-            if(!UI.bookHistoryDiv) return;
-            UI.bookHistoryDiv.innerHTML = '';
-            
-            if (bookHistory.length === 0) {
-                UI.bookHistoryDiv.classList.add('hidden');
-                return;
-            }
-            
-            UI.bookHistoryDiv.classList.remove('hidden');
-            
-            bookHistory.forEach(book => {
-                const btn = document.createElement('button');
-                btn.className = 'flex-shrink-0 bg-[#0f172a] hover:bg-slate-800 text-orange-400 text-xs px-3 py-1.5 rounded-full border border-orange-900/50 transition-colors whitespace-nowrap outline-none';
-                btn.textContent = book;
-                btn.onclick = (e) => {
-                    e.stopPropagation();
-                    UI.inBook.value = book;
-                    saveData();
-                };
-                UI.bookHistoryDiv.appendChild(btn);
-            });
-        }
 
         function loadData() {
             UI.name.value = localStorage.getItem('dhwani_name') || "";
             UI.age.value = localStorage.getItem('dhwani_age') || "";
             UI.keyIn.value = localStorage.getItem('dhwani_api_key') || "";
             UI.inBook.value = localStorage.getItem('dhwani_book') || "";
-            
+            bookHistory = JSON.parse(localStorage.getItem('dhwani_book_history') || '[]'); 
+
             const savedLang = localStorage.getItem('dhwani_lang');
             if (savedLang) UI.selLang.value = savedLang;
             
@@ -465,14 +446,45 @@
             chatHistory = []; 
             localStorage.removeItem('dhwani_history');
             UI.log.innerHTML = `<div class="text-gray-400 text-center mt-12 cinzel"><p class="text-orange-500 text-xl mb-2 font-bold">🧹 History Cleared</p>Let's open a new chapter.</div>`;
-            synth.cancel();
-            resetAllPlayButtons();
-            ttsStatus = 'STOPPED';
-            window.currentPlayingText = "";
+            resetCurrentTTS();
             clearAttachment();
         }
 
-        // --- 4. SPEECH RECOGNITION ---
+        // --- 4. BOOK HISTORY DROPDOWN ---
+        function saveBookToHistory(bookName) {
+            bookName = bookName.trim();
+            if (!bookName) return;
+            bookHistory = bookHistory.filter(b => b.toLowerCase() !== bookName.toLowerCase());
+            bookHistory.unshift(bookName);
+            if (bookHistory.length > 10) bookHistory.pop();
+            localStorage.setItem('dhwani_book_history', JSON.stringify(bookHistory));
+        }
+
+        function renderBookHistory(filterText = '') {
+            UI.bookList.innerHTML = '';
+            const filtered = bookHistory.filter(b => b.toLowerCase().includes(filterText.toLowerCase()));
+            
+            if (filtered.length === 0) {
+                UI.bookList.style.display = 'none';
+                return;
+            }
+
+            filtered.forEach(book => {
+                const item = document.createElement('div');
+                item.className = 'autocomplete-item';
+                item.innerText = book;
+                item.onmousedown = (e) => { 
+                    e.preventDefault(); 
+                    UI.inBook.value = book;
+                    UI.bookList.style.display = 'none';
+                    saveData();
+                };
+                UI.bookList.appendChild(item);
+            });
+            UI.bookList.style.display = 'block';
+        }
+
+        // --- 5. SPEECH RECOGNITION ---
         function initSpeechRecognition() {
             const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRec) return;
@@ -521,16 +533,23 @@
             }
         }
 
-        // --- 5. EVENT LISTENERS ---
+        // --- 6. EVENT LISTENERS ---
         function setupEventListeners() {
             UI.selLang.addEventListener('change', saveData);
-            UI.inBook.addEventListener('input', saveData);
+            
+            UI.inBook.addEventListener('focus', () => renderBookHistory(UI.inBook.value));
+            UI.inBook.addEventListener('input', (e) => {
+                renderBookHistory(e.target.value);
+                saveData(); 
+            });
+            UI.inBook.addEventListener('blur', () => {
+                setTimeout(() => { UI.bookList.style.display = 'none'; }, 150);
+            });
 
             UI.advToggle.onclick = (e) => { e.stopPropagation(); UI.settingsModal.classList.remove('hidden'); };
             UI.btnCloseSet.onclick = (e) => { e.stopPropagation(); UI.settingsModal.classList.add('hidden'); };
             UI.btnSaveSet.onclick = (e) => { e.stopPropagation(); saveData(); UI.settingsModal.classList.add('hidden'); };
             
-            // ATTACHMENT LOGIC
             UI.btnAttach.onclick = (e) => {
                 e.stopPropagation();
                 UI.fileUpload.click();
@@ -539,13 +558,11 @@
             UI.fileUpload.addEventListener('change', (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
-                
                 const reader = new FileReader();
                 reader.onload = (evt) => {
                     pendingAttachmentData = evt.target.result.split(',')[1];
                     pendingMimeType = file.type;
                     pendingFileName = file.name;
-                    
                     UI.textIn.placeholder = `📎 ${pendingFileName} attached! Ask a question...`;
                     UI.btnAttach.classList.add('text-orange-400');
                     UI.btnAttach.classList.remove('text-gray-400');
@@ -565,27 +582,16 @@
                 } catch (err) {}
             });
 
-            // STOP BUTTON LOGIC
             UI.btnStop.onclick = (e) => {
                 e.stopPropagation();
-                
-                // Stop audio
-                synth.cancel();
-                ttsStatus = 'STOPPED';
-                resetAllPlayButtons();
-                window.currentPlayingText = "";
-                
-                // Kill active fetch requests
+                resetCurrentTTS();
                 if (currentAbortController) {
                     currentAbortController.abort();
                     currentAbortController = null;
                 }
-                
-                // Stop listening
                 if (isListening && recognition) {
                     recognition.stop();
                 }
-                
                 state.isProcessing = false;
                 resetMicUI();
             };
@@ -593,7 +599,7 @@
             UI.btnMute.onclick = (e) => { 
                 e.stopPropagation(); state.isMuted = !state.isMuted; 
                 if(state.isMuted) { 
-                    synth.cancel(); ttsStatus = 'STOPPED'; resetAllPlayButtons(); window.currentPlayingText = "";
+                    resetCurrentTTS();
                     UI.iconVol.classList.add('hidden'); UI.iconMute.classList.remove('hidden'); 
                 } else { 
                     UI.iconVol.classList.remove('hidden'); UI.iconMute.classList.add('hidden'); 
@@ -630,7 +636,7 @@
             UI.textIn.placeholder = "Ask about a chapter, quote, or summary...";
         }
 
-        // --- 6. AI LOGIC & PROCESSING ---
+        // --- 7. AI LOGIC & PROCESSING ---
         async function processInput(userText) {
             userText = userText.trim();
             if (!userText && !pendingAttachmentData) return; 
@@ -640,7 +646,6 @@
                 return;
             }
 
-            // Save the currently referenced book into the visual history
             saveBookToHistory(UI.inBook.value);
 
             const rawUserText = userText; 
@@ -674,13 +679,14 @@
             try {
                 const aiResRaw = await getAIResponse(chatHistory);
                 
-                state.lastAIMessage = aiResRaw;
                 chatHistory.push({ role: 'model', parts: [{ text: aiResRaw }] });
-                
-                const playBtn = renderMessage("Dhwani", aiResRaw, true, true);
+                const newMsgId = renderMessage("Dhwani", aiResRaw, true, true);
                 saveData();
                 
-                if (!state.isMuted && playBtn) handleIndividualPlayPause(sanitizeForTTS(aiResRaw), playBtn);
+                if (!state.isMuted && newMsgId) {
+                    const playBtn = document.getElementById(`play-btn-${newMsgId}`);
+                    if (playBtn) toggleSingleMessagePlay(playBtn);
+                }
             } catch (err) {
                 if (err.name === 'AbortError') {
                     renderMessage("System", "🛑 Processing stopped by user.", true);
@@ -726,14 +732,13 @@
                 systemInstruction: { parts: [{ text: prompt }] } 
             };
 
-            // Initialize the abort controller for this specific request
             currentAbortController = new AbortController();
 
             const response = await fetch(PROXY_URL, { 
                 method: 'POST', 
                 headers: headers, 
                 body: JSON.stringify(payload),
-                signal: currentAbortController.signal // Bind the abort signal here
+                signal: currentAbortController.signal 
             });
             
             if (!response.ok) throw new Error('API Error');
@@ -741,73 +746,224 @@
             return data.candidates[0].content.parts[0].text;
         }
 
-        // --- 7. MEDIA PARSERS & TTS ---
-        function sanitizeForTTS(text) {
-            return text
-                .replace(/YT_SEARCH:.*$/gm, '')
-                .replace(/IMG_SEARCH:.*$/gm, '')
-                .replace(/[*_#`~]/g, '') 
-                .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') 
-                .replace(/<[^>]+>/g, '') 
-                .replace(/^[-*+]\s+/gm, '') 
-                .trim();
-        }
+        // --- 8. TTS HIGHLIGHTER & ENGINE ---
 
-        function resetAllPlayButtons() {
-            document.querySelectorAll('.msg-play-btn').forEach(b => {
-                b.innerHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+        function prepareTextForTTSAndHighlighting(container, msgId) {
+            // Traverse DOM ignoring custom external link nodes
+            const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+                acceptNode: function(node) {
+                    if (node.parentNode && node.parentNode.closest('.external-link-btn')) return NodeFilter.FILTER_REJECT;
+                    return NodeFilter.FILTER_ACCEPT;
+                }
+            }, false);
+            
+            const textNodes = [];
+            let node;
+            
+            while (node = walker.nextNode()) {
+                if (node.nodeValue.trim() !== '') {
+                    textNodes.push(node);
+                }
+            }
+
+            let wordCounter = 0;
+            let finalSpeechText = [];
+
+            textNodes.forEach(textNode => {
+                const parts = textNode.nodeValue.split(/(\s+)/); 
+                const fragment = document.createDocumentFragment();
+                
+                parts.forEach(part => {
+                    if (part.trim().length > 0) {
+                        const span = document.createElement('span');
+                        span.id = `tts-${msgId}-${wordCounter}`;
+                        span.className = 'transition-all duration-150'; 
+                        span.textContent = part;
+                        fragment.appendChild(span);
+                        
+                        finalSpeechText.push(part);
+                        wordCounter++;
+                    } else {
+                        fragment.appendChild(document.createTextNode(part));
+                    }
+                });
+                textNode.parentNode.replaceChild(fragment, textNode);
             });
+
+            return finalSpeechText.join(' ');
         }
 
-        function handleIndividualPlayPause(text, btnElement) {
+        function highlightTTSWord(msgId, wordIndex) {
+            clearTTSHighlight(); 
+            const span = document.getElementById(`tts-${msgId}-${wordIndex}`);
+            if (span) {
+                // Fiery orange theme matching Dhwani
+                span.classList.add('bg-orange-500/30', 'text-orange-300', 'font-bold', 'rounded-[3px]', 'px-[2px]', 'shadow-[0_0_8px_rgba(234,88,12,0.4)]');
+                lastHighlightedSpan = span;
+
+                const logContainer = document.getElementById('conversation-log');
+                const spanRect = span.getBoundingClientRect();
+                const logRect = logContainer.getBoundingClientRect();
+                
+                if (spanRect.bottom > logRect.bottom - 40 || spanRect.top < logRect.top + 40) {
+                    span.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        }
+
+        function clearTTSHighlight() {
+            if (lastHighlightedSpan) {
+                lastHighlightedSpan.classList.remove('bg-orange-500/30', 'text-orange-300', 'font-bold', 'rounded-[3px]', 'px-[2px]', 'shadow-[0_0_8px_rgba(234,88,12,0.4)]');
+                lastHighlightedSpan = null;
+            }
+        }
+
+        function updatePlayBtnUI(btn, isPlaying) {
+            if (!btn) return;
+            const playIcon = btn.querySelector('.play-icon');
+            const pauseIcon = btn.querySelector('.pause-icon');
+            
+            if (isPlaying) {
+                if (playIcon) playIcon.classList.add('hidden');
+                if (pauseIcon) pauseIcon.classList.remove('hidden');
+            } else {
+                if (playIcon) playIcon.classList.remove('hidden');
+                if (pauseIcon) pauseIcon.classList.add('hidden');
+            }
+        }
+
+        function resetCurrentTTS() {
+            if (currentActiveBtn) {
+                updatePlayBtnUI(currentActiveBtn, false);
+                currentActiveBtn = null;
+            }
+            synth.cancel();
+            clearTTSHighlight(); 
+            ttsStatus = 'STOPPED';
+            lastSpokenIndex = 0;
+            window.currentPlayingText = "";
+        }
+
+        function toggleSingleMessagePlay(btnElem) {
             if (state.isMuted) return;
 
-            const playIcon = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
-            const pauseIcon = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
+            const msgId = btnElem.getAttribute('data-msg-id');
+            const plainText = speechDataMap[msgId] || "";
 
-            if (window.currentPlayingText === text) {
+            if (currentActiveBtn === btnElem && window.currentPlayingText === plainText) {
                 if (ttsStatus === 'PAUSED') {
                     ttsStatus = 'PLAYING';
-                    btnElement.innerHTML = pauseIcon; 
-                    synth.resume();
+                    updatePlayBtnUI(btnElem, true);
+                    synth.cancel();
+                    
+                    const remainingText = plainText.substring(lastSpokenIndex);
+                    startNewUtterance(remainingText, plainText, btnElem, lastSpokenIndex);
                     return;
                 } else if (ttsStatus === 'PLAYING') {
                     ttsStatus = 'PAUSED';
-                    btnElement.innerHTML = playIcon; 
-                    synth.pause(); 
+                    updatePlayBtnUI(btnElem, false);
+                    synth.cancel();
                     return;
                 }
             }
 
-            synth.cancel(); 
-            resetAllPlayButtons();
-            window.currentPlayingText = text;
+            resetCurrentTTS();
+            currentActiveBtn = btnElem;
+            window.currentPlayingText = plainText;
             ttsStatus = 'PLAYING';
-            btnElement.innerHTML = pauseIcon; 
+            lastSpokenIndex = 0;
+            updatePlayBtnUI(btnElem, true);
 
-            setTimeout(() => { 
-                const utterance = new SpeechSynthesisUtterance(text);
-                const langMap = { 'Marathi':'mr-IN', 'Hindi':'hi-IN', 'English':'en-IN', 'Sanskrit':'hi-IN', 'Gujarati':'gu-IN', 'Bengali':'bn-IN', 'Tamil':'ta-IN', 'Telugu':'te-IN', 'Kannada':'kn-IN', 'Malayalam':'ml-IN' };
-                utterance.lang = langMap[UI.selLang.value] || 'en-IN';
-                
-                const age = parseInt(UI.age.value) || 25;
-                utterance.rate = age < 12 ? 0.85 : 1.0;
-                
-                utterance.onend = () => {
-                    btnElement.innerHTML = playIcon;
-                    ttsStatus = 'STOPPED'; 
-                    window.currentPlayingText = ""; 
-                };
-                utterance.onerror = (e) => {
-                    if (e.error !== 'canceled') btnElement.innerHTML = playIcon;
-                };
-
-                synth.speak(utterance);
-            }, 50);
+            startNewUtterance(plainText, plainText, btnElem, 0); 
         }
 
-        // --- 8. RENDER UI ---
+        function startNewUtterance(textToSpeak, fullOriginalText, btnElement, offsetIndex) {
+            if (!textToSpeak.trim()) {
+                resetCurrentTTS();
+                return;
+            }
+
+            const msgId = btnElement.getAttribute('data-msg-id'); 
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            
+            window.__activeUtterance = utterance; // GC prevention
+
+            const langMap = { 'Marathi':'mr-IN', 'Hindi':'hi-IN', 'English':'en-IN', 'Sanskrit':'hi-IN', 'Gujarati':'gu-IN', 'Bengali':'bn-IN', 'Tamil':'ta-IN', 'Telugu':'te-IN', 'Kannada':'kn-IN', 'Malayalam':'ml-IN' };
+            utterance.lang = langMap[UI.selLang.value] || 'en-IN';
+            
+            const age = parseInt(UI.age.value) || 25;
+            const speechRate = age < 12 ? 0.85 : 1.0;
+            utterance.rate = speechRate;
+            
+            let hasBoundaryFired = false;
+            let fallbackTimer = null;
+            
+            const spokenSoFar = fullOriginalText.substring(0, offsetIndex);
+            const match = spokenSoFar.match(/\S+/g);
+            let estimatedWordIndex = match ? match.length : 0;
+            const wordsArray = fullOriginalText.match(/\S+/g) || [];
+            
+            const cleanup = () => {
+                if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+                clearTTSHighlight();
+                if (ttsStatus === 'PLAYING') resetCurrentTTS(); 
+            };
+
+            // Dynamic Android Fallback Engine (prevents stuck highlights if native boundary fails)
+            utterance.onstart = () => {
+                setTimeout(() => {
+                    if (!hasBoundaryFired && ttsStatus === 'PLAYING') {
+                        const BASE_DELAY = 150; 
+                        const CHAR_DELAY = 30;   
+                        const MAX_DELAY = 850;   
+
+                        const highlightNextWord = () => {
+                            if (hasBoundaryFired || ttsStatus !== 'PLAYING' || estimatedWordIndex >= wordsArray.length) return;
+                            
+                            highlightTTSWord(msgId, estimatedWordIndex);
+                            
+                            const currentWord = wordsArray[estimatedWordIndex] || "";
+                            const charCount = currentWord.length;
+                            
+                            let wordDuration = (BASE_DELAY + (charCount * CHAR_DELAY)) / speechRate; 
+                            if (wordDuration > MAX_DELAY) wordDuration = MAX_DELAY;
+                            
+                            estimatedWordIndex++;
+                            fallbackTimer = setTimeout(highlightNextWord, wordDuration);
+                        };
+                        highlightNextWord(); 
+                    }
+                }, 100);
+            };
+
+            utterance.onboundary = (event) => { 
+                hasBoundaryFired = true; 
+                if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+
+                lastSpokenIndex = offsetIndex + event.charIndex; 
+                
+                const currentSpoken = fullOriginalText.substring(0, lastSpokenIndex);
+                const currentMatch = currentSpoken.match(/\S+/g);
+                const currentWordIndex = currentMatch ? currentMatch.length : 0;
+                
+                highlightTTSWord(msgId, currentWordIndex);
+            };
+            
+            utterance.onend = cleanup;
+            
+            utterance.onerror = (e) => {
+                if (e.error !== 'canceled' && e.error !== 'interrupted') cleanup();
+            };
+            
+            synth.speak(utterance);
+            synth.resume(); 
+        }
+
+        // --- 9. RENDER UI ---
         function renderMessage(sender, text, isModel, isNewMessage = true, rawText = "") {
+            const msgId = 'msg-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+            rawTextMap[msgId] = rawText || text;
+
             const div = document.createElement('div');
             div.className = `p-4 rounded-2xl ${isModel ? 'bg-[#0f172a]/90 border border-slate-700/50 shadow-lg ml-2 mr-8' : 'bg-orange-900/40 text-right mr-2 ml-8'} mb-4`;
             
@@ -847,8 +1003,6 @@
             let htmlContent = `${senderHtml}
                                <div class="text-sm leading-relaxed text-gray-100 markdown-body">${displayHtml}</div>`;
             
-            let playBtnElement = null;
-
             if (isModel) {
                 htmlContent += `
                     <div class="mt-3 flex justify-end gap-2">
@@ -858,8 +1012,9 @@
                         <button class="msg-copy-btn p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-full text-slate-400 hover:text-green-400 transition-colors shadow-sm focus:outline-none" title="Copy Answer">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                         </button>
-                        <button class="msg-play-btn p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-full text-orange-400 transition-colors shadow-sm focus:outline-none" title="Play/Pause Audio">
-                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        <button id="play-btn-${msgId}" data-msg-id="${msgId}" class="msg-play-btn p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-full text-orange-400 transition-colors shadow-sm focus:outline-none" title="Play/Pause Audio">
+                            <svg class="play-icon w-4 h-4 pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            <svg class="pause-icon w-4 h-4 hidden pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
                         </button>
                     </div>`;
             }
@@ -867,7 +1022,14 @@
             div.innerHTML = htmlContent;
 
             if (isModel) {
-                playBtnElement = div.querySelector('.msg-play-btn');
+                // Initialize TTS Text mapping after mounting DOM
+                UI.log.appendChild(div);
+                
+                const mdBody = div.querySelector('.markdown-body');
+                const speechText = prepareTextForTTSAndHighlighting(mdBody, msgId);
+                speechDataMap[msgId] = speechText;
+
+                const playBtnElement = document.getElementById(`play-btn-${msgId}`);
                 
                 div.querySelector('.msg-pdf-btn').addEventListener('click', (e) => { 
                     e.stopPropagation(); 
@@ -876,17 +1038,19 @@
 
                 playBtnElement.addEventListener('click', (e) => { 
                     e.stopPropagation(); 
-                    handleIndividualPlayPause(sanitizeForTTS(text), playBtnElement); 
+                    toggleSingleMessagePlay(playBtnElement); 
                 });
                 
                 div.querySelector('.msg-copy-btn').addEventListener('click', (e) => {
                     e.stopPropagation();
-                    navigator.clipboard.writeText(text).then(() => {
+                    const textToCopy = rawTextMap[msgId];
+                    navigator.clipboard.writeText(textToCopy).then(() => {
                         e.currentTarget.classList.replace('text-slate-400', 'text-green-400');
                         setTimeout(() => { e.currentTarget.classList.replace('text-green-400', 'text-slate-400'); }, 1500);
                     });
                 });
             } else {
+                UI.log.appendChild(div);
                 const editBtn = div.querySelector('.msg-edit-btn');
                 if (editBtn) {
                     editBtn.addEventListener('click', (e) => {
@@ -897,14 +1061,11 @@
                 }
             }
 
-            UI.log.appendChild(div);
             setTimeout(() => { UI.log.scrollTop = UI.log.scrollHeight; }, 50);
-
-            return playBtnElement;
+            return msgId;
         }
 
-        // --- 9. PDF EXPORT ---
-
+        // --- 10. PDF EXPORT ---
         function addPDFHeader(container) {
             const header = document.createElement('div');
             header.innerText = 'ai.eprashala.com';
