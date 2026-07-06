@@ -316,12 +316,68 @@
 
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
-            requestWakeLock(); // Only recover wake lock, not fullscreen automatically to prevent blocks
+            requestWakeLock();
         }
     });
 
     document.body.setAttribute('ondragstart', 'return false;');
     document.body.setAttribute('ondrop', 'return false;');
+
+    // ==========================================
+    // TEXT-TO-SPEECH (TTS) ENGINE
+    // ==========================================
+    function playTTS(btn, textId) {
+        const textElement = document.getElementById(textId);
+        if (!textElement) return;
+        
+        // Stop if clicking the active button again
+        if (btn.dataset.playing === 'true') {
+            window.speechSynthesis.cancel();
+            btn.innerHTML = '🔊 Read';
+            btn.dataset.playing = 'false';
+            return;
+        }
+
+        // Cancel any ongoing speech globally
+        window.speechSynthesis.cancel();
+        
+        // Reset all buttons visually
+        document.querySelectorAll('.tts-btn').forEach(b => {
+            b.innerHTML = '🔊 Read';
+            b.dataset.playing = 'false';
+            b.style.background = 'transparent';
+            b.style.color = '#64748b';
+        });
+
+        // Extract pure text (strips out HTML table tags etc)
+        const textToRead = textElement.innerText;
+        if (!textToRead.trim()) return;
+
+        const utterance = new SpeechSynthesisUtterance(textToRead);
+        utterance.lang = document.getElementById('langSelect').value;
+        
+        utterance.onend = () => {
+            btn.innerHTML = '🔊 Read';
+            btn.dataset.playing = 'false';
+            btn.style.background = 'transparent';
+            btn.style.color = '#64748b';
+        };
+        
+        utterance.onerror = () => {
+            btn.innerHTML = '🔊 Read';
+            btn.dataset.playing = 'false';
+            btn.style.background = 'transparent';
+            btn.style.color = '#64748b';
+        };
+
+        // UI active state
+        btn.innerHTML = '⏹️ Stop';
+        btn.dataset.playing = 'true';
+        btn.style.background = '#eff6ff';
+        btn.style.color = '#2563eb';
+        
+        window.speechSynthesis.speak(utterance);
+    }
 
     // ==========================================
     // API & DATABASE
@@ -391,6 +447,7 @@
                 <div class="content-editable" contenteditable="true"></div>
             </div>`;
         document.getElementById('sessionBadge').style.display = 'inline-block';
+        window.speechSynthesis.cancel(); // Stop TTS if new session
         autoSaveSession();
     }
 
@@ -477,17 +534,28 @@
         const session = sessions.find(s => s.id === id);
         if(!session) return;
 
+        window.speechSynthesis.cancel(); // Stop speech when loading
         currentSessionId = session.id;
         const chat = document.getElementById('chatWindow');
         chat.innerHTML = '';
 
         session.messages.forEach(m => {
             const div = document.createElement('div');
+            const msgId = 'msg-' + Date.now() + Math.random().toString(36).substr(2, 5);
+            
             div.className = m.role === 'user' ? 'message user-msg' : 'message ai-msg';
-            if(m.role === 'user') div.id = 'activeUserNode';
-            const label = m.role === 'user' ? 'You (Dictation Draft)' : 'Steno AI (Final Body Draft - Editable)';
-            const cls = m.role === 'ai' ? 'content-editable final-ai-body' : 'content-editable';
-            div.innerHTML = `<div class="msg-label">${label}</div><div class="${cls}" contenteditable="true">${m.content}</div>`;
+            if (m.role === 'user') {
+                div.id = 'activeUserNode';
+                div.innerHTML = `<div class="msg-label">You (Dictation Draft)</div><div class="content-editable" contenteditable="true">${m.content}</div>`;
+            } else {
+                div.innerHTML = `
+                    <div class="msg-label" style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>Steno AI (Final Body)</span>
+                        <button onclick="playTTS(this, 'text-${msgId}')" class="tts-btn" style="padding: 2px 8px; font-size: 0.7rem; border-radius: 4px; background: transparent; border: 1px solid #cbd5e1; color: #64748b; font-weight: bold;">🔊 Read</button>
+                    </div>
+                    <div class="content-editable final-ai-body" id="text-${msgId}" contenteditable="true">${m.content}</div>
+                `;
+            }
             chat.appendChild(div);
         });
         
@@ -902,8 +970,16 @@ STRICT OUTPUT RULES:
 
             const chat = document.getElementById('chatWindow');
             const div = document.createElement('div');
+            const msgId = 'msg-' + Date.now() + Math.random().toString(36).substr(2, 5);
+            
             div.className = 'message ai-msg';
-            div.innerHTML = `<div class="msg-label">Steno AI (Final Body)</div><div class="content-editable final-ai-body" contenteditable="true">${aiHtml}</div>`;
+            div.innerHTML = `
+                <div class="msg-label" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Steno AI (Final Body)</span>
+                    <button onclick="playTTS(this, 'text-${msgId}')" class="tts-btn" style="padding: 2px 8px; font-size: 0.7rem; border-radius: 4px; background: transparent; border: 1px solid #cbd5e1; color: #64748b; font-weight: bold; cursor: pointer; transition: 0.2s;">🔊 Read</button>
+                </div>
+                <div class="content-editable final-ai-body" id="text-${msgId}" contenteditable="true">${aiHtml}</div>
+            `;
             chat.appendChild(div);
             
             document.getElementById('aiInstructions').value = "";
@@ -919,7 +995,7 @@ STRICT OUTPUT RULES:
     }
 
     // ==========================================
-    // EXPORT ENGINE (WORD & PDF)
+    // EXPORT ENGINE (WORD & PDF REBUILT FOR COMPATIBILITY)
     // ==========================================
     function getElementHTML(dropdownId, align = "left", forWord = false) {
         const val = document.getElementById(dropdownId).value;
