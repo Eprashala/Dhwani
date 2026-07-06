@@ -270,7 +270,7 @@
     </div>
 
     <script>
-    // ==========================================
+// ==========================================
     // KIOSK MODE / SECURITY LOCKDOWN
     // ==========================================
     document.addEventListener('contextmenu', event => event.preventDefault());
@@ -292,31 +292,38 @@
         } catch (err) { console.warn('Wake Lock Error:', err.message); }
     }
 
+    // 1. UPDATED FULLSCREEN FUNCTION (Covers all browser engines)
     function enforceFullscreen() {
-        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-            const docElm = document.documentElement;
-            if (docElm.requestFullscreen) docElm.requestFullscreen().catch(() => {});
-            else if (docElm.webkitRequestFullscreen) docElm.webkitRequestFullscreen().catch(() => {});
+        const docElm = document.documentElement;
+        if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement && !document.msFullscreenElement) {
+            if (docElm.requestFullscreen) {
+                docElm.requestFullscreen().catch(err => console.log("FS Error:", err));
+            } else if (docElm.webkitRequestFullscreen) { /* Safari / iOS */
+                docElm.webkitRequestFullscreen();
+            } else if (docElm.mozRequestFullScreen) { /* Firefox */
+                docElm.mozRequestFullScreen();
+            } else if (docElm.msRequestFullscreen) { /* IE/Edge */
+                docElm.msRequestFullscreen();
+            }
         }
     }
 
-    document.getElementById('start-overlay').addEventListener('click', function() {
-        this.style.display = 'none';
-        enforceFullscreen();
-        requestWakeLock();
-    });
-
-    ['click', 'touchstart'].forEach(evt => {
-        window.addEventListener(evt, () => {
+    // 2. CLEAN USER GESTURE (Only triggered exactly when the overlay is tapped)
+    const overlay = document.getElementById('start-overlay');
+    if(overlay) {
+        overlay.addEventListener('click', function() {
+            this.style.display = 'none';
             enforceFullscreen();
             requestWakeLock();
-        }, { capture: true, passive: true });
-    });
+            // Try to unlock audio context for speech synthesis/recognition
+            try { window.AudioContext = window.AudioContext || window.webkitAudioContext; new AudioContext().resume(); } catch(e){}
+        });
+    }
 
+    // 3. WAKE LOCK RECOVERY (Do NOT request fullscreen here, it causes browser blocks)
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
-            requestWakeLock();
-            enforceFullscreen();
+            requestWakeLock(); // Only recover wake lock, not fullscreen
         }
     });
 
