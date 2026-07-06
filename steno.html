@@ -708,12 +708,16 @@
             }
         }
 
-        // --- DICTATION ENGINE ---
+// --- DICTATION ENGINE (ANDROID BUG FIX RESTORED) ---
+        let lastFinalizedText = ""; // Tracks the last string to prevent Android duplicates
+        let autoPunctuateTimer = null;
+
         function initSpeech() {
             if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
                 const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
                 recognition = new SpeechRec();
                 
+                // Keep continuous true to prevent the constant start/stop beeping
                 recognition.continuous = true; 
                 recognition.interimResults = true;
                 
@@ -722,10 +726,15 @@
                     let finalTranscript = '';
 
                     for (let i = e.resultIndex; i < e.results.length; ++i) {
+                        let transcriptStr = e.results[i][0].transcript;
+                        
                         if (e.results[i].isFinal) {
-                            finalTranscript += e.results[i][0].transcript;
+                            // DEDUPLICATION: Ignore exact consecutive matches (The Android Bug Fix)
+                            if (transcriptStr.trim() === lastFinalizedText.trim()) continue;
+                            lastFinalizedText = transcriptStr;
+                            finalTranscript += transcriptStr;
                         } else {
-                            interimTranscript += e.results[i][0].transcript;
+                            interimTranscript += transcriptStr;
                         }
                     }
 
@@ -734,12 +743,14 @@
                     if (existingInterim) existingInterim.remove();
 
                     if (finalTranscript) {
+                        // Formatting: ensure spacing after punctuation
                         finalTranscript = finalTranscript.replace(/([.!?])([^\s])/g, '$1 $2');
                         let currentText = activeNode.innerText.trim();
                         if (currentText === '' || /[.!?]\s*$/.test(currentText)) {
                             finalTranscript = finalTranscript.charAt(0).toUpperCase() + finalTranscript.slice(1);
                         }
 
+                        // Add leading space if needed
                         if (currentText !== '' && !currentText.endsWith(' ')) {
                             finalTranscript = ' ' + finalTranscript;
                         }
@@ -757,6 +768,7 @@
                         activeNode.appendChild(span);
                     }
 
+                    // AUTO-PUNCTUATION TIMER
                     clearTimeout(autoPunctuateTimer);
                     autoPunctuateTimer = setTimeout(() => {
                         if (isRecording) {
@@ -782,6 +794,38 @@
             }
         }
 
+        function toggleDictation() {
+            if (!recognition) return;
+            const btn = document.getElementById('dictateBtn');
+            if (isRecording) {
+                isRecording = false; 
+                clearTimeout(autoPunctuateTimer);
+                recognition.stop();
+                btn.innerHTML = '🎙️ Start Dictation'; btn.classList.remove('recording');
+                
+                const activeNode = document.querySelector('#activeUserNode .content-editable');
+                const existingInterim = activeNode.querySelector('.interim-text');
+                if (existingInterim) existingInterim.remove();
+            } else {
+                isRecording = true; 
+                lastFinalizedText = ""; // Reset memory cache on new recording
+                recognition.lang = document.getElementById('langSelect').value; 
+                try { recognition.start(); } catch(e){}
+                btn.innerHTML = '⏹️ Stop Dictation'; btn.classList.add('recording');
+            }
+        }
+
+        function addNewBubble() {
+            document.querySelectorAll('#activeUserNode').forEach(el => el.removeAttribute('id'));
+            const chat = document.getElementById('chatWindow');
+            const div = document.createElement('div');
+            div.className = 'message user-msg'; div.id = 'activeUserNode';
+            div.innerHTML = `<div class="msg-label">You (Dictation Draft)</div><div class="content-editable" contenteditable="true"></div>`;
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
+            autoSaveSession();
+        }
+		
         function toggleDictation() {
             if (!recognition) return;
             const btn = document.getElementById('dictateBtn');
