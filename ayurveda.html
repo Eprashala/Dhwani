@@ -108,6 +108,8 @@
 
 <body class="text-white flex flex-col items-center h-screen overflow-hidden" ondragstart="return false;" ondrop="return false;">
 
+    <input type="file" id="file-upload" accept="image/*,application/pdf" class="hidden">
+
     <div id="start-overlay" class="cursor-pointer text-center px-4 absolute inset-0 z-[100] bg-[radial-gradient(circle_at_center,#064e3b_0%,#022c22_100%)] flex flex-col items-center justify-center">
         <div class="text-xl text-emerald-500 font-bold mb-2 uppercase tracking-widest">|| सर्वे सन्तु निरामयाः ||</div>
         <div class="golden-om">🌿</div>
@@ -193,17 +195,27 @@
 
             <div class="w-full flex items-center px-1 relative mt-1">
                 <div class="flex-1 flex justify-start items-center pl-2">
-                    <button id="btn-share-pdf" class="text-emerald-600 hover:text-emerald-400 transition-colors outline-none p-1" title="Download Prescription as PDF">
+                    <button id="btn-share-pdf" class="text-emerald-600 hover:text-emerald-400 transition-colors outline-none p-1" title="Download Consultation as PDF">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                     </button>
                 </div>
                 
                 <div class="flex items-center bg-black/40 p-1.5 rounded-full border border-emerald-900/50 shadow-inner flex-shrink-0">
+                    
+                    <button id="btn-attach" class="audio-btn p-1.5 mr-1" title="Attach Image/PDF">
+                        <svg class="w-5 h-5 text-gray-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                    </button>
+
                     <button id="btn-mic" class="big-mic w-12 h-12 rounded-full flex items-center justify-center mx-1 outline-none select-none transition-all shadow-[0_0_15px_rgba(16,185,129,0.5)]">
                         <svg id="icon-mic-default" class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z"/></svg>
                         <svg id="icon-mic-thinking" class="w-5 h-5 text-white hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                     </button>
-                    <button id="btn-mute" class="audio-btn p-1.5" title="Mute TTS">
+
+                    <button id="btn-stop" class="audio-btn p-1.5 mx-0.5 text-red-500 hover:text-red-400" title="Stop AI & Audio">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+                    </button>
+
+                    <button id="btn-mute" class="audio-btn p-1.5 ml-0.5" title="Mute TTS">
                         <svg class="w-5 h-5" id="icon-vol" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
                         <svg class="w-5 h-5 hidden text-red-400" id="icon-mute" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/></svg>
                     </button>
@@ -230,14 +242,14 @@
 
         let wakeLock = null;
         async function requestWakeLock() {
-            try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } 
-            catch (err) { console.log('Wake Lock Error:', err.message); }
+            try { 
+                if ('wakeLock' in navigator) { 
+                    if (wakeLock !== null) return; 
+                    wakeLock = await navigator.wakeLock.request('screen'); 
+                    wakeLock.addEventListener('release', () => { wakeLock = null; });
+                } 
+            } catch (err) { console.log('Wake Lock Error:', err.message); }
         }
-
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') requestWakeLock();
-            else { if (ttsStatus === 'PLAYING') { ttsStatus = 'PAUSED'; synth.cancel(); resetAllPlayButtons(); } }
-        });
 
         function enforceFullscreen() {
             if (!document.fullscreenElement && !document.webkitFullscreenElement) {
@@ -247,14 +259,30 @@
             }
         }
 
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                requestWakeLock();
+                enforceFullscreen();
+            } else { 
+                if (ttsStatus === 'PLAYING') resetCurrentTTS(); 
+            }
+        });
+
         ['click', 'touchstart'].forEach(evt => {
-            window.addEventListener(evt, enforceFullscreen, { capture: true, passive: true });
+            window.addEventListener(evt, () => {
+                enforceFullscreen();
+                requestWakeLock();
+            }, { capture: true, passive: true });
         });
 
         function unlockAudio() {
-            const silent = new SpeechSynthesisUtterance('');
-            silent.volume = 0;
-            synth.speak(silent);
+            try {
+                if (typeof SpeechSynthesisUtterance !== 'undefined' && synth) {
+                    const silent = new SpeechSynthesisUtterance('');
+                    silent.volume = 0;
+                    synth.speak(silent);
+                }
+            } catch (err) { console.warn('Audio unlock skipped:', err.message); }
         }
 
         // --- 1. CONFIG & STATE ---
@@ -265,9 +293,21 @@
         let synth = window.speechSynthesis;
         let isListening = false; 
         let state = { isProcessing: false, isMuted: false };
+        
+        // HIGHLIGHTER & TTS STATE
         let ttsStatus = 'STOPPED'; 
         let lastSpokenIndex = 0;   
-        window.currentPlayingText = "";
+        let currentActiveBtn = null;
+        let lastHighlightedSpan = null;
+        const speechDataMap = {}; // Maps msgId to clean TTS string
+        const rawTextMap = {}; // Maps msgId to raw input text
+
+        let currentAbortController = null;
+
+        // File Attachment States
+        let pendingAttachmentData = null;
+        let pendingMimeType = null;
+        let pendingFileName = "";
 
         // --- 2. DOM ELEMENTS ---
         const UI = {
@@ -277,11 +317,14 @@
             textIn: document.getElementById('text-input'),
             btnSend: document.getElementById('btn-send'),
             btnMic: document.getElementById('btn-mic'),
+            btnStop: document.getElementById('btn-stop'),
             iconMicDefault: document.getElementById('icon-mic-default'),
             iconMicThinking: document.getElementById('icon-mic-thinking'),
             btnMute: document.getElementById('btn-mute'),
             btnRestart: document.getElementById('btn-restart'),
             btnSharePdf: document.getElementById('btn-share-pdf'),
+            btnAttach: document.getElementById('btn-attach'),
+            fileUpload: document.getElementById('file-upload'),
             iconVol: document.getElementById('icon-vol'),
             iconMute: document.getElementById('icon-mute'),
             
@@ -333,8 +376,8 @@
                         if (chatHistory.length > 0) {
                             UI.welcome.style.display = 'none';
                             chatHistory.forEach(msg => {
-                                const textPart = msg.parts[0].text;
-                                renderMessage(msg.role === 'user' ? (UI.name.value || 'Patient') : "Vaidyaji", textPart, msg.role === 'model', false); 
+                                const textPart = msg.parts.find(p => p.text)?.text || "📎 [File Attached]";
+                                renderMessage(msg.role === 'user' ? (UI.name.value || 'Patient') : "Vaidyaji", textPart, msg.role === 'model', false, textPart); 
                             });
                         }
                     } catch (e) {}
@@ -361,10 +404,8 @@
             chatHistory = []; 
             localStorage.removeItem('vaidya_history');
             UI.log.innerHTML = `<div class="text-emerald-700/80 text-center mt-12 cinzel"><p class="text-emerald-500 text-xl mb-2 font-bold">🌿 History Cleared</p>Let us begin a new consultation.</div>`;
-            synth.cancel();
-            resetAllPlayButtons();
-            ttsStatus = 'STOPPED';
-            window.currentPlayingText = "";
+            resetCurrentTTS();
+            clearAttachment();
         }
 
         // --- 4. SPEECH RECOGNITION ---
@@ -399,7 +440,7 @@
         function resetMicUI() {
             UI.btnMic.classList.remove('mic-pulse');
             UI.status.style.backgroundColor = '#065f46'; // emerald-800 back to normal
-            UI.textIn.placeholder = "Describe your symptoms...";
+            UI.textIn.placeholder = pendingAttachmentData ? `📎 ${pendingFileName} attached! Describe your symptoms...` : "Describe your symptoms...";
             setMicThinkingState(false);
         }
 
@@ -425,6 +466,26 @@
             UI.btnCloseSet.onclick = (e) => { e.stopPropagation(); UI.settingsModal.classList.add('hidden'); };
             UI.btnSaveSet.onclick = (e) => { e.stopPropagation(); saveData(); UI.settingsModal.classList.add('hidden'); };
             
+            UI.btnAttach.onclick = (e) => {
+                e.stopPropagation();
+                UI.fileUpload.click();
+            };
+
+            UI.fileUpload.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                    pendingAttachmentData = evt.target.result.split(',')[1];
+                    pendingMimeType = file.type;
+                    pendingFileName = file.name;
+                    UI.textIn.placeholder = `📎 ${pendingFileName} attached! Describe your symptoms...`;
+                    UI.btnAttach.classList.add('text-emerald-400');
+                    UI.btnAttach.classList.remove('text-gray-400');
+                };
+                reader.readAsDataURL(file);
+            });
+
             UI.btnPasteKey.addEventListener('click', async (e) => {
                 e.stopPropagation(); 
                 try {
@@ -437,10 +498,24 @@
                 } catch (err) {}
             });
 
+            UI.btnStop.onclick = (e) => {
+                e.stopPropagation();
+                resetCurrentTTS();
+                if (currentAbortController) {
+                    currentAbortController.abort();
+                    currentAbortController = null;
+                }
+                if (isListening && recognition) {
+                    recognition.stop();
+                }
+                state.isProcessing = false;
+                resetMicUI();
+            };
+
             UI.btnMute.onclick = (e) => { 
                 e.stopPropagation(); state.isMuted = !state.isMuted; 
                 if(state.isMuted) { 
-                    synth.cancel(); ttsStatus = 'STOPPED'; resetAllPlayButtons(); window.currentPlayingText = "";
+                    resetCurrentTTS();
                     UI.iconVol.classList.add('hidden'); UI.iconMute.classList.remove('hidden'); 
                 } else { 
                     UI.iconVol.classList.remove('hidden'); UI.iconMute.classList.add('hidden'); 
@@ -467,16 +542,27 @@
             });
         }
 
+        function clearAttachment() {
+            pendingAttachmentData = null;
+            pendingMimeType = null;
+            pendingFileName = "";
+            UI.fileUpload.value = '';
+            UI.btnAttach.classList.remove('text-emerald-400');
+            UI.btnAttach.classList.add('text-gray-400');
+            UI.textIn.placeholder = "Describe your symptoms...";
+        }
+
         // --- 6. AI LOGIC & PROCESSING ---
         async function processInput(userText) {
             userText = userText.trim();
-            if (!userText) return; 
+            if (!userText && !pendingAttachmentData) return; 
             
             if (!UI.inAilment.value.trim()) {
                 alert("Please enter a Chief Complaint in the top input box first (e.g., Fever, Knee Pain).");
                 return;
             }
 
+            const rawUserText = userText; 
             UI.textIn.value = '';
             UI.textIn.placeholder = "Vaidyaji is analyzing...";
             if (UI.welcome) UI.welcome.style.display = 'none';
@@ -486,27 +572,46 @@
             setMicThinkingState(true);
 
             const userName = UI.name.value || "Patient";
-            renderMessage(userName, userText, false);
+            const displayMessage = userText || `📎 [${pendingFileName} attached for analysis]`;
             
-            chatHistory.push({ role: 'user', parts: [{ text: userText }] });
+            renderMessage(userName, displayMessage, false, true, rawUserText);
+            
+            let messageParts = [];
+            if (userText) messageParts.push({ text: userText });
+            if (!userText && pendingAttachmentData) messageParts.push({ text: "Please analyze this attached report." });
+            
+            if (pendingAttachmentData) {
+                messageParts.push({
+                    inlineData: { mimeType: pendingMimeType, data: pendingAttachmentData }
+                });
+            }
+
+            chatHistory.push({ role: 'user', parts: messageParts });
+            clearAttachment(); 
             saveData();
 
             try {
                 const aiResRaw = await getAIResponse(chatHistory);
                 
-                state.lastAIMessage = aiResRaw;
                 chatHistory.push({ role: 'model', parts: [{ text: aiResRaw }] });
-                
-                const playBtn = renderMessage("Vaidyaji", aiResRaw, true, true);
+                const newMsgId = renderMessage("Vaidyaji", aiResRaw, true, true);
                 saveData();
                 
-                if (!state.isMuted && playBtn) handleIndividualPlayPause(sanitizeForTTS(aiResRaw), playBtn);
+                if (!state.isMuted && newMsgId) {
+                    const playBtn = document.getElementById(`play-btn-${newMsgId}`);
+                    if (playBtn) toggleSingleMessagePlay(playBtn);
+                }
             } catch (err) {
-                renderMessage("System", "⚠️ Network interrupted. Please check your key or internet.", true);
+                if (err.name === 'AbortError') {
+                    renderMessage("System", "🛑 Analysis stopped by user.", true);
+                } else {
+                    renderMessage("System", "⚠️ Network interrupted. Please check your key or internet.", true);
+                }
+            } finally {
+                state.isProcessing = false;
+                currentAbortController = null;
+                resetMicUI();
             }
-
-            state.isProcessing = false;
-            resetMicUI();
         }
 
         async function getAIResponse(history) {
@@ -534,6 +639,7 @@
                - Exact Sanskrit Verse from one of the above books relevant to the ailment. State the book name.
                - Exact translation of the verse in ${lang}.
                - In-depth Expert Advice: Detailed remedy, diet (Pathya-Apathya), and lifestyle changes.
+               - If an image/report is provided, deeply analyze it using Ayurvedic principles.
             3. FORMATTING: Use Markdown (**bold**, bullet points). Do NOT use complex LaTeX.
             4. TONE: Calm, Healing, Authoritative, Expert, Compassionate.`;
 
@@ -543,97 +649,267 @@
                 systemInstruction: { parts: [{ text: prompt }] } 
             };
 
-            const response = await fetch(PROXY_URL, { method: 'POST', headers: headers, body: JSON.stringify(payload) });
+            currentAbortController = new AbortController();
+
+            const response = await fetch(PROXY_URL, { 
+                method: 'POST', 
+                headers: headers, 
+                body: JSON.stringify(payload),
+                signal: currentAbortController.signal 
+            });
+            
             if (!response.ok) throw new Error('API Error');
             const data = await response.json();
             return data.candidates[0].content.parts[0].text;
         }
 
-        // --- 7. MEDIA PARSERS & TTS ---
-        function sanitizeForTTS(text) {
-            return text
-                .replace(/[*_#`~]/g, '') 
-                .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') 
-                .replace(/<[^>]+>/g, '') 
-                .replace(/^[-*+]\s+/gm, '') 
-                .trim();
-        }
+        // --- 7. TTS HIGHLIGHTER & ENGINE ---
+        function prepareTextForTTSAndHighlighting(container, msgId) {
+            const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+            
+            const textNodes = [];
+            let node;
+            
+            while (node = walker.nextNode()) {
+                if (node.nodeValue.trim() !== '') {
+                    textNodes.push(node);
+                }
+            }
 
-        function resetAllPlayButtons() {
-            document.querySelectorAll('.msg-play-btn').forEach(b => {
-                b.innerHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+            let wordCounter = 0;
+            let finalSpeechText = [];
+
+            textNodes.forEach(textNode => {
+                const parts = textNode.nodeValue.split(/(\s+)/); 
+                const fragment = document.createDocumentFragment();
+                
+                parts.forEach(part => {
+                    if (part.trim().length > 0) {
+                        const span = document.createElement('span');
+                        span.id = `tts-${msgId}-${wordCounter}`;
+                        span.className = 'transition-all duration-150'; 
+                        span.textContent = part;
+                        fragment.appendChild(span);
+                        
+                        finalSpeechText.push(part);
+                        wordCounter++;
+                    } else {
+                        fragment.appendChild(document.createTextNode(part));
+                    }
+                });
+                textNode.parentNode.replaceChild(fragment, textNode);
             });
+
+            return finalSpeechText.join(' ');
         }
 
-        function handleIndividualPlayPause(text, btnElement) {
+        function highlightTTSWord(msgId, wordIndex) {
+            clearTTSHighlight(); 
+            const span = document.getElementById(`tts-${msgId}-${wordIndex}`);
+            if (span) {
+                // Emerald theme matching Vaidyaji
+                span.classList.add('bg-emerald-500/30', 'text-emerald-300', 'font-bold', 'rounded-[3px]', 'px-[2px]', 'shadow-[0_0_8px_rgba(16,185,129,0.4)]');
+                lastHighlightedSpan = span;
+
+                const logContainer = document.getElementById('conversation-log');
+                const spanRect = span.getBoundingClientRect();
+                const logRect = logContainer.getBoundingClientRect();
+                
+                if (spanRect.bottom > logRect.bottom - 40 || spanRect.top < logRect.top + 40) {
+                    span.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        }
+
+        function clearTTSHighlight() {
+            if (lastHighlightedSpan) {
+                lastHighlightedSpan.classList.remove('bg-emerald-500/30', 'text-emerald-300', 'font-bold', 'rounded-[3px]', 'px-[2px]', 'shadow-[0_0_8px_rgba(16,185,129,0.4)]');
+                lastHighlightedSpan = null;
+            }
+        }
+
+        function updatePlayBtnUI(btn, isPlaying) {
+            if (!btn) return;
+            const playIcon = btn.querySelector('.play-icon');
+            const pauseIcon = btn.querySelector('.pause-icon');
+            
+            if (isPlaying) {
+                if (playIcon) playIcon.classList.add('hidden');
+                if (pauseIcon) pauseIcon.classList.remove('hidden');
+            } else {
+                if (playIcon) playIcon.classList.remove('hidden');
+                if (pauseIcon) pauseIcon.classList.add('hidden');
+            }
+        }
+
+        function resetCurrentTTS() {
+            if (currentActiveBtn) {
+                updatePlayBtnUI(currentActiveBtn, false);
+                currentActiveBtn = null;
+            }
+            synth.cancel();
+            clearTTSHighlight(); 
+            ttsStatus = 'STOPPED';
+            lastSpokenIndex = 0;
+            window.currentPlayingText = "";
+        }
+
+        function toggleSingleMessagePlay(btnElem) {
             if (state.isMuted) return;
 
-            const playIcon = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
-            const pauseIcon = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
+            const msgId = btnElem.getAttribute('data-msg-id');
+            const plainText = speechDataMap[msgId] || "";
 
-            if (window.currentPlayingText === text) {
+            if (currentActiveBtn === btnElem && window.currentPlayingText === plainText) {
                 if (ttsStatus === 'PAUSED') {
                     ttsStatus = 'PLAYING';
-                    btnElement.innerHTML = pauseIcon; 
-                    synth.resume();
+                    updatePlayBtnUI(btnElem, true);
+                    synth.cancel();
+                    
+                    const remainingText = plainText.substring(lastSpokenIndex);
+                    startNewUtterance(remainingText, plainText, btnElem, lastSpokenIndex);
                     return;
                 } else if (ttsStatus === 'PLAYING') {
                     ttsStatus = 'PAUSED';
-                    btnElement.innerHTML = playIcon; 
-                    synth.pause(); 
+                    updatePlayBtnUI(btnElem, false);
+                    synth.cancel();
                     return;
                 }
             }
 
-            synth.cancel(); 
-            resetAllPlayButtons();
-            window.currentPlayingText = text;
+            resetCurrentTTS();
+            currentActiveBtn = btnElem;
+            window.currentPlayingText = plainText;
             ttsStatus = 'PLAYING';
-            btnElement.innerHTML = pauseIcon; 
+            lastSpokenIndex = 0;
+            updatePlayBtnUI(btnElem, true);
 
-            setTimeout(() => { 
-                const utterance = new SpeechSynthesisUtterance(text);
-                const langMap = { 'Marathi':'mr-IN', 'Hindi':'hi-IN', 'English':'en-IN', 'Sanskrit':'hi-IN', 'Gujarati':'gu-IN', 'Bengali':'bn-IN', 'Tamil':'ta-IN', 'Telugu':'te-IN', 'Kannada':'kn-IN', 'Malayalam':'ml-IN' };
-                utterance.lang = langMap[UI.selLang.value] || 'en-IN';
-                
-                // Vaidyaji voice is slightly slower and lower pitch
-                utterance.rate = 0.85; 
-                utterance.pitch = 0.9;
-                
-                utterance.onend = () => {
-                    btnElement.innerHTML = playIcon;
-                    ttsStatus = 'STOPPED'; 
-                    window.currentPlayingText = ""; 
-                };
-                utterance.onerror = (e) => {
-                    if (e.error !== 'canceled') btnElement.innerHTML = playIcon;
-                };
+            startNewUtterance(plainText, plainText, btnElem, 0); 
+        }
 
-                synth.speak(utterance);
-            }, 50);
+        function startNewUtterance(textToSpeak, fullOriginalText, btnElement, offsetIndex) {
+            if (!textToSpeak.trim()) {
+                resetCurrentTTS();
+                return;
+            }
+
+            const msgId = btnElement.getAttribute('data-msg-id'); 
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            
+            window.__activeUtterance = utterance; // GC prevention
+
+            const langMap = { 'Marathi':'mr-IN', 'Hindi':'hi-IN', 'English':'en-IN', 'Sanskrit':'hi-IN', 'Gujarati':'gu-IN', 'Bengali':'bn-IN', 'Tamil':'ta-IN', 'Telugu':'te-IN', 'Kannada':'kn-IN', 'Malayalam':'ml-IN' };
+            utterance.lang = langMap[UI.selLang.value] || 'en-IN';
+            
+            // Vaidyaji voice is slightly slower and lower pitch
+            utterance.rate = 0.85; 
+            utterance.pitch = 0.9;
+            
+            let hasBoundaryFired = false;
+            let fallbackTimer = null;
+            
+            const spokenSoFar = fullOriginalText.substring(0, offsetIndex);
+            const match = spokenSoFar.match(/\S+/g);
+            let estimatedWordIndex = match ? match.length : 0;
+            const wordsArray = fullOriginalText.match(/\S+/g) || [];
+            
+            const cleanup = () => {
+                if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+                clearTTSHighlight();
+                if (ttsStatus === 'PLAYING') resetCurrentTTS(); 
+            };
+
+            // Dynamic Android Fallback Engine (prevents stuck highlights if native boundary fails)
+            utterance.onstart = () => {
+                setTimeout(() => {
+                    if (!hasBoundaryFired && ttsStatus === 'PLAYING') {
+                        const BASE_DELAY = 150; 
+                        const CHAR_DELAY = 30;   
+                        const MAX_DELAY = 850;   
+
+                        const highlightNextWord = () => {
+                            if (hasBoundaryFired || ttsStatus !== 'PLAYING' || estimatedWordIndex >= wordsArray.length) return;
+                            
+                            highlightTTSWord(msgId, estimatedWordIndex);
+                            
+                            const currentWord = wordsArray[estimatedWordIndex] || "";
+                            const charCount = currentWord.length;
+                            
+                            let wordDuration = (BASE_DELAY + (charCount * CHAR_DELAY)) / 0.85; 
+                            if (wordDuration > MAX_DELAY) wordDuration = MAX_DELAY;
+                            
+                            estimatedWordIndex++;
+                            fallbackTimer = setTimeout(highlightNextWord, wordDuration);
+                        };
+                        highlightNextWord(); 
+                    }
+                }, 100);
+            };
+
+            utterance.onboundary = (event) => { 
+                hasBoundaryFired = true; 
+                if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+
+                lastSpokenIndex = offsetIndex + event.charIndex; 
+                
+                const currentSpoken = fullOriginalText.substring(0, lastSpokenIndex);
+                const currentMatch = currentSpoken.match(/\S+/g);
+                const currentWordIndex = currentMatch ? currentMatch.length : 0;
+                
+                highlightTTSWord(msgId, currentWordIndex);
+            };
+            
+            utterance.onend = cleanup;
+            
+            utterance.onerror = (e) => {
+                if (e.error !== 'canceled' && e.error !== 'interrupted') cleanup();
+            };
+            
+            synth.speak(utterance);
+            synth.resume(); 
         }
 
         // --- 8. RENDER UI ---
-        function renderMessage(sender, text, isModel, isNewMessage = true) {
+        function renderMessage(sender, text, isModel, isNewMessage = true, rawText = "") {
+            const msgId = 'msg-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+            rawTextMap[msgId] = rawText || text;
+
             const div = document.createElement('div');
             // User: Emerald-900 tint on the right. Model: Darker slate/emerald tint on the left.
             div.className = `p-4 rounded-2xl ${isModel ? 'bg-[#022c22]/90 border border-emerald-800/50 shadow-lg ml-2 mr-8' : 'bg-emerald-900/60 text-right mr-2 ml-8'} mb-4`;
             
-            let displayHtml = isModel ? marked.parse(text) : text;
+            let displayHtml = "";
+            let senderHtml = "";
+
+            if (isModel) {
+                displayHtml = marked.parse(text);
+                senderHtml = `<div class="text-[10px] uppercase font-bold tracking-wider text-emerald-400 cinzel mb-1">${sender}</div>`;
+            } else {
+                displayHtml = text;
+                senderHtml = `
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-[10px] uppercase font-bold tracking-wider text-emerald-200/80">${sender}</span>
+                        <button class="msg-edit-btn text-emerald-600/70 hover:text-emerald-400 transition-colors p-1 -mr-1 focus:outline-none outline-none" title="Edit Input">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                        </button>
+                    </div>`;
+            }
             
-            let htmlContent = `<div class="text-[10px] uppercase font-bold tracking-wider ${isModel ? 'text-emerald-400 cinzel' : 'text-emerald-200/80'} mb-1">${sender}</div>
+            let htmlContent = `${senderHtml}
                                <div class="text-sm leading-relaxed text-gray-100 markdown-body">${displayHtml}</div>`;
             
-            let playBtnElement = null;
-
             if (isModel) {
                 htmlContent += `
                     <div class="mt-3 flex justify-end gap-2">
-                        <button class="msg-copy-btn p-1.5 bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 rounded-full text-emerald-600 hover:text-emerald-400 transition-colors shadow-sm focus:outline-none">
+                        <button class="msg-pdf-btn p-1.5 bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 rounded-full text-emerald-600 hover:text-emerald-400 transition-colors shadow-sm focus:outline-none" title="Download Answer as PDF">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        </button>
+                        <button class="msg-copy-btn p-1.5 bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 rounded-full text-emerald-600 hover:text-emerald-300 transition-colors shadow-sm focus:outline-none" title="Copy Answer">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                         </button>
-                        <button class="msg-play-btn p-1.5 bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 rounded-full text-emerald-500 transition-colors shadow-sm focus:outline-none">
-                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        <button id="play-btn-${msgId}" data-msg-id="${msgId}" class="msg-play-btn p-1.5 bg-emerald-950 hover:bg-emerald-900 border border-emerald-800 rounded-full text-emerald-500 transition-colors shadow-sm focus:outline-none" title="Play/Pause Audio">
+                            <svg class="play-icon w-4 h-4 pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            <svg class="pause-icon w-4 h-4 hidden pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
                         </button>
                     </div>`;
             }
@@ -641,29 +917,62 @@
             div.innerHTML = htmlContent;
 
             if (isModel) {
-                playBtnElement = div.querySelector('.msg-play-btn');
+                UI.log.appendChild(div);
                 
+                const mdBody = div.querySelector('.markdown-body');
+                const speechText = prepareTextForTTSAndHighlighting(mdBody, msgId);
+                speechDataMap[msgId] = speechText;
+
+                const playBtnElement = document.getElementById(`play-btn-${msgId}`);
+                
+                div.querySelector('.msg-pdf-btn').addEventListener('click', (e) => { 
+                    e.stopPropagation(); 
+                    exportSingleMessageToPDF(text); 
+                });
+
                 playBtnElement.addEventListener('click', (e) => { 
                     e.stopPropagation(); 
-                    handleIndividualPlayPause(sanitizeForTTS(text), playBtnElement); 
+                    toggleSingleMessagePlay(playBtnElement); 
                 });
                 
                 div.querySelector('.msg-copy-btn').addEventListener('click', (e) => {
                     e.stopPropagation();
-                    navigator.clipboard.writeText(text).then(() => {
-                        e.currentTarget.classList.replace('text-emerald-600', 'text-emerald-300');
-                        setTimeout(() => { e.currentTarget.classList.replace('text-emerald-300', 'text-emerald-600'); }, 1500);
+                    const textToCopy = rawTextMap[msgId];
+                    navigator.clipboard.writeText(textToCopy).then(() => {
+                        e.currentTarget.classList.replace('text-emerald-600', 'text-emerald-400');
+                        setTimeout(() => { e.currentTarget.classList.replace('text-emerald-400', 'text-emerald-600'); }, 1500);
                     });
                 });
+            } else {
+                UI.log.appendChild(div);
+                const editBtn = div.querySelector('.msg-edit-btn');
+                if (editBtn) {
+                    editBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        UI.textIn.value = rawText || text.replace(/📎 \[.*?\]/g, '').trim();
+                        UI.textIn.focus();
+                    });
+                }
             }
 
-            UI.log.appendChild(div);
             setTimeout(() => { UI.log.scrollTop = UI.log.scrollHeight; }, 50);
-
-            return playBtnElement;
+            return msgId;
         }
 
         // --- 9. PDF EXPORT ---
+        function addPDFHeader(container) {
+            const header = document.createElement('div');
+            header.innerText = 'Vaidyaji AI Consultation';
+            header.style.fontSize = '18px';
+            header.style.fontWeight = 'bold';
+            header.style.textAlign = 'center';
+            header.style.marginBottom = '20px';
+            header.style.paddingBottom = '10px';
+            header.style.borderBottom = '1px solid #059669';
+            header.style.color = '#064e3b'; 
+            container.appendChild(header);
+        }
+
         function exportChatToPDF() {
             if (chatHistory.length === 0) return alert("No consultation history to export.");
             const container = document.createElement('div');
@@ -672,8 +981,10 @@
             container.style.backgroundColor = '#f0fdf4'; // Light green tint for paper 
             container.style.color = '#000000'; 
 
+            addPDFHeader(container);
+
             const title = document.createElement('h2');
-            title.innerText = `Vaidyaji Consultation: ${UI.inAilment.value}`;
+            title.innerText = `Topic: ${UI.inAilment.value}`;
             title.style.borderBottom = '2px solid #059669';
             title.style.paddingBottom = '15px';
             title.style.marginBottom = '20px';
@@ -688,7 +999,7 @@
                 sender.style.fontWeight = 'bold';
                 sender.style.color = msg.role === 'user' ? '#047857' : '#b45309'; 
                 
-                const textPart = msg.parts[0].text;
+                const textPart = msg.parts.find(p => p.text)?.text || "[File analyzed]";
                 
                 const content = document.createElement('div');
                 content.innerHTML = msg.role === 'model' ? marked.parse(textPart) : textPart;
@@ -704,6 +1015,32 @@
             const opt = {
                 margin: 0.5,
                 filename: `Vaidyaji_${UI.inAilment.value.replace(/[^a-zA-Z0-9]/g, '')}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+            html2pdf().set(opt).from(container).save();
+        }
+
+        function exportSingleMessageToPDF(text) {
+            const container = document.createElement('div');
+            container.style.padding = '30px';
+            container.style.fontFamily = 'Arial, sans-serif';
+            container.style.backgroundColor = '#f0fdf4'; 
+            container.style.color = '#000000'; 
+
+            addPDFHeader(container);
+            
+            const content = document.createElement('div');
+            content.innerHTML = marked.parse(text);
+            content.style.lineHeight = '1.6';
+            content.style.color = '#064e3b'; 
+            
+            container.appendChild(content);
+
+            const opt = {
+                margin: 0.5,
+                filename: `Vaidyaji_Answer_${Date.now()}.pdf`,
                 image: { type: 'jpeg', quality: 0.98 },
                 html2canvas: { scale: 2 },
                 jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
