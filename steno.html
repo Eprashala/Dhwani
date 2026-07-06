@@ -28,6 +28,7 @@
         .profile-widget select { background: transparent; border: none; color: white; font-size: 0.8rem; font-weight: 600; outline: none; cursor: pointer; padding: 0 4px; }
         .profile-widget select option { background: var(--primary); color: white; }
         .profile-widget button { background: var(--success); color: white; border: none; border-radius: 4px; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; padding: 0; }
+        .profile-widget button:hover { background: #059669; }
         
         .session-badge { background: var(--success); font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; display: none; font-weight: 600; }
         
@@ -104,10 +105,10 @@
             .navbar { flex-direction: column; align-items: stretch; padding: 10px; }
             .navbar-brand { justify-content: space-between; width: 100%; margin-bottom: 10px; }
             .nav-controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: 100%; }
-            .nav-controls > select { grid-column: span 3; } /* Make language full width */
+            .nav-controls > select { grid-column: span 3; } 
             
             .config-strip { flex-wrap: wrap; overflow-x: hidden; gap: 10px; }
-            .config-item { width: calc(50% - 5px); } /* 2 columns grid */
+            .config-item { width: calc(50% - 5px); } 
             .config-divider { display: none; }
             
             .controls-panel { padding: 10px; }
@@ -270,7 +271,7 @@
     </div>
 
     <script>
-// ==========================================
+    // ==========================================
     // KIOSK MODE / SECURITY LOCKDOWN
     // ==========================================
     document.addEventListener('contextmenu', event => event.preventDefault());
@@ -292,591 +293,561 @@
         } catch (err) { console.warn('Wake Lock Error:', err.message); }
     }
 
-    // 1. UPDATED FULLSCREEN FUNCTION (Covers all browser engines)
     function enforceFullscreen() {
         const docElm = document.documentElement;
         if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement && !document.msFullscreenElement) {
             if (docElm.requestFullscreen) {
-                docElm.requestFullscreen().catch(err => console.log("FS Error:", err));
-            } else if (docElm.webkitRequestFullscreen) { /* Safari / iOS */
+                docElm.requestFullscreen().catch(() => {});
+            } else if (docElm.webkitRequestFullscreen) { 
                 docElm.webkitRequestFullscreen();
-            } else if (docElm.mozRequestFullScreen) { /* Firefox */
+            } else if (docElm.mozRequestFullScreen) { 
                 docElm.mozRequestFullScreen();
-            } else if (docElm.msRequestFullscreen) { /* IE/Edge */
+            } else if (docElm.msRequestFullscreen) { 
                 docElm.msRequestFullscreen();
             }
         }
     }
 
-    // 2. CLEAN USER GESTURE (Only triggered exactly when the overlay is tapped)
-    const overlay = document.getElementById('start-overlay');
-    if(overlay) {
-        overlay.addEventListener('click', function() {
-            this.style.display = 'none';
-            enforceFullscreen();
-            requestWakeLock();
-            // Try to unlock audio context for speech synthesis/recognition
-            try { window.AudioContext = window.AudioContext || window.webkitAudioContext; new AudioContext().resume(); } catch(e){}
-        });
-    }
+    document.getElementById('start-overlay').addEventListener('click', function() {
+        this.style.display = 'none';
+        enforceFullscreen();
+        requestWakeLock();
+    });
 
-    // 3. WAKE LOCK RECOVERY (Do NOT request fullscreen here, it causes browser blocks)
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
-            requestWakeLock(); // Only recover wake lock, not fullscreen
+            requestWakeLock(); // Only recover wake lock, not fullscreen automatically to prevent blocks
         }
     });
 
     document.body.setAttribute('ondragstart', 'return false;');
     document.body.setAttribute('ondrop', 'return false;');
 
-        // --- API & DATABASE ---
-        const PROXY_URL = "https://eprashala.pythonanywhere.com/api/chat";
-        const DB_NAME = 'StenoProDB';
-        const DB_VERSION = 1;
-        let db;
+    // ==========================================
+    // API & DATABASE
+    // ==========================================
+    const PROXY_URL = "https://eprashala.pythonanywhere.com/api/chat";
+    const DB_NAME = 'StenoProDB';
+    const DB_VERSION = 1;
+    let db;
 
-        function initDB() {
-            return new Promise((resolve, reject) => {
-                const request = indexedDB.open(DB_NAME, DB_VERSION);
-                request.onupgradeneeded = (event) => {
-                    db = event.target.result;
-                    if (!db.objectStoreNames.contains('sessions')) {
-                        const store = db.createObjectStore('sessions', { keyPath: 'id' });
-                        store.createIndex('date', 'date', { unique: false });
-                    }
-                };
-                request.onsuccess = (event) => { db = event.target.result; resolve(db); };
-                request.onerror = (event) => { console.error("Database error: ", event.target.error); reject(event.target.error); };
-            });
-        }
-
-        const dbOps = {
-            saveSession: (sessionData) => {
-                return new Promise((resolve) => {
-                    const tx = db.transaction('sessions', 'readwrite');
-                    tx.objectStore('sessions').put(sessionData);
-                    tx.oncomplete = () => resolve();
-                });
-            },
-            getAllSessions: () => {
-                return new Promise((resolve) => {
-                    const tx = db.transaction('sessions', 'readonly');
-                    const request = tx.objectStore('sessions').getAll();
-                    request.onsuccess = () => resolve(request.result.sort((a,b) => b.timestamp - a.timestamp));
-                });
-            },
-            deleteSession: (id) => {
-                return new Promise((resolve) => {
-                    const tx = db.transaction('sessions', 'readwrite');
-                    tx.objectStore('sessions').delete(id);
-                    tx.oncomplete = () => resolve();
-                });
-            },
-            clearAll: () => {
-                return new Promise((resolve) => {
-                    const tx = db.transaction('sessions', 'readwrite');
-                    tx.objectStore('sessions').clear();
-                    tx.oncomplete = () => resolve();
-                });
-            }
-        };
-
-        // --- SESSION STATE ---
-        let currentSessionId = null;
-        let saveTimeout = null;
-
-        function startNewSession() {
-            currentSessionId = Date.now();
-            document.getElementById('chatWindow').innerHTML = `
-                <div class="message user-msg" id="activeUserNode">
-                    <div class="msg-label">You (Dictation Draft)</div>
-                    <div class="content-editable" contenteditable="true"></div>
-                </div>`;
-            document.getElementById('sessionBadge').style.display = 'inline-block';
-            autoSaveSession();
-        }
-
-        function extractMessages() {
-            const msgs = [];
-            document.querySelectorAll('#chatWindow .message').forEach(el => {
-                const role = el.classList.contains('user-msg') ? 'user' : 'ai';
-                const content = el.querySelector('.content-editable').innerHTML;
-                if (content.trim()) msgs.push({ role, content });
-            });
-            return msgs;
-        }
-
-        async function autoSaveSession() {
-            if (!currentSessionId) currentSessionId = Date.now();
-            const msgs = extractMessages();
-            if (msgs.length === 0) return;
-
-            const dateStr = new Date(currentSessionId).toLocaleDateString();
-            const timeStr = new Date(currentSessionId).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            let previewText = msgs[0].content.replace(/<[^>]+>/g, '').substring(0, 60) + '...';
-
-            const sessionData = {
-                id: currentSessionId,
-                date: dateStr,
-                time: timeStr,
-                timestamp: currentSessionId,
-                preview: previewText,
-                messages: msgs
+    function initDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            request.onupgradeneeded = (event) => {
+                db = event.target.result;
+                if (!db.objectStoreNames.contains('sessions')) {
+                    const store = db.createObjectStore('sessions', { keyPath: 'id' });
+                    store.createIndex('date', 'date', { unique: false });
+                }
             };
-            await dbOps.saveSession(sessionData);
-            document.getElementById('sessionBadge').style.display = 'inline-block';
+            request.onsuccess = (event) => { db = event.target.result; resolve(db); };
+            request.onerror = (event) => { console.error("Database error: ", event.target.error); reject(event.target.error); };
+        });
+    }
+
+    const dbOps = {
+        saveSession: (sessionData) => {
+            return new Promise((resolve) => {
+                const tx = db.transaction('sessions', 'readwrite');
+                tx.objectStore('sessions').put(sessionData);
+                tx.oncomplete = () => resolve();
+            });
+        },
+        getAllSessions: () => {
+            return new Promise((resolve) => {
+                const tx = db.transaction('sessions', 'readonly');
+                const request = tx.objectStore('sessions').getAll();
+                request.onsuccess = () => resolve(request.result.sort((a,b) => b.timestamp - a.timestamp));
+            });
+        },
+        deleteSession: (id) => {
+            return new Promise((resolve) => {
+                const tx = db.transaction('sessions', 'readwrite');
+                tx.objectStore('sessions').delete(id);
+                tx.oncomplete = () => resolve();
+            });
+        },
+        clearAll: () => {
+            return new Promise((resolve) => {
+                const tx = db.transaction('sessions', 'readwrite');
+                tx.objectStore('sessions').clear();
+                tx.oncomplete = () => resolve();
+            });
+        }
+    };
+
+    // ==========================================
+    // SESSION STATE
+    // ==========================================
+    let currentSessionId = null;
+    let saveTimeout = null;
+
+    function startNewSession() {
+        currentSessionId = Date.now();
+        document.getElementById('chatWindow').innerHTML = `
+            <div class="message user-msg" id="activeUserNode">
+                <div class="msg-label">You (Dictation Draft)</div>
+                <div class="content-editable" contenteditable="true"></div>
+            </div>`;
+        document.getElementById('sessionBadge').style.display = 'inline-block';
+        autoSaveSession();
+    }
+
+    function extractMessages() {
+        const msgs = [];
+        document.querySelectorAll('#chatWindow .message').forEach(el => {
+            const role = el.classList.contains('user-msg') ? 'user' : 'ai';
+            const content = el.querySelector('.content-editable').innerHTML;
+            if (content.trim()) msgs.push({ role, content });
+        });
+        return msgs;
+    }
+
+    async function autoSaveSession() {
+        if (!currentSessionId) currentSessionId = Date.now();
+        const msgs = extractMessages();
+        if (msgs.length === 0) return;
+
+        const dateStr = new Date(currentSessionId).toLocaleDateString();
+        const timeStr = new Date(currentSessionId).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        let previewText = msgs[0].content.replace(/<[^>]+>/g, '').substring(0, 60) + '...';
+
+        const sessionData = {
+            id: currentSessionId,
+            date: dateStr,
+            time: timeStr,
+            timestamp: currentSessionId,
+            preview: previewText,
+            messages: msgs
+        };
+        await dbOps.saveSession(sessionData);
+        document.getElementById('sessionBadge').style.display = 'inline-block';
+    }
+
+    document.getElementById('chatWindow').addEventListener('input', () => {
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(autoSaveSession, 1500);
+    });
+
+    // ==========================================
+    // HISTORY UI
+    // ==========================================
+    async function openHistoryModal() {
+        const container = document.getElementById('historyContainer');
+        container.innerHTML = '<p>Loading...</p>';
+        openModal('historyModal');
+        
+        const sessions = await dbOps.getAllSessions();
+        if (sessions.length === 0) {
+            container.innerHTML = '<p style="text-align:center; color:#64748b;">No history found.</p>';
+            return;
         }
 
-        document.getElementById('chatWindow').addEventListener('input', () => {
-            clearTimeout(saveTimeout);
-            saveTimeout = setTimeout(autoSaveSession, 1500);
+        const grouped = {};
+        sessions.forEach(s => {
+            if(!grouped[s.date]) grouped[s.date] = [];
+            grouped[s.date].push(s);
         });
 
-        // --- HISTORY UI ---
-        async function openHistoryModal() {
-            const container = document.getElementById('historyContainer');
-            container.innerHTML = '<p>Loading...</p>';
-            openModal('historyModal');
-            
-            const sessions = await dbOps.getAllSessions();
-            if (sessions.length === 0) {
-                container.innerHTML = '<p style="text-align:center; color:#64748b;">No history found.</p>';
-                return;
-            }
-
-            const grouped = {};
-            sessions.forEach(s => {
-                if(!grouped[s.date]) grouped[s.date] = [];
-                grouped[s.date].push(s);
+        container.innerHTML = '';
+        for (const [date, sessArr] of Object.entries(grouped)) {
+            let html = `<div class="history-group"><div class="history-date">📅 ${date}</div>`;
+            sessArr.forEach(s => {
+                const isActive = s.id === currentSessionId ? 'border-color:var(--accent);' : '';
+                html += `
+                    <div class="history-item" style="${isActive}">
+                        <div class="history-info">
+                            <div style="font-size:0.8rem; font-weight:bold; color:var(--primary);">${s.time}</div>
+                            <div class="history-preview">${s.preview || 'Empty Draft'}</div>
+                        </div>
+                        <div class="history-actions">
+                            <button class="secondary" onclick="loadSession(${s.id})" style="padding: 4px 10px; font-size: 0.8rem;">📂 Load</button>
+                            <button class="danger" onclick="deleteSession(${s.id}, this)" style="padding: 4px 10px; font-size: 0.8rem;">🗑️</button>
+                        </div>
+                    </div>`;
             });
+            html += `</div>`;
+            container.innerHTML += html;
+        }
+    }
 
-            container.innerHTML = '';
-            for (const [date, sessArr] of Object.entries(grouped)) {
-                let html = `<div class="history-group"><div class="history-date">📅 ${date}</div>`;
-                sessArr.forEach(s => {
-                    const isActive = s.id === currentSessionId ? 'border-color:var(--accent);' : '';
-                    html += `
-                        <div class="history-item" style="${isActive}">
-                            <div class="history-info">
-                                <div style="font-size:0.8rem; font-weight:bold; color:var(--primary);">${s.time}</div>
-                                <div class="history-preview">${s.preview || 'Empty Draft'}</div>
-                            </div>
-                            <div class="history-actions">
-                                <button class="secondary" onclick="loadSession(${s.id})" style="padding: 4px 10px; font-size: 0.8rem;">📂 Load</button>
-                                <button class="danger" onclick="deleteSession(${s.id}, this)" style="padding: 4px 10px; font-size: 0.8rem;">🗑️</button>
-                            </div>
-                        </div>`;
-                });
+    async function loadSession(id) {
+        const sessions = await dbOps.getAllSessions();
+        const session = sessions.find(s => s.id === id);
+        if(!session) return;
+
+        currentSessionId = session.id;
+        const chat = document.getElementById('chatWindow');
+        chat.innerHTML = '';
+
+        session.messages.forEach(m => {
+            const div = document.createElement('div');
+            div.className = m.role === 'user' ? 'message user-msg' : 'message ai-msg';
+            if(m.role === 'user') div.id = 'activeUserNode';
+            const label = m.role === 'user' ? 'You (Dictation Draft)' : 'Steno AI (Final Body Draft - Editable)';
+            const cls = m.role === 'ai' ? 'content-editable final-ai-body' : 'content-editable';
+            div.innerHTML = `<div class="msg-label">${label}</div><div class="${cls}" contenteditable="true">${m.content}</div>`;
+            chat.appendChild(div);
+        });
+        
+        if (session.messages.length > 0 && session.messages[session.messages.length-1].role === 'ai') {
+            addNewBubble();
+        } else {
+            document.querySelectorAll('#activeUserNode').forEach((el, index, arr) => {
+                if (index !== arr.length - 1) el.removeAttribute('id');
+            });
+        }
+
+        document.getElementById('sessionBadge').style.display = 'inline-block';
+        closeModal('historyModal');
+        chat.scrollTop = chat.scrollHeight;
+    }
+
+    async function deleteSession(id, btnElement) {
+        if(confirm("Delete this session?")) {
+            await dbOps.deleteSession(id);
+            btnElement.closest('.history-item').remove();
+            if (id === currentSessionId) startNewSession();
+        }
+    }
+
+    // ==========================================
+    // BACKUP / RESTORE
+    // ==========================================
+    async function exportSystemData() {
+        const sessions = await dbOps.getAllSessions();
+        const exportData = {
+            stenoSettings: localStorage.getItem('stenoAppData'),
+            sessions: sessions
+        };
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData));
+        const dlAnchorElem = document.createElement('a');
+        dlAnchorElem.setAttribute("href", dataStr);
+        dlAnchorElem.setAttribute("download", `StenoPro_Backup_${new Date().toLocaleDateString().replace(/\//g,'-')}.steno`);
+        dlAnchorElem.click();
+    }
+
+    async function importSystemData(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const data = JSON.parse(e.target.result);
+                if (data.stenoSettings) localStorage.setItem('stenoAppData', data.stenoSettings);
+                if (data.sessions && Array.isArray(data.sessions)) {
+                    await dbOps.clearAll();
+                    for(let s of data.sessions) await dbOps.saveSession(s);
+                }
+                alert("Backup Imported Successfully! App will now reload.");
+                location.reload();
+            } catch(err) {
+                alert("Invalid backup file.");
+                console.error(err);
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    // ==========================================
+    // PROFILES & CONFIG
+    // ==========================================
+    const configStructure = [
+        { id: 'lht1', cat: 'Letterheads (Top)', title: 'Top Letterhead 1', text: true, img: true },
+        { id: 'lht2', cat: 'Letterheads (Top)', title: 'Top Letterhead 2', text: true, img: true },
+        { id: 'lhb1', cat: 'Letterheads (Bottom)', title: 'Bottom Letterhead 1', text: true, img: true },
+        { id: 'lhb2', cat: 'Letterheads (Bottom)', title: 'Bottom Letterhead 2', text: true, img: true },
+        { id: 'h1', cat: 'Headers', title: 'Header 1', text: true, img: true },
+        { id: 'h2', cat: 'Headers', title: 'Header 2', text: true, img: true },
+        { id: 'h3', cat: 'Headers', title: 'Header 3', text: true, img: true },
+        { id: 'f1', cat: 'Footers', title: 'Footer 1', text: true, img: true },
+        { id: 'f2', cat: 'Footers', title: 'Footer 2', text: true, img: true },
+        { id: 'f3', cat: 'Footers', title: 'Footer 3', text: true, img: true },
+        { id: 's1', cat: 'Signatures', title: 'Signature 1', text: true, img: true },
+        { id: 's2', cat: 'Signatures', title: 'Signature 2', text: true, img: true },
+        { id: 's3', cat: 'Signatures', title: 'Signature 3', text: true, img: true },
+        { id: 'bg1', cat: 'Background / Watermark', title: 'Full Page Background', text: false, img: true }
+    ];
+
+    let appData = { activeProfile: "Default", profiles: { "Default": {} } };
+    let stenoData = {}; 
+    let recognition = null;
+    let isRecording = false;
+
+    window.onload = async () => {
+        if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+        await initDB();
+        initSettingsUI();
+        loadProfiles();
+        initSpeech();
+        startNewSession(); 
+    };
+
+    function loadProfiles() {
+        const saved = localStorage.getItem('stenoAppData');
+        if (saved) {
+            appData = JSON.parse(saved);
+            if (!appData.profiles) appData = { activeProfile: "Default", profiles: { "Default": {} } };
+        }
+        updateProfileDropdown();
+        switchProfile(appData.activeProfile);
+    }
+
+    function updateProfileDropdown() {
+        const sel = document.getElementById('profileSelect');
+        sel.innerHTML = '';
+        for (const profileName in appData.profiles) {
+            const opt = document.createElement('option');
+            opt.value = profileName;
+            opt.innerText = profileName;
+            if (profileName === appData.activeProfile) opt.selected = true;
+            sel.appendChild(opt);
+        }
+    }
+
+    function createNewProfile() {
+        const name = prompt("Enter new profile name:");
+        if (name && name.trim() !== "" && !appData.profiles[name]) {
+            appData.profiles[name] = {};
+            appData.activeProfile = name;
+            saveAppData();
+            updateProfileDropdown();
+            switchProfile(name);
+        }
+    }
+
+    function switchProfile(forceName = null) {
+        const sel = document.getElementById('profileSelect');
+        const targetProfile = forceName || sel.value;
+        appData.activeProfile = targetProfile;
+        stenoData = appData.profiles[targetProfile];
+        saveAppData();
+        populateSettingsUI();
+    }
+
+    function saveAppData() {
+        localStorage.setItem('stenoAppData', JSON.stringify(appData));
+    }
+
+    function initSettingsUI() {
+        const acc = document.getElementById('settingsAccordion');
+        const categories = [...new Set(configStructure.map(c => c.cat))];
+        categories.forEach(cat => {
+            const details = document.createElement('details');
+            details.innerHTML = `<summary>${cat}</summary><div class="details-content" id="cat_${cat.replace(/\s/g,'')}"></div>`;
+            acc.appendChild(details);
+            const content = details.querySelector('.details-content');
+            configStructure.filter(c => c.cat === cat).forEach(item => {
+                let html = `<div class="setup-block"><h4>${item.title}</h4>`;
+                if (item.text) html += `<textarea id="txt_${item.id}" placeholder="Enter text or HTML here..."></textarea>`;
+                if (item.img) html += `<div class="file-upload"><input type="file" accept="image/*" onchange="processImage(this, '${item.id}')"><button class="danger" onclick="clearImage('${item.id}')" style="font-size:0.7rem; padding: 2px 6px;">Clear Img</button></div><img id="img_preview_${item.id}" class="img-preview" src=""><input type="hidden" id="b64_${item.id}">`;
                 html += `</div>`;
-                container.innerHTML += html;
-            }
-        }
-
-        async function loadSession(id) {
-            const sessions = await dbOps.getAllSessions();
-            const session = sessions.find(s => s.id === id);
-            if(!session) return;
-
-            currentSessionId = session.id;
-            const chat = document.getElementById('chatWindow');
-            chat.innerHTML = '';
-
-            session.messages.forEach(m => {
-                const div = document.createElement('div');
-                div.className = m.role === 'user' ? 'message user-msg' : 'message ai-msg';
-                if(m.role === 'user') div.id = 'activeUserNode';
-                const label = m.role === 'user' ? 'You (Dictation Draft)' : 'Steno AI (Final Body Draft - Editable)';
-                const cls = m.role === 'ai' ? 'content-editable final-ai-body' : 'content-editable';
-                div.innerHTML = `<div class="msg-label">${label}</div><div class="${cls}" contenteditable="true">${m.content}</div>`;
-                chat.appendChild(div);
+                content.innerHTML += html;
             });
+        });
+    }
+
+    function populateSettingsUI() {
+        document.getElementById('cfg_apikey').value = stenoData['apikey'] || '';
+        configStructure.forEach(item => {
+            const txtEl = document.getElementById(`txt_${item.id}`);
+            const b64El = document.getElementById(`b64_${item.id}`);
+            const prevEl = document.getElementById(`img_preview_${item.id}`);
             
-            if (session.messages.length > 0 && session.messages[session.messages.length-1].role === 'ai') {
-                addNewBubble();
-            } else {
-                document.querySelectorAll('#activeUserNode').forEach((el, index, arr) => {
-                    if (index !== arr.length - 1) el.removeAttribute('id');
-                });
+            if (txtEl) txtEl.value = (stenoData[item.id] && stenoData[item.id].text) ? stenoData[item.id].text : '';
+            if (b64El) {
+                const imgData = (stenoData[item.id] && stenoData[item.id].img) ? stenoData[item.id].img : '';
+                b64El.value = imgData;
+                prevEl.src = imgData;
+                prevEl.style.display = imgData ? 'block' : 'none';
             }
+        });
+    }
 
-            document.getElementById('sessionBadge').style.display = 'inline-block';
-            closeModal('historyModal');
-            chat.scrollTop = chat.scrollHeight;
-        }
-
-        async function deleteSession(id, btnElement) {
-            if(confirm("Delete this session?")) {
-                await dbOps.deleteSession(id);
-                btnElement.closest('.history-item').remove();
-                if (id === currentSessionId) startNewSession();
-            }
-        }
-
-        // --- BACKUP / RESTORE ---
-        async function exportSystemData() {
-            const sessions = await dbOps.getAllSessions();
-            const exportData = {
-                stenoSettings: localStorage.getItem('stenoAppData'),
-                sessions: sessions
+    function processImage(input, id) { 
+        if (!input.files[0]) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let w = img.width, h = img.height;
+                const max = id.startsWith('bg') ? 1200 : 800;
+                if(w > max) { h *= max/w; w = max; }
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                document.getElementById(`b64_${id}`).value = dataUrl;
+                const prev = document.getElementById(`img_preview_${id}`);
+                prev.src = dataUrl; prev.style.display = 'block';
             };
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData));
-            const dlAnchorElem = document.createElement('a');
-            dlAnchorElem.setAttribute("href", dataStr);
-            dlAnchorElem.setAttribute("download", `StenoPro_Backup_${new Date().toLocaleDateString().replace(/\//g,'-')}.steno`);
-            dlAnchorElem.click();
-        }
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+    
+    function clearImage(id) { document.getElementById(`b64_${id}`).value = ''; document.getElementById(`img_preview_${id}`).style.display = 'none'; }
 
-        async function importSystemData(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                try {
-                    const data = JSON.parse(e.target.result);
-                    if (data.stenoSettings) localStorage.setItem('stenoAppData', data.stenoSettings);
-                    if (data.sessions && Array.isArray(data.sessions)) {
-                        await dbOps.clearAll();
-                        for(let s of data.sessions) await dbOps.saveSession(s);
+    function saveAllSettings() {
+        stenoData['apikey'] = document.getElementById('cfg_apikey').value;
+        configStructure.forEach(item => {
+            stenoData[item.id] = {};
+            if (item.text) stenoData[item.id].text = document.getElementById(`txt_${item.id}`).value;
+            if (item.img) stenoData[item.id].img = document.getElementById(`b64_${item.id}`).value;
+        });
+        saveAppData(); 
+        alert(`Settings Saved for profile: ${appData.activeProfile}`);
+        closeModal('settingsModal');
+    }
+
+    function toggleConfigStrip() {
+        const strip = document.getElementById('configStrip');
+        if (strip.style.display === 'none' || strip.style.display === '') {
+            strip.style.display = 'flex';
+        } else {
+            strip.style.display = 'none';
+        }
+    }
+
+    // ==========================================
+    // DICTATION ENGINE (ANDROID BUG FIX)
+    // ==========================================
+    let lastFinalizedText = ""; 
+    let autoPunctuateTimer = null;
+
+    function initSpeech() {
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRec();
+            
+            recognition.continuous = true; 
+            recognition.interimResults = true;
+            
+            recognition.onresult = (e) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+
+                for (let i = e.resultIndex; i < e.results.length; ++i) {
+                    let transcriptStr = e.results[i][0].transcript;
+                    
+                    if (e.results[i].isFinal) {
+                        if (transcriptStr.trim() === lastFinalizedText.trim()) continue;
+                        lastFinalizedText = transcriptStr;
+                        finalTranscript += transcriptStr;
+                    } else {
+                        interimTranscript += transcriptStr;
                     }
-                    alert("Backup Imported Successfully! App will now reload.");
-                    location.reload();
-                } catch(err) {
-                    alert("Invalid backup file.");
-                    console.error(err);
+                }
+
+                const activeNode = document.querySelector('#activeUserNode .content-editable');
+                const existingInterim = activeNode.querySelector('.interim-text');
+                if (existingInterim) existingInterim.remove();
+
+                if (finalTranscript) {
+                    finalTranscript = finalTranscript.replace(/([.!?])([^\s])/g, '$1 $2');
+                    let currentText = activeNode.innerText.trim();
+                    if (currentText === '' || /[.!?]\s*$/.test(currentText)) {
+                        finalTranscript = finalTranscript.charAt(0).toUpperCase() + finalTranscript.slice(1);
+                    }
+
+                    if (currentText !== '' && !currentText.endsWith(' ')) {
+                        finalTranscript = ' ' + finalTranscript;
+                    }
+
+                    activeNode.innerText += finalTranscript;
+                    autoSaveSession(); 
+                }
+
+                if (interimTranscript) {
+                    const span = document.createElement('span');
+                    span.className = 'interim-text';
+                    span.style.color = '#94a3b8';
+                    span.style.fontStyle = 'italic';
+                    span.innerText = " " + interimTranscript;
+                    activeNode.appendChild(span);
+                }
+
+                clearTimeout(autoPunctuateTimer);
+                autoPunctuateTimer = setTimeout(() => {
+                    if (isRecording) {
+                        const node = document.querySelector('#activeUserNode .content-editable');
+                        let text = node.innerText.trim();
+                        if (text.length > 0 && !/[.!?,"']$/.test(text)) {
+                            node.innerText += '. ';
+                            autoSaveSession();
+                        }
+                    }
+                }, 2000); 
+            };
+            
+            recognition.onerror = (e) => { console.warn("Speech Error:", e.error); };
+            
+            recognition.onend = () => { 
+                if (isRecording) {
+                    try { recognition.start(); } catch (err) {}
                 }
             };
-            reader.readAsText(file);
+        } else { 
+            alert("Speech Web API not supported. Use Google Chrome."); 
         }
+    }
 
-        // --- PROFILES & CONFIG ---
-        const configStructure = [
-            { id: 'lht1', cat: 'Letterheads (Top)', title: 'Top Letterhead 1', text: true, img: true },
-            { id: 'lht2', cat: 'Letterheads (Top)', title: 'Top Letterhead 2', text: true, img: true },
-            { id: 'lhb1', cat: 'Letterheads (Bottom)', title: 'Bottom Letterhead 1', text: true, img: true },
-            { id: 'lhb2', cat: 'Letterheads (Bottom)', title: 'Bottom Letterhead 2', text: true, img: true },
-            { id: 'h1', cat: 'Headers', title: 'Header 1', text: true, img: true },
-            { id: 'h2', cat: 'Headers', title: 'Header 2', text: true, img: true },
-            { id: 'h3', cat: 'Headers', title: 'Header 3', text: true, img: true },
-            { id: 'f1', cat: 'Footers', title: 'Footer 1', text: true, img: true },
-            { id: 'f2', cat: 'Footers', title: 'Footer 2', text: true, img: true },
-            { id: 'f3', cat: 'Footers', title: 'Footer 3', text: true, img: true },
-            { id: 's1', cat: 'Signatures', title: 'Signature 1', text: true, img: true },
-            { id: 's2', cat: 'Signatures', title: 'Signature 2', text: true, img: true },
-            { id: 's3', cat: 'Signatures', title: 'Signature 3', text: true, img: true },
-            { id: 'bg1', cat: 'Background / Watermark', title: 'Full Page Background', text: false, img: true }
-        ];
+    function toggleDictation() {
+        if (!recognition) return;
+        const btn = document.getElementById('dictateBtn');
+        if (isRecording) {
+            isRecording = false; 
+            clearTimeout(autoPunctuateTimer);
+            recognition.stop();
+            btn.innerHTML = '🎙️ Start Dictation'; btn.classList.remove('recording');
+            
+            const activeNode = document.querySelector('#activeUserNode .content-editable');
+            const existingInterim = activeNode.querySelector('.interim-text');
+            if (existingInterim) existingInterim.remove();
+        } else {
+            isRecording = true; 
+            lastFinalizedText = ""; 
+            recognition.lang = document.getElementById('langSelect').value; 
+            try { recognition.start(); } catch(e){}
+            btn.innerHTML = '⏹️ Stop Dictation'; btn.classList.add('recording');
+        }
+    }
 
-        let appData = { activeProfile: "Default", profiles: { "Default": {} } };
-        let stenoData = {}; 
-        let recognition = null;
-        let isRecording = false;
-        let autoPunctuateTimer = null;
+    function addNewBubble() {
+        document.querySelectorAll('#activeUserNode').forEach(el => el.removeAttribute('id'));
+        const chat = document.getElementById('chatWindow');
+        const div = document.createElement('div');
+        div.className = 'message user-msg'; div.id = 'activeUserNode';
+        div.innerHTML = `<div class="msg-label">You (Dictation Draft)</div><div class="content-editable" contenteditable="true"></div>`;
+        chat.appendChild(div);
+        chat.scrollTop = chat.scrollHeight;
+        autoSaveSession();
+    }
 
-        window.onload = async () => {
-            if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
-            await initDB();
-            initSettingsUI();
-            loadProfiles();
-            initSpeech();
-            startNewSession(); 
+    // ==========================================
+    // AI DOCUMENT GENERATION
+    // ==========================================
+    async function generateDocument() {
+        let fullText = "";
+        document.querySelectorAll('.user-msg .content-editable').forEach(el => fullText += el.innerText + "\n\n");
+        if(!fullText.trim()) return alert("No dictation text found. Please dictate or type something first.");
+
+        const instructions = document.getElementById('aiInstructions').value;
+        const docType = document.getElementById('sel_doctype').value;
+        const lang = document.getElementById('langSelect').options[document.getElementById('langSelect').selectedIndex].text;
+
+        const getContextText = (selId) => {
+            const val = document.getElementById(selId).value;
+            return (val && stenoData[val] && stenoData[val].text) ? stenoData[val].text : "";
         };
 
-        function loadProfiles() {
-            const saved = localStorage.getItem('stenoAppData');
-            if (saved) {
-                appData = JSON.parse(saved);
-                if (!appData.profiles) appData = { activeProfile: "Default", profiles: { "Default": {} } };
-            }
-            updateProfileDropdown();
-            switchProfile(appData.activeProfile);
-        }
+        let ctxStr = `Top Letterhead: ${getContextText('sel_lht')}\n`;
+        ctxStr += `Bottom Letterhead: ${getContextText('sel_lhb')}\n`;
+        ctxStr += `Signature Info: ${getContextText('sel_s')}\n`;
 
-        function updateProfileDropdown() {
-            const sel = document.getElementById('profileSelect');
-            sel.innerHTML = '';
-            for (const profileName in appData.profiles) {
-                const opt = document.createElement('option');
-                opt.value = profileName;
-                opt.innerText = profileName;
-                if (profileName === appData.activeProfile) opt.selected = true;
-                sel.appendChild(opt);
-            }
-        }
-
-        function createNewProfile() {
-            const name = prompt("Enter new profile name:");
-            if (name && name.trim() !== "" && !appData.profiles[name]) {
-                appData.profiles[name] = {};
-                appData.activeProfile = name;
-                saveAppData();
-                updateProfileDropdown();
-                switchProfile(name);
-            }
-        }
-
-        function switchProfile(forceName = null) {
-            const sel = document.getElementById('profileSelect');
-            const targetProfile = forceName || sel.value;
-            appData.activeProfile = targetProfile;
-            stenoData = appData.profiles[targetProfile];
-            saveAppData();
-            populateSettingsUI();
-        }
-
-        function saveAppData() {
-            localStorage.setItem('stenoAppData', JSON.stringify(appData));
-        }
-
-        function initSettingsUI() {
-            const acc = document.getElementById('settingsAccordion');
-            const categories = [...new Set(configStructure.map(c => c.cat))];
-            categories.forEach(cat => {
-                const details = document.createElement('details');
-                details.innerHTML = `<summary>${cat}</summary><div class="details-content" id="cat_${cat.replace(/\s/g,'')}"></div>`;
-                acc.appendChild(details);
-                const content = details.querySelector('.details-content');
-                configStructure.filter(c => c.cat === cat).forEach(item => {
-                    let html = `<div class="setup-block"><h4>${item.title}</h4>`;
-                    if (item.text) html += `<textarea id="txt_${item.id}" placeholder="Enter text or HTML here..."></textarea>`;
-                    if (item.img) html += `<div class="file-upload"><input type="file" accept="image/*" onchange="processImage(this, '${item.id}')"><button class="danger" onclick="clearImage('${item.id}')" style="font-size:0.7rem; padding: 2px 6px;">Clear Img</button></div><img id="img_preview_${item.id}" class="img-preview" src=""><input type="hidden" id="b64_${item.id}">`;
-                    html += `</div>`;
-                    content.innerHTML += html;
-                });
-            });
-        }
-
-        function populateSettingsUI() {
-            document.getElementById('cfg_apikey').value = stenoData['apikey'] || '';
-            configStructure.forEach(item => {
-                const txtEl = document.getElementById(`txt_${item.id}`);
-                const b64El = document.getElementById(`b64_${item.id}`);
-                const prevEl = document.getElementById(`img_preview_${item.id}`);
-                
-                if (txtEl) txtEl.value = (stenoData[item.id] && stenoData[item.id].text) ? stenoData[item.id].text : '';
-                if (b64El) {
-                    const imgData = (stenoData[item.id] && stenoData[item.id].img) ? stenoData[item.id].img : '';
-                    b64El.value = imgData;
-                    prevEl.src = imgData;
-                    prevEl.style.display = imgData ? 'block' : 'none';
-                }
-            });
-        }
-
-        function processImage(input, id) { 
-            if (!input.files[0]) return;
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    let w = img.width, h = img.height;
-                    const max = id.startsWith('bg') ? 1200 : 800;
-                    if(w > max) { h *= max/w; w = max; }
-                    canvas.width = w; canvas.height = h;
-                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                    document.getElementById(`b64_${id}`).value = dataUrl;
-                    const prev = document.getElementById(`img_preview_${id}`);
-                    prev.src = dataUrl; prev.style.display = 'block';
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(input.files[0]);
-        }
+        const prompt = `You are an expert document drafter and executive stenographer fluent in ${lang}.
         
-        function clearImage(id) { document.getElementById(`b64_${id}`).value = ''; document.getElementById(`img_preview_${id}`).style.display = 'none'; }
-
-        function saveAllSettings() {
-            stenoData['apikey'] = document.getElementById('cfg_apikey').value;
-            configStructure.forEach(item => {
-                stenoData[item.id] = {};
-                if (item.text) stenoData[item.id].text = document.getElementById(`txt_${item.id}`).value;
-                if (item.img) stenoData[item.id].img = document.getElementById(`b64_${item.id}`).value;
-            });
-            saveAppData(); 
-            alert(`Settings Saved for profile: ${appData.activeProfile}`);
-            closeModal('settingsModal');
-        }
-
-        function toggleConfigStrip() {
-            const strip = document.getElementById('configStrip');
-            if (strip.style.display === 'none' || strip.style.display === '') {
-                strip.style.display = 'flex';
-            } else {
-                strip.style.display = 'none';
-            }
-        }
-
-// --- DICTATION ENGINE (ANDROID BUG FIX RESTORED) ---
-        let lastFinalizedText = ""; // Tracks the last string to prevent Android duplicates
-        let autoPunctuateTimer = null;
-
-        function initSpeech() {
-            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-                const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-                recognition = new SpeechRec();
-                
-                // Keep continuous true to prevent the constant start/stop beeping
-                recognition.continuous = true; 
-                recognition.interimResults = true;
-                
-                recognition.onresult = (e) => {
-                    let interimTranscript = '';
-                    let finalTranscript = '';
-
-                    for (let i = e.resultIndex; i < e.results.length; ++i) {
-                        let transcriptStr = e.results[i][0].transcript;
-                        
-                        if (e.results[i].isFinal) {
-                            // DEDUPLICATION: Ignore exact consecutive matches (The Android Bug Fix)
-                            if (transcriptStr.trim() === lastFinalizedText.trim()) continue;
-                            lastFinalizedText = transcriptStr;
-                            finalTranscript += transcriptStr;
-                        } else {
-                            interimTranscript += transcriptStr;
-                        }
-                    }
-
-                    const activeNode = document.querySelector('#activeUserNode .content-editable');
-                    const existingInterim = activeNode.querySelector('.interim-text');
-                    if (existingInterim) existingInterim.remove();
-
-                    if (finalTranscript) {
-                        // Formatting: ensure spacing after punctuation
-                        finalTranscript = finalTranscript.replace(/([.!?])([^\s])/g, '$1 $2');
-                        let currentText = activeNode.innerText.trim();
-                        if (currentText === '' || /[.!?]\s*$/.test(currentText)) {
-                            finalTranscript = finalTranscript.charAt(0).toUpperCase() + finalTranscript.slice(1);
-                        }
-
-                        // Add leading space if needed
-                        if (currentText !== '' && !currentText.endsWith(' ')) {
-                            finalTranscript = ' ' + finalTranscript;
-                        }
-
-                        activeNode.innerText += finalTranscript;
-                        autoSaveSession(); 
-                    }
-
-                    if (interimTranscript) {
-                        const span = document.createElement('span');
-                        span.className = 'interim-text';
-                        span.style.color = '#94a3b8';
-                        span.style.fontStyle = 'italic';
-                        span.innerText = " " + interimTranscript;
-                        activeNode.appendChild(span);
-                    }
-
-                    // AUTO-PUNCTUATION TIMER
-                    clearTimeout(autoPunctuateTimer);
-                    autoPunctuateTimer = setTimeout(() => {
-                        if (isRecording) {
-                            const node = document.querySelector('#activeUserNode .content-editable');
-                            let text = node.innerText.trim();
-                            if (text.length > 0 && !/[.!?,"']$/.test(text)) {
-                                node.innerText += '. ';
-                                autoSaveSession();
-                            }
-                        }
-                    }, 2000); 
-                };
-                
-                recognition.onerror = (e) => { console.warn("Speech Error:", e.error); };
-                
-                recognition.onend = () => { 
-                    if (isRecording) {
-                        try { recognition.start(); } catch (err) {}
-                    }
-                };
-            } else { 
-                alert("Speech Web API not supported. Use Google Chrome."); 
-            }
-        }
-
-        function toggleDictation() {
-            if (!recognition) return;
-            const btn = document.getElementById('dictateBtn');
-            if (isRecording) {
-                isRecording = false; 
-                clearTimeout(autoPunctuateTimer);
-                recognition.stop();
-                btn.innerHTML = '🎙️ Start Dictation'; btn.classList.remove('recording');
-                
-                const activeNode = document.querySelector('#activeUserNode .content-editable');
-                const existingInterim = activeNode.querySelector('.interim-text');
-                if (existingInterim) existingInterim.remove();
-            } else {
-                isRecording = true; 
-                lastFinalizedText = ""; // Reset memory cache on new recording
-                recognition.lang = document.getElementById('langSelect').value; 
-                try { recognition.start(); } catch(e){}
-                btn.innerHTML = '⏹️ Stop Dictation'; btn.classList.add('recording');
-            }
-        }
-
-        function addNewBubble() {
-            document.querySelectorAll('#activeUserNode').forEach(el => el.removeAttribute('id'));
-            const chat = document.getElementById('chatWindow');
-            const div = document.createElement('div');
-            div.className = 'message user-msg'; div.id = 'activeUserNode';
-            div.innerHTML = `<div class="msg-label">You (Dictation Draft)</div><div class="content-editable" contenteditable="true"></div>`;
-            chat.appendChild(div);
-            chat.scrollTop = chat.scrollHeight;
-            autoSaveSession();
-        }
-		
-        function toggleDictation() {
-            if (!recognition) return;
-            const btn = document.getElementById('dictateBtn');
-            if (isRecording) {
-                isRecording = false; 
-                clearTimeout(autoPunctuateTimer);
-                recognition.stop();
-                btn.innerHTML = '🎙️ Start Dictation'; btn.classList.remove('recording');
-                
-                const activeNode = document.querySelector('#activeUserNode .content-editable');
-                const existingInterim = activeNode.querySelector('.interim-text');
-                if (existingInterim) existingInterim.remove();
-            } else {
-                isRecording = true; 
-                recognition.lang = document.getElementById('langSelect').value; 
-                try { recognition.start(); } catch(e){}
-                btn.innerHTML = '⏹️ Stop Dictation'; btn.classList.add('recording');
-            }
-        }
-
-        function addNewBubble() {
-            document.querySelectorAll('#activeUserNode').forEach(el => el.removeAttribute('id'));
-            const chat = document.getElementById('chatWindow');
-            const div = document.createElement('div');
-            div.className = 'message user-msg'; div.id = 'activeUserNode';
-            div.innerHTML = `<div class="msg-label">You (Dictation Draft)</div><div class="content-editable" contenteditable="true"></div>`;
-            chat.appendChild(div);
-            chat.scrollTop = chat.scrollHeight;
-            autoSaveSession();
-        }
-
-        async function generateDocument() {
-            let fullText = "";
-            document.querySelectorAll('.user-msg .content-editable').forEach(el => fullText += el.innerText + "\n\n");
-            if(!fullText.trim()) return alert("No dictation text found. Please dictate or type something first.");
-
-            const instructions = document.getElementById('aiInstructions').value;
-            const docType = document.getElementById('sel_doctype').value;
-            const lang = document.getElementById('langSelect').options[document.getElementById('langSelect').selectedIndex].text;
-
-            const getContextText = (selId) => {
-                const val = document.getElementById(selId).value;
-                return (val && stenoData[val] && stenoData[val].text) ? stenoData[val].text : "";
-            };
-
-            let ctxStr = `Top Letterhead: ${getContextText('sel_lht')}\n`;
-            ctxStr += `Bottom Letterhead: ${getContextText('sel_lhb')}\n`;
-            ctxStr += `Signature Info: ${getContextText('sel_s')}\n`;
-
-            const prompt = `You are an expert document drafter and executive stenographer fluent in ${lang}.
-            
 TASK: Auto-draft ONLY the core BODY of a "${docType}".
 Do NOT include letterheads, headers, footers, or signatures (I will append those via the layout engine). 
 
@@ -901,218 +872,203 @@ STRICT OUTPUT RULES:
 2. The language must match the raw dictation unless the user instructions explicitly state otherwise.
 3. Use semantic HTML (<p>, <strong>, <ul>, <table>) so it renders perfectly in MS Word.`;
 
-            const btn = event.target;
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '⏳ Drafting via Server...'; btn.disabled = true;
+        const btn = event.target;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '⏳ Drafting via Server...'; btn.disabled = true;
 
-            try {
-                const customKey = stenoData['apikey'];
-                const headers = { 'Content-Type': 'application/json' };
-                if (customKey && customKey.trim().length > 10) {
-                    headers['X-Custom-Api-Key'] = customKey.trim();
-                }
-
-                const payload = {
-                    model: "gemini-1.5-flash",
-                    contents: [{ role: "user", parts: [{ text: "Please draft the document based on the system instructions." }] }],
-                    systemInstruction: { parts: [{ text: prompt }] }
-                };
-
-                const res = await fetch(PROXY_URL, {
-                    method: 'POST', 
-                    headers: headers,
-                    body: JSON.stringify(payload)
-                });
-                
-                if (!res.ok) throw new Error("API Error or Server Unreachable");
-                const data = await res.json();
-                
-                let aiHtml = data.candidates[0].content.parts[0].text.replace(/```html/gi, '').replace(/```/g, '').trim();
-
-                const chat = document.getElementById('chatWindow');
-                const div = document.createElement('div');
-                div.className = 'message ai-msg';
-                div.innerHTML = `<div class="msg-label">Steno AI (Final Body)</div><div class="content-editable final-ai-body" contenteditable="true">${aiHtml}</div>`;
-                chat.appendChild(div);
-                
-                document.getElementById('aiInstructions').value = "";
-                addNewBubble();
-                await autoSaveSession(); 
-
-            } catch (error) { 
-                console.error(error);
-                alert("Connection failed. Check API Key or Proxy Server."); 
-            } finally { 
-                btn.innerHTML = originalText; btn.disabled = false; 
+        try {
+            const customKey = stenoData['apikey'];
+            const headers = { 'Content-Type': 'application/json' };
+            if (customKey && customKey.trim().length > 10) {
+                headers['X-Custom-Api-Key'] = customKey.trim();
             }
-        }
 
-        // --- EXPORT ENGINE (WORD & PDF REBUILT FOR COMPATIBILITY) ---
-        // New Engine: Forces 1-inch margins on text, but allows images to span 100%
-        function getElementHTML(dropdownId, align = "left", forWord = false) {
-            const val = document.getElementById(dropdownId).value;
-            if (!val || !stenoData[val]) return { hasImg: false, html: "" };
-            const d = stenoData[val];
+            const payload = {
+                model: "gemini-1.5-flash",
+                contents: [{ role: "user", parts: [{ text: "Please draft the document based on the system instructions." }] }],
+                systemInstruction: { parts: [{ text: prompt }] }
+            };
+
+            const res = await fetch(PROXY_URL, {
+                method: 'POST', 
+                headers: headers,
+                body: JSON.stringify(payload)
+            });
             
-            let html = `<div style="margin-bottom: 15px; text-align: ${align};" align="${align}">`;
-            let hasImg = false;
+            if (!res.ok) throw new Error("API Error or Server Unreachable");
+            const data = await res.json();
             
-            if (d.img) {
-                // Images get 100% width and do NOT have the 96px side padding
-                html += `<img src="${d.img}" style="width: 100%; max-width: 100%; display: block; margin: 0;"><br>`;
-                hasImg = true;
-            }
-            if (d.text) {
-                let txt = d.text;
-                if (forWord) txt = txt.replace(/\n/g, '<br>');
-                // Only the independent top/bottom letterhead texts need their own padding injected here
-                let pad = (dropdownId === 'sel_lht' || dropdownId === 'sel_lhb') ? 'padding: 0 96px;' : '';
-                html += `<div style="white-space: pre-wrap; line-height: 1.4; ${pad}">${txt}</div>`;
-            }
-            html += `</div>`;
-            return { hasImg: hasImg, html: html };
-        }
+            let aiHtml = data.candidates[0].content.parts[0].text.replace(/```html/gi, '').replace(/```/g, '').trim();
 
-        // Modern layout for PDF & Preview
-        function assemblePDFDocument() {
-            const aiBodies = document.querySelectorAll('.final-ai-body');
-            let docBody = aiBodies.length > 0 ? aiBodies[aiBodies.length - 1].innerHTML : "<p style='color:red;'>No AI draft generated yet.</p>";
+            const chat = document.getElementById('chatWindow');
+            const div = document.createElement('div');
+            div.className = 'message ai-msg';
+            div.innerHTML = `<div class="msg-label">Steno AI (Final Body)</div><div class="content-editable final-ai-body" contenteditable="true">${aiHtml}</div>`;
+            chat.appendChild(div);
             
-            const bgVal = document.getElementById('sel_bg').value;
-            const bgStyle = (bgVal && stenoData[bgVal] && stenoData[bgVal].img) ? `background-image: url('${stenoData[bgVal].img}'); background-size: cover; background-position: center;` : "";
-            
-            const fontFam = document.getElementById('sel_font').value;
-            const fontSz = document.getElementById('sel_fontsize').value;
+            document.getElementById('aiInstructions').value = "";
+            addNewBubble();
+            await autoSaveSession(); 
 
-            let lht = getElementHTML('sel_lht', 'center', false);
-            let h = getElementHTML('sel_h', 'left', false);
-            let s = getElementHTML('sel_s', 'left', false);
-            let f = getElementHTML('sel_f', 'center', false);
-            let lhb = getElementHTML('sel_lhb', 'center', false);
-
-            // Add top 1-inch spacer ONLY if there is no full-bleed letterhead image
-            let topSpacing = lht.hasImg ? '0px' : '96px';
-            let botSpacing = lhb.hasImg ? '0px' : '96px';
-
-            return `
-                <div style="font-family: ${fontFam}; font-size: ${fontSz}; position: relative; min-height: 1056px; color: #000; background: white; padding-top: ${topSpacing}; padding-bottom: ${botSpacing};">
-                    <div style="position: absolute; top:0; left:0; right:0; bottom:0; opacity: 0.15; z-index: 0; pointer-events: none; ${bgStyle}"></div>
-                    <div style="position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100%;">
-                        ${lht.html}
-                        
-                        <div style="padding: 0 96px; flex: 1; display: flex; flex-direction: column;">
-                            ${h.html ? `<div style="border-bottom: 2px solid #000; margin-bottom: 20px;">${h.html}</div>` : ''}
-                            
-                            <div style="flex: 1; line-height: 1.6;">${docBody}</div>
-                            
-                            <div style="margin-top: 40px;">
-                                <div style="display: flex; justify-content: flex-end;"><div style="width: 300px;">${s.html}</div></div>
-                                ${f.html ? `<div style="border-top: 1px solid #ccc; margin-top: 20px; padding-top: 10px; font-size: 9pt;">${f.html}</div>` : ''}
-                            </div>
-                        </div>
-                        
-                        ${lhb.html}
-                    </div>
-                </div>`;
+        } catch (error) { 
+            console.error(error);
+            alert("Connection failed. Check API Key or Proxy Server."); 
+        } finally { 
+            btn.innerHTML = originalText; btn.disabled = false; 
         }
+    }
 
-        // 1999-Era Table layout for MS Word Compatibility
-        function assembleWordDocument() {
-            const aiBodies = document.querySelectorAll('.final-ai-body');
-            let docBody = aiBodies.length > 0 ? aiBodies[aiBodies.length - 1].innerHTML : "<p>No AI draft generated yet.</p>";
-
-            const fontFam = document.getElementById('sel_font').value;
-            const fontSz = document.getElementById('sel_fontsize').value;
-
-            let lht = getElementHTML('sel_lht', 'center', true);
-            let h = getElementHTML('sel_h', 'left', true);
-            let s = getElementHTML('sel_s', 'left', true);
-            let f = getElementHTML('sel_f', 'center', true);
-            let lhb = getElementHTML('sel_lhb', 'center', true);
-
-            let topSpacing = lht.hasImg ? '0px' : '96px';
-            let botSpacing = lhb.hasImg ? '0px' : '96px';
-
-            return `
-                <div style="font-family: ${fontFam}; font-size: ${fontSz}; color: #000; background: white; padding-top: ${topSpacing}; padding-bottom: ${botSpacing};">
-                    <div align="center" style="text-align: center;">${lht.html}</div>
-                    
-                    <div style="padding: 0 96px;">
-                        ${h.html ? `<div style="border-bottom: 1px solid #000; margin-bottom: 20px;">${h.html}</div>` : ''}
-                        
-                        <div style="line-height: 1.5; margin-bottom: 30px;">${docBody}</div>
-                        
-                        <table width="100%" border="0" cellpadding="0" cellspacing="0" style="margin-top: 30px;">
-                            <tr>
-                                <td width="60%"></td>
-                                <td width="40%" align="left" valign="top">${s.html}</td>
-                            </tr>
-                        </table>
-                        
-                        ${f.html ? `<div align="center" style="border-top: 1px solid #ccc; padding-top: 10px; margin-top: 20px; text-align: center;">${f.html}</div>` : ''}
-                    </div>
-
-                    <div align="center" style="text-align: center; margin-top: 10px;">${lhb.html}</div>
-                </div>`;
-        }
-
-        function previewDoc() { 
-            document.getElementById('finalDocumentContainer').innerHTML = assemblePDFDocument(); 
-            openModal('previewModal'); 
-        }
+    // ==========================================
+    // EXPORT ENGINE (WORD & PDF)
+    // ==========================================
+    function getElementHTML(dropdownId, align = "left", forWord = false) {
+        const val = document.getElementById(dropdownId).value;
+        if (!val || !stenoData[val]) return { hasImg: false, html: "" };
+        const d = stenoData[val];
         
-        function downloadPDF() {
-            const el = document.createElement('div'); 
-            el.innerHTML = assemblePDFDocument(); 
-            document.body.appendChild(el);
+        let html = `<div style="margin-bottom: 15px; text-align: ${align};" align="${align}">`;
+        let hasImg = false;
+        
+        if (d.img) {
+            html += `<img src="${d.img}" style="width: 100%; max-width: 100%; display: block; margin: 0;"><br>`;
+            hasImg = true;
+        }
+        if (d.text) {
+            let txt = d.text;
+            if (forWord) txt = txt.replace(/\n/g, '<br>');
+            let pad = (dropdownId === 'sel_lht' || dropdownId === 'sel_lhb') ? 'padding: 0 96px;' : '';
+            html += `<div style="white-space: pre-wrap; line-height: 1.4; ${pad}">${txt}</div>`;
+        }
+        html += `</div>`;
+        return { hasImg: hasImg, html: html };
+    }
 
-            const fitMode = document.getElementById('sel_pdf_fit').value;
-            const pageSize = document.getElementById('sel_pagesize').value;
-            const orientation = document.getElementById('sel_orientation').value;
+    function assemblePDFDocument() {
+        const aiBodies = document.querySelectorAll('.final-ai-body');
+        let docBody = aiBodies.length > 0 ? aiBodies[aiBodies.length - 1].innerHTML : "<p style='color:red;'>No AI draft generated yet.</p>";
+        
+        const bgVal = document.getElementById('sel_bg').value;
+        const bgStyle = (bgVal && stenoData[bgVal] && stenoData[bgVal].img) ? `background-image: url('${stenoData[bgVal].img}'); background-size: cover; background-position: center;` : "";
+        
+        const fontFam = document.getElementById('sel_font').value;
+        const fontSz = document.getElementById('sel_fontsize').value;
 
-            // Important: Margin is strictly 0 here because our CSS already handles the 1-inch indent perfectly.
-            let jsPDFOpts = { unit: 'in', format: pageSize, orientation: orientation };
+        let lht = getElementHTML('sel_lht', 'center', false);
+        let h = getElementHTML('sel_h', 'left', false);
+        let s = getElementHTML('sel_s', 'left', false);
+        let f = getElementHTML('sel_f', 'center', false);
+        let lhb = getElementHTML('sel_lhb', 'center', false);
 
-            // Fit-to-1-Page Engine
-            if (fitMode === 'single') {
-                const elHeightPx = el.scrollHeight;
-                const elWidthPx = el.scrollWidth;
-                jsPDFOpts = { unit: 'in', format: [elWidthPx / 96, elHeightPx / 96], orientation: orientation };
-            }
+        let topSpacing = lht.hasImg ? '0px' : '96px';
+        let botSpacing = lhb.hasImg ? '0px' : '96px';
 
-            html2pdf().set({ 
-                margin: 0, 
-                filename: 'Document.pdf', 
-                image: { type: 'jpeg', quality: 0.98 }, 
-                html2canvas: { scale: 2, useCORS: true }, 
-                jsPDF: jsPDFOpts 
-            }).from(el).save().then(() => document.body.removeChild(el));
+        return `
+            <div style="font-family: ${fontFam}; font-size: ${fontSz}; position: relative; min-height: 1056px; color: #000; background: white; padding-top: ${topSpacing}; padding-bottom: ${botSpacing};">
+                <div style="position: absolute; top:0; left:0; right:0; bottom:0; opacity: 0.15; z-index: 0; pointer-events: none; ${bgStyle}"></div>
+                <div style="position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100%;">
+                    ${lht.html}
+                    <div style="padding: 0 96px; flex: 1; display: flex; flex-direction: column;">
+                        ${h.html ? `<div style="border-bottom: 2px solid #000; margin-bottom: 20px;">${h.html}</div>` : ''}
+                        <div style="flex: 1; line-height: 1.6;">${docBody}</div>
+                        <div style="margin-top: 40px;">
+                            <div style="display: flex; justify-content: flex-end;"><div style="width: 300px;">${s.html}</div></div>
+                            ${f.html ? `<div style="border-top: 1px solid #ccc; margin-top: 20px; padding-top: 10px; font-size: 9pt;">${f.html}</div>` : ''}
+                        </div>
+                    </div>
+                    ${lhb.html}
+                </div>
+            </div>`;
+    }
+
+    function assembleWordDocument() {
+        const aiBodies = document.querySelectorAll('.final-ai-body');
+        let docBody = aiBodies.length > 0 ? aiBodies[aiBodies.length - 1].innerHTML : "<p>No AI draft generated yet.</p>";
+
+        const fontFam = document.getElementById('sel_font').value;
+        const fontSz = document.getElementById('sel_fontsize').value;
+
+        let lht = getElementHTML('sel_lht', 'center', true);
+        let h = getElementHTML('sel_h', 'left', true);
+        let s = getElementHTML('sel_s', 'left', true);
+        let f = getElementHTML('sel_f', 'center', true);
+        let lhb = getElementHTML('sel_lhb', 'center', true);
+
+        let topSpacing = lht.hasImg ? '0px' : '96px';
+        let botSpacing = lhb.hasImg ? '0px' : '96px';
+
+        return `
+            <div style="font-family: ${fontFam}; font-size: ${fontSz}; color: #000; background: white; padding-top: ${topSpacing}; padding-bottom: ${botSpacing};">
+                <div align="center" style="text-align: center;">${lht.html}</div>
+                <div style="padding: 0 96px;">
+                    ${h.html ? `<div style="border-bottom: 1px solid #000; margin-bottom: 20px;">${h.html}</div>` : ''}
+                    <div style="line-height: 1.5; margin-bottom: 30px;">${docBody}</div>
+                    <table width="100%" border="0" cellpadding="0" cellspacing="0" style="margin-top: 30px;">
+                        <tr>
+                            <td width="60%"></td>
+                            <td width="40%" align="left" valign="top">${s.html}</td>
+                        </tr>
+                    </table>
+                    ${f.html ? `<div align="center" style="border-top: 1px solid #ccc; padding-top: 10px; margin-top: 20px; text-align: center;">${f.html}</div>` : ''}
+                </div>
+                <div align="center" style="text-align: center; margin-top: 10px;">${lhb.html}</div>
+            </div>`;
+    }
+
+    function previewDoc() { 
+        document.getElementById('finalDocumentContainer').innerHTML = assemblePDFDocument(); 
+        openModal('previewModal'); 
+    }
+    
+    function downloadPDF() {
+        const el = document.createElement('div'); 
+        el.innerHTML = assemblePDFDocument(); 
+        document.body.appendChild(el);
+
+        const fitMode = document.getElementById('sel_pdf_fit').value;
+        const pageSize = document.getElementById('sel_pagesize').value;
+        const orientation = document.getElementById('sel_orientation').value;
+
+        let jsPDFOpts = { unit: 'in', format: pageSize, orientation: orientation };
+
+        if (fitMode === 'single') {
+            const elHeightPx = el.scrollHeight;
+            const elWidthPx = el.scrollWidth;
+            jsPDFOpts = { unit: 'in', format: [elWidthPx / 96, elHeightPx / 96], orientation: orientation };
         }
 
-        function downloadWord() {
-            const wordHtml = `
-            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
-            <head>
-                <meta charset="utf-8">
-                <title>Exported Document</title>
-                <xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml>
-            </head>
-            <body>
-                ${assembleWordDocument()}
-            </body>
-            </html>`;
+        html2pdf().set({ 
+            margin: 0, 
+            filename: 'Document.pdf', 
+            image: { type: 'jpeg', quality: 0.98 }, 
+            html2canvas: { scale: 2, useCORS: true }, 
+            jsPDF: jsPDFOpts 
+        }).from(el).save().then(() => document.body.removeChild(el));
+    }
 
-            const src = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(wordHtml);
-            const a = document.createElement("a"); 
-            a.href = src; 
-            a.download = 'Document.doc'; 
-            document.body.appendChild(a); 
-            a.click(); 
-            document.body.removeChild(a);
-        }
+    function downloadWord() {
+        const wordHtml = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+            <meta charset="utf-8">
+            <title>Exported Document</title>
+            <xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml>
+        </head>
+        <body>
+            ${assembleWordDocument()}
+        </body>
+        </html>`;
 
-        function openModal(id) { document.getElementById(id).style.display = 'flex'; }
-        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        const src = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(wordHtml);
+        const a = document.createElement("a"); 
+        a.href = src; 
+        a.download = 'Document.doc'; 
+        document.body.appendChild(a); 
+        a.click(); 
+        document.body.removeChild(a);
+    }
+
+    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
     </script>
 </body>
 </html>
