@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expert TTS Synthesizer</title>
+    <style>
+        :root {
+            --bg-color: #f4f4f9;
+            --container-bg: #ffffff;
+            --text-color: #333;
+            --border-color: #ccc;
+            --primary-btn: #007bff;
+            --primary-hover: #0056b3;
+            --danger-btn: #dc3545;
+            --danger-hover: #c82333;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .app-container {
+            background: var(--container-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 500px;
+        }
+
+        h2 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-weight: 600;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+
+        textarea {
+            width: 100%;
+            height: 120px;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            resize: vertical;
+            font-family: inherit;
+            box-sizing: border-box;
+        }
+
+        select {
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 1rem;
+            background-color: #fff;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        #play-btn { background-color: var(--primary-btn); }
+        #play-btn:hover { background-color: var(--primary-hover); }
+        
+        #stop-btn { background-color: var(--danger-btn); }
+        #stop-btn:hover { background-color: var(--danger-hover); }
+
+        .status {
+            margin-top: 15px;
+            font-size: 0.85rem;
+            color: #666;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <h2>Speech Synthesizer</h2>
+    
+    <div class="form-group">
+        <label for="text-input">Text to Speak</label>
+        <textarea id="text-input" placeholder="Enter text here...">Hello! I am your advanced text to speech assistant. How can I help you today?</textarea>
+    </div>
+
+    <div class="form-group">
+        <label for="lang-select">Language</label>
+        <select id="lang-select">
+            <option value="">Loading languages...</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="voice-select">Available Voices</label>
+        <select id="voice-select">
+            <option value="">Waiting for language selection...</option>
+        </select>
+    </div>
+
+    <div class="controls">
+        <button id="play-btn">Speak</button>
+        <button id="stop-btn">Stop</button>
+    </div>
+    
+    <div class="status" id="status-text">System Ready</div>
+</div>
+
+<script>
+    const synth = window.speechSynthesis;
+    let availableVoices = [];
+    
+    // DOM Elements
+    const textInput = document.getElementById('text-input');
+    const langSelect = document.getElementById('lang-select');
+    const voiceSelect = document.getElementById('voice-select');
+    const playBtn = document.getElementById('play-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    const statusText = document.getElementById('status-text');
+
+    /**
+     * Core functionality: Fetch voices, extract languages, and populate dropdowns.
+     */
+    function initVoices() {
+        availableVoices = synth.getVoices();
+        
+        if (availableVoices.length === 0) return; // Wait for voiceschanged event
+
+        // 1. Extract unique languages from the available voices
+        const uniqueLanguages = [...new Set(availableVoices.map(voice => voice.lang))].sort();
+
+        // 2. Populate Language Dropdown
+        const currentLang = langSelect.value; // Save current selection if re-rendering
+        langSelect.innerHTML = ''; 
+        
+        uniqueLanguages.forEach(lang => {
+            const option = document.createElement('option');
+            option.textContent = lang;
+            option.value = lang;
+            langSelect.appendChild(option);
+        });
+
+        // Try to set a sensible default (e.g., user's browser language or English)
+        if (currentLang && uniqueLanguages.includes(currentLang)) {
+            langSelect.value = currentLang;
+        } else if (uniqueLanguages.includes('en-US')) {
+            langSelect.value = 'en-US';
+        }
+
+        // 3. Populate Voices based on the selected language
+        updateVoiceList();
+    }
+
+    /**
+     * Filters the voice dropdown based on the selected language.
+     */
+    function updateVoiceList() {
+        const selectedLang = langSelect.value;
+        voiceSelect.innerHTML = '';
+
+        const filteredVoices = availableVoices.filter(voice => voice.lang === selectedLang);
+
+        filteredVoices.forEach(voice => {
+            const option = document.createElement('option');
+            // Distinguish Local vs Network (Cloud) voices for expert UX
+            const type = voice.localService ? 'Local' : 'Network';
+            option.textContent = `${voice.name} (${type})`;
+            option.value = voice.voiceURI;
+            // Set default voice for this language
+            if (voice.default) option.selected = true;
+            voiceSelect.appendChild(option);
+        });
+        
+        if (filteredVoices.length === 0) {
+            voiceSelect.innerHTML = '<option value="">No voices available for this language</option>';
+        }
+    }
+
+    /**
+     * Handles the text-to-speech execution.
+     */
+    function speakText() {
+        if (synth.speaking) {
+            console.warn("Already speaking. Stopping current speech to start new one.");
+            synth.cancel(); 
+        }
+
+        const text = textInput.value.trim();
+        if (text === '') {
+            statusText.textContent = "Please enter some text.";
+            return;
+        }
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        
+        // Find the specific voice object based on the selected voiceURI
+        const selectedVoiceURI = voiceSelect.value;
+        const selectedVoice = availableVoices.find(voice => voice.voiceURI === selectedVoiceURI);
+        
+        if (selectedVoice) {
+            utterance.voice = selectedVoice;
+            utterance.lang = selectedVoice.lang;
+        }
+
+        // Event Listeners for UI feedback
+        utterance.onstart = () => {
+            statusText.textContent = "Speaking...";
+            playBtn.disabled = true;
+        };
+        
+        utterance.onend = () => {
+            statusText.textContent = "Finished speaking.";
+            playBtn.disabled = false;
+        };
+        
+        utterance.onerror = (e) => {
+            console.error("Speech synthesis error", e);
+            statusText.textContent = "Error occurred during playback.";
+            playBtn.disabled = false;
+        };
+
+        // Execute speech
+        synth.speak(utterance);
+    }
+
+    // --- Event Listeners ---
+
+    // The most important event for TTS: ensuring voices are loaded
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+        speechSynthesis.onvoiceschanged = initVoices;
+    }
+    
+    // Fallback for browsers that load instantly (Safari sometimes)
+    initVoices(); 
+
+    langSelect.addEventListener('change', updateVoiceList);
+    
+    playBtn.addEventListener('click', speakText);
+    
+    stopBtn.addEventListener('click', () => {
+        synth.cancel();
+        statusText.textContent = "Speech stopped.";
+        playBtn.disabled = false;
+    });
+
+</script>
+</body>
+</html>
