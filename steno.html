@@ -17,10 +17,20 @@
         
         /* Navbar */
         .navbar { background: var(--primary); color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.1); flex-wrap: wrap; gap: 10px; }
-        .navbar h1 { margin: 0; font-size: 1.2rem; font-weight: 600; letter-spacing: 0.5px; display: flex; align-items: center; gap: 10px; }
-        .session-badge { background: var(--success); font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; display: none; }
+        .navbar-brand { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+        .navbar h1 { margin: 0; font-size: 1.2rem; font-weight: 600; letter-spacing: 0.5px; }
         
-        .nav-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+        /* Profile UI */
+        .profile-widget { display: flex; align-items: center; gap: 5px; background: rgba(255, 255, 255, 0.1); padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.2); }
+        .profile-widget span { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; color: #cbd5e1; font-weight: 600; }
+        .profile-widget select { background: transparent; border: none; color: white; font-size: 0.8rem; font-weight: 600; outline: none; cursor: pointer; padding: 0 4px; }
+        .profile-widget select option { background: var(--primary); color: white; }
+        .profile-widget button { background: var(--success); color: white; border: none; border-radius: 4px; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; padding: 0; }
+        .profile-widget button:hover { background: #059669; }
+
+        .session-badge { background: var(--success); font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; display: none; font-weight: 600; }
+        
+        .nav-controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
         button, select, input[type="text"], input[type="password"] { padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; outline: none; background: white; }
         button { background: var(--accent); color: white; border: none; cursor: pointer; font-weight: 500; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 5px; }
         button:hover { background: var(--accent-hover); }
@@ -32,7 +42,7 @@
         .main-workspace { display: flex; flex-direction: column; flex: 1; overflow: hidden; position: relative; }
         
         /* Config Strip */
-        .config-strip { background: var(--panel-bg); padding: 10px 15px; border-bottom: 1px solid var(--border); display: flex; gap: 10px; overflow-x: auto; white-space: nowrap; scrollbar-width: thin; }
+        .config-strip { background: var(--panel-bg); padding: 10px 15px; border-bottom: 1px solid var(--border); display: flex; gap: 10px; overflow-x: auto; white-space: nowrap; scrollbar-width: thin; transition: all 0.2s ease-in-out; }
         .config-strip::-webkit-scrollbar { height: 6px; }
         .config-strip::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         .config-item { display: flex; flex-direction: column; gap: 3px; }
@@ -109,14 +119,20 @@
     </div>
         
     <div class="navbar">
-        <h1 style="display: flex; gap: 10px; align-items: center;">
-            Steno Pro 
-            <select id="profileSelect" onchange="switchProfile()" style="font-size: 0.8rem; padding: 4px; background: #334155; color: white; border-color: #475569;"></select>
-            <button onclick="createNewProfile()" style="padding: 4px 8px; font-size: 0.8rem; background: var(--success);">+</button>
+        <div class="navbar-brand">
+            <h1>Steno Pro</h1>
+            
+            <div class="profile-widget">
+                <span>Profile:</span>
+                <select id="profileSelect" onchange="switchProfile()"></select>
+                <button onclick="createNewProfile()" title="Create New Profile">+</button>
+            </div>
+            
             <span class="session-badge" id="sessionBadge">Active</span>
-        </h1>
+        </div>
+
         <div class="nav-controls">
-		<button class="secondary" onclick="toggleConfigStrip()" style="background: var(--bg-color); font-size: 1rem; padding: 4px 10px;" title="Toggle Document Formatting">🔧</button>
+            <button class="secondary" onclick="toggleConfigStrip()" style="background: var(--bg-color); font-size: 1rem; padding: 4px 10px;" title="Toggle Document Formatting">🔧</button>
             <button class="secondary" onclick="startNewSession()" style="background: var(--bg-color);">📝 New Session</button>
             <button class="secondary" onclick="openHistoryModal()" style="background: var(--bg-color);">🕒 History</button>
             <select id="langSelect" style="padding: 4px 8px; font-size: 0.8rem;">
@@ -140,8 +156,7 @@
     </div>
 
     <div class="main-workspace">
-        <div class="config-strip">
-		<div class="config-strip" id="configStrip" style="display: none;">
+        <div class="config-strip" id="configStrip" style="display: none;">
             <div class="config-item">
                 <label>Doc Type</label>
                 <select id="sel_doctype">
@@ -242,7 +257,6 @@
     </div>
 
     <script>
-    
     // ==========================================
     // KIOSK MODE / SECURITY LOCKDOWN SCRIPT
     // ==========================================
@@ -272,6 +286,13 @@
             else if (docElm.webkitRequestFullscreen) docElm.webkitRequestFullscreen().catch(() => {});
         }
     }
+
+    // OVERLAY CLICK LISTENER (FIXED)
+    document.getElementById('start-overlay').addEventListener('click', function() {
+        this.style.display = 'none';
+        enforceFullscreen();
+        requestWakeLock();
+    });
 
     ['click', 'touchstart'].forEach(evt => {
         window.addEventListener(evt, () => {
@@ -530,19 +551,10 @@
         ];
 
         let appData = { activeProfile: "Default", profiles: { "Default": {} } };
-        let stenoData = {}; // Points to the active profile's data
+        let stenoData = {}; 
         let recognition = null;
         let isRecording = false;
         let autoPunctuateTimer = null;
-
-        // --- FULLSCREEN & WAKE LOCK OVERLAY TRIGGER ---
-        document.getElementById('start-overlay').addEventListener('click', function() {
-            this.style.display = 'none';
-            enforceFullscreen();
-            requestWakeLock();
-            // Unlock Audio context if needed
-            try { const AudioContext = window.AudioContext || window.webkitAudioContext; new AudioContext().resume(); } catch(e){}
-        });
 
         window.onload = async () => {
             if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
@@ -587,15 +599,6 @@
             }
         }
 
-		function toggleConfigStrip() {
-            const strip = document.getElementById('configStrip');
-            if (strip.style.display === 'none' || strip.style.display === '') {
-                strip.style.display = 'flex'; // Shows the strip
-            } else {
-                strip.style.display = 'none'; // Hides the strip
-            }
-        }
-		
         function switchProfile(forceName = null) {
             const sel = document.getElementById('profileSelect');
             const targetProfile = forceName || sel.value;
@@ -666,6 +669,7 @@
             };
             reader.readAsDataURL(input.files[0]);
         }
+        
         function clearImage(id) { document.getElementById(`b64_${id}`).value = ''; document.getElementById(`img_preview_${id}`).style.display = 'none'; }
 
         function saveAllSettings() {
@@ -680,6 +684,16 @@
             closeModal('settingsModal');
         }
 
+        // --- UI TOGGLES ---
+        function toggleConfigStrip() {
+            const strip = document.getElementById('configStrip');
+            if (strip.style.display === 'none' || strip.style.display === '') {
+                strip.style.display = 'flex';
+            } else {
+                strip.style.display = 'none';
+            }
+        }
+
         // --- 6. DICTATION ENGINE (FIXED BEEPING & ADDED AUTO-PUNCTUATION) ---
         let lastResultIndex = 0;
 
@@ -688,7 +702,6 @@
                 const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
                 recognition = new SpeechRec();
                 
-                // Keep continuous true to prevent the constant start/stop beeping
                 recognition.continuous = true; 
                 recognition.interimResults = true;
                 
@@ -696,7 +709,6 @@
                     let interimTranscript = '';
                     let finalTranscript = '';
 
-                    // Deduplication logic using resultIndex
                     for (let i = e.resultIndex; i < e.results.length; ++i) {
                         if (e.results[i].isFinal) {
                             finalTranscript += e.results[i][0].transcript;
@@ -710,16 +722,12 @@
                     if (existingInterim) existingInterim.remove();
 
                     if (finalTranscript) {
-                        // Formatting: ensure spacing after punctuation
                         finalTranscript = finalTranscript.replace(/([.!?])([^\s])/g, '$1 $2');
-                        
-                        // Capitalize first letter if it's the start of a new sentence
                         let currentText = activeNode.innerText.trim();
                         if (currentText === '' || /[.!?]\s*$/.test(currentText)) {
                             finalTranscript = finalTranscript.charAt(0).toUpperCase() + finalTranscript.slice(1);
                         }
 
-                        // Add leading space if needed
                         if (currentText !== '' && !currentText.endsWith(' ')) {
                             finalTranscript = ' ' + finalTranscript;
                         }
@@ -737,19 +745,17 @@
                         activeNode.appendChild(span);
                     }
 
-                    // AUTO-PUNCTUATION TIMER
                     clearTimeout(autoPunctuateTimer);
                     autoPunctuateTimer = setTimeout(() => {
                         if (isRecording) {
                             const node = document.querySelector('#activeUserNode .content-editable');
                             let text = node.innerText.trim();
-                            // If it doesn't end in punctuation, append a full stop
                             if (text.length > 0 && !/[.!?,"']$/.test(text)) {
                                 node.innerText += '. ';
                                 autoSaveSession();
                             }
                         }
-                    }, 2000); // 2 seconds of silence adds a period
+                    }, 2000); 
                 };
                 
                 recognition.onerror = (e) => { 
@@ -757,8 +763,6 @@
                 };
                 
                 recognition.onend = () => { 
-                    // If the user hasn't clicked Stop, but Android killed the mic (usually after 15s of silence), restart it.
-                    // Note: This WILL cause a beep, but only after long silences, not constantly.
                     if (isRecording) {
                         try { recognition.start(); } catch (err) {}
                     }
@@ -846,14 +850,12 @@ STRICT OUTPUT RULES:
             btn.innerHTML = '⏳ Drafting via Server...'; btn.disabled = true;
 
             try {
-                // Setup API Proxy Logic
                 const customKey = stenoData['apikey'];
                 const headers = { 'Content-Type': 'application/json' };
                 if (customKey && customKey.trim().length > 10) {
                     headers['X-Custom-Api-Key'] = customKey.trim();
                 }
 
-                // Payload structurally expected by the proxy to pass to Gemini
                 const payload = {
                     model: "gemini-1.5-flash",
                     contents: [{ role: "user", parts: [{ text: "Please draft the document based on the system instructions." }] }],
@@ -869,7 +871,6 @@ STRICT OUTPUT RULES:
                 if (!res.ok) throw new Error("API Error or Server Unreachable");
                 const data = await res.json();
                 
-                // Clean the output
                 let aiHtml = data.candidates[0].content.parts[0].text.replace(/```html/gi, '').replace(/```/g, '').trim();
 
                 const chat = document.getElementById('chatWindow');
