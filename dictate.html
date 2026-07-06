@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Steno Pro: AI Document Architect</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        :root {
+            --primary: #0f172a; --primary-hover: #334155; --accent: #2563eb; --accent-hover: #1d4ed8;
+            --success: #10b981; --warning: #f59e0b; --danger: #ef4444; --bg-color: #f8fafc;
+            --panel-bg: #ffffff; --border: #e2e8f0; --text: #1e293b; --text-light: #64748b;
+        }
+        
+        * { box-sizing: border-box; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        body { margin: 0; padding: 0; background-color: var(--bg-color); color: var(--text); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        
+        /* Navbar */
+        .navbar { background: var(--primary); color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.1); flex-wrap: wrap; gap: 10px; }
+        .navbar h1 { margin: 0; font-size: 1.2rem; font-weight: 600; letter-spacing: 0.5px; display: flex; align-items: center; gap: 10px; }
+        .session-badge { background: var(--success); font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; display: none; }
+        
+        .nav-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+        button, select, input[type="text"] { padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; outline: none; background: white; }
+        button { background: var(--accent); color: white; border: none; cursor: pointer; font-weight: 500; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 5px; }
+        button:hover { background: var(--accent-hover); }
+        button.secondary { background: #e2e8f0; color: var(--text); border: 1px solid #cbd5e1; }
+        button.secondary:hover { background: #cbd5e1; }
+        button.danger { background: var(--danger); color: white; }
+        
+        /* Main Layout */
+        .main-workspace { display: flex; flex-direction: column; flex: 1; overflow: hidden; position: relative; }
+        
+        /* Config Strip */
+        .config-strip { background: var(--panel-bg); padding: 10px 15px; border-bottom: 1px solid var(--border); display: flex; gap: 10px; overflow-x: auto; white-space: nowrap; scrollbar-width: thin; }
+        .config-strip::-webkit-scrollbar { height: 6px; }
+        .config-strip::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .config-item { display: flex; flex-direction: column; gap: 3px; }
+        .config-item label { font-size: 0.7rem; font-weight: 600; color: var(--text-light); text-transform: uppercase; }
+        
+        /* Chat Window */
+        .chat-container { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; scroll-behavior: smooth; }
+        .message { padding: 15px 20px; border-radius: 8px; max-width: 90%; line-height: 1.6; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .user-msg { background: #eff6ff; border: 1px solid #bfdbfe; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .ai-msg { background: #ffffff; border: 1px solid var(--border); align-self: flex-start; border-bottom-left-radius: 2px; width: 95%; }
+        .ai-msg table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        .ai-msg th, .ai-msg td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; }
+        .ai-msg th { background: #f8fafc; font-weight: bold; }
+        
+        .msg-label { font-size: 0.7rem; font-weight: bold; color: var(--text-light); margin-bottom: 8px; text-transform: uppercase; }
+        .content-editable { outline: none; min-height: 20px; }
+        .content-editable:focus { box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2); border-radius: 4px; }
+
+        /* Bottom Controls */
+        .controls-panel { background: var(--panel-bg); border-top: 1px solid var(--border); padding: 15px; display: flex; flex-direction: column; gap: 10px; z-index: 5; }
+        .input-row { display: flex; gap: 10px; }
+        .input-row input { flex: 1; }
+        .action-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+        .recording { background: #ef4444 !important; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } }
+
+        /* Modals */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 100; justify-content: center; align-items: center; padding: 20px; backdrop-filter: blur(2px); }
+        .modal-content { background: var(--bg-color); width: 100%; max-width: 600px; max-height: 90vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .modal-content.large { max-width: 900px; }
+        .modal-header { padding: 15px 20px; background: white; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+        
+        /* Settings Elements */
+        details { background: white; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+        summary { padding: 12px 15px; font-weight: 600; cursor: pointer; background: #f8fafc; list-style: none; display: flex; justify-content: space-between; }
+        summary::-webkit-details-marker { display: none; }
+        summary:after { content: "▼"; font-size: 0.8rem; color: var(--text-light); }
+        details[open] summary:after { content: "▲"; }
+        .details-content { padding: 15px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 15px; }
+        .setup-block { border: 1px dashed #cbd5e1; padding: 12px; border-radius: 6px; background: #fafafa; }
+        .setup-block textarea { width: 100%; min-height: 60px; margin-bottom: 10px; resize: vertical; padding: 8px; border: 1px solid var(--border); border-radius: 4px; }
+        .file-upload { font-size: 0.8rem; display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
+        .img-preview { max-height: 50px; border-radius: 4px; display: none; border: 1px solid var(--border); }
+
+        /* History Elements */
+        .history-group { margin-bottom: 20px; }
+        .history-date { font-weight: bold; color: var(--text-light); margin-bottom: 10px; border-bottom: 2px solid var(--border); padding-bottom: 5px; }
+        .history-item { background: white; padding: 15px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .history-info { flex: 1; }
+        .history-preview { font-size: 0.85rem; color: var(--text-light); margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px; }
+        .history-actions { display: flex; gap: 5px; }
+
+        .page-sheet { background: white; width: 100%; max-width: 816px; min-height: 1056px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin: 0 auto; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+        .page-sheet table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 15px; }
+        .page-sheet th, .page-sheet td { border: 1px solid #333; padding: 10px; }
+
+        @media (max-width: 768px) {
+            .input-row { flex-direction: column; }
+            .btn-group { width: 100%; }
+            .btn-group button { flex: 1; }
+            .navbar { flex-direction: column; align-items: flex-start; }
+            .nav-controls { width: 100%; justify-content: space-between; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Navbar -->
+    <div class="navbar">
+        <h1>Steno Pro <span class="session-badge" id="sessionBadge">Active</span></h1>
+        <div class="nav-controls">
+            <button class="secondary" onclick="startNewSession()" style="background: var(--bg-color);">📝 New Session</button>
+            <button class="secondary" onclick="openHistoryModal()" style="background: var(--bg-color);">🕒 History</button>
+            <select id="langSelect" style="padding: 4px 8px; font-size: 0.8rem;">
+                <option value="mr-IN" selected>Marathi (मराठी)</option>
+                <option value="hi-IN">Hindi (हिन्दी)</option>
+                <option value="en-IN">English (India)</option>
+                <option value="en-US">English (US)</option>
+                <!-- Add other languages as needed -->
+            </select>
+            <button class="secondary" onclick="openModal('settingsModal')" style="padding: 4px 12px;">⚙️ Settings</button>
+        </div>
+    </div>
+
+    <!-- Main Workspace -->
+    <div class="main-workspace">
+        <div class="config-strip">
+            <div class="config-item"><label>Doc Type</label><select id="sel_doctype"><option>Formal Letter</option><option>Notice</option><option>Basic Invoice</option><option>Doctor Prescription</option><option>SMS</option><option>Report</option></select></div>
+            <div class="config-item"><label>Letterhead Top</label><select id="sel_lht"><option value="">None</option><option value="lht1">Option 1</option></select></div>
+            <div class="config-item"><label>Header</label><select id="sel_h"><option value="">None</option><option value="h1">H1</option></select></div>
+            <div class="config-item"><label>Footer</label><select id="sel_f"><option value="">None</option><option value="f1">F1</option></select></div>
+            <div class="config-item"><label>Signature</label><select id="sel_s"><option value="">None</option><option value="s1">S1</option></select></div>
+            <div class="config-item"><label>Letterhead Bot</label><select id="sel_lhb"><option value="">None</option><option value="lhb1">Option 1</option></select></div>
+            <div class="config-item"><label>Background</label><select id="sel_bg"><option value="">None</option><option value="bg1">BG 1</option></select></div>
+        </div>
+
+        <div class="chat-container" id="chatWindow">
+            <div class="message user-msg" id="activeUserNode">
+                <div class="msg-label">You (Dictation Draft)</div>
+                <div class="content-editable" contenteditable="true"></div>
+            </div>
+        </div>
+
+        <div class="controls-panel">
+            <div class="input-row">
+                <button id="dictateBtn" onclick="toggleDictation()" style="min-width: 150px;">🎙️ Start Dictation</button>
+                <input type="text" id="aiInstructions" placeholder="Instructions (e.g., 'Extract items into a table')">
+                <button onclick="generateDocument()" style="background: var(--success); min-width: 140px;">✨ Generate Body</button>
+            </div>
+            <div class="action-row">
+                <div class="btn-group">
+                    <button class="secondary" onclick="addNewBubble()">💬 New Block</button>
+                </div>
+                <div class="btn-group">
+                    <button onclick="previewDoc()">👁️ View Assembly</button>
+                    <button class="secondary" onclick="downloadWord()">📄 DOC</button>
+                    <button class="secondary" onclick="downloadPDF()">📕 PDF</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Modal -->
+    <div class="modal-overlay" id="historyModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 style="margin:0; font-size:1.2rem;">Session History</h2>
+                <button class="danger" onclick="closeModal('historyModal')" style="padding: 4px 10px;">✕</button>
+            </div>
+            <div class="modal-body" id="historyContainer">
+                <!-- History loads here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 style="margin:0; font-size:1.2rem;">Settings & Data Management</h2>
+                <button class="danger" onclick="closeModal('settingsModal')" style="padding: 4px 10px;">✕</button>
+            </div>
+            <div class="modal-body">
+                
+                <div class="setup-block" style="margin-bottom: 15px; border-color: var(--accent); background: #eff6ff;">
+                    <h4 style="color: var(--accent); margin-top:0;">💾 Backup & Restore (Device Migration)</h4>
+                    <p style="font-size: 0.8rem; color: var(--text-light); margin-top:0;">Export your history and settings to a file to prevent data loss when clearing cache, or to move to a new device.</p>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="exportSystemData()" style="background: var(--accent);">⬇️ Export Backup (.steno)</button>
+                        <div style="position: relative; overflow: hidden; display: inline-block;">
+                            <button class="secondary">⬆️ Import Backup</button>
+                            <input type="file" accept=".steno" onchange="importSystemData(event)" style="position: absolute; top: 0; left: 0; opacity: 0; cursor: pointer; height: 100%;">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="setup-block" style="margin-bottom: 15px;">
+                    <label style="font-weight: bold; font-size: 0.9rem;">Gemini AI API Key:</label>
+                    <input type="password" id="cfg_apikey" style="width:100%; margin-top:5px;" placeholder="AIzaSy...">
+                </div>
+
+                <div id="settingsAccordion"></div>
+            </div>
+            <div class="modal-header" style="justify-content: flex-end;">
+                <button onclick="saveAllSettings()">💾 Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div class="modal-overlay" id="previewModal">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h2 style="margin:0; font-size:1.2rem;">Document Assembly Preview</h2>
+                <button class="danger" onclick="closeModal('previewModal')" style="padding: 4px 10px;">✕ Close</button>
+            </div>
+            <div class="modal-body" style="background: #e2e8f0; padding: 20px;">
+                <div class="page-sheet" id="finalDocumentContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. INDEXED_DB (DATABASE ENGINE) ---
+        const DB_NAME = 'StenoProDB';
+        const DB_VERSION = 1;
+        let db;
+
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onupgradeneeded = (event) => {
+                    db = event.target.result;
+                    if (!db.objectStoreNames.contains('sessions')) {
+                        const store = db.createObjectStore('sessions', { keyPath: 'id' });
+                        store.createIndex('date', 'date', { unique: false });
+                    }
+                };
+                request.onsuccess = (event) => { db = event.target.result; resolve(db); };
+                request.onerror = (event) => { console.error("Database error: ", event.target.error); reject(event.target.error); };
+            });
+        }
+
+        const dbOps = {
+            saveSession: (sessionData) => {
+                return new Promise((resolve) => {
+                    const tx = db.transaction('sessions', 'readwrite');
+                    tx.objectStore('sessions').put(sessionData);
+                    tx.oncomplete = () => resolve();
+                });
+            },
+            getAllSessions: () => {
+                return new Promise((resolve) => {
+                    const tx = db.transaction('sessions', 'readonly');
+                    const request = tx.objectStore('sessions').getAll();
+                    request.onsuccess = () => resolve(request.result.sort((a,b) => b.timestamp - a.timestamp));
+                });
+            },
+            deleteSession: (id) => {
+                return new Promise((resolve) => {
+                    const tx = db.transaction('sessions', 'readwrite');
+                    tx.objectStore('sessions').delete(id);
+                    tx.oncomplete = () => resolve();
+                });
+            },
+            clearAll: () => {
+                return new Promise((resolve) => {
+                    const tx = db.transaction('sessions', 'readwrite');
+                    tx.objectStore('sessions').clear();
+                    tx.oncomplete = () => resolve();
+                });
+            }
+        };
+
+        // --- 2. STATE & AUTO-SAVE LOGIC ---
+        let currentSessionId = null;
+        let saveTimeout = null;
+
+        function startNewSession() {
+            currentSessionId = Date.now();
+            document.getElementById('chatWindow').innerHTML = `
+                <div class="message user-msg" id="activeUserNode">
+                    <div class="msg-label">You (Dictation Draft)</div>
+                    <div class="content-editable" contenteditable="true"></div>
+                </div>`;
+            document.getElementById('sessionBadge').style.display = 'inline-block';
+            autoSaveSession();
+        }
+
+        function extractMessages() {
+            const msgs = [];
+            document.querySelectorAll('#chatWindow .message').forEach(el => {
+                const role = el.classList.contains('user-msg') ? 'user' : 'ai';
+                const content = el.querySelector('.content-editable').innerHTML;
+                if (content.trim()) msgs.push({ role, content });
+            });
+            return msgs;
+        }
+
+        async function autoSaveSession() {
+            if (!currentSessionId) currentSessionId = Date.now();
+            const msgs = extractMessages();
+            if (msgs.length === 0) return;
+
+            const dateStr = new Date(currentSessionId).toLocaleDateString();
+            const timeStr = new Date(currentSessionId).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            let previewText = msgs[0].content.replace(/<[^>]+>/g, '').substring(0, 60) + '...';
+
+            const sessionData = {
+                id: currentSessionId,
+                date: dateStr,
+                time: timeStr,
+                timestamp: currentSessionId, // used for sorting
+                preview: previewText,
+                messages: msgs
+            };
+            await dbOps.saveSession(sessionData);
+            document.getElementById('sessionBadge').style.display = 'inline-block';
+        }
+
+        // Debounce input to autosave while typing
+        document.getElementById('chatWindow').addEventListener('input', () => {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(autoSaveSession, 1500);
+        });
+
+        // --- 3. HISTORY UI ---
+        async function openHistoryModal() {
+            const container = document.getElementById('historyContainer');
+            container.innerHTML = '<p>Loading...</p>';
+            openModal('historyModal');
+            
+            const sessions = await dbOps.getAllSessions();
+            if (sessions.length === 0) {
+                container.innerHTML = '<p style="text-align:center; color:#64748b;">No history found.</p>';
+                return;
+            }
+
+            // Group by Date
+            const grouped = {};
+            sessions.forEach(s => {
+                if(!grouped[s.date]) grouped[s.date] = [];
+                grouped[s.date].push(s);
+            });
+
+            container.innerHTML = '';
+            for (const [date, sessArr] of Object.entries(grouped)) {
+                let html = `<div class="history-group"><div class="history-date">📅 ${date}</div>`;
+                sessArr.forEach(s => {
+                    const isActive = s.id === currentSessionId ? 'border-color:var(--accent);' : '';
+                    html += `
+                        <div class="history-item" style="${isActive}">
+                            <div class="history-info">
+                                <div style="font-size:0.8rem; font-weight:bold; color:var(--primary);">${s.time}</div>
+                                <div class="history-preview">${s.preview || 'Empty Draft'}</div>
+                            </div>
+                            <div class="history-actions">
+                                <button class="secondary" onclick="loadSession(${s.id})" style="padding: 4px 10px; font-size: 0.8rem;">📂 Load</button>
+                                <button class="danger" onclick="deleteSession(${s.id}, this)" style="padding: 4px 10px; font-size: 0.8rem;">🗑️</button>
+                            </div>
+                        </div>`;
+                });
+                html += `</div>`;
+                container.innerHTML += html;
+            }
+        }
+
+        async function loadSession(id) {
+            const sessions = await dbOps.getAllSessions();
+            const session = sessions.find(s => s.id === id);
+            if(!session) return;
+
+            currentSessionId = session.id;
+            const chat = document.getElementById('chatWindow');
+            chat.innerHTML = '';
+
+            session.messages.forEach(m => {
+                const div = document.createElement('div');
+                div.className = m.role === 'user' ? 'message user-msg' : 'message ai-msg';
+                if(m.role === 'user') div.id = 'activeUserNode'; // Set last user node as active temporarily
+                const label = m.role === 'user' ? 'You (Dictation Draft)' : 'Steno AI (Final Body Draft - Editable)';
+                const cls = m.role === 'ai' ? 'content-editable final-ai-body' : 'content-editable';
+                div.innerHTML = `<div class="msg-label">${label}</div><div class="${cls}" contenteditable="true">${m.content}</div>`;
+                chat.appendChild(div);
+            });
+            
+            // Ensure there's an active user node at bottom if the last was AI
+            if (session.messages.length > 0 && session.messages[session.messages.length-1].role === 'ai') {
+                addNewBubble();
+            } else {
+                // Ensure only the LAST user node has the active ID
+                document.querySelectorAll('#activeUserNode').forEach((el, index, arr) => {
+                    if (index !== arr.length - 1) el.removeAttribute('id');
+                });
+            }
+
+            document.getElementById('sessionBadge').style.display = 'inline-block';
+            closeModal('historyModal');
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        async function deleteSession(id, btnElement) {
+            if(confirm("Delete this session?")) {
+                await dbOps.deleteSession(id);
+                btnElement.closest('.history-item').remove();
+                if (id === currentSessionId) startNewSession();
+            }
+        }
+
+        // --- 4. EXPORT & IMPORT (FULL SYSTEM BACKUP) ---
+        async function exportSystemData() {
+            const sessions = await dbOps.getAllSessions();
+            const exportData = {
+                stenoSettings: localStorage.getItem('stenoData'),
+                sessions: sessions
+            };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", `StenoPro_Backup_${new Date().toLocaleDateString().replace(/\//g,'-')}.steno`);
+            dlAnchorElem.click();
+        }
+
+        async function importSystemData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (data.stenoSettings) localStorage.setItem('stenoData', data.stenoSettings);
+                    if (data.sessions && Array.isArray(data.sessions)) {
+                        await dbOps.clearAll();
+                        for(let s of data.sessions) await dbOps.saveSession(s);
+                    }
+                    alert("Backup Imported Successfully! App will now reload.");
+                    location.reload();
+                } catch(err) {
+                    alert("Invalid backup file.");
+                    console.error(err);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // --- 5. INITIALIZATION & STANDARD LOGIC ---
+        const configStructure = [
+            { id: 'lht1', cat: 'Letterheads', title: 'Top Letterhead 1', text: true, img: true },
+            { id: 'lhb1', cat: 'Letterheads', title: 'Bottom Letterhead 1', text: true, img: true },
+            { id: 'h1', cat: 'Headers', title: 'Header 1', text: true, img: true },
+            { id: 'f1', cat: 'Footers', title: 'Footer 1', text: true, img: true },
+            { id: 's1', cat: 'Signatures', title: 'Signature 1', text: true, img: true },
+            { id: 'bg1', cat: 'Background', title: 'Full Page Background', text: false, img: true }
+        ];
+
+        let stenoData = {}; 
+        let recognition = null;
+        let isRecording = false;
+
+        window.onload = async () => {
+            // Request Persistent Storage
+            if (navigator.storage && navigator.storage.persist) {
+                navigator.storage.persist().then(granted => console.log("Persistent storage granted:", granted));
+            }
+            
+            await initDB();
+            initSettingsUI();
+            loadSettings();
+            initSpeech();
+            startNewSession(); // Start fresh on open
+        };
+
+        // --- SETTINGS UI (Abbreviated for space, works same as before) ---
+        function initSettingsUI() {
+            const acc = document.getElementById('settingsAccordion');
+            const categories = [...new Set(configStructure.map(c => c.cat))];
+            categories.forEach(cat => {
+                const details = document.createElement('details');
+                details.innerHTML = `<summary>${cat}</summary><div class="details-content" id="cat_${cat.replace(/\s/g,'')}"></div>`;
+                acc.appendChild(details);
+                const content = details.querySelector('.details-content');
+                configStructure.filter(c => c.cat === cat).forEach(item => {
+                    let html = `<div class="setup-block"><h4>${item.title}</h4>`;
+                    if (item.text) html += `<textarea id="txt_${item.id}"></textarea>`;
+                    if (item.img) html += `<div class="file-upload"><input type="file" accept="image/*" onchange="processImage(this, '${item.id}')"><button class="danger" onclick="clearImage('${item.id}')" style="font-size:0.7rem; padding: 2px 6px;">Clear</button></div><img id="img_preview_${item.id}" class="img-preview" src=""><input type="hidden" id="b64_${item.id}">`;
+                    html += `</div>`;
+                    content.innerHTML += html;
+                });
+            });
+        }
+
+        function processImage(input, id) {
+            if (!input.files[0]) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let w = img.width, h = img.height;
+                    const max = id.startsWith('bg') ? 1200 : 800;
+                    if(w > max) { h *= max/w; w = max; }
+                    canvas.width = w; canvas.height = h;
+                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    document.getElementById(`b64_${id}`).value = dataUrl;
+                    const prev = document.getElementById(`img_preview_${id}`);
+                    prev.src = dataUrl; prev.style.display = 'block';
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+        function clearImage(id) { document.getElementById(`b64_${id}`).value = ''; document.getElementById(`img_preview_${id}`).style.display = 'none'; }
+
+        function saveAllSettings() {
+            stenoData['apikey'] = document.getElementById('cfg_apikey').value;
+            configStructure.forEach(item => {
+                stenoData[item.id] = {};
+                if (item.text) stenoData[item.id].text = document.getElementById(`txt_${item.id}`).value;
+                if (item.img) stenoData[item.id].img = document.getElementById(`b64_${item.id}`).value;
+            });
+            localStorage.setItem('stenoData', JSON.stringify(stenoData));
+            alert("Settings Saved.");
+            closeModal('settingsModal');
+        }
+
+        function loadSettings() {
+            const saved = localStorage.getItem('stenoData');
+            if (saved) {
+                stenoData = JSON.parse(saved);
+                document.getElementById('cfg_apikey').value = stenoData['apikey'] || '';
+                configStructure.forEach(item => {
+                    if (stenoData[item.id]) {
+                        if (item.text && stenoData[item.id].text) document.getElementById(`txt_${item.id}`).value = stenoData[item.id].text;
+                        if (item.img && stenoData[item.id].img) {
+                            document.getElementById(`b64_${item.id}`).value = stenoData[item.id].img;
+                            const prev = document.getElementById(`img_preview_${item.id}`);
+                            prev.src = stenoData[item.id].img; prev.style.display = 'block';
+                        }
+                    }
+                });
+            }
+        }
+
+        // --- DICTATION & AI LOGIC ---
+        function initSpeech() {
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRec();
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                recognition.onresult = (e) => {
+                    let finalTranscript = '';
+                    for (let i = e.resultIndex; i < e.results.length; ++i) {
+                        if (e.results[i].isFinal) finalTranscript += e.results[i][0].transcript + ' ';
+                    }
+                    if (finalTranscript) {
+                        document.querySelector('#activeUserNode .content-editable').innerText += finalTranscript;
+                        autoSaveSession(); // Save when phrase complete
+                    }
+                };
+                recognition.onend = () => { if(isRecording) recognition.start(); else autoSaveSession(); };
+            } else { alert("Speech Web API not supported. Use Chrome."); }
+        }
+
+        function toggleDictation() {
+            if (!recognition) return;
+            const btn = document.getElementById('dictateBtn');
+            if (isRecording) {
+                isRecording = false; recognition.stop();
+                btn.innerHTML = '🎙️ Start Dictation'; btn.classList.remove('recording');
+            } else {
+                isRecording = true; recognition.lang = document.getElementById('langSelect').value; recognition.start();
+                btn.innerHTML = '⏹️ Stop Dictation'; btn.classList.add('recording');
+            }
+        }
+
+        function addNewBubble() {
+            document.querySelectorAll('#activeUserNode').forEach(el => el.removeAttribute('id'));
+            const chat = document.getElementById('chatWindow');
+            const div = document.createElement('div');
+            div.className = 'message user-msg'; div.id = 'activeUserNode';
+            div.innerHTML = `<div class="msg-label">You (Dictation Draft)</div><div class="content-editable" contenteditable="true"></div>`;
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
+            autoSaveSession();
+        }
+
+        async function generateDocument() {
+            const apikey = stenoData['apikey'];
+            if (!apikey) return alert("Please enter API Key in Settings.");
+
+            let fullText = "";
+            document.querySelectorAll('.user-msg .content-editable').forEach(el => fullText += el.innerText + "\n\n");
+            if(!fullText.trim()) return alert("No dictation text found.");
+
+            const instructions = document.getElementById('aiInstructions').value;
+            const docType = document.getElementById('sel_doctype').value;
+            const lang = document.getElementById('langSelect').options[document.getElementById('langSelect').selectedIndex].text;
+
+            const prompt = `You are an expert document drafter fluent in ${lang}.
+TASK: Auto-draft ONLY the core HTML BODY of a "${docType}".
+Do NOT include letterheads or wrappers. Output ONLY raw HTML.
+RAW DICTATION: ${fullText}
+INSTRUCTIONS: ${instructions}`;
+
+            const btn = event.target;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '⏳ Drafting...'; btn.disabled = true;
+
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apikey}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                });
+                if (!res.ok) throw new Error("API Error");
+                const data = await res.json();
+                let aiHtml = data.candidates[0].content.parts[0].text.replace(/```html/gi, '').replace(/```/g, '').trim();
+
+                const chat = document.getElementById('chatWindow');
+                const div = document.createElement('div');
+                div.className = 'message ai-msg';
+                div.innerHTML = `<div class="msg-label">Steno AI (Final Body)</div><div class="content-editable final-ai-body" contenteditable="true">${aiHtml}</div>`;
+                chat.appendChild(div);
+                
+                document.getElementById('aiInstructions').value = "";
+                addNewBubble();
+                await autoSaveSession(); // Force save after AI response
+
+            } catch (error) { alert("AI Error. Check API Key."); } 
+            finally { btn.innerHTML = originalText; btn.disabled = false; }
+        }
+
+        // --- ASSEMBLY & EXPORT ---
+        function getElementHTML(dropdownId, align = "left") {
+            const val = document.getElementById(dropdownId).value;
+            if (!val || !stenoData[val]) return "";
+            const d = stenoData[val];
+            let html = `<div style="margin-bottom: 15px; text-align: ${align};">`;
+            if (d.img) html += `<img src="${d.img}" style="max-width: 100%; display: block; margin-bottom: 10px; ${align==='center'?'margin: 0 auto 10px auto;':''}"><br>`;
+            if (d.text) html += `<div style="white-space: pre-wrap; line-height: 1.4;">${d.text}</div>`;
+            return html + `</div>`;
+        }
+
+        function assembleFullDocument() {
+            const aiBodies = document.querySelectorAll('.final-ai-body');
+            let docBody = aiBodies.length > 0 ? aiBodies[aiBodies.length - 1].innerHTML : "<p style='color:red;'>No AI draft generated.</p>";
+            
+            const bgVal = document.getElementById('sel_bg').value;
+            const bgStyle = (bgVal && stenoData[bgVal] && stenoData[bgVal].img) ? `background-image: url('${stenoData[bgVal].img}'); background-size: cover; background-position: center;` : "";
+
+            return `
+                <div style="position: relative; padding: 40px 50px; min-height: 1056px; font-family: Arial, sans-serif; color: #000; font-size: 11pt;">
+                    <div style="position: absolute; top:0; left:0; right:0; bottom:0; opacity: 0.15; z-index: 0; pointer-events: none; ${bgStyle}"></div>
+                    <div style="position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 976px;">
+                        ${getElementHTML('sel_lht', 'center')}
+                        <div style="border-bottom: 2px solid #000; margin-bottom: 20px;">${getElementHTML('sel_h')}</div>
+                        <div style="flex: 1; line-height: 1.6;">${docBody}</div>
+                        <div style="margin-top: 40px;">
+                            <div style="display: flex; justify-content: flex-end;"><div style="width: 300px;">${getElementHTML('sel_s', 'left')}</div></div>
+                            <div style="border-top: 1px solid #ccc; margin-top: 20px; font-size: 9pt;">${getElementHTML('sel_f', 'center')}</div>
+                            ${getElementHTML('sel_lhb', 'center')}
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        function previewDoc() { document.getElementById('finalDocumentContainer').innerHTML = assembleFullDocument(); openModal('previewModal'); }
+        function downloadPDF() {
+            const el = document.createElement('div'); el.innerHTML = assembleFullDocument(); document.body.appendChild(el);
+            html2pdf().set({ margin: 0, filename: 'Document.pdf', html2canvas: { scale: 2 }, jsPDF: { format: 'letter' } }).from(el).save().then(() => document.body.removeChild(el));
+        }
+        function downloadWord() {
+            const src = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent("<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'></head><body>" + assembleFullDocument() + "</body></html>");
+            const a = document.createElement("a"); a.href = src; a.download = 'Document.doc'; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        }
+
+        // Utils
+        function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    </script>
+</body>
+</html>
