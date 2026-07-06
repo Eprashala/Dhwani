@@ -367,6 +367,7 @@ document.addEventListener("DOMContentLoaded", () => {
         iconVol: document.getElementById('icon-vol'),
         iconMute: document.getElementById('icon-mute'),
         
+        // Right Side Handle Elements
         advToggle: document.getElementById('adv-toggle'),
         settingsModal: document.getElementById('settings-modal'),
         btnCloseSet: document.getElementById('btn-close-settings'),
@@ -380,6 +381,19 @@ document.addEventListener("DOMContentLoaded", () => {
         modelSlider: document.getElementById('model-slider'),
         ratioVal: document.getElementById('ratio-val'),
         modelVal: document.getElementById('model-val'),
+
+        // Left Side Handle Elements (Reading & Audio)
+        leftAdvToggle: document.getElementById('left-adv-toggle'),
+        leftSettingsModal: document.getElementById('left-settings-modal'),
+        btnCloseLeftSet: document.getElementById('btn-close-left-settings'),
+        btnSaveLeftSet: document.getElementById('btn-save-left-settings'),
+        fontSizeSlider: document.getElementById('font-size-slider'),
+        fontSizeVal: document.getElementById('font-size-val'),
+        ttsSpeedSlider: document.getElementById('tts-speed-slider'),
+        ttsSpeedVal: document.getElementById('tts-speed-val'),
+        ttsPitchSlider: document.getElementById('tts-pitch-slider'),
+        ttsPitchVal: document.getElementById('tts-pitch-val'),
+        highlightCheckbox: document.getElementById('highlight-checkbox'),
         
         ddBtn: document.getElementById('dropdown-btn'),
         ddMenu: document.getElementById('dropdown-menu'),
@@ -522,6 +536,19 @@ function updateSliderLabels() {
     UI.modelVal.innerText = `${getModelInfo(mVal).name} (${mVal}%)`;
 }
 
+function updateLeftSliderLabels() {
+    if (!UI.fontSizeSlider) return;
+    const fVal = UI.fontSizeSlider.value;
+    UI.fontSizeVal.innerText = fVal + 'px';
+    document.documentElement.style.setProperty('--chat-font-size', fVal + 'px');
+
+    const sVal = UI.ttsSpeedSlider.value;
+    UI.ttsSpeedVal.innerText = sVal + 'x';
+
+    const pVal = UI.ttsPitchSlider.value;
+    UI.ttsPitchVal.innerText = pVal;
+}
+
 function updateSliderAvailability() {
     const hasKey = UI.keyIn.value.trim().length > 10;
     const container = document.getElementById('advanced-sliders-container');
@@ -560,6 +587,12 @@ function saveData() {
         localStorage.setItem('darshan_lang', UI.lang.value);
         
         localStorage.setItem('darshan_apikey', UI.keyIn.value); 
+
+        // Save Left Settings
+        localStorage.setItem('darshan_font_size', UI.fontSizeSlider.value);
+        localStorage.setItem('darshan_tts_speed', UI.ttsSpeedSlider.value);
+        localStorage.setItem('darshan_tts_pitch', UI.ttsPitchSlider.value);
+        localStorage.setItem('darshan_highlight', UI.highlightCheckbox.checked);
         
         if (UI.remember.checked && chatHistory.length > 0) {
             localStorage.setItem('darshan_history', JSON.stringify(chatHistory));
@@ -588,6 +621,17 @@ function loadData() {
         
         if (localStorage.getItem('darshan_lang')) {
             UI.lang.value = localStorage.getItem('darshan_lang'); 
+        }
+
+        // Load Left Settings
+        if (UI.fontSizeSlider) {
+            UI.fontSizeSlider.value = localStorage.getItem('darshan_font_size') || "14";
+            UI.ttsSpeedSlider.value = localStorage.getItem('darshan_tts_speed') || "0.9";
+            UI.ttsPitchSlider.value = localStorage.getItem('darshan_tts_pitch') || "1.0";
+            
+            const savedHighlight = localStorage.getItem('darshan_highlight');
+            UI.highlightCheckbox.checked = savedHighlight !== 'false'; // default true
+            updateLeftSliderLabels();
         }
         
         updateSliderLabels(); 
@@ -669,8 +713,24 @@ function setupEventListeners() {
     UI.modelSlider.addEventListener('input', updateSliderLabels);
     UI.keyIn.addEventListener('input', updateSliderAvailability);
 
+    // Right Modal Events
     const openSettings = (e) => { e.stopPropagation(); UI.settingsModal.classList.remove('hidden'); };
     const closeSettings = (e) => { e.stopPropagation(); UI.settingsModal.classList.add('hidden'); };
+    UI.advToggle.onclick = openSettings;
+    UI.btnCloseSet.onclick = closeSettings;
+    UI.btnSaveSet.onclick = (e) => { e.stopPropagation(); saveData(); closeSettings(e); };
+    UI.settingsModal.addEventListener('click', e => e.stopPropagation());
+
+    // Left Modal Events
+    UI.fontSizeSlider.addEventListener('input', updateLeftSliderLabels);
+    UI.ttsSpeedSlider.addEventListener('input', updateLeftSliderLabels);
+    UI.ttsPitchSlider.addEventListener('input', updateLeftSliderLabels);
+    const openLeftSettings = (e) => { e.stopPropagation(); UI.leftSettingsModal.classList.remove('hidden'); };
+    const closeLeftSettings = (e) => { e.stopPropagation(); UI.leftSettingsModal.classList.add('hidden'); };
+    UI.leftAdvToggle.onclick = openLeftSettings;
+    UI.btnCloseLeftSet.onclick = closeLeftSettings;
+    UI.btnSaveLeftSet.onclick = (e) => { e.stopPropagation(); saveData(); closeLeftSettings(e); };
+    UI.leftSettingsModal.addEventListener('click', e => e.stopPropagation());
     
     const fabContainer = document.getElementById('mainFab');
     const fabToggle = document.getElementById('fabToggle');
@@ -701,11 +761,6 @@ function setupEventListeners() {
             alert('Could not access clipboard. Please paste manually.');
         }
     });
-
-    UI.advToggle.onclick = openSettings;
-    UI.btnCloseSet.onclick = closeSettings;
-    UI.btnSaveSet.onclick = (e) => { e.stopPropagation(); saveData(); closeSettings(e); };
-    UI.settingsModal.addEventListener('click', e => e.stopPropagation());
 
     if (UI.btnStop) {
         UI.btnStop.onclick = (e) => {
@@ -1047,7 +1102,10 @@ async function getAIResponse(history, config) {
     5. THE EXPLANATION: Explain the profound meaning of this specific verse strictly within the context and philosophy of "${config.texts}", then apply it directly to the user's question to provide actionable guidance.
     6. LANGUAGE: Speak strictly in the language code: ${UI.lang.value}.
     7. FORMATTING: Use rich Markdown formatting (bolding, headers, lists) to make the text beautiful and structured for the user to read.
-    8. TONE & RATIO: Maintain a divine, knowledgeable, and comforting tone. Your answer must be exactly ${bookRatio}% strict traditional quotation/interpretation of "${config.texts}" and ${aiRatio}% compassionate contextualization for the modern user. ${contextAddon}`;
+    8. TONE & RATIO: Maintain a divine, knowledgeable, and comforting tone. Your answer must be exactly ${bookRatio}% strict traditional quotation/interpretation of "${config.texts}" and ${aiRatio}% compassionate contextualization for the modern user. ${contextAddon}
+    9. MEDIA LINKS: At the very end of your response, provide EXACTLY two lines formatted like this for further exploration (translate the descriptive text to ${UI.lang.value}):
+       YT_SEARCH: relevant_topic_keywords
+       IMG_SEARCH: relevant_topic_keywords`;
     
     const payload = { 
         model: selectedModelInfo.id, 
@@ -1071,7 +1129,12 @@ async function getAIResponse(history, config) {
 
 // --- NEW HIGHLIGHT AND TTS PREP LOGIC ---
 function prepareTextForTTSAndHighlighting(container, msgId) {
-    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+        acceptNode: function(node) {
+            if (node.parentNode && node.parentNode.closest('.external-link-btn')) return NodeFilter.FILTER_REJECT;
+            return NodeFilter.FILTER_ACCEPT;
+        }
+    }, false);
     const textNodes = [];
     let node;
     
@@ -1113,9 +1176,15 @@ function highlightTTSWord(msgId, wordIndex) {
 
     const span = document.getElementById(`tts-${msgId}-${wordIndex}`);
     if (span) {
-        span.classList.add('bg-yellow-500/30', 'text-yellow-300', 'font-bold', 'rounded-[3px]', 'px-[2px]', 'shadow-[0_0_8px_rgba(234,179,8,0.4)]');
-        lastHighlightedSpan = span;
+        
+        // Only apply the visual yellow highlight if the setting is checked
+        if (UI.highlightCheckbox && UI.highlightCheckbox.checked) {
+            span.classList.add('bg-yellow-500/30', 'text-yellow-300', 'font-bold', 'rounded-[3px]', 'px-[2px]', 'shadow-[0_0_8px_rgba(234,179,8,0.4)]');
+            lastHighlightedSpan = span;
+        }
 
+        // We STILL auto-scroll the window regardless of the highlight setting 
+        // to ensure the user can always see what is being read
         const logContainer = document.getElementById('conversation-log');
         const spanRect = span.getBoundingClientRect();
         const logRect = logContainer.getBoundingClientRect();
@@ -1223,9 +1292,13 @@ window.toggleSingleMessagePlay = (btnElem) => {
 			window.__activeUtterance = utterance; // Prevent Android GC
 
 			utterance.lang = UI.lang ? UI.lang.value : 'hi-IN';
-			const speechRate = 0.90; // Your chosen rate
+			
+            // Use dynamically selected values from the new Left Settings slider
+            const speechRate = parseFloat(UI.ttsSpeedSlider ? UI.ttsSpeedSlider.value : 0.90); 
 			utterance.rate = speechRate; 
-			utterance.pitch = ['Saraswati', 'Lakshmi', 'Durga', 'Kali'].includes(getSelectedItemName()) ? 1.2 : 0.8;
+			
+            const speechPitch = parseFloat(UI.ttsPitchSlider ? UI.ttsPitchSlider.value : 1.0);
+            utterance.pitch = speechPitch;
 			
 			let hasBoundaryFired = false;
 			let fallbackTimer = null;
@@ -1243,7 +1316,6 @@ window.toggleSingleMessagePlay = (btnElem) => {
 			};
 
 			// --- NEW DYNAMIC ANDROID FALLBACK ENGINE ---
-// --- NEW DYNAMIC ANDROID FALLBACK ENGINE ---
 			utterance.onstart = () => {
 				// Wait 100ms to see if native boundary events work, otherwise take over
 				setTimeout(() => {
@@ -1307,7 +1379,7 @@ window.toggleSingleMessagePlay = (btnElem) => {
 		}
 window.copySingleMessage = async (btnElem) => {
     const msgId = btnElem.getAttribute('data-msg-id');
-    const text = rawTextMap[msgId] || ""; 
+    const text = (rawTextMap[msgId] || "").replace(/YT_SEARCH:.*$/gm, '').replace(/IMG_SEARCH:.*$/gm, '').trim(); 
     try {
         await navigator.clipboard.writeText(text);
         
@@ -1328,11 +1400,27 @@ function renderMessage(sender, text, isModel) {
     
     div.className = `msg-container p-4 rounded-2xl ${isModel ? 'bg-[#0f172a]/90 border border-slate-700/50 shadow-lg ml-2 mr-8' : 'bg-cyan-900/40 text-right mr-2 ml-8'} mb-4`;
     
-    const parsedText = isModel ? marked.parse(text) : text;
+    let parsedText = text;
+    let mediaLinks = "";
+
+    if (isModel) {
+        parsedText = parsedText.replace(/YT_SEARCH:\s*(.*)/g, (match, keyword) => {
+            const q = encodeURIComponent(keyword.trim());
+            mediaLinks += `<a href="https://www.youtube.com/results?search_query=${q}" target="_blank" class="external-link-btn yt-btn">🎥 Watch Video</a>`;
+            return ""; 
+        });
+        parsedText = parsedText.replace(/IMG_SEARCH:\s*(.*)/g, (match, keyword) => {
+            const q = encodeURIComponent(keyword.trim());
+            mediaLinks += `<a href="https://www.google.com/search?tbm=isch&q=${q}" target="_blank" class="external-link-btn img-btn">🖼️ See Images</a>`;
+            return "";
+        });
+    }
+
+    const displayHtml = isModel ? marked.parse(parsedText) + (mediaLinks ? `<div class="mt-3 block border-t border-slate-700/50 pt-2">${mediaLinks}</div>` : '') : text;
     
     let htmlContent = `
         <div class="text-[10px] uppercase font-bold tracking-wider ${isModel ? 'text-cyan-400 cinzel' : 'text-slate-300'} mb-1">${sender}</div>
-        <div class="text-sm leading-relaxed text-gray-100 markdown-body" id="md-${msgId}">${parsedText}</div>
+        <div class="text-sm leading-relaxed text-gray-100 markdown-body" id="md-${msgId}">${displayHtml}</div>
     `;
     
     if (isModel) {
