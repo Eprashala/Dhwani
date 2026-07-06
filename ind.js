@@ -398,8 +398,6 @@ document.addEventListener("DOMContentLoaded", () => {
         fontSizeVal: document.getElementById('font-size-val'),
         ttsSpeedSlider: document.getElementById('tts-speed-slider'),
         ttsSpeedVal: document.getElementById('tts-speed-val'),
-        ttsPitchSlider: document.getElementById('tts-pitch-slider'),
-        ttsPitchVal: document.getElementById('tts-pitch-val'),
         highlightCheckbox: document.getElementById('highlight-checkbox'),
         
         ddBtn: document.getElementById('dropdown-btn'),
@@ -558,8 +556,6 @@ function updateLeftSliderLabels() {
     const sVal = UI.ttsSpeedSlider.value;
     UI.ttsSpeedVal.innerText = sVal + 'x';
 
-    const pVal = UI.ttsPitchSlider.value;
-    UI.ttsPitchVal.innerText = pVal;
 }
 
 function updateSliderAvailability() {
@@ -604,7 +600,6 @@ function saveData() {
         // Save Left Settings
         localStorage.setItem('darshan_font_size', UI.fontSizeSlider.value);
         localStorage.setItem('darshan_tts_speed', UI.ttsSpeedSlider.value);
-        localStorage.setItem('darshan_tts_pitch', UI.ttsPitchSlider.value);
         localStorage.setItem('darshan_highlight', UI.highlightCheckbox.checked);
         
         if (UI.remember.checked && chatHistory.length > 0) {
@@ -640,7 +635,6 @@ function loadData() {
         if (UI.fontSizeSlider) {
             UI.fontSizeSlider.value = localStorage.getItem('darshan_font_size') || "14";
             UI.ttsSpeedSlider.value = localStorage.getItem('darshan_tts_speed') || "0.9";
-            UI.ttsPitchSlider.value = localStorage.getItem('darshan_tts_pitch') || "1.0";
             
             const savedHighlight = localStorage.getItem('darshan_highlight');
             UI.highlightCheckbox.checked = savedHighlight === 'true'; // default true
@@ -737,7 +731,6 @@ function setupEventListeners() {
     // Left Modal Events
     UI.fontSizeSlider.addEventListener('input', updateLeftSliderLabels);
     UI.ttsSpeedSlider.addEventListener('input', updateLeftSliderLabels);
-    UI.ttsPitchSlider.addEventListener('input', updateLeftSliderLabels);
     const openLeftSettings = (e) => { e.stopPropagation(); UI.leftSettingsModal.classList.remove('hidden'); };
     const closeLeftSettings = (e) => { e.stopPropagation(); UI.leftSettingsModal.classList.add('hidden'); };
     UI.leftAdvToggle.onclick = openLeftSettings;
@@ -1043,9 +1036,10 @@ async function processInput(userText) {
     
     const config = getSelectedConfig();
 
-    if (chatHistory.length === 0) {
+	if (chatHistory.length === 0) {
         chatHistory.push({ role: 'user', parts: [{ text: "Pranam." }] });
-        chatHistory.push({ role: 'model', parts: [{ text: `${config.greeting}. I am here to share wisdom.` }] });
+        // Updated to establish Dhwani's identity immediately 
+        chatHistory.push({ role: 'model', parts: [{ text: `Namaste, me Dhwani. I am here to share the wisdom of ${config.persona}.` }] });
     }
 
     const userName = UI.name.value || "Bhakt";
@@ -1285,7 +1279,7 @@ window.toggleSingleMessagePlay = (btnElem) => {
             // Resume Cloud Audio
             if (currentAudio) currentAudio.play();
             // Resume Highlighter
-            const speechRate = parseFloat(UI.ttsSpeedSlider ? UI.ttsSpeedSlider.value : 0.90);
+            const speechRate = parseFloat(UI.ttsSpeedSlider ? UI.ttsSpeedSlider.value : 1.00);
             startHighlightTimer(msgId, speechRate);
             
             return;
@@ -1346,7 +1340,7 @@ function playCloudAudio(fullText, btnElement) {
     
     // Extract base language code (e.g., 'mr-IN' becomes 'mr')
     const langCode = UI.lang ? UI.lang.value.split('-')[0] : 'hi'; 
-    const speechRate = parseFloat(UI.ttsSpeedSlider ? UI.ttsSpeedSlider.value : 0.90);
+    const speechRate = parseFloat(UI.ttsSpeedSlider ? UI.ttsSpeedSlider.value : 1.0);
 
     // Setup Highlighting Arrays
     wordsArray = fullText.match(/\S+/g) || [];
