@@ -634,7 +634,7 @@ function loadData() {
         // Load Left Settings
         if (UI.fontSizeSlider) {
             UI.fontSizeSlider.value = localStorage.getItem('darshan_font_size') || "14";
-            UI.ttsSpeedSlider.value = localStorage.getItem('darshan_tts_speed') || "0.9";
+            UI.ttsSpeedSlider.value = localStorage.getItem('darshan_tts_speed') || "1.0";
             
             const savedHighlight = localStorage.getItem('darshan_highlight');
             UI.highlightCheckbox.checked = savedHighlight === 'true'; // default true
