@@ -58,11 +58,26 @@ async function releaseWakeLock() {
 
 // --- EXPERT FULLSCREEN ENFORCER ---
 function enforceFullScreen() {
-    // Check if we are NOT in fullscreen, and if the browser supports it
-    if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-        document.documentElement.requestFullscreen().catch((err) => {
-            console.warn("Fullscreen enforcement delayed by browser:", err);
-        });
+    // 1. Check if we are NOT in fullscreen (using standard and older prefixes)
+    const isFullscreen = document.fullscreenElement || 
+                         document.webkitFullscreenElement || 
+                         document.mozFullScreenElement || 
+                         document.msFullscreenElement;
+
+    if (!isFullscreen) {
+        const docEl = document.documentElement;
+        
+        // 2. Map out all possible browser-specific fullscreen commands
+        const requestFS = docEl.requestFullscreen || 
+                          docEl.webkitRequestFullscreen || 
+                          docEl.mozRequestFullScreen || 
+                          docEl.msRequestFullscreen;
+
+        if (requestFS) {
+            requestFS.call(docEl).catch((err) => {
+                console.warn("Fullscreen enforcement delayed by browser:", err);
+            });
+        }
     }
 }
 
