@@ -1369,7 +1369,7 @@ function playNextChunk(langCode, msgId, btnElement, speechRate) {
     }
 
     // UPDATED: Using the reliable 'gtx' Google API endpoint instead of 'tw-ob'
-    const url = `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=${langCode}&q=${encodeURIComponent(chunkText)}`;
+	const url = `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=${langCode}&q=${encodeURIComponent(chunkText)}`;
 
     currentAudio = new Audio(url);
     currentAudio.playbackRate = speechRate; 
