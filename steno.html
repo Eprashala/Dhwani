@@ -102,9 +102,21 @@
 </head>
 <body>
 
+    <div id="start-overlay" style="position:fixed; inset:0; z-index:9999; background:#0f172a; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; color:white; text-align:center;">
+        <h1 style="color:var(--accent); margin-bottom:10px;">Steno Pro</h1>
+        <p>Tap anywhere to start dictation mode</p>
+        <p style="font-size:0.75rem; color:#64748b;">Enables Fullscreen & Keeps Screen Awake</p>
+    </div>
+        
     <div class="navbar">
-        <h1>Steno Pro <span class="session-badge" id="sessionBadge">Active</span></h1>
+        <h1 style="display: flex; gap: 10px; align-items: center;">
+            Steno Pro 
+            <select id="profileSelect" onchange="switchProfile()" style="font-size: 0.8rem; padding: 4px; background: #334155; color: white; border-color: #475569;"></select>
+            <button onclick="createNewProfile()" style="padding: 4px 8px; font-size: 0.8rem; background: var(--success);">+</button>
+            <span class="session-badge" id="sessionBadge">Active</span>
+        </h1>
         <div class="nav-controls">
+		<button class="secondary" onclick="toggleConfigStrip()" style="background: var(--bg-color); font-size: 1rem; padding: 4px 10px;" title="Toggle Document Formatting">🔧</button>
             <button class="secondary" onclick="startNewSession()" style="background: var(--bg-color);">📝 New Session</button>
             <button class="secondary" onclick="openHistoryModal()" style="background: var(--bg-color);">🕒 History</button>
             <select id="langSelect" style="padding: 4px 8px; font-size: 0.8rem;">
@@ -129,6 +141,7 @@
 
     <div class="main-workspace">
         <div class="config-strip">
+		<div class="config-strip" id="configStrip" style="display: none;">
             <div class="config-item">
                 <label>Doc Type</label>
                 <select id="sel_doctype">
@@ -229,81 +242,53 @@
     </div>
 
     <script>
-	
-	// ==========================================
-// KIOSK MODE / SECURITY LOCKDOWN SCRIPT
-// ==========================================
+    
+    // ==========================================
+    // KIOSK MODE / SECURITY LOCKDOWN SCRIPT
+    // ==========================================
+    document.addEventListener('contextmenu', event => event.preventDefault());
 
-// 1. DISABLE RIGHT-CLICK (Context Menu)
-document.addEventListener('contextmenu', event => event.preventDefault());
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'F12') { e.preventDefault(); return false; }
+        if (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(e.key.toUpperCase())) { e.preventDefault(); return false; }
+        if (e.ctrlKey && ['U', 'S', 'P'].includes(e.key.toUpperCase())) { e.preventDefault(); return false; }
+    });
 
-// 2. DISABLE DEVELOPER TOOLS & VIEW SOURCE KEYBOARDS
-document.addEventListener('keydown', (e) => {
-    // Disable F12
-    if (e.key === 'F12') { 
-        e.preventDefault(); 
-        return false; 
+    let wakeLock = null;
+    async function requestWakeLock() {
+        try { 
+            if ('wakeLock' in navigator) { 
+                if (wakeLock !== null) return;
+                wakeLock = await navigator.wakeLock.request('screen'); 
+                wakeLock.addEventListener('release', () => { wakeLock = null; });
+            } 
+        } catch (err) { console.warn('Wake Lock Error:', err.message); }
     }
-    // Disable Ctrl+Shift+I, J, C (Inspector, Console, Elements)
-    if (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(e.key.toUpperCase())) { 
-        e.preventDefault(); 
-        return false; 
-    }
-    // Disable Ctrl+U, S, P (View Source, Save, Print)
-    if (e.ctrlKey && ['U', 'S', 'P'].includes(e.key.toUpperCase())) { 
-        e.preventDefault(); 
-        return false; 
-    }
-});
 
-// 3. SCREEN ALWAYS ON (WAKE LOCK API)
-let wakeLock = null;
-async function requestWakeLock() {
-    try { 
-        if ('wakeLock' in navigator) { 
-            if (wakeLock !== null) return; // Already active
-            wakeLock = await navigator.wakeLock.request('screen'); 
-            wakeLock.addEventListener('release', () => { wakeLock = null; });
-            console.log("Wake Lock active: Screen will stay on.");
-        } 
-    } catch (err) { 
-        console.warn('Wake Lock Error:', err.message); 
-    }
-}
-
-// 4. ENFORCE FULL SCREEN
-function enforceFullscreen() {
-    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-        const docElm = document.documentElement;
-        if (docElm.requestFullscreen) {
-            docElm.requestFullscreen().catch(() => {});
-        } else if (docElm.webkitRequestFullscreen) {
-            // Safari support
-            docElm.webkitRequestFullscreen().catch(() => {});
+    function enforceFullscreen() {
+        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+            const docElm = document.documentElement;
+            if (docElm.requestFullscreen) docElm.requestFullscreen().catch(() => {});
+            else if (docElm.webkitRequestFullscreen) docElm.webkitRequestFullscreen().catch(() => {});
         }
     }
-}
 
-// 5. TRIGGER ON INTERACTION & TAB SWITCHING
-// Browsers require user interaction to trigger Fullscreen and Wake Lock
-['click', 'touchstart'].forEach(evt => {
-    window.addEventListener(evt, () => {
-        enforceFullscreen();
-        requestWakeLock();
-    }, { capture: true, passive: true });
-});
+    ['click', 'touchstart'].forEach(evt => {
+        window.addEventListener(evt, () => {
+            enforceFullscreen();
+            requestWakeLock();
+        }, { capture: true, passive: true });
+    });
 
-// Re-apply Wake Lock and Fullscreen if the user switches tabs and comes back
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-        requestWakeLock();
-        enforceFullscreen();
-    }
-});
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            requestWakeLock();
+            enforceFullscreen();
+        }
+    });
 
-// Disable drag and drop on the body to prevent accidental file opening
-document.body.setAttribute('ondragstart', 'return false;');
-document.body.setAttribute('ondrop', 'return false;');
+    document.body.setAttribute('ondragstart', 'return false;');
+    document.body.setAttribute('ondrop', 'return false;');
 
         // --- API CONFIGURATION ---
         const PROXY_URL = "https://eprashala.pythonanywhere.com/api/chat";
@@ -494,7 +479,7 @@ document.body.setAttribute('ondrop', 'return false;');
         async function exportSystemData() {
             const sessions = await dbOps.getAllSessions();
             const exportData = {
-                stenoSettings: localStorage.getItem('stenoData'),
+                stenoSettings: localStorage.getItem('stenoAppData'),
                 sessions: sessions
             };
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData));
@@ -511,7 +496,7 @@ document.body.setAttribute('ondrop', 'return false;');
             reader.onload = async (e) => {
                 try {
                     const data = JSON.parse(e.target.result);
-                    if (data.stenoSettings) localStorage.setItem('stenoData', data.stenoSettings);
+                    if (data.stenoSettings) localStorage.setItem('stenoAppData', data.stenoSettings);
                     if (data.sessions && Array.isArray(data.sessions)) {
                         await dbOps.clearAll();
                         for(let s of data.sessions) await dbOps.saveSession(s);
@@ -526,7 +511,7 @@ document.body.setAttribute('ondrop', 'return false;');
             reader.readAsText(file);
         }
 
-        // --- 5. INITIALIZATION & DATA STRUCTURE ---
+        // --- 5. DATA STRUCTURE & PROFILES ---
         const configStructure = [
             { id: 'lht1', cat: 'Letterheads (Top)', title: 'Top Letterhead 1', text: true, img: true },
             { id: 'lht2', cat: 'Letterheads (Top)', title: 'Top Letterhead 2', text: true, img: true },
@@ -544,21 +529,87 @@ document.body.setAttribute('ondrop', 'return false;');
             { id: 'bg1', cat: 'Background / Watermark', title: 'Full Page Background', text: false, img: true }
         ];
 
-        let stenoData = {}; 
+        let appData = { activeProfile: "Default", profiles: { "Default": {} } };
+        let stenoData = {}; // Points to the active profile's data
         let recognition = null;
         let isRecording = false;
+        let autoPunctuateTimer = null;
+
+        // --- FULLSCREEN & WAKE LOCK OVERLAY TRIGGER ---
+        document.getElementById('start-overlay').addEventListener('click', function() {
+            this.style.display = 'none';
+            enforceFullscreen();
+            requestWakeLock();
+            // Unlock Audio context if needed
+            try { const AudioContext = window.AudioContext || window.webkitAudioContext; new AudioContext().resume(); } catch(e){}
+        });
 
         window.onload = async () => {
-            if (navigator.storage && navigator.storage.persist) {
-                navigator.storage.persist().then(granted => console.log("Persistent storage granted:", granted));
-            }
+            if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
             await initDB();
             initSettingsUI();
-            loadSettings();
+            loadProfiles();
             initSpeech();
             startNewSession(); 
         };
 
+        // --- PROFILE MANAGEMENT ---
+        function loadProfiles() {
+            const saved = localStorage.getItem('stenoAppData');
+            if (saved) {
+                appData = JSON.parse(saved);
+                if (!appData.profiles) appData = { activeProfile: "Default", profiles: { "Default": {} } };
+            }
+            updateProfileDropdown();
+            switchProfile(appData.activeProfile);
+        }
+
+        function updateProfileDropdown() {
+            const sel = document.getElementById('profileSelect');
+            sel.innerHTML = '';
+            for (const profileName in appData.profiles) {
+                const opt = document.createElement('option');
+                opt.value = profileName;
+                opt.innerText = profileName;
+                if (profileName === appData.activeProfile) opt.selected = true;
+                sel.appendChild(opt);
+            }
+        }
+
+        function createNewProfile() {
+            const name = prompt("Enter new profile name:");
+            if (name && name.trim() !== "" && !appData.profiles[name]) {
+                appData.profiles[name] = {};
+                appData.activeProfile = name;
+                saveAppData();
+                updateProfileDropdown();
+                switchProfile(name);
+            }
+        }
+
+		function toggleConfigStrip() {
+            const strip = document.getElementById('configStrip');
+            if (strip.style.display === 'none' || strip.style.display === '') {
+                strip.style.display = 'flex'; // Shows the strip
+            } else {
+                strip.style.display = 'none'; // Hides the strip
+            }
+        }
+		
+        function switchProfile(forceName = null) {
+            const sel = document.getElementById('profileSelect');
+            const targetProfile = forceName || sel.value;
+            appData.activeProfile = targetProfile;
+            stenoData = appData.profiles[targetProfile];
+            saveAppData();
+            populateSettingsUI();
+        }
+
+        function saveAppData() {
+            localStorage.setItem('stenoAppData', JSON.stringify(appData));
+        }
+
+        // --- SETTINGS UI ---
         function initSettingsUI() {
             const acc = document.getElementById('settingsAccordion');
             const categories = [...new Set(configStructure.map(c => c.cat))];
@@ -577,7 +628,24 @@ document.body.setAttribute('ondrop', 'return false;');
             });
         }
 
-        function processImage(input, id) {
+        function populateSettingsUI() {
+            document.getElementById('cfg_apikey').value = stenoData['apikey'] || '';
+            configStructure.forEach(item => {
+                const txtEl = document.getElementById(`txt_${item.id}`);
+                const b64El = document.getElementById(`b64_${item.id}`);
+                const prevEl = document.getElementById(`img_preview_${item.id}`);
+                
+                if (txtEl) txtEl.value = (stenoData[item.id] && stenoData[item.id].text) ? stenoData[item.id].text : '';
+                if (b64El) {
+                    const imgData = (stenoData[item.id] && stenoData[item.id].img) ? stenoData[item.id].img : '';
+                    b64El.value = imgData;
+                    prevEl.src = imgData;
+                    prevEl.style.display = imgData ? 'block' : 'none';
+                }
+            });
+        }
+
+        function processImage(input, id) { 
             if (!input.files[0]) return;
             const reader = new FileReader();
             reader.onload = (e) => {
@@ -607,99 +675,92 @@ document.body.setAttribute('ondrop', 'return false;');
                 if (item.text) stenoData[item.id].text = document.getElementById(`txt_${item.id}`).value;
                 if (item.img) stenoData[item.id].img = document.getElementById(`b64_${item.id}`).value;
             });
-            localStorage.setItem('stenoData', JSON.stringify(stenoData));
-            alert("Settings Saved.");
+            saveAppData(); 
+            alert(`Settings Saved for profile: ${appData.activeProfile}`);
             closeModal('settingsModal');
         }
 
-        function loadSettings() {
-            const saved = localStorage.getItem('stenoData');
-            if (saved) {
-                stenoData = JSON.parse(saved);
-                document.getElementById('cfg_apikey').value = stenoData['apikey'] || '';
-                configStructure.forEach(item => {
-                    if (stenoData[item.id]) {
-                        if (item.text && stenoData[item.id].text) document.getElementById(`txt_${item.id}`).value = stenoData[item.id].text;
-                        if (item.img && stenoData[item.id].img) {
-                            document.getElementById(`b64_${item.id}`).value = stenoData[item.id].img;
-                            const prev = document.getElementById(`img_preview_${item.id}`);
-                            prev.src = stenoData[item.id].img; prev.style.display = 'block';
-                        }
-                    }
-                });
-            }
-        }
-
-		let lastFinalizedText = ""; // Deduplication memory variable
+        // --- 6. DICTATION ENGINE (FIXED BEEPING & ADDED AUTO-PUNCTUATION) ---
+        let lastResultIndex = 0;
 
         function initSpeech() {
             if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
                 const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
                 recognition = new SpeechRec();
                 
-                // 1. BUFFER FLUSH LOGIC: Force continuous to FALSE on mobile.
-                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                recognition.continuous = !isMobile; 
+                // Keep continuous true to prevent the constant start/stop beeping
+                recognition.continuous = true; 
                 recognition.interimResults = true;
                 
                 recognition.onresult = (e) => {
                     let interimTranscript = '';
                     let finalTranscript = '';
 
+                    // Deduplication logic using resultIndex
                     for (let i = e.resultIndex; i < e.results.length; ++i) {
-                        const transcriptStr = e.results[i][0].transcript;
                         if (e.results[i].isFinal) {
-                            // 2. DEDUPLICATION LOGIC: Discard exact repeats
-                            if (transcriptStr.trim() === lastFinalizedText.trim()) continue;
-                            
-                            lastFinalizedText = transcriptStr;
-                            finalTranscript += transcriptStr + ' ';
+                            finalTranscript += e.results[i][0].transcript;
                         } else {
-                            interimTranscript += transcriptStr;
+                            interimTranscript += e.results[i][0].transcript;
                         }
                     }
 
                     const activeNode = document.querySelector('#activeUserNode .content-editable');
-                    
-                    // 3. INTERIM CLEANUP: Remove old preview text before appending
                     const existingInterim = activeNode.querySelector('.interim-text');
                     if (existingInterim) existingInterim.remove();
 
                     if (finalTranscript) {
+                        // Formatting: ensure spacing after punctuation
+                        finalTranscript = finalTranscript.replace(/([.!?])([^\s])/g, '$1 $2');
+                        
+                        // Capitalize first letter if it's the start of a new sentence
+                        let currentText = activeNode.innerText.trim();
+                        if (currentText === '' || /[.!?]\s*$/.test(currentText)) {
+                            finalTranscript = finalTranscript.charAt(0).toUpperCase() + finalTranscript.slice(1);
+                        }
+
+                        // Add leading space if needed
+                        if (currentText !== '' && !currentText.endsWith(' ')) {
+                            finalTranscript = ' ' + finalTranscript;
+                        }
+
                         activeNode.innerText += finalTranscript;
                         autoSaveSession(); 
                     }
 
                     if (interimTranscript) {
-                        // Render a grey, italic preview of what is currently being spoken
                         const span = document.createElement('span');
                         span.className = 'interim-text';
                         span.style.color = '#94a3b8';
                         span.style.fontStyle = 'italic';
-                        span.innerText = interimTranscript;
+                        span.innerText = " " + interimTranscript;
                         activeNode.appendChild(span);
                     }
+
+                    // AUTO-PUNCTUATION TIMER
+                    clearTimeout(autoPunctuateTimer);
+                    autoPunctuateTimer = setTimeout(() => {
+                        if (isRecording) {
+                            const node = document.querySelector('#activeUserNode .content-editable');
+                            let text = node.innerText.trim();
+                            // If it doesn't end in punctuation, append a full stop
+                            if (text.length > 0 && !/[.!?,"']$/.test(text)) {
+                                node.innerText += '. ';
+                                autoSaveSession();
+                            }
+                        }
+                    }, 2000); // 2 seconds of silence adds a period
                 };
                 
                 recognition.onerror = (e) => { 
-                    console.warn("Speech API Error:", e.error);
-                    if (e.error === 'not-allowed') {
-                        isRecording = false;
-                        document.getElementById('dictateBtn').innerHTML = '🎙️ Start Dictation';
-                        document.getElementById('dictateBtn').classList.remove('recording');
-                    }
+                    console.warn("Speech Error:", e.error);
                 };
                 
                 recognition.onend = () => { 
-                    // MANUAL LOOP: If still recording, restart immediately to flush Android buffer
+                    // If the user hasn't clicked Stop, but Android killed the mic (usually after 15s of silence), restart it.
+                    // Note: This WILL cause a beep, but only after long silences, not constantly.
                     if (isRecording) {
-                        try {
-                            recognition.start();
-                        } catch (err) {
-                            // Failsafe if engine is already restarting
-                        }
-                    } else {
-                        autoSaveSession(); 
+                        try { recognition.start(); } catch (err) {}
                     }
                 };
             } else { 
@@ -712,22 +773,18 @@ document.body.setAttribute('ondrop', 'return false;');
             const btn = document.getElementById('dictateBtn');
             if (isRecording) {
                 isRecording = false; 
+                clearTimeout(autoPunctuateTimer);
                 recognition.stop();
-                btn.innerHTML = '🎙️ Start Dictation'; 
-                btn.classList.remove('recording');
+                btn.innerHTML = '🎙️ Start Dictation'; btn.classList.remove('recording');
                 
-                // Clear any lingering preview text
                 const activeNode = document.querySelector('#activeUserNode .content-editable');
                 const existingInterim = activeNode.querySelector('.interim-text');
                 if (existingInterim) existingInterim.remove();
-                
             } else {
                 isRecording = true; 
-                lastFinalizedText = ""; // Reset memory on new session
                 recognition.lang = document.getElementById('langSelect').value; 
-                recognition.start();
-                btn.innerHTML = '⏹️ Stop Dictation'; 
-                btn.classList.add('recording');
+                try { recognition.start(); } catch(e){}
+                btn.innerHTML = '⏹️ Stop Dictation'; btn.classList.add('recording');
             }
         }
 

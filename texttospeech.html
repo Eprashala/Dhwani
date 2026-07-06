@@ -211,49 +211,32 @@
     /**
      * Handles the text-to-speech execution.
      */
-    function speakText() {
-        if (synth.speaking) {
-            console.warn("Already speaking. Stopping current speech to start new one.");
-            synth.cancel(); 
-        }
+			 function speakText() {
+				if (synth.speaking) synth.cancel(); 
 
-        const text = textInput.value.trim();
-        if (text === '') {
-            statusText.textContent = "Please enter some text.";
-            return;
-        }
+				const text = textInput.value.trim();
+				if (text === '') return;
 
-        const utterance = new SpeechSynthesisUtterance(text);
-        
-        // Find the specific voice object based on the selected voiceURI
-        const selectedVoiceURI = voiceSelect.value;
-        const selectedVoice = availableVoices.find(voice => voice.voiceURI === selectedVoiceURI);
-        
-        if (selectedVoice) {
-            utterance.voice = selectedVoice;
-            utterance.lang = selectedVoice.lang;
-        }
+				const utterance = new SpeechSynthesisUtterance(text);
+				const selectedVoiceURI = voiceSelect.value;
+				const selectedVoice = availableVoices.find(voice => voice.voiceURI === selectedVoiceURI);
+				
+				if (selectedVoice) {
+					// RULE 1: Explicitly set the voice object
+					utterance.voice = selectedVoice;
+					
+					// RULE 2: The utterance language MUST exactly match the voice language.
+					// If these don't match, Android drops the voice object entirely.
+					utterance.lang = selectedVoice.lang; 
+					
+					// RULE 3: Force standard pitch and rate. Extreme values sometimes 
+					// cause Android to revert to the default robust voice.
+					utterance.pitch = 1.0;
+					utterance.rate = 1.0;
+				}
 
-        // Event Listeners for UI feedback
-        utterance.onstart = () => {
-            statusText.textContent = "Speaking...";
-            playBtn.disabled = true;
-        };
-        
-        utterance.onend = () => {
-            statusText.textContent = "Finished speaking.";
-            playBtn.disabled = false;
-        };
-        
-        utterance.onerror = (e) => {
-            console.error("Speech synthesis error", e);
-            statusText.textContent = "Error occurred during playback.";
-            playBtn.disabled = false;
-        };
-
-        // Execute speech
-        synth.speak(utterance);
-    }
+				synth.speak(utterance);
+			}
 
     // --- Event Listeners ---
 
