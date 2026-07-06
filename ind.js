@@ -1360,8 +1360,16 @@ function playNextChunk(langCode, msgId, btnElement, speechRate) {
     }
 
     const chunkText = audioChunks[currentChunkIndex];
-    // Secure URL that tricks Google into thinking it's a web browser request
-    const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${langCode}&q=${encodeURIComponent(chunkText)}`;
+    
+    // Safety check: Skip if a chunk is completely empty
+    if (!chunkText || chunkText.trim() === '') {
+        currentChunkIndex++;
+        playNextChunk(langCode, msgId, btnElement, speechRate);
+        return;
+    }
+
+    // UPDATED: Using the reliable 'gtx' Google API endpoint instead of 'tw-ob'
+    const url = `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=${langCode}&q=${encodeURIComponent(chunkText)}`;
 
     currentAudio = new Audio(url);
     currentAudio.playbackRate = speechRate; 
@@ -1373,7 +1381,7 @@ function playNextChunk(langCode, msgId, btnElement, speechRate) {
         }
     }).catch(err => {
         console.error("Cloud TTS Stream failed:", err);
-        alert("Audio stream blocked. Please ensure you have internet access.");
+        alert("Audio stream blocked by server or network. Please try tapping play again.");
         resetCurrentTTS();
     });
 
