@@ -1164,49 +1164,73 @@ async function processInput(userText) {
     setTimeout(updateStopButtonVisibility, 100); 
 }
 
-		function renderHistoryList() {
-			const container = document.getElementById('history-list-container');
-			container.innerHTML = '';
-			
-			if (allSessions.length === 0) {
-				container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-slate-500"><svg class="w-12 h-12 mb-3 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg><p class="text-sm italic">No past records found.</p></div>';
-				return;
-			}
-
-			// Sort newest to oldest
-			const sorted = [...allSessions].sort((a, b) => b.id - a.id);
-
-			sorted.forEach(session => {
-				const btn = document.createElement('button');
-				// Styled for a larger, more comfortable tap target since we have the space
-				btn.className = "w-full text-left text-sm text-slate-300 bg-slate-800/80 hover:bg-slate-700 p-4 rounded-xl transition-colors border border-slate-700 hover:border-cyan-500/50 flex flex-col gap-2 outline-none mb-2 shadow-sm";
+			function renderHistoryList() {
+				const container = document.getElementById('history-list-container');
+				container.innerHTML = '';
 				
-				btn.innerHTML = `
-					<div class="flex justify-between items-center w-full">
-						<span class="font-bold tracking-wide text-cyan-100">${session.title}</span> 
-						<span class="text-[10px] text-cyan-400 bg-cyan-900/40 border border-cyan-800/50 px-2 py-1 rounded-full font-bold uppercase">${session.messages.length} msgs</span>
-					</div>
-					<div class="text-xs text-slate-500 truncate w-full">
-						${session.messages.length > 0 ? session.messages[0].parts[0].text : 'Empty session'}
-					</div>
-				`;
-				
-				btn.onclick = (e) => {
-					e.stopPropagation();
-					loadSpecificSession(session.id); 
-					// Close the main modal entirely upon selection
-					UI.settingsModal.classList.add('hidden'); 
+				if (allSessions.length === 0) {
+					container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-slate-500"><svg class="w-12 h-12 mb-3 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg><p class="text-sm italic">No past records found.</p></div>';
+					return;
+				}
+
+				// Sort newest to oldest
+				const sorted = [...allSessions].sort((a, b) => b.id - a.id);
+
+				sorted.forEach(session => {
+					// Changed to a div so we can safely put a clickable edit icon inside it
+					const card = document.createElement('div');
+					card.className = "w-full text-left text-sm text-slate-300 bg-slate-800/80 hover:bg-slate-700 p-4 rounded-xl transition-colors border border-slate-700 hover:border-cyan-500/50 flex flex-col gap-2 outline-none mb-2 shadow-sm cursor-pointer group";
 					
-					// Reset the views in the background
-					setTimeout(() => {
-						UI.historyView.classList.add('hidden');
-						UI.historyView.classList.remove('flex');
-						UI.mainView.classList.remove('hidden');
-					}, 300);
-				};
-				container.appendChild(btn);
-			});
-		}
+					card.innerHTML = `
+						<div class="flex justify-between items-center w-full">
+							<div class="flex items-center gap-2 overflow-hidden flex-1">
+								<span class="font-bold tracking-wide text-cyan-100 truncate">${session.title}</span>
+								<button class="rename-btn p-1 text-slate-500 hover:text-cyan-400 transition-colors focus:outline-none" title="Rename Session">
+									<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+								</button>
+							</div>
+							<span class="text-[10px] text-cyan-400 bg-cyan-900/40 border border-cyan-800/50 px-2 py-1 rounded-full font-bold uppercase ml-2 flex-shrink-0">${session.messages.length} msgs</span>
+						</div>
+						<div class="text-xs text-slate-500 truncate w-full pointer-events-none">
+							${session.messages.length > 0 ? session.messages[0].parts[0].text : 'Empty session'}
+						</div>
+					`;
+					
+					// --- RENAME LOGIC ---
+					const renameBtn = card.querySelector('.rename-btn');
+					renameBtn.onclick = (e) => {
+						e.stopPropagation(); // Prevents the card from loading the session
+						const newTitle = prompt("Enter a new name for this consultation:", session.title);
+						
+						if (newTitle && newTitle.trim() !== "") {
+							session.title = newTitle.trim();
+							localStorage.setItem('darshan_all_history', JSON.stringify(allSessions));
+							renderHistoryList(); // Instantly refresh the UI
+							
+							// If the user renames the session they are currently viewing, update the top banner
+							if (currentSessionId === session.id) {
+								const banner = document.getElementById('archive-notice-banner');
+								if (banner) banner.innerText = `Session: ${session.title}`;
+							}
+						}
+					};
+
+					// --- LOAD SESSION LOGIC ---
+					card.onclick = (e) => {
+						e.stopPropagation();
+						loadSpecificSession(session.id); 
+						UI.settingsModal.classList.add('hidden'); 
+						
+						setTimeout(() => {
+							UI.historyView.classList.add('hidden');
+							UI.historyView.classList.remove('flex');
+							UI.mainView.classList.remove('hidden');
+						}, 300);
+					};
+					
+					container.appendChild(card);
+				});
+			}
 
 			function loadSpecificSession(targetId) {
 				resetCurrentTTS();
@@ -1223,6 +1247,7 @@ async function processInput(userText) {
 					if (UI.welcome) UI.welcome.style.display = 'none';
 					
 					const archiveNotice = document.createElement('div');
+					archiveNotice.id = "archive-notice-banner";
 					archiveNotice.className = "text-center text-xs text-cyan-500 mb-6 font-bold border-b border-cyan-900/50 pb-2 uppercase tracking-widest mt-4";
 					archiveNotice.innerText = `Session: ${targetSession.title}`;
 					UI.log.appendChild(archiveNotice);
