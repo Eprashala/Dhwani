@@ -31,7 +31,6 @@
         .profile-widget select { background: transparent; border: none; color: white; font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer; padding: 0; max-width: 80px; text-overflow: ellipsis; }
         .profile-widget select option { background: var(--primary); color: white; }
         .profile-widget button { background: var(--success); color: white; border: none; border-radius: 4px; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; padding: 0; }
-        .profile-widget button:hover { background: #059669; }
         
         .session-badge { background: var(--success); font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; display: none; font-weight: 600; }
         
@@ -60,7 +59,7 @@
         .msg-label { font-size: 0.7rem; font-weight: bold; color: var(--text-light); margin-bottom: 8px; text-transform: uppercase; }
         .content-editable { outline: none; min-height: 30px; font-size: 0.95rem; }
         
-        /* Bottom Controls */
+        /* Bottom Controls Redesigned */
         .controls-panel { background: var(--panel-bg); border-top: 1px solid var(--border); padding: 10px; display: flex; flex-direction: column; gap: 8px; z-index: 5; }
         .input-row { display: flex; gap: 8px; align-items: stretch; }
         
@@ -171,7 +170,7 @@
                 </select>
             </div>
             <div class="config-divider"></div>
-            <div class="config-item"><label>Page Size</label><select id="sel_pagesize"><option value="a4" selected>A4</option><option value="letter">Letter</option><option value="legal">Legal</option></select></div>
+            <div class="config-item"><label>Page Size</label><select id="sel_pagesize"><option value="a4">A4</option><option value="letter">Letter</option><option value="legal">Legal</option></select></div>
             <div class="config-item"><label>Orientation</label><select id="sel_orientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></div>
             <div class="config-divider"></div>
             <div class="config-item"><label>Font</label><select id="sel_font"><option value="Arial, sans-serif">Arial</option><option value="'Times New Roman', serif">Times New Roman</option><option value="'Courier New', monospace">Courier</option></select></div>
@@ -253,7 +252,7 @@
                 <button class="btn-secondary" style="padding: 4px 10px; background: #ef4444; color:white; border:none;" onclick="closeModal('previewModal')">✕ Close</button>
             </div>
             <div class="modal-body" style="background: #e2e8f0; padding: 15px; overflow-x: auto;">
-                <div id="finalDocumentContainer" style="background: white; width: 100%; min-height: 500px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; flex-direction: column;"></div>
+                <div class="page-sheet" id="finalDocumentContainer" style="background: white; width: 100%; min-height: 500px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; flex-direction: column;"></div>
             </div>
         </div>
     </div>
@@ -318,9 +317,7 @@
     }, { capture: true, passive: true });
 
     document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-            requestWakeLock();
-        }
+        if (document.visibilityState === 'visible') requestWakeLock();
     });
 
     document.body.setAttribute('ondragstart', 'return false;');
@@ -458,13 +455,6 @@
                 <div class="content-editable" contenteditable="true"></div>
             </div>`;
         window.speechSynthesis.cancel(); 
-        
-        // Reset dedup & span state on new session
-        ignoreResultsUpTo = 0;
-        activeSessionSpan = null;
-        activeInterimSpan = null;
-        injectedPunctuation = '';
-        
         autoSaveSession();
     }
 
@@ -798,42 +788,34 @@
     }
 
     // ==========================================
-    // DICTATION ENGINE (ANDROID FIX & 2-STAGE SMART PUNCTUATION)
+    // THE ULTIMATE ANDROID DEDUPLICATION ENGINE
     // ==========================================
-    let ignoreResultsUpTo = 0; 
-    let commaTimer = null;
-    let periodTimer = null;
+    let ignoreResultsUpTo = 0;
+    let autoPunctuateTimer = null;
     let activeSessionSpan = null;
     let activeInterimSpan = null;
-    let injectedPunctuation = '';
-    let currentResultsLength = 0;
 
     function initSpeech() {
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
             recognition = new SpeechRec();
             
+            // Continuous MUST be true to prevent dropping words
             recognition.continuous = true; 
             recognition.interimResults = true;
             
             recognition.onstart = () => {
                 ignoreResultsUpTo = 0;
                 activeSessionSpan = null;
-                activeInterimSpan = null;
-                injectedPunctuation = '';
             };
             
             recognition.onresult = (e) => {
-                // Clear active auto-punctuation timers
-                clearTimeout(commaTimer);
-                clearTimeout(periodTimer);
-                injectedPunctuation = '';
-                currentResultsLength = e.results.length;
+                clearTimeout(autoPunctuateTimer);
 
                 let currentFinals = [];
                 let interim = '';
 
-                // Extract unprocessed results
+                // Extract all results we haven't locked in yet
                 for (let i = ignoreResultsUpTo; i < e.results.length; i++) {
                     let transcript = e.results[i][0].transcript.trim();
                     if (e.results[i].isFinal) {
@@ -843,15 +825,15 @@
                     }
                 }
 
-                // Diffing Algorithm to kill Android duplication
+                // Aggressive Diffing Algorithm to kill Android duplication
                 let dedup = [];
                 for (let i = 0; i < currentFinals.length; i++) {
                     if (i > 0 && currentFinals[i].toLowerCase().startsWith(currentFinals[i-1].toLowerCase())) {
-                        dedup[dedup.length - 1] = currentFinals[i]; 
+                        dedup[dedup.length - 1] = currentFinals[i]; // Replace accumulation
                     } else if (i > 0 && currentFinals[i-1].toLowerCase().startsWith(currentFinals[i].toLowerCase())) {
-                        // ignore 
+                        // Ignore fragment
                     } else if (i > 0 && currentFinals[i].toLowerCase() === dedup[dedup.length - 1].toLowerCase()) {
-                        // ignore
+                        // Ignore exact consecutive duplicate
                     } else {
                         dedup.push(currentFinals[i]);
                     }
@@ -859,10 +841,12 @@
 
                 let finalStr = dedup.join(' ');
                 
+                // Capitalization formatting
                 if (finalStr) {
                     finalStr = finalStr.charAt(0).toUpperCase() + finalStr.slice(1);
                 }
 
+                // Render logic
                 const activeContainer = document.querySelector('#activeUserNode .content-editable');
                 if (!activeContainer) return;
 
@@ -881,42 +865,22 @@
                 activeSessionSpan.innerText = finalStr ? finalStr + ' ' : '';
                 activeInterimSpan.innerText = interim ? " " + interim : '';
 
-                // 2-SECOND TIMER: Inject Comma
-                commaTimer = setTimeout(() => {
-                    if (isRecording && activeSessionSpan) {
+                // AUTO-PUNCTUATION TIMER (2 Seconds)
+                autoPunctuateTimer = setTimeout(() => {
+                    if (isRecording && activeSessionSpan && activeSessionSpan.innerText.trim().length > 0) {
                         let txt = activeSessionSpan.innerText.trim();
-                        if (txt.length > 0 && !/[.!?,"']$/.test(txt)) {
-                            injectedPunctuation = ',';
-                            activeSessionSpan.innerText = txt + ', ';
-                            autoSaveSession();
+                        if (!/[.!?,"']$/.test(txt)) {
+                            activeSessionSpan.innerText = txt + '. ';
+                        } else {
+                            activeSessionSpan.innerText = txt + ' ';
                         }
+                        
+                        // Freeze this span and reset tracking for the next sentence
+                        activeSessionSpan = null;
+                        ignoreResultsUpTo = e.results.length;
+                        autoSaveSession();
                     }
                 }, 2000); 
-
-                // 4-SECOND TIMER: Inject Full Stop & Lock
-                periodTimer = setTimeout(() => {
-                    if (isRecording && activeSessionSpan) {
-                        let txt = activeSessionSpan.innerText.trim();
-                        
-                        // If it currently ends with our injected comma, remove it
-                        if (injectedPunctuation === ',' && txt.endsWith(',')) {
-                            txt = txt.slice(0, -1);
-                        }
-                        
-                        if (txt.length > 0) {
-                            if (!/[.!?,"']$/.test(txt)) {
-                                activeSessionSpan.innerText = txt + '. ';
-                            } else if (injectedPunctuation === ',') {
-                                activeSessionSpan.innerText = txt + '. ';
-                            }
-                            
-                            // Freeze this span and reset tracking for the next sentence
-                            activeSessionSpan = null;
-                            ignoreResultsUpTo = currentResultsLength;
-                            autoSaveSession();
-                        }
-                    }
-                }, 4000); 
             };
             
             recognition.onerror = (e) => { console.warn("Speech Error:", e.error); };
@@ -940,8 +904,7 @@
         const btn = document.getElementById('dictateBtn');
         if (isRecording) {
             isRecording = false; 
-            clearTimeout(commaTimer);
-            clearTimeout(periodTimer);
+            clearTimeout(autoPunctuateTimer);
             recognition.stop();
             btn.innerHTML = '🎙️ Dictate'; 
             btn.classList.remove('recording');
@@ -974,6 +937,7 @@
         chat.appendChild(div);
         chat.scrollTop = chat.scrollHeight;
         
+        // Reset pointers so the engine knows it's a new box
         ignoreResultsUpTo = 0;
         activeSessionSpan = null;
         activeInterimSpan = null;
@@ -982,7 +946,7 @@
     }
 
     // ==========================================
-    // AI DOCUMENT GENERATION (A4 SPACING PROMPT)
+    // AI DOCUMENT GENERATION
     // ==========================================
     async function generateDocument() {
         let fullText = "";
@@ -1009,8 +973,10 @@ Do NOT include letterheads, headers, footers, or signatures (I will append those
 
 CRITICAL LAYOUT GUIDELINES FOR "${docType}":
 - If Invoice or Challan: You MUST output a standard HTML <table> with inline CSS (border="1" style="border-collapse: collapse; width: 100%;"). Include headers (Item, Qty, Price, Total) and a bold final total row. Align numbers to the right.
-- If Formal Letter or Standard Document: Ensure the draft is professionally spaced for an A4 page like an expert stenographer's draft. Use proper paragraph breaks (<p> tags). Do NOT cramp text together.
+- If Formal Letter: Output standard letter body. Use <br> for line breaks. Include Sender Address, Date, Recipient Address, Subject, and Salutation at the top.
+- If Doctor Prescription: Use a clean layout. Start with "Rx" prominently. List medicines with bullet points or a neat table.
 - If SMS/WhatsApp: Keep it extremely concise. Text only. Use <br> for line breaks.
+- If Notice/Memo: Center the title using <div align="center"><strong>NOTICE</strong></div>. Include Date, To, From.
 
 CONTEXT (External elements already present, do not duplicate):
 ${ctxStr}
@@ -1022,13 +988,13 @@ USER INSTRUCTIONS:
 ${instructions || 'Format professionally based on the document type.'}
 
 STRICT OUTPUT RULES:
-1. Output ONLY pure, valid HTML.
+1. Output ONLY pure, valid HTML (no markdown backticks, no \`\`\`html wrapper, no conversational intro).
 2. The language must match the raw dictation unless the user instructions explicitly state otherwise.
 3. Use semantic HTML (<p>, <strong>, <ul>, <table>) so it renders perfectly in MS Word.`;
 
         const btn = event.target;
         const originalText = btn.innerHTML;
-        btn.innerHTML = '⏳'; btn.disabled = true;
+        btn.innerHTML = '⏳ Drafting...'; btn.disabled = true;
 
         try {
             const customKey = stenoData['apikey'];
@@ -1084,7 +1050,7 @@ STRICT OUTPUT RULES:
     }
 
     // ==========================================
-    // EXPORT ENGINE (WORD & PDF WITH A4 SPACING)
+    // EXPORT ENGINE (WORD & PDF REBUILT FOR COMPATIBILITY)
     // ==========================================
     function getElementHTML(dropdownId, align = "left", forWord = false) {
         const val = document.getElementById(dropdownId).value;
@@ -1108,17 +1074,6 @@ STRICT OUTPUT RULES:
         return { hasImg: hasImg, html: html };
     }
 
-    // Adds a custom CSS block to enforce A4 well-spaced layout rules
-    function getA4SpacingCSS() {
-        return `
-            <style>
-                p { margin-bottom: 1.5em; line-height: 1.8; }
-                table { border-collapse: collapse; width: 100%; margin: 20px 0; }
-                th, td { border: 1px solid #000; padding: 10px; }
-            </style>
-        `;
-    }
-
     function assemblePDFDocument() {
         const aiBodies = document.querySelectorAll('.final-ai-body');
         let docBody = aiBodies.length > 0 ? aiBodies[aiBodies.length - 1].innerHTML : "<p style='color:red;'>No AI draft generated yet.</p>";
@@ -1128,8 +1083,6 @@ STRICT OUTPUT RULES:
         
         const fontFam = document.getElementById('sel_font').value;
         const fontSz = document.getElementById('sel_fontsize').value;
-        const pSize = document.getElementById('sel_pagesize').value;
-        const orientation = document.getElementById('sel_orientation').value;
 
         let lht = getElementHTML('sel_lht', 'center', false);
         let h = getElementHTML('sel_h', 'left', false);
@@ -1140,21 +1093,14 @@ STRICT OUTPUT RULES:
         let topSpacing = lht.hasImg ? '0px' : '96px';
         let botSpacing = lhb.hasImg ? '0px' : '96px';
 
-        // Adjust preview container size to look like the selected paper
-        let previewW = '794px'; let previewMinH = '1123px'; // A4 defaults
-        if (pSize === 'letter') { previewW = '816px'; previewMinH = '1056px'; }
-        if (pSize === 'legal') { previewW = '816px'; previewMinH = '1344px'; }
-        if (orientation === 'landscape') { const temp = previewW; previewW = previewMinH; previewMinH = temp; }
-
         return `
-            ${getA4SpacingCSS()}
-            <div style="font-family: ${fontFam}; font-size: ${fontSz}; position: relative; min-height: ${previewMinH}; width: 100%; max-width: ${previewW}; margin: 0 auto; color: #000; background: white; padding-top: ${topSpacing}; padding-bottom: ${botSpacing};">
+            <div style="font-family: ${fontFam}; font-size: ${fontSz}; position: relative; min-height: 1056px; color: #000; background: white; padding-top: ${topSpacing}; padding-bottom: ${botSpacing};">
                 <div style="position: absolute; top:0; left:0; right:0; bottom:0; opacity: 0.15; z-index: 0; pointer-events: none; ${bgStyle}"></div>
                 <div style="position: relative; z-index: 1; display: flex; flex-direction: column; min-height: 100%;">
                     ${lht.html}
                     <div style="padding: 0 96px; flex: 1; display: flex; flex-direction: column;">
                         ${h.html ? `<div style="border-bottom: 2px solid #000; margin-bottom: 20px;">${h.html}</div>` : ''}
-                        <div style="flex: 1; line-height: 1.8;">${docBody}</div>
+                        <div style="flex: 1; line-height: 1.6;">${docBody}</div>
                         <div style="margin-top: 40px;">
                             <div style="display: flex; justify-content: flex-end;"><div style="width: 300px;">${s.html}</div></div>
                             ${f.html ? `<div style="border-top: 1px solid #ccc; margin-top: 20px; padding-top: 10px; font-size: 9pt;">${f.html}</div>` : ''}
@@ -1186,7 +1132,7 @@ STRICT OUTPUT RULES:
                 <div align="center" style="text-align: center;">${lht.html}</div>
                 <div style="padding: 0 96px;">
                     ${h.html ? `<div style="border-bottom: 1px solid #000; margin-bottom: 20px;">${h.html}</div>` : ''}
-                    <div style="margin-bottom: 30px;">${docBody}</div>
+                    <div style="line-height: 1.5; margin-bottom: 30px;">${docBody}</div>
                     <table width="100%" border="0" cellpadding="0" cellspacing="0" style="margin-top: 30px;">
                         <tr>
                             <td width="60%"></td>
@@ -1236,7 +1182,6 @@ STRICT OUTPUT RULES:
         <head>
             <meta charset="utf-8">
             <title>Exported Document</title>
-            ${getA4SpacingCSS()}
             <xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml>
         </head>
         <body>
