@@ -793,6 +793,7 @@
     let ignoreResultsUpTo = 0;
     let autoPunctuateTimer = null;
     let activeSessionSpan = null;
+	let autoPunctuateTimerFullStop = null;
     let activeInterimSpan = null;
 
     function initSpeech() {
@@ -809,8 +810,9 @@
                 activeSessionSpan = null;
             };
             
-            recognition.onresult = (e) => {
+			recognition.onresult = (e) => {
                 clearTimeout(autoPunctuateTimer);
+                clearTimeout(autoPunctuateTimerFullStop);
 
                 let currentFinals = [];
                 let interim = '';
@@ -865,10 +867,26 @@
                 activeSessionSpan.innerText = finalStr ? finalStr + ' ' : '';
                 activeInterimSpan.innerText = interim ? " " + interim : '';
 
-                // AUTO-PUNCTUATION TIMER (2 Seconds)
+			// AUTO-PUNCTUATION: 2s for Comma
                 autoPunctuateTimer = setTimeout(() => {
                     if (isRecording && activeSessionSpan && activeSessionSpan.innerText.trim().length > 0) {
                         let txt = activeSessionSpan.innerText.trim();
+                        if (!/[.!?,"']$/.test(txt)) {
+                            activeSessionSpan.innerText = txt + ', ';
+                        }
+                    }
+                }, 2000); 
+
+                // AUTO-PUNCTUATION: 4s for Full Stop
+                autoPunctuateTimerFullStop = setTimeout(() => {
+                    if (isRecording && activeSessionSpan && activeSessionSpan.innerText.trim().length > 0) {
+                        let txt = activeSessionSpan.innerText.trim();
+                        
+                        // If a comma was added by the 2s timer, remove it before adding the full stop
+                        if (txt.endsWith(',')) {
+                            txt = txt.slice(0, -1);
+                        }
+
                         if (!/[.!?,"']$/.test(txt)) {
                             activeSessionSpan.innerText = txt + '. ';
                         } else {
@@ -880,7 +898,7 @@
                         ignoreResultsUpTo = e.results.length;
                         autoSaveSession();
                     }
-                }, 2000); 
+                }, 4000);
             };
             
             recognition.onerror = (e) => { console.warn("Speech Error:", e.error); };
@@ -972,10 +990,11 @@ TASK: Auto-draft ONLY the core BODY of a "${docType}".
 Do NOT include letterheads, headers, footers, or signatures (I will append those via the layout engine). 
 
 CRITICAL LAYOUT GUIDELINES FOR "${docType}":
+- FOR ALL STANDARD DOCUMENTS (Letters, Reports, Memos, Notices): You MUST use professional A4 spacing. Wrap paragraphs in <p style="margin-bottom: 12pt; text-align: justify; line-height: 1.5;"></p>. Do not bunch text together; space it exactly as an expert stenographer would in Microsoft Word.
 - If Invoice or Challan: You MUST output a standard HTML <table> with inline CSS (border="1" style="border-collapse: collapse; width: 100%;"). Include headers (Item, Qty, Price, Total) and a bold final total row. Align numbers to the right.
-- If Formal Letter: Output standard letter body. Use <br> for line breaks. Include Sender Address, Date, Recipient Address, Subject, and Salutation at the top.
+- If Formal Letter: Include Sender Address, Date, Recipient Address, Subject, and Salutation at the top, perfectly spaced.
 - If Doctor Prescription: Use a clean layout. Start with "Rx" prominently. List medicines with bullet points or a neat table.
-- If SMS/WhatsApp: Keep it extremely concise. Text only. Use <br> for line breaks.
+- If SMS/WhatsApp: Ignore A4 spacing. Keep it extremely concise. Text only. Use <br> for line breaks.
 - If Notice/Memo: Center the title using <div align="center"><strong>NOTICE</strong></div>. Include Date, To, From.
 
 CONTEXT (External elements already present, do not duplicate):
@@ -1155,17 +1174,10 @@ STRICT OUTPUT RULES:
         el.innerHTML = assemblePDFDocument(); 
         document.body.appendChild(el);
 
-        const fitMode = document.getElementById('sel_pdf_fit').value;
-        const pageSize = document.getElementById('sel_pagesize').value;
+		const pageSize = document.getElementById('sel_pagesize').value;
         const orientation = document.getElementById('sel_orientation').value;
 
         let jsPDFOpts = { unit: 'in', format: pageSize, orientation: orientation };
-
-        if (fitMode === 'single') {
-            const elHeightPx = el.scrollHeight;
-            const elWidthPx = el.scrollWidth;
-            jsPDFOpts = { unit: 'in', format: [elWidthPx / 96, elHeightPx / 96], orientation: orientation };
-        }
 
         html2pdf().set({ 
             margin: 0, 
