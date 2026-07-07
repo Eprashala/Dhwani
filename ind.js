@@ -1021,20 +1021,8 @@ function setupEventListeners() {
             html2pdf().set(opt).from(clone).save();
         });
     }
-			
-		const btnViewHistory = document.getElementById('btn-view-history');
-		const historyContainer = document.getElementById('history-list-container');
+	
 
-		if (btnViewHistory) {
-			btnViewHistory.addEventListener('click', (e) => {
-				e.stopPropagation();
-				historyContainer.classList.toggle('hidden');
-				if (!historyContainer.classList.contains('hidden')) {
-					renderHistoryList(); // Generate the buttons when opened
-				}
-			});
-		}
-       
 }
 
 function initSpeechRecognition() {
