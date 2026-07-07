@@ -21,6 +21,9 @@ let globalWordIndex = 0;
 let highlightTimer = null;
 let wordsArray = [];
 
+let allSessions = []; 
+const currentDateKey = new Date().toISOString().split('T')[0]; // Yields standard YYYY-MM-DD
+
 // Memory Dictionaries to prevent Android DOM parsing crashes
 const speechDataMap = {};
 const rawTextMap = {};
@@ -615,11 +618,17 @@ function saveData() {
         localStorage.setItem('darshan_tts_speed', UI.ttsSpeedSlider.value);
         localStorage.setItem('darshan_highlight', UI.highlightCheckbox.checked);
         
-        if (UI.remember.checked && chatHistory.length > 0) {
-            localStorage.setItem('darshan_history', JSON.stringify(chatHistory));
-        } else { 
-            localStorage.removeItem('darshan_history'); 
-        }
+		if (UI.remember.checked && chatHistory.length > 0) {
+			let sessionIndex = allSessions.findIndex(s => s.date === currentDateKey);
+			if (sessionIndex > -1) {
+				allSessions[sessionIndex].messages = chatHistory; // Update today
+			} else {
+				allSessions.push({ date: currentDateKey, messages: chatHistory }); // Create new day
+			}
+			localStorage.setItem('darshan_all_history', JSON.stringify(allSessions));
+		} else if (!UI.remember.checked) { 
+			localStorage.removeItem('darshan_all_history'); 
+		}
     } catch (err) {
         console.warn("Local storage restricted or full:", err);
     }
@@ -656,20 +665,26 @@ function loadData() {
         
         updateSliderLabels(); 
         
-        if (UI.remember.checked) {
-            const savedHist = localStorage.getItem('darshan_history');
-            if (savedHist) {
-                try {
-                    chatHistory = JSON.parse(savedHist);
-                    if (chatHistory.length > 0) {
-                        UI.welcome.style.display = 'none';
-                        chatHistory.forEach(msg => renderMessage(msg.role === 'user' ? (UI.name.value || "Bhakt") : getSelectedItemName(), msg.parts[0].text, msg.role === 'model'));
-                        const lastModel = [...chatHistory].reverse().find(m => m.role === 'model');
-                        if (lastModel) state.lastAIMessage = lastModel.parts[0].text;
-                    }
-                } catch (e) { }
-            }
-        }
+			
+			if (UI.remember.checked) {
+				const savedHist = localStorage.getItem('darshan_all_history');
+				if (savedHist) {
+					try {
+						allSessions = JSON.parse(savedHist);
+						// Only auto-load today's specific session into the active chat
+						const todaySession = allSessions.find(s => s.date === currentDateKey);
+						if (todaySession) {
+							chatHistory = todaySession.messages;
+							if (chatHistory.length > 0) {
+								UI.welcome.style.display = 'none';
+								chatHistory.forEach(msg => renderMessage(msg.role === 'user' ? (UI.name.value || "Bhakt") : getSelectedItemName(), msg.parts[0].text, msg.role === 'model'));
+								const lastModel = [...chatHistory].reverse().find(m => m.role === 'model');
+								if (lastModel) state.lastAIMessage = lastModel.parts[0].text;
+							}
+						}
+					} catch (e) { console.warn("History parse error", e); }
+				}
+			}
     } catch (err) {
         console.warn("Could not load local storage", err);
     }
@@ -953,6 +968,19 @@ function setupEventListeners() {
             html2pdf().set(opt).from(clone).save();
         });
     }
+			
+		const btnViewHistory = document.getElementById('btn-view-history');
+		const historyContainer = document.getElementById('history-list-container');
+
+		if (btnViewHistory) {
+			btnViewHistory.addEventListener('click', (e) => {
+				e.stopPropagation();
+				historyContainer.classList.toggle('hidden');
+				if (!historyContainer.classList.contains('hidden')) {
+					renderHistoryList(); // Generate the buttons when opened
+				}
+			});
+		}
        
 }
 
@@ -1094,6 +1122,66 @@ async function processInput(userText) {
     resetMicUI();
     setTimeout(updateStopButtonVisibility, 100); 
 }
+
+function renderHistoryList() {
+    const container = document.getElementById('history-list-container');
+    container.innerHTML = '';
+    
+    if (allSessions.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-500 text-center italic py-2">No past records found.</p>';
+        return;
+    }
+
+    // Sort the array so the newest dates appear at the top
+    const sorted = [...allSessions].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    sorted.forEach(session => {
+        const btn = document.createElement('button');
+        btn.className = "w-full text-left text-xs text-slate-300 bg-slate-800/80 hover:bg-slate-700 px-3 py-2.5 rounded-lg transition-colors border border-transparent hover:border-cyan-500/50 flex justify-between items-center outline-none";
+        btn.innerHTML = `<span class="font-bold tracking-wide">${session.date}</span> <span class="text-[10px] text-slate-500 bg-slate-900 px-2 py-0.5 rounded-full">${session.messages.length} msgs</span>`;
+        
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            loadSpecificSession(session.date);
+            UI.settingsModal.classList.add('hidden'); // Auto-close modal
+        };
+        container.appendChild(btn);
+    });
+}
+
+			function loadSpecificSession(targetDate) {
+				// 1. Stop active audio and clear the screen
+				resetCurrentTTS();
+				UI.log.innerHTML = '';
+				chatHistory = [];
+				
+				// 2. Fetch the target data
+				const targetSession = allSessions.find(s => s.date === targetDate);
+				if (targetSession) {
+					chatHistory = targetSession.messages;
+					if (UI.welcome) UI.welcome.style.display = 'none';
+					
+					// 3. Add an Archive Header to visually indicate it's an old chat
+					const archiveNotice = document.createElement('div');
+					archiveNotice.className = "text-center text-xs text-cyan-500 mb-6 font-bold border-b border-cyan-900/50 pb-2 uppercase tracking-widest mt-4";
+					archiveNotice.innerText = targetDate === currentDateKey ? "Today's Active Session" : `Archived Session: ${targetDate}`;
+					UI.log.appendChild(archiveNotice);
+
+					// 4. Render the messages
+					chatHistory.forEach(msg => {
+						renderMessage(msg.role === 'user' ? (UI.name.value || "Bhakt") : "Archive", msg.parts[0].text, msg.role === 'model');
+					});
+					
+					// If it's not today, disable the ability to edit the last message
+					if (targetDate !== currentDateKey && UI.btnEditLast) {
+						UI.btnEditLast.classList.add('hidden');
+						UI.btnEditLast.classList.remove('flex');
+					} else if (UI.btnEditLast && chatHistory.length > 0) {
+						UI.btnEditLast.classList.remove('hidden');
+						UI.btnEditLast.classList.add('flex');
+					}
+				}
+			}
 
 async function getAIResponse(history, config) {
     const customKey = (UI.keyIn.value.length > 10) ? UI.keyIn.value : null;
