@@ -27,9 +27,12 @@
         #langSelect option { background: var(--primary); color: white; }
 
         .profile-widget { display: flex; align-items: center; gap: 5px; background: rgba(255, 255, 255, 0.1); padding: 2px 6px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.2); }
+        .profile-widget span { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; color: #cbd5e1; font-weight: 600; }
         .profile-widget select { background: transparent; border: none; color: white; font-size: 0.75rem; font-weight: 600; outline: none; cursor: pointer; padding: 0; max-width: 80px; text-overflow: ellipsis; }
         .profile-widget select option { background: var(--primary); color: white; }
         .profile-widget button { background: var(--success); color: white; border: none; border-radius: 4px; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; padding: 0; }
+        
+        .session-badge { background: var(--success); font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; display: none; font-weight: 600; }
         
         .nav-controls { display: flex; width: 100%; gap: 6px; justify-content: space-between; }
         .nav-btn { flex: 1; background: var(--bg-color); color: var(--text); border: 1px solid #cbd5e1; padding: 6px 0; font-size: 0.75rem; border-radius: 6px; font-weight: 600; cursor: pointer; text-align: center; }
@@ -95,8 +98,6 @@
 
         .history-item { background: white; padding: 12px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
         
-        .page-sheet { background: white; width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin: 0 auto; position: relative; overflow: hidden; display: flex; flex-direction: column; }
-
         /* =========================================
            MOBILE OPTIMIZATIONS
            ========================================= */
@@ -309,7 +310,6 @@
         requestWakeLock();
     });
 
-    // Aggressive Fullscreen enforcement on ANY click
     document.addEventListener('click', () => {
         if (!document.fullscreenElement && !document.webkitFullscreenElement) {
             enforceFullscreen();
@@ -317,9 +317,7 @@
     }, { capture: true, passive: true });
 
     document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') {
-            requestWakeLock();
-        }
+        if (document.visibilityState === 'visible') requestWakeLock();
     });
 
     document.body.setAttribute('ondragstart', 'return false;');
@@ -447,6 +445,7 @@
     // SESSION STATE
     // ==========================================
     let currentSessionId = null;
+    let saveTimeout = null;
 
     function startNewSession() {
         currentSessionId = Date.now();
@@ -487,7 +486,13 @@
             messages: msgs
         };
         await dbOps.saveSession(sessionData);
+        document.getElementById('sessionBadge').style.display = 'inline-block';
     }
+
+    document.getElementById('chatWindow').addEventListener('input', () => {
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(autoSaveSession, 1500);
+    });
 
     // ==========================================
     // HISTORY UI
@@ -783,53 +788,110 @@
     }
 
     // ==========================================
-    // DICTATION ENGINE (AYURVEDA STABLE LOGIC)
+    // THE ULTIMATE ANDROID DEDUPLICATION ENGINE
     // ==========================================
+    let ignoreResultsUpTo = 0;
+    let autoPunctuateTimer = null;
+    let activeSessionSpan = null;
+    let activeInterimSpan = null;
+
     function initSpeech() {
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
             recognition = new SpeechRec();
             
-            // EXACT AYURVEDA LOGIC: Disabling continuous and interim forces Android to flush its buffer.
-            recognition.continuous = false; 
-            recognition.interimResults = false;
+            // Continuous MUST be true to prevent dropping words
+            recognition.continuous = true; 
+            recognition.interimResults = true;
+            
+            recognition.onstart = () => {
+                ignoreResultsUpTo = 0;
+                activeSessionSpan = null;
+            };
             
             recognition.onresult = (e) => {
-                let finalTranscript = e.results[e.results.length - 1][0].transcript.trim();
+                clearTimeout(autoPunctuateTimer);
 
-                const activeNode = document.querySelector('#activeUserNode .content-editable');
-                if (!activeNode) return;
-                
-                if (finalTranscript) {
-                    // Formatting: ensure spacing after punctuation
-                    finalTranscript = finalTranscript.replace(/([.!?])([^\s])/g, '$1 $2');
-                    let currentText = activeNode.innerText.trim();
-                    if (currentText === '' || /[.!?]\s*$/.test(currentText)) {
-                        finalTranscript = finalTranscript.charAt(0).toUpperCase() + finalTranscript.slice(1);
+                let currentFinals = [];
+                let interim = '';
+
+                // Extract all results we haven't locked in yet
+                for (let i = ignoreResultsUpTo; i < e.results.length; i++) {
+                    let transcript = e.results[i][0].transcript.trim();
+                    if (e.results[i].isFinal) {
+                        currentFinals.push(transcript);
+                    } else {
+                        interim += transcript + ' ';
                     }
-
-                    if (currentText !== '' && !currentText.endsWith(' ')) {
-                        finalTranscript = ' ' + finalTranscript;
-                    }
-
-                    activeNode.innerText += finalTranscript + ' '; // Add space for the next phrase
-                    autoSaveSession(); 
                 }
+
+                // Aggressive Diffing Algorithm to kill Android duplication
+                let dedup = [];
+                for (let i = 0; i < currentFinals.length; i++) {
+                    if (i > 0 && currentFinals[i].toLowerCase().startsWith(currentFinals[i-1].toLowerCase())) {
+                        dedup[dedup.length - 1] = currentFinals[i]; // Replace accumulation
+                    } else if (i > 0 && currentFinals[i-1].toLowerCase().startsWith(currentFinals[i].toLowerCase())) {
+                        // Ignore fragment
+                    } else if (i > 0 && currentFinals[i].toLowerCase() === dedup[dedup.length - 1].toLowerCase()) {
+                        // Ignore exact consecutive duplicate
+                    } else {
+                        dedup.push(currentFinals[i]);
+                    }
+                }
+
+                let finalStr = dedup.join(' ');
+                
+                // Capitalization formatting
+                if (finalStr) {
+                    finalStr = finalStr.charAt(0).toUpperCase() + finalStr.slice(1);
+                }
+
+                // Render logic
+                const activeContainer = document.querySelector('#activeUserNode .content-editable');
+                if (!activeContainer) return;
+
+                if (!activeSessionSpan) {
+                    activeSessionSpan = document.createElement('span');
+                    activeContainer.appendChild(activeSessionSpan);
+                }
+                if (!activeInterimSpan) {
+                    activeInterimSpan = document.createElement('span');
+                    activeInterimSpan.className = 'interim-text';
+                    activeInterimSpan.style.color = '#94a3b8';
+                    activeInterimSpan.style.fontStyle = 'italic';
+                    activeContainer.appendChild(activeInterimSpan);
+                }
+
+                activeSessionSpan.innerText = finalStr ? finalStr + ' ' : '';
+                activeInterimSpan.innerText = interim ? " " + interim : '';
+
+                // AUTO-PUNCTUATION TIMER (2 Seconds)
+                autoPunctuateTimer = setTimeout(() => {
+                    if (isRecording && activeSessionSpan && activeSessionSpan.innerText.trim().length > 0) {
+                        let txt = activeSessionSpan.innerText.trim();
+                        if (!/[.!?,"']$/.test(txt)) {
+                            activeSessionSpan.innerText = txt + '. ';
+                        } else {
+                            activeSessionSpan.innerText = txt + ' ';
+                        }
+                        
+                        // Freeze this span and reset tracking for the next sentence
+                        activeSessionSpan = null;
+                        ignoreResultsUpTo = e.results.length;
+                        autoSaveSession();
+                    }
+                }, 2000); 
             };
             
-            recognition.onerror = (e) => { 
-                console.warn("Speech Error:", e.error);
-                if (e.error === 'not-allowed') {
-                    isRecording = false;
-                    const btn = document.getElementById('dictateBtn');
-                    btn.innerHTML = '🎙️ Dictate'; btn.classList.remove('recording');
-                }
-            };
+            recognition.onerror = (e) => { console.warn("Speech Error:", e.error); };
             
             recognition.onend = () => { 
-                // Seamlessly restart to simulate continuous dictation without the Android bug
                 if (isRecording) {
-                    try { recognition.start(); } catch (err) {}
+                    try { 
+                        ignoreResultsUpTo = 0;
+                        activeSessionSpan = null;
+                        recognition.start(); 
+                    } catch (err) {}
                 }
             };
         } else { 
@@ -842,11 +904,23 @@
         const btn = document.getElementById('dictateBtn');
         if (isRecording) {
             isRecording = false; 
+            clearTimeout(autoPunctuateTimer);
             recognition.stop();
             btn.innerHTML = '🎙️ Dictate'; 
             btn.classList.remove('recording');
+            
+            if (activeInterimSpan) {
+                activeInterimSpan.remove();
+                activeInterimSpan = null;
+            }
         } else {
             isRecording = true; 
+            ignoreResultsUpTo = 0;
+            activeSessionSpan = null;
+            if (activeInterimSpan) {
+                activeInterimSpan.remove();
+                activeInterimSpan = null;
+            }
             recognition.lang = document.getElementById('langSelect').value; 
             try { recognition.start(); } catch(e){}
             btn.innerHTML = '⏹️ Stop'; 
@@ -862,6 +936,12 @@
         div.innerHTML = `<div class="msg-label">You (Dictation Draft)</div><div class="content-editable" contenteditable="true"></div>`;
         chat.appendChild(div);
         chat.scrollTop = chat.scrollHeight;
+        
+        // Reset pointers so the engine knows it's a new box
+        ignoreResultsUpTo = 0;
+        activeSessionSpan = null;
+        activeInterimSpan = null;
+        
         autoSaveSession();
     }
 
@@ -914,7 +994,7 @@ STRICT OUTPUT RULES:
 
         const btn = event.target;
         const originalText = btn.innerHTML;
-        btn.innerHTML = '⏳ Drafting via Server...'; btn.disabled = true;
+        btn.innerHTML = '⏳ Drafting...'; btn.disabled = true;
 
         try {
             const customKey = stenoData['apikey'];
@@ -959,7 +1039,7 @@ STRICT OUTPUT RULES:
             
             document.getElementById('aiInstructions').value = "";
             addNewBubble();
-            autoSaveSession(); 
+            await autoSaveSession(); 
 
         } catch (error) { 
             console.error(error);
