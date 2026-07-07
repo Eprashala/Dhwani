@@ -23,6 +23,7 @@ let wordsArray = [];
 
 let allSessions = []; 
 const currentDateKey = new Date().toISOString().split('T')[0]; // Yields standard YYYY-MM-DD
+let currentSessionId = Date.now();
 
 // Memory Dictionaries to prevent Android DOM parsing crashes
 const speechDataMap = {};
@@ -619,11 +620,22 @@ function saveData() {
         localStorage.setItem('darshan_highlight', UI.highlightCheckbox.checked);
         
 		if (UI.remember.checked && chatHistory.length > 0) {
-			let sessionIndex = allSessions.findIndex(s => s.date === currentDateKey);
+			// Look for the unique session ID, not just the date
+			let sessionIndex = allSessions.findIndex(s => s.id === currentSessionId);
+			
 			if (sessionIndex > -1) {
-				allSessions[sessionIndex].messages = chatHistory; // Update today
+				allSessions[sessionIndex].messages = chatHistory; // Update ongoing session
 			} else {
-				allSessions.push({ date: currentDateKey, messages: chatHistory }); // Create new day
+				// Create a new session block with Date and Time
+				let timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+				let displayTitle = `${currentDateKey} (${timeString})`;
+				
+				allSessions.push({ 
+					id: currentSessionId, 
+					date: currentDateKey, 
+					title: displayTitle, 
+					messages: chatHistory 
+				});
 			}
 			localStorage.setItem('darshan_all_history', JSON.stringify(allSessions));
 		} else if (!UI.remember.checked) { 
@@ -698,10 +710,13 @@ function loadData() {
 }
 
 function clearData() {
-    chatHistory = []; state.lastAIMessage = ""; 
-    try { localStorage.removeItem('darshan_history'); } catch(e){}
+    chatHistory = []; 
+    state.lastAIMessage = ""; 
+    currentSessionId = Date.now(); // Generate a fresh ID for the new session
+    
     UI.log.innerHTML = `<div class="text-gray-400 text-center mt-12 cinzel"><p class="text-yellow-500 text-xl mb-2">🙏 Memory Cleared 🙏</p>Begin anew.</div>`;
     resetCurrentTTS();
+    
     if (UI.btnEditLast) {
         UI.btnEditLast.classList.add('hidden');
         UI.btnEditLast.classList.remove('flex');
@@ -1123,66 +1138,64 @@ async function processInput(userText) {
     setTimeout(updateStopButtonVisibility, 100); 
 }
 
-function renderHistoryList() {
-    const container = document.getElementById('history-list-container');
-    container.innerHTML = '';
-    
-    if (allSessions.length === 0) {
-        container.innerHTML = '<p class="text-xs text-slate-500 text-center italic py-2">No past records found.</p>';
-        return;
-    }
+			function renderHistoryList() {
+				const container = document.getElementById('history-list-container');
+				container.innerHTML = '';
+				
+				if (allSessions.length === 0) {
+					container.innerHTML = '<p class="text-xs text-slate-500 text-center italic py-2">No past records found.</p>';
+					return;
+				}
 
-    // Sort the array so the newest dates appear at the top
-    const sorted = [...allSessions].sort((a, b) => new Date(b.date) - new Date(a.date));
+				// Sort newest to oldest
+				const sorted = [...allSessions].sort((a, b) => b.id - a.id);
 
-    sorted.forEach(session => {
-        const btn = document.createElement('button');
-        btn.className = "w-full text-left text-xs text-slate-300 bg-slate-800/80 hover:bg-slate-700 px-3 py-2.5 rounded-lg transition-colors border border-transparent hover:border-cyan-500/50 flex justify-between items-center outline-none";
-        btn.innerHTML = `<span class="font-bold tracking-wide">${session.date}</span> <span class="text-[10px] text-slate-500 bg-slate-900 px-2 py-0.5 rounded-full">${session.messages.length} msgs</span>`;
-        
-        btn.onclick = (e) => {
-            e.stopPropagation();
-            loadSpecificSession(session.date);
-            UI.settingsModal.classList.add('hidden'); // Auto-close modal
-        };
-        container.appendChild(btn);
-    });
-}
+				sorted.forEach(session => {
+					const btn = document.createElement('button');
+					btn.className = "w-full text-left text-xs text-slate-300 bg-slate-800/80 hover:bg-slate-700 px-3 py-2.5 rounded-lg transition-colors border border-transparent hover:border-cyan-500/50 flex justify-between items-center outline-none";
+					
+					// Display the title which includes both Date and Time
+					btn.innerHTML = `<span class="font-bold tracking-wide">${session.title}</span> <span class="text-[10px] text-slate-500 bg-slate-900 px-2 py-0.5 rounded-full">${session.messages.length} msgs</span>`;
+					
+					btn.onclick = (e) => {
+						e.stopPropagation();
+						// Pass the unique ID instead of the date
+						loadSpecificSession(session.id); 
+						UI.settingsModal.classList.add('hidden'); 
+					};
+					container.appendChild(btn);
+				});
+			}
 
-			function loadSpecificSession(targetDate) {
-				// 1. Stop active audio and clear the screen
+			function loadSpecificSession(targetId) {
 				resetCurrentTTS();
 				UI.log.innerHTML = '';
 				chatHistory = [];
 				
-				// 2. Fetch the target data
-				const targetSession = allSessions.find(s => s.date === targetDate);
+				// Find by ID
+				const targetSession = allSessions.find(s => s.id === targetId);
 				if (targetSession) {
+					// Set the active variables to the loaded session so continuing the chat saves to it
+					currentSessionId = targetSession.id;
 					chatHistory = targetSession.messages;
+					
 					if (UI.welcome) UI.welcome.style.display = 'none';
 					
-					// 3. Add an Archive Header to visually indicate it's an old chat
 					const archiveNotice = document.createElement('div');
 					archiveNotice.className = "text-center text-xs text-cyan-500 mb-6 font-bold border-b border-cyan-900/50 pb-2 uppercase tracking-widest mt-4";
-					archiveNotice.innerText = targetDate === currentDateKey ? "Today's Active Session" : `Archived Session: ${targetDate}`;
+					archiveNotice.innerText = `Session: ${targetSession.title}`;
 					UI.log.appendChild(archiveNotice);
 
-					// 4. Render the messages
 					chatHistory.forEach(msg => {
 						renderMessage(msg.role === 'user' ? (UI.name.value || "Bhakt") : "Archive", msg.parts[0].text, msg.role === 'model');
 					});
 					
-					// If it's not today, disable the ability to edit the last message
-					if (targetDate !== currentDateKey && UI.btnEditLast) {
-						UI.btnEditLast.classList.add('hidden');
-						UI.btnEditLast.classList.remove('flex');
-					} else if (UI.btnEditLast && chatHistory.length > 0) {
+					if (UI.btnEditLast && chatHistory.length > 0) {
 						UI.btnEditLast.classList.remove('hidden');
 						UI.btnEditLast.classList.add('flex');
 					}
 				}
 			}
-
 async function getAIResponse(history, config) {
     const customKey = (UI.keyIn.value.length > 10) ? UI.keyIn.value : null;
     const headers = { 'Content-Type': 'application/json' };
