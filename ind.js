@@ -647,7 +647,7 @@ function loadData() {
         // Load Left Settings
         if (UI.fontSizeSlider) {
             UI.fontSizeSlider.value = localStorage.getItem('darshan_font_size') || "14";
-            UI.ttsSpeedSlider.value = localStorage.getItem('darshan_tts_speed') || "1.0";
+            UI.ttsSpeedSlider.value = localStorage.getItem('darshan_tts_speed') || "1.1";
             
             const savedHighlight = localStorage.getItem('darshan_highlight');
             UI.highlightCheckbox.checked = savedHighlight === 'true'; // default true
@@ -1397,8 +1397,8 @@ function startHighlightTimer(msgId) {
     if (highlightTimer) clearTimeout(highlightTimer);
 
     // Tuned synchronization defaults for 1x reading speed
-    const BASE_DELAY = 120;  
-    const CHAR_DELAY = 45;   
+    const BASE_DELAY = 140;  
+    const CHAR_DELAY = 50;   
     const MAX_DELAY = 800;   
 
     const highlightNextWord = () => {
