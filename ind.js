@@ -14,7 +14,7 @@ let currentAborter = null;
 let lastHighlightedSpan = null;
 
 // --- CLOUD TTS STATE VARIABLES ---
-let currentAudio = null;
+let currentAudio = new Audio(); // Singleton audio element prevents browser autoplay blocks
 let audioChunks = [];
 let currentChunkIndex = 0;
 let globalWordIndex = 0;
@@ -58,7 +58,6 @@ async function releaseWakeLock() {
 
 // --- EXPERT FULLSCREEN ENFORCER ---
 function enforceFullScreen() {
-    // 1. Check if we are NOT in fullscreen (using standard and older prefixes)
     const isFullscreen = document.fullscreenElement || 
                          document.webkitFullscreenElement || 
                          document.mozFullScreenElement || 
@@ -66,25 +65,23 @@ function enforceFullScreen() {
 
     if (!isFullscreen) {
         const docEl = document.documentElement;
-        
-        // 2. Map out all possible browser-specific fullscreen commands
         const requestFS = docEl.requestFullscreen || 
                           docEl.webkitRequestFullscreen || 
                           docEl.mozRequestFullScreen || 
                           docEl.msRequestFullscreen;
 
         if (requestFS) {
-            requestFS.call(docEl).catch((err) => {
-                console.warn("Fullscreen enforcement delayed by browser:", err);
+            Promise.resolve(requestFS.call(docEl)).catch(() => {
+                // Silently handle delayed browser rejections to prevent console spam
             });
         }
     }
 }
 
-// By using { capture: true }, this runs first, ignoring all e.stopPropagation() calls lower in the app.
-// Adding 'touchstart' guarantees instant response on Android touchscreens before the finger even lifts.
-document.addEventListener('click', enforceFullScreen, { capture: true });
-document.addEventListener('touchstart', enforceFullScreen, { capture: true, passive: true });
+// Broadened event listeners to guarantee fullscreen return on any interaction
+['click', 'touchstart', 'touchend', 'keydown'].forEach(evt => {
+    document.addEventListener(evt, enforceFullScreen, { capture: true, passive: true });
+});
 
 // --- 2. THE ANCIENT LIBRARY CONFIGURATION ---
 const PROXY_URL = "https://eprashala.pythonanywhere.com/api/chat"; 
@@ -361,8 +358,7 @@ const LIBRARY_CONFIG = {
         "Nitisara": { persona: "Kamandaka", texts: "Nitisara", "greeting": "Hari Om" },
         "Manusmriti": { persona: "Manu", texts: "Manusmriti", "greeting": "Hari Om" },
         "Yajnavalkya Smriti": { persona: "Maharishi Yajnavalkya", texts: "Yajnavalkya Smriti", "greeting": "Hari Om" }
-    },
-    "Maharishis": maharishiObject
+    }
 };
 
 // Wait for HTML to be fully painted before finding elements
@@ -432,9 +428,7 @@ document.addEventListener("DOMContentLoaded", () => {
         setupEventListeners();
 
         UI.overlay.addEventListener('click', () => {
-            if (document.documentElement.requestFullscreen) {
-                document.documentElement.requestFullscreen().catch(() => {});
-            }
+            enforceFullScreen();
             acquireWakeLock();
             
             // Native initialization hack to ensure mobile audio isn't completely locked
@@ -570,7 +564,11 @@ function updateLeftSliderLabels() {
 
     const sVal = UI.ttsSpeedSlider.value;
     UI.ttsSpeedVal.innerText = sVal + 'x';
-
+    
+    // Apply speed instantly to active audio if playing
+    if (currentAudio && !currentAudio.paused) {
+        currentAudio.playbackRate = parseFloat(sVal);
+    }
 }
 
 function updateSliderAvailability() {
@@ -886,7 +884,6 @@ function setupEventListeners() {
         e.stopPropagation();
         if (state.isProcessing) return;
         
-        // NEW: Alert the user if their device/browser blocks the API
         if (!recognition) {
             alert("⚠️ Speech Recognition is not supported by this browser or app wrapper. Please open this library directly in Google Chrome, ensure the URL starts with HTTPS, and grant Microphone permissions.");
             return;
@@ -999,7 +996,6 @@ function initSpeechRecognition() {
         setTimeout(updateStopButtonVisibility, 50); 
         
         if (e.error === 'no-speech') {
-            // Normal timeout, user didn't speak
             return; 
         } else if (e.error === 'network') {
             alert("⚠️ Network Error: Android's Google App cannot reach the speech servers. Check internet or Google App restrictions.");
@@ -1010,6 +1006,7 @@ function initSpeechRecognition() {
         }
     };
 }
+
 function resetMicUI() {
     UI.btnMic.classList.remove('mic-pulse');
     UI.status.style.backgroundColor = '#4b5563'; 
@@ -1053,7 +1050,6 @@ async function processInput(userText) {
 
 	if (chatHistory.length === 0) {
         chatHistory.push({ role: 'user', parts: [{ text: "Pranam." }] });
-        // Updated to establish Dhwani's identity immediately 
         chatHistory.push({ role: 'model', parts: [{ text: `Namaste, me Dhwani. I am here to share the wisdom of ${config.persona}.` }] });
     }
 
@@ -1069,12 +1065,9 @@ async function processInput(userText) {
         chatHistory.push({ role: 'model', parts: [{ text: rawRes }] });
         
         const newMsgId = renderMessage(getSelectedItemName(), rawRes, true); 
-        
-        // This was throwing an error on Android WebView previously
         saveData();
         
         if (!state.isMuted) {
-            // Instantly start TTS without SetTimeout
             const btn = document.getElementById(`play-btn-${newMsgId}`);
             if (btn) window.toggleSingleMessagePlay(btn);
         }
@@ -1199,15 +1192,11 @@ function highlightTTSWord(msgId, wordIndex) {
 
     const span = document.getElementById(`tts-${msgId}-${wordIndex}`);
     if (span) {
-        
-        // Only apply the visual yellow highlight if the setting is checked
         if (UI.highlightCheckbox && UI.highlightCheckbox.checked) {
             span.classList.add('bg-yellow-500/30', 'text-yellow-300', 'font-bold', 'rounded-[3px]', 'px-[2px]', 'shadow-[0_0_8px_rgba(234,179,8,0.4)]');
             lastHighlightedSpan = span;
         }
 
-        // We STILL auto-scroll the window regardless of the highlight setting 
-        // to ensure the user can always see what is being read
         const logContainer = document.getElementById('conversation-log');
         const spanRect = span.getBoundingClientRect();
         const logRect = logContainer.getBoundingClientRect();
@@ -1226,7 +1215,6 @@ function clearTTSHighlight() {
 }
 
 // --- TTS STATE MANAGEMENT ---
-
 function updatePlayBtnUI(btn, isPlaying) {
     if (!btn) return;
     const playIcon = btn.querySelector('.play-icon');
@@ -1254,11 +1242,10 @@ function resetCurrentTTS() {
         currentActiveBtn = null;
     }
     
-    // Stop Cloud Audio
+    // Stop Global Cloud Audio
     if (currentAudio) {
         currentAudio.pause();
         currentAudio.src = "";
-        currentAudio = null;
     }
     
     // Stop Highlighter
@@ -1291,12 +1278,10 @@ window.toggleSingleMessagePlay = (btnElem) => {
             updatePlayBtnUI(btnElem, true);
             updateStopButtonVisibility(); 
             
-            // Resume Cloud Audio
-            if (currentAudio) currentAudio.play();
-            // Resume Highlighter
-            const speechRate = parseFloat(UI.ttsSpeedSlider ? UI.ttsSpeedSlider.value : 1.00);
-            startHighlightTimer(msgId, speechRate);
+            // Resume Global Cloud Audio
+            if (currentAudio && currentAudio.src) currentAudio.play();
             
+            startHighlightTimer(msgId);
             return;
         } else if (ttsStatus === 'PLAYING') {
             ttsStatus = 'PAUSED';
@@ -1304,10 +1289,8 @@ window.toggleSingleMessagePlay = (btnElem) => {
             const textSpan = btnElem.querySelector('.play-text');
             if (textSpan) textSpan.innerText = "Resume";
             
-            // Pause Cloud Audio
             if (currentAudio) currentAudio.pause();
             if (highlightTimer) clearTimeout(highlightTimer);
-            
             return;
         }
     }
@@ -1328,7 +1311,6 @@ window.toggleSingleMessagePlay = (btnElem) => {
 // ==========================================
 
 function chunkText(text, maxLength = 180) {
-    // Splits text safely by punctuation to avoid cutting words in half
     const regex = /[^.?!।,\n]+[.?!।,\n]*/g;
     let chunks = [];
     let currentChunk = "";
@@ -1344,31 +1326,23 @@ function chunkText(text, maxLength = 180) {
         }
     }
     if (currentChunk) chunks.push(currentChunk.trim());
-    
-    // Fallback if no punctuation exists
     if (chunks.length === 0 && text.trim().length > 0) chunks.push(text.trim());
     return chunks;
 }
 
 function playCloudAudio(fullText, btnElement) {
     const msgId = btnElement.getAttribute('data-msg-id');
-    
-    // Extract base language code (e.g., 'mr-IN' becomes 'mr')
     const langCode = UI.lang ? UI.lang.value.split('-')[0] : 'hi'; 
-    const speechRate = parseFloat(UI.ttsSpeedSlider ? UI.ttsSpeedSlider.value : 1.0);
-
-    // Setup Highlighting Arrays
+    
     wordsArray = fullText.match(/\S+/g) || [];
     globalWordIndex = 0;
-
-    // Break text into safe chunks for Google Translate
     audioChunks = chunkText(fullText, 180);
     currentChunkIndex = 0;
 
-    playNextChunk(langCode, msgId, btnElement, speechRate);
+    playNextChunk(langCode, msgId, btnElement);
 }
 
-function playNextChunk(langCode, msgId, btnElement, speechRate) {
+function playNextChunk(langCode, msgId, btnElement) {
     if (currentChunkIndex >= audioChunks.length || ttsStatus !== 'PLAYING') {
         resetCurrentTTS();
         return;
@@ -1376,44 +1350,56 @@ function playNextChunk(langCode, msgId, btnElement, speechRate) {
 
     const chunkText = audioChunks[currentChunkIndex];
     
-    // Safety check: Skip if a chunk is completely empty
     if (!chunkText || chunkText.trim() === '') {
         currentChunkIndex++;
-        playNextChunk(langCode, msgId, btnElement, speechRate);
+        playNextChunk(langCode, msgId, btnElement);
         return;
     }
 
-    // UPDATED: Using the reliable 'gtx' Google API endpoint instead of 'tw-ob'
-	const url = `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=${langCode}&q=${encodeURIComponent(chunkText)}`;
+    const url = `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=${langCode}&q=${encodeURIComponent(chunkText)}`;
 
-    currentAudio = new Audio(url);
-    currentAudio.playbackRate = speechRate; 
+    // Read real-time speech rate
+    const currentRate = parseFloat(UI.ttsSpeedSlider ? UI.ttsSpeedSlider.value : 1.0);
+
+    // Reuse singleton audio element instead of instantiating `new Audio(url)`
+    // By keeping the audio element persistent, browsers retain the user's initial unlock gesture.
+    currentAudio.src = url;
+    currentAudio.playbackRate = currentRate; 
+    currentAudio.preservesPitch = true;
 
     currentAudio.play().then(() => {
-        // Only start the highlighter loop on the first chunk
         if (currentChunkIndex === 0) {
-            startHighlightTimer(msgId, speechRate);
+            startHighlightTimer(msgId);
         }
     }).catch(err => {
         console.error("Cloud TTS Stream failed:", err);
-        alert("Audio stream blocked by server or network. Please try tapping play again.");
-        resetCurrentTTS();
+        // Fallback: Skip chunk silently rather than hard erroring out if blocked
+        setTimeout(() => {
+            currentChunkIndex++;
+            playNextChunk(langCode, msgId, btnElement);
+        }, 300);
     });
 
     currentAudio.onended = () => {
         currentChunkIndex++;
-        playNextChunk(langCode, msgId, btnElement, speechRate);
+        playNextChunk(langCode, msgId, btnElement);
+    };
+
+    currentAudio.onerror = () => {
+        console.warn("Audio element error, trying next chunk.");
+        currentChunkIndex++;
+        playNextChunk(langCode, msgId, btnElement);
     };
 }
 
 // --- DECOUPLED HIGHLIGHTER TIMER ---
-function startHighlightTimer(msgId, speechRate) {
+function startHighlightTimer(msgId) {
     if (highlightTimer) clearTimeout(highlightTimer);
 
-    // Timing Tuning (Adjust these if highlight lags or rushes)
-    const BASE_DELAY = 150;  
-    const CHAR_DELAY = 30;   
-    const MAX_DELAY = 850;   
+    // Tuned synchronization defaults for 1x reading speed
+    const BASE_DELAY = 120;  
+    const CHAR_DELAY = 45;   
+    const MAX_DELAY = 800;   
 
     const highlightNextWord = () => {
         if (ttsStatus !== 'PLAYING' || globalWordIndex >= wordsArray.length) return;
@@ -1423,8 +1409,11 @@ function startHighlightTimer(msgId, speechRate) {
         const currentWord = wordsArray[globalWordIndex] || "";
         const charCount = currentWord.length;
 
-        let wordDuration = (BASE_DELAY + (charCount * CHAR_DELAY)) / speechRate; 
-        if (wordDuration > MAX_DELAY) wordDuration = MAX_DELAY;
+        // Fetch the active UI slider value directly to dynamically adjust speed mid-sentence
+        const dynamicSpeechRate = parseFloat(UI.ttsSpeedSlider ? UI.ttsSpeedSlider.value : 1.0);
+
+        let wordDuration = (BASE_DELAY + (charCount * CHAR_DELAY)) / dynamicSpeechRate; 
+        if (wordDuration > (MAX_DELAY / dynamicSpeechRate)) wordDuration = (MAX_DELAY / dynamicSpeechRate);
 
         globalWordIndex++;
         highlightTimer = setTimeout(highlightNextWord, wordDuration);
@@ -1452,7 +1441,7 @@ function renderMessage(sender, text, isModel) {
     const msgId = 'msg-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
     const div = document.createElement('div');
     
-    rawTextMap[msgId] = text; // Safe memory storage for copying
+    rawTextMap[msgId] = text; 
     
     div.className = `msg-container p-4 rounded-2xl ${isModel ? 'bg-[#0f172a]/90 border border-slate-700/50 shadow-lg ml-2 mr-8' : 'bg-cyan-900/40 text-right mr-2 ml-8'} mb-4`;
     
@@ -1502,7 +1491,7 @@ function renderMessage(sender, text, isModel) {
     if (isModel) {
         const mdBody = div.querySelector('.markdown-body');
         const speechText = prepareTextForTTSAndHighlighting(mdBody, msgId);
-        speechDataMap[msgId] = speechText; // Safe memory storage for TTS
+        speechDataMap[msgId] = speechText;
     }
     
     setTimeout(() => { UI.log.scrollTop = UI.log.scrollHeight; }, 50);
