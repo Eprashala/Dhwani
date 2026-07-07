@@ -1485,8 +1485,8 @@ function startHighlightTimer(msgId) {
     if (highlightTimer) clearTimeout(highlightTimer);
 
     // Tuned synchronization defaults for 1x reading speed
-    const BASE_DELAY = 140;  
-    const CHAR_DELAY = 50;   
+    const BASE_DELAY = 150;  
+    const CHAR_DELAY = 55;   
     const MAX_DELAY = 800;   
 
     const highlightNextWord = () => {
