@@ -403,6 +403,9 @@ document.addEventListener("DOMContentLoaded", () => {
         modelSlider: document.getElementById('model-slider'),
         ratioVal: document.getElementById('ratio-val'),
         modelVal: document.getElementById('model-val'),
+		mainView: document.getElementById('settings-main-view'),
+        historyView: document.getElementById('settings-history-view'),
+        btnHistoryBack: document.getElementById('btn-history-back'),
 
         // Left Side Handle Elements (Reading & Audio)
         leftAdvToggle: document.getElementById('left-adv-toggle'),
@@ -763,14 +766,49 @@ function setupEventListeners() {
     UI.modelSlider.addEventListener('input', updateSliderLabels);
     UI.keyIn.addEventListener('input', updateSliderAvailability);
 
-    // Right Modal Events
+// Right Modal Events
     const openSettings = (e) => { e.stopPropagation(); UI.settingsModal.classList.remove('hidden'); };
-    const closeSettings = (e) => { e.stopPropagation(); UI.settingsModal.classList.add('hidden'); };
+    
+    const closeSettings = (e) => { 
+        e.stopPropagation(); 
+        UI.settingsModal.classList.add('hidden'); 
+        
+        // Reset the modal back to the main view quietly in the background
+        setTimeout(() => {
+            if (UI.historyView && UI.mainView) {
+                UI.historyView.classList.add('hidden');
+                UI.historyView.classList.remove('flex');
+                UI.mainView.classList.remove('hidden');
+            }
+        }, 300);
+    };
+
     UI.advToggle.onclick = openSettings;
     UI.btnCloseSet.onclick = closeSettings;
     UI.btnSaveSet.onclick = (e) => { e.stopPropagation(); saveData(); closeSettings(e); };
     UI.settingsModal.addEventListener('click', e => e.stopPropagation());
 
+    // Switch to History View
+    const btnViewHistory = document.getElementById('btn-view-history');
+    if (btnViewHistory) {
+        btnViewHistory.addEventListener('click', (e) => {
+            e.stopPropagation();
+            UI.mainView.classList.add('hidden');
+            UI.historyView.classList.remove('hidden');
+            UI.historyView.classList.add('flex');
+            renderHistoryList();
+        });
+    }
+
+    // Switch back to Main View
+    if (UI.btnHistoryBack) {
+        UI.btnHistoryBack.addEventListener('click', (e) => {
+            e.stopPropagation();
+            UI.historyView.classList.add('hidden');
+            UI.historyView.classList.remove('flex');
+            UI.mainView.classList.remove('hidden');
+        });
+    }
     // Left Modal Events
     UI.fontSizeSlider.addEventListener('input', updateLeftSliderLabels);
     UI.ttsSpeedSlider.addEventListener('input', updateLeftSliderLabels);
@@ -1138,34 +1176,49 @@ async function processInput(userText) {
     setTimeout(updateStopButtonVisibility, 100); 
 }
 
-			function renderHistoryList() {
-				const container = document.getElementById('history-list-container');
-				container.innerHTML = '';
-				
-				if (allSessions.length === 0) {
-					container.innerHTML = '<p class="text-xs text-slate-500 text-center italic py-2">No past records found.</p>';
-					return;
-				}
-
-				// Sort newest to oldest
-				const sorted = [...allSessions].sort((a, b) => b.id - a.id);
-
-				sorted.forEach(session => {
-					const btn = document.createElement('button');
-					btn.className = "w-full text-left text-xs text-slate-300 bg-slate-800/80 hover:bg-slate-700 px-3 py-2.5 rounded-lg transition-colors border border-transparent hover:border-cyan-500/50 flex justify-between items-center outline-none";
-					
-					// Display the title which includes both Date and Time
-					btn.innerHTML = `<span class="font-bold tracking-wide">${session.title}</span> <span class="text-[10px] text-slate-500 bg-slate-900 px-2 py-0.5 rounded-full">${session.messages.length} msgs</span>`;
-					
-					btn.onclick = (e) => {
-						e.stopPropagation();
-						// Pass the unique ID instead of the date
-						loadSpecificSession(session.id); 
-						UI.settingsModal.classList.add('hidden'); 
-					};
-					container.appendChild(btn);
-				});
+		function renderHistoryList() {
+			const container = document.getElementById('history-list-container');
+			container.innerHTML = '';
+			
+			if (allSessions.length === 0) {
+				container.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-slate-500"><svg class="w-12 h-12 mb-3 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg><p class="text-sm italic">No past records found.</p></div>';
+				return;
 			}
+
+			// Sort newest to oldest
+			const sorted = [...allSessions].sort((a, b) => b.id - a.id);
+
+			sorted.forEach(session => {
+				const btn = document.createElement('button');
+				// Styled for a larger, more comfortable tap target since we have the space
+				btn.className = "w-full text-left text-sm text-slate-300 bg-slate-800/80 hover:bg-slate-700 p-4 rounded-xl transition-colors border border-slate-700 hover:border-cyan-500/50 flex flex-col gap-2 outline-none mb-2 shadow-sm";
+				
+				btn.innerHTML = `
+					<div class="flex justify-between items-center w-full">
+						<span class="font-bold tracking-wide text-cyan-100">${session.title}</span> 
+						<span class="text-[10px] text-cyan-400 bg-cyan-900/40 border border-cyan-800/50 px-2 py-1 rounded-full font-bold uppercase">${session.messages.length} msgs</span>
+					</div>
+					<div class="text-xs text-slate-500 truncate w-full">
+						${session.messages.length > 0 ? session.messages[0].parts[0].text : 'Empty session'}
+					</div>
+				`;
+				
+				btn.onclick = (e) => {
+					e.stopPropagation();
+					loadSpecificSession(session.id); 
+					// Close the main modal entirely upon selection
+					UI.settingsModal.classList.add('hidden'); 
+					
+					// Reset the views in the background
+					setTimeout(() => {
+						UI.historyView.classList.add('hidden');
+						UI.historyView.classList.remove('flex');
+						UI.mainView.classList.remove('hidden');
+					}, 300);
+				};
+				container.appendChild(btn);
+			});
+		}
 
 			function loadSpecificSession(targetId) {
 				resetCurrentTTS();
