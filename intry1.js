@@ -149,7 +149,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         btnPasteKey: document.getElementById('btn-paste-key'),
         iconVol: document.getElementById('icon-vol'),
         iconMute: document.getElementById('icon-mute'),
-        
+        btnDownloadAllPdf: document.getElementById('btn-download-all-pdf'),
         advToggle: document.getElementById('adv-toggle'),
         settingsModal: document.getElementById('settings-modal'),
         btnCloseSet: document.getElementById('btn-close-settings'),
@@ -748,6 +748,12 @@ function setupEventListeners() {
             window.downloadSinglePDF(pdfBtn, sender);
             return;
         }
+		if (UI.btnDownloadAllPdf) {
+			UI.btnDownloadAllPdf.addEventListener('click', (e) => {
+				e.stopPropagation();
+				downloadEntireSessionPDF();
+			});
+		}
     });
 	
     UI.ratioSlider.addEventListener('input', updateSliderLabels);
@@ -1523,3 +1529,76 @@ function renderMessage(sender, text, isModel) {
 
     return msgId;
 }
+
+window.downloadEntireSessionPDF = () => {
+    if (typeof html2pdf === 'undefined') {
+        alert("PDF engine is still loading. Please try again in a moment.");
+        return;
+    }
+    
+    if (chatHistory.length === 0) {
+        alert("The library is currently empty. Speak to a sage first.");
+        return;
+    }
+
+    // Clone the conversation log so we don't alter the actual UI
+    const logClone = UI.log.cloneNode(true);
+    
+    // Remove UI elements we don't want in the PDF (buttons, welcome message, etc.)
+    const elementsToRemove = logClone.querySelectorAll('.msg-action-bar, .user-edit-btn, #welcome-msg, #archive-notice-banner');
+    elementsToRemove.forEach(el => el.remove());
+
+    // Create a printable container
+    const container = document.createElement('div');
+    container.style.padding = '30px';
+    container.style.fontFamily = 'Arial, sans-serif';
+    container.style.backgroundColor = '#FFFFFF'; 
+    container.style.color = '#000000'; 
+
+    // Add Header
+    const header = document.createElement('div');
+    header.innerText = "ai.eprashala.com - Ancient Library Session";
+    header.style.textAlign = 'center';
+    header.style.color = '#6b7280'; 
+    header.style.fontSize = '14px'; 
+    header.style.fontWeight = 'bold';
+    header.style.letterSpacing = '2px';
+    header.style.paddingBottom = '15px';
+    header.style.marginBottom = '20px';
+    header.style.borderBottom = '2px solid #e5e7eb';
+    container.appendChild(header);
+    
+    // Title
+    const title = document.createElement('h3');
+    title.innerText = currentSessionTitle || `Session: ${new Date().toLocaleDateString()}`;
+    title.style.color = '#0891b2'; 
+    title.style.marginBottom = '20px';
+    container.appendChild(title);
+
+    // Format the cloned messages for a white background
+    const messages = logClone.querySelectorAll('.msg-container');
+    messages.forEach(msg => {
+        msg.style.backgroundColor = '#f8fafc'; // light slate
+        msg.style.border = '1px solid #e2e8f0';
+        msg.style.color = '#0f172a';
+        msg.style.marginBottom = '15px';
+        msg.style.padding = '15px';
+        msg.style.borderRadius = '8px';
+        
+        // Force text color inside markdown body to black for printing
+        const textElements = msg.querySelectorAll('*');
+        textElements.forEach(el => el.style.color = '#0f172a');
+    });
+
+    container.appendChild(logClone);
+
+    const opt = {
+        margin:       0.5,
+        filename:     `Eprashala_Session_${new Date().toISOString().slice(0,10)}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+    
+    html2pdf().set(opt).from(container).save();
+};
