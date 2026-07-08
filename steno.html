@@ -47,6 +47,7 @@
         .config-item select { padding: 4px 8px; font-size: 0.8rem; border: 1px solid var(--border); border-radius: 4px; outline: none; background: white; }
         .config-divider { width: 1px; background: var(--border); height: 25px; align-self: center; margin: 0 2px; }
         
+		
         /* Chat Window */
         .chat-container { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; scroll-behavior: smooth; }
         .message { padding: 12px 15px; border-radius: 8px; max-width: 100%; line-height: 1.6; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
@@ -120,6 +121,45 @@
             button, select, input { padding: 10px; }
             .message { max-width: 100%; }
         }
+		
+		/* Rich Text Toolbar */
+        .rich-toolbar {
+            background: var(--panel-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 8px 10px;
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            white-space: nowrap;
+            scrollbar-width: none; /* Hide scrollbar for clean mobile look */
+            -ms-overflow-style: none;
+            z-index: 10;
+        }
+        .rich-toolbar::-webkit-scrollbar { display: none; }
+        
+        .fmt-btn {
+            background: var(--bg-color);
+            border: 1px solid #cbd5e1;
+            color: var(--text);
+            border-radius: 4px;
+            min-width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.1s;
+        }
+        .fmt-btn:active { background: #e2e8f0; transform: scale(0.95); }
+        .fmt-divider {
+            width: 1px;
+            background: var(--border);
+            height: 24px;
+            align-self: center;
+            margin: 0 4px;
+        }
     </style>
 </head>
 <body>
@@ -159,17 +199,17 @@
 				<option value="ks-IN">کٲشُر</option>
                 </select>
             </div>
-            <div class="profile-widget">
+			<div class="profile-widget">
                 <select id="profileSelect" onchange="switchProfile()"></select>
                 <button onclick="createNewProfile()" title="Create New Profile">+</button>
+                <button onclick="closeApp()" title="Close App" style="background: #ef4444; margin-left: 2px;">✕</button>
             </div>
-        </div>
-
+		</div>
         <div class="nav-controls">
             <button class="nav-btn" onclick="toggleConfigStrip()">🔧 Format</button>
-            <button class="nav-btn" onclick="startNewSession()">📝 New</button>
+            <button class="nav-btn" onclick="startNewSession()">📝 New Doc</button>
             <button class="nav-btn" onclick="openHistoryModal()">🕒 History</button>
-            <button class="nav-btn" onclick="openModal('settingsModal')">⚙️ Set</button>
+            <button class="nav-btn" onclick="openModal('settingsModal')">⚙️ Settings</button>
         </div>
     </div>
 
@@ -199,6 +239,23 @@
             <div class="config-item"><label>Background</label><select id="sel_bg"><option value="">None</option><option value="bg1">BG 1</option></select></div>
         </div>
 
+		<div class="rich-toolbar" id="richToolbar" style="display: none;">
+            <button class="fmt-btn" onclick="execCmd('undo')" title="Undo">↩️</button>
+            <button class="fmt-btn" onclick="execCmd('redo')" title="Redo">↪️</button>
+            <div class="fmt-divider"></div>
+            <button class="fmt-btn" onclick="execCmd('bold')" style="font-family: serif;"><b>B</b></button>
+            <button class="fmt-btn" onclick="execCmd('italic')" style="font-family: serif;"><i>I</i></button>
+            <button class="fmt-btn" onclick="execCmd('underline')" style="font-family: serif;"><u>U</u></button>
+            <button class="fmt-btn" onclick="execCmd('strikeThrough')" style="text-decoration: line-through;">S</button>
+            <div class="fmt-divider"></div>
+            <button class="fmt-btn" onclick="execCmd('justifyLeft')" title="Align Left">⬅️</button>
+            <button class="fmt-btn" onclick="execCmd('justifyCenter')" title="Center">↔️</button>
+            <button class="fmt-btn" onclick="execCmd('justifyRight')" title="Align Right">➡️</button>
+            <div class="fmt-divider"></div>
+            <button class="fmt-btn" onclick="execCmd('insertUnorderedList')" title="Bullet List">●</button>
+            <button class="fmt-btn" onclick="execCmd('insertOrderedList')" title="Numbered List">1.</button>
+        </div>
+
         <div class="chat-container" id="chatWindow">
             <div class="message user-msg" id="activeUserNode">
                 <div class="msg-label">You (Dictation Draft)</div>
@@ -218,6 +275,7 @@
                 <button class="btn-secondary" onclick="downloadPDF()">📕 PDF</button>
             </div>
         </div>
+        
     </div>
 
     <div class="modal-overlay" id="historyModal">
@@ -411,6 +469,26 @@
         
         window.speechSynthesis.speak(utterance);
     }
+		// ==========================================
+    // APP TERMINATION LOGIC
+    // ==========================================
+    function closeApp() {
+        if (confirm("Are you sure you want to exit Steno Pro?")) {
+            // Attempt to close the window (Works in PWAs, WebViews, Electron)
+            window.close();
+            
+            // Fallback for strict desktop browsers that block window.close()
+            setTimeout(() => {
+                document.body.innerHTML = `
+                    <div style="display:flex; flex-direction:column; height:100vh; align-items:center; justify-content:center; background:#0f172a; color:white; text-align:center; padding: 20px;">
+                        <h1 style="color: #38bdf8; margin-bottom: 10px;">Steno Pro Closed</h1>
+                        <p style="color: #94a3b8;">It is now safe to close this browser tab.</p>
+                    </div>`;
+            }, 300);
+        }
+    }
+
+
 
     // ==========================================
     // API & DATABASE
@@ -831,12 +909,16 @@
         closeModal('settingsModal');
     }
 
-    function toggleConfigStrip() {
+	function toggleConfigStrip() {
         const strip = document.getElementById('configStrip');
+        const toolbar = document.getElementById('richToolbar');
+        
         if (strip.style.display === 'none' || strip.style.display === '') {
             strip.style.display = 'flex';
+            toolbar.style.display = 'flex'; // Shows the formatting buttons
         } else {
             strip.style.display = 'none';
+            toolbar.style.display = 'none'; // Hides the formatting buttons
         }
     }
 
@@ -1121,6 +1203,25 @@ STRICT OUTPUT RULES:
         }
     }
 
+
+	// ==========================================
+    // RICH TEXT FORMATTING ENGINE
+    // ==========================================
+    function execCmd(command) {
+        // Execute the native browser formatting command
+        document.execCommand(command, false, null);
+        
+        // Find the currently active editable div and ensure it retains focus
+        // so the mobile keyboard doesn't randomly close
+        const activeEditor = document.activeElement;
+        if (activeEditor && activeEditor.hasAttribute('contenteditable')) {
+            activeEditor.focus();
+        }
+        
+        // Trigger the auto-save mechanism so formatting changes are logged to IndexedDB
+        autoSaveSession();
+    }
+	
     // ==========================================
     // EXPORT ENGINE (WORD & PDF REBUILT FOR COMPATIBILITY)
     // ==========================================
