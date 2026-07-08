@@ -69,7 +69,6 @@ const UI = {
     textIn: document.getElementById('text-input'),
     btnSend: document.getElementById('btn-send'),
     btnStop: document.getElementById('btn-stop'),
-    btnEditLast: document.getElementById('btn-edit-last'),
     btnMic: document.getElementById('btn-mic'),
     iconMicDefault: document.getElementById('icon-mic-default'),
     iconMicThinking: document.getElementById('icon-mic-thinking'),
@@ -283,10 +282,7 @@ function loadData() {
                             const textPart = msg.parts.find(p => p.text)?.text || "📷 [Image attached]";
                             renderMessage(msg.role === 'user' ? (UI.name.value || UI.role.value) : "Teacher", textPart, msg.role === 'model', false); 
                         });
-                        if (UI.btnEditLast) {
-                            UI.btnEditLast.classList.remove('hidden');
-                            UI.btnEditLast.classList.add('flex');
-                        }
+
                     }
                 }
             } catch (e) { console.warn("History parse error", e); }
@@ -344,10 +340,7 @@ function clearData() {
     UI.log.innerHTML = `<div class="text-gray-400 text-center mt-12 cinzel"><p class="text-sky-500 text-xl mb-2 font-bold">🧹 Board Cleared</p>Let's start a new lesson.</div>`;
     
     resetCurrentTTS();
-    if (UI.btnEditLast) {
-        UI.btnEditLast.classList.add('hidden');
-        UI.btnEditLast.classList.remove('flex');
-    }
+
 }
 
 // --- HISTORY VAULT LOGIC ---
@@ -434,10 +427,7 @@ function loadSpecificSession(targetId) {
             renderMessage(msg.role === 'user' ? (UI.name.value || UI.role.value) : "Teacher", textPart, msg.role === 'model', false); 
         });
         
-        if (UI.btnEditLast && chatHistory.length > 0) {
-            UI.btnEditLast.classList.remove('hidden');
-            UI.btnEditLast.classList.add('flex');
-        }
+
     }
 }
 
@@ -672,47 +662,6 @@ function setupEventListeners() {
         };
     }
 
-    if (UI.btnEditLast) {
-        UI.btnEditLast.onclick = (e) => {
-            e.stopPropagation();
-
-            if (state.isProcessing && currentAborter) currentAborter.abort();
-            resetCurrentTTS();
-            if (isListening && recognition) recognition.stop();
-            
-            resetMicUI();
-            state.isProcessing = false;
-            updateStopButtonVisibility(); 
-            UI.status.style.backgroundColor = '#4b5563';
-
-            if (chatHistory.length > 0) {
-                let lastRole = chatHistory[chatHistory.length - 1].role;
-
-                if (lastRole === 'model') {
-                    chatHistory.pop();
-                    if (UI.log.lastElementChild && UI.log.lastElementChild.classList.contains('msg-container')) {
-                        UI.log.removeChild(UI.log.lastElementChild);
-                    }
-                    lastRole = chatHistory.length > 0 ? chatHistory[chatHistory.length - 1].role : null;
-                }
-
-                if (lastRole === 'user') {
-                    const userMsg = chatHistory.pop();
-                    if (UI.log.lastElementChild && UI.log.lastElementChild.classList.contains('msg-container')) {
-                        UI.log.removeChild(UI.log.lastElementChild);
-                    }
-                    
-                    const textContent = userMsg.parts.find(p => p.text)?.text || "";
-                    UI.textIn.value = textContent;
-                    UI.textIn.focus();
-                }
-            }
-
-            saveData();
-            UI.btnEditLast.classList.add('hidden');
-            UI.btnEditLast.classList.remove('flex');
-        };
-    }
 
     UI.btnMute.onclick = (e) => { 
         e.stopPropagation(); state.isMuted = !state.isMuted; 
@@ -804,10 +753,7 @@ async function processInput(userText, isHiddenQuizTrigger = false) {
     setMicThinkingState(true);
     updateStopButtonVisibility();
 
-    if (UI.btnEditLast) {
-        UI.btnEditLast.classList.add('hidden');
-        UI.btnEditLast.classList.remove('flex');
-    }
+
 
     const userName = UI.name.value || UI.role.value;
     const displayMessage = userText || "📷 [Image attached for analysis]";
@@ -854,10 +800,7 @@ async function processInput(userText, isHiddenQuizTrigger = false) {
             if (btn) window.toggleSingleMessagePlay(btn);
         }
         
-        if (UI.btnEditLast) {
-            UI.btnEditLast.classList.remove('hidden');
-            UI.btnEditLast.classList.add('flex');
-        }
+
         
     } catch (err) {
         if (err.name === 'AbortError') {
@@ -1297,6 +1240,7 @@ window.downloadSinglePDF = (btnElem, senderName) => {
 };
 
 // --- RENDER UI ---
+// --- RENDER UI ---
 function renderMessage(sender, text, isModel) {
     const msgId = 'msg-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
     const div = document.createElement('div');
@@ -1306,12 +1250,17 @@ function renderMessage(sender, text, isModel) {
     
     const parsedText = isModel ? marked.parse(text) : text;
     
+    // Sweep away any pencil buttons from older user messages so only the newest one has it
+    if (!isModel) {
+        document.querySelectorAll('.edit-user-btn').forEach(btn => btn.remove());
+    }
+
     let htmlContent = `
         <div class="text-[10px] uppercase font-bold tracking-wider ${isModel ? 'text-sky-400 cinzel' : 'text-slate-300'} mb-1">${sender}</div>
         <div class="text-sm leading-relaxed text-gray-100 markdown-body" id="md-${msgId}">${parsedText}</div>
     `;
     
-	if (isModel) {
+    if (isModel) {
         htmlContent += `
             <div class="msg-action-bar mt-3 flex justify-end gap-2">
                 <button class="msg-pdf-btn p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-full text-slate-400 hover:text-red-400 transition-colors shadow-sm focus:outline-none" onclick="window.downloadSinglePDF(this, '${sender}')" data-msg-id="${msgId}" title="Download Answer as PDF">
@@ -1325,18 +1274,69 @@ function renderMessage(sender, text, isModel) {
                     <svg class="pause-icon w-4 h-4 hidden pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
                 </button>
             </div>`;
+    } else {
+        // Embed the pencil button directly into the bottom right of the user's bubble
+        htmlContent += `
+            <div class="mt-2 flex justify-end">
+                <button class="edit-user-btn p-1 text-slate-400 hover:text-sky-400 transition-colors focus:outline-none" title="Edit Input">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                </button>
+            </div>`;
     }
 
     div.innerHTML = htmlContent;
+
+    // Bind the chat-reversal logic to the new pencil button
+    if (!isModel) {
+        const editBtn = div.querySelector('.edit-user-btn');
+        if (editBtn) {
+            editBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+
+                if (state.isProcessing && currentAborter) currentAborter.abort();
+                resetCurrentTTS();
+                if (isListening && recognition) recognition.stop();
+                
+                resetMicUI();
+                state.isProcessing = false;
+                updateStopButtonVisibility(); 
+                UI.status.style.backgroundColor = '#4b5563';
+
+                if (chatHistory.length > 0) {
+                    let lastRole = chatHistory[chatHistory.length - 1].role;
+
+                    // Erase AI response if it exists
+                    if (lastRole === 'model') {
+                        chatHistory.pop();
+                        if (UI.log.lastElementChild && UI.log.lastElementChild.classList.contains('msg-container')) {
+                            UI.log.removeChild(UI.log.lastElementChild);
+                        }
+                        lastRole = chatHistory.length > 0 ? chatHistory[chatHistory.length - 1].role : null;
+                    }
+
+                    // Erase User bubble and pull text back to input
+                    if (lastRole === 'user') {
+                        const userMsg = chatHistory.pop();
+                        if (UI.log.lastElementChild && UI.log.lastElementChild.classList.contains('msg-container')) {
+                            UI.log.removeChild(UI.log.lastElementChild);
+                        }
+                        
+                        const textContent = userMsg.parts.find(p => p.text)?.text || "";
+                        UI.textIn.value = textContent;
+                        UI.textIn.focus();
+                    }
+                }
+                saveData();
+            });
+        }
+    }
+
     UI.log.appendChild(div);
 
     if (isModel) {
         const mdBody = div.querySelector('.markdown-body');
-        
-        // Strip markdown before sending to TTS preparation so it reads cleanly
         const cleanTextForTTS = text.replace(/[*_#`~]/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/<[^>]+>/g, '');
         const speechText = prepareTextForTTSAndHighlighting(mdBody, msgId);
-        
         speechDataMap[msgId] = cleanTextForTTS;
     }
     
