@@ -179,12 +179,17 @@ UI.overlay.addEventListener('click', () => {
     enforceFullscreen();
     requestWakeLock();
     
-    // Native initialization hack to unlock device speakers
+// Unlock Native Engine
     if (window.speechSynthesis) {
         const silent = new SpeechSynthesisUtterance('');
         silent.volume = 0; 
         window.speechSynthesis.speak(silent);
     }
+    
+    // Unlock Cloud Engine
+    currentAudio.play().catch(()=>{});
+    currentAudio.pause();
+    currentAudio.src = "";
     
     UI.overlay.style.display = 'none';
     setupEventListeners(); 
@@ -1174,14 +1179,14 @@ function playNextChunk(langCode, msgId, btnElement) {
     const currentRate = parseFloat(UI.ttsSpeedSlider ? UI.ttsSpeedSlider.value : 1.0);
 
     currentAudio.src = url;
-    currentAudio.load(); // Force element reload to bypass some webview blocks
+    // DO NOT USE currentAudio.load(); IT BLOCKS AUTOPLAY IN WEBVIEWS
     currentAudio.playbackRate = currentRate; 
     currentAudio.preservesPitch = true;
 
     currentAudio.play().then(() => {
         if (currentChunkIndex === 0) startHighlightTimer(msgId);
     }).catch(err => {
-        console.warn("Cloud TTS Blocked, skipping chunk.");
+        console.warn("Cloud TTS Blocked, skipping chunk.", err);
         setTimeout(() => {
             currentChunkIndex++;
             playNextChunk(langCode, msgId, btnElement);
