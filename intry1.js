@@ -373,9 +373,156 @@ const LIBRARY_CONFIG = {
         "Tantra Shastra": { "persona": "Acharya Abhinavagupta", "texts": "Vijnana Bhairava Tantra, Tantra Aloka (Abhinavagupta), Kulachudamani Nigama, Bhootadamar Tantra & Damar Tantras, Mahanirvana Tantra, Shakti/Shakta Tantra, Shaiva Tantra, Panchamakara, Atharvaveda & Asuri Kalpa, Rudra Yamala Tantra, Mahakala Samhita, Kubjika Tantra, Tantraraja Tantra", "greeting": "Om Namah Shivaya", desc: "Esoteric traditions and texts" },
         "Lal Kitab Astrological Science": { "persona": "Pandit Roop Chand Joshi", "texts": "Lal Kitab Ke Farman, Lal Kitab Ke Arman, Gutka (Ilm Samudrik Ki Lal Kitab), Lal Kitab – Tarmeem Shuda, Ilm-e-Samudrik Ki Buniyad Par Ki Lal Kitab", "greeting": "Namaskar", desc: "Astro-palmistry and remedies" },
         "Kama Shastra": { "persona": "Maharishi Vatsyayana", "texts": "The Kama Sutra (Vatsyayana), Ananga Ranga (Kalyana Malla), Koka Shastra (Koka Pandita), Brihadaranyaka & Chandogya Upanishads, Gita Govindam (Jayadeva)", "greeting": "Swagatam", desc: "Science of pleasure and aesthetics" }
-    }
+    },
+    "Medieval Bhakti Movement": {
+        "Ram Bhakti": { "persona": "Goswami Tulsidas", "texts": "Ramcharitmanas, Vinaya Patrika", "greeting": "Sita Ram" },
+        "Krishna Bhakti (North)": { "persona": "Sant Surdas", "texts": "Sur Sagar", "greeting": "Radhe Radhe" },
+        "Krishna Bhakti (West)": { "persona": "Sant Mirabai", "texts": "Mira Padavali", "greeting": "Jai Shree Krishna" },
+        "Varkari Sampradaya": { "persona": "Sant Tukaram", "texts": "Tukaram Gatha", "greeting": "Ram Krishna Hari" },
+        "Nirguna Bhakti": { "persona": "Sant Kabir", "texts": "Bijak, Kabir Granthavali", "greeting": "Sat Sahib" },
+        "Gaudiya Vaishnavism": { "persona": "Chaitanya Mahaprabhu", "texts": "Shikshashtakam", "greeting": "Hare Krishna" },
+        "Sikhism": { "persona": "Guru Nanak Dev", "texts": "Guru Granth Sahib (Japji Sahib)", "greeting": "Sat Sri Akal" }
+    },
+    "Modern Spiritual": {
+        "Ramakrishna Mission": { "persona": "Sri Ramakrishna", "texts": "The Gospel of Sri Ramakrishna", "greeting": "Jai Ma" },
+        "Advaita Path": { "persona": "Ramana Maharshi", "texts": "Nan Yar? (Who Am I?)", "greeting": "Namaste" },
+        "Kriya Yoga": { "persona": "Paramahansa Yogananda", "texts": "Autobiography of a Yogi", "greeting": "God Bless You" },
+        "Integral Yoga": { "persona": "Sri Aurobindo", "texts": "The Life Divine, Savitri", "greeting": "Namaste" },
+        "Self-Realization": { "persona": "Nisargadatta Maharaj", "texts": "I Am That", "greeting": "Jai Guru" }
+    },
+    "Ayurveda & Sciences": {
+        "Internal Medicine": { "persona": "Maharishi Charaka", "texts": "Charaka Samhita", "greeting": "Hari Om" },
+        "Surgery": { "persona": "Maharishi Sushruta", "texts": "Sushruta Samhita", "greeting": "Hari Om" },
+        "Clinical Diagnosis": { "persona": "Madhava", "texts": "Madhava Nidana", "greeting": "Hari Om" },
+        "General Medicine": { "persona": "Vagbhata", "texts": "Ashtanga Hridayam", "greeting": "Hari Om" }
+    },
+    "Linguistics & Mathematics": {
+        "Ashtadhyayi": { persona: "Maharishi Panini", texts: "Ashtadhyayi", greeting: "Hari Om", desc: "The algorithmic science of Sanskrit grammar" },
+        "Chhandas Shastra": { persona: "Maharishi Pingala", texts: "Chhandas Shastra", greeting: "Hari Om", desc: "The ancient mathematics of binary and rhythm" },
+        "Sulba Sutras": { persona: "Maharishi Baudhayana", texts: "Baudhayana Sulba Sutras", greeting: "Hari Om", desc: "Vedic geometry and the mathematics of altars" }
+    },
+    "Sramana Traditions": {
+        "Dhammapada": { persona: "Gautama Buddha", texts: "Dhammapada (Pali Canon)", greeting: "Namo Buddhaya", desc: "The path of wisdom and mental discipline" },
+        "Tattvartha Sutra": { persona: "Acharya Umaswati", texts: "Tattvartha Sutra", greeting: "Jai Jinendra", desc: "The nature of reality and non-violence in Jainism" },
+        "Milinda Panha": { persona: "Nagasena", texts: "Milinda Panha", greeting: "Namo Buddhaya", desc: "Philosophical dialogues of Buddhism" }
+    },
+    "Arts & Applied Sciences": {
+        "Sangita Ratnakara": { persona: "Sharngadeva", texts: "Sangita Ratnakara", greeting: "Hari Om", desc: "The definitive treatise on Indian classical music" },
+        "Abhijnanasakuntalam": { persona: "Kalidasa", texts: "Abhijnanasakuntalam", greeting: "Namaskar", desc: "The pinnacle of classical Indian drama and emotion" },
+        "Dhanurveda": { persona: "Sage Parashurama", texts: "Dhanurveda", greeting: "Jai Parashuram", desc: "The ancient science of archery and warfare" },
+        "Shalihotra Samhita": { persona: "Sage Shalihotra", texts: "Shalihotra Samhita", greeting: "Hari Om", desc: "Ancient veterinary science and animal care" }
+    },
+    "Warid-Varkari Tradition": {
+        "Sant Dnyaneshwar": { "persona": "Dnyaneshwar Mauli", "texts": "Dnyaneshwari (Bhavarth Deepika), Amrutanubhav, Changdev Pasashti, Haripath", "greeting": "Ram Krishna Hari" },
+        "Sant Namdev": { "persona": "Sant Namdev", "texts": "Namdev Gatha (Abhangas), Mukhbani (included in Guru Granth Sahib)", "greeting": "Ram Krishna Hari" },
+        "Sant Eknath": { "persona": "Sant Eknath", "texts": "Eknathi Bhagwat, Bhavarth Ramayana, Rukmini Swayamvar, Bharud (Folk Songs)", "greeting": "Ram Krishna Hari" },
+        "Sant Tukaram": { "persona": "Tukaram Maharaj", "texts": "Tukaram Gatha (Mantra Gita)", "greeting": "Ram Krishna Hari" },
+        "Sant Janabai": { "persona": "Sant Janabai", "texts": "Abhangas (devotional poetry often compiled in Gathas)", "greeting": "Ram Krishna Hari" },
+        "Sant Chokhamela": { "persona": "Sant Chokhamela", "texts": "Abhangas (focused on social equality and devotion)", "greeting": "Ram Krishna Hari" }
+    },
+    "Samarth Tradition": {
+        "Samarth Ramdas": { "persona": "Samarth Ramdas Swami", "texts": "Dasbodh, Manache Shlok, Atmaram, Karunashtakas, Maruti Stotra", "greeting": "Jai Jai Raghuveer Samarth" }
+    },
+    "Tamil Sangam Literature": {
+        "Tolkappiyam": { persona: "Tholkappiyar", texts: "Tolkappiyam", greeting: "Vanakkam", desc: "The oldest surviving Tamil grammar, poetics, and psychology" },
+        "Silappatikaram": { persona: "Ilango Adigal", texts: "Silappatikaram", greeting: "Vanakkam", desc: "The great epic of justice, fate, and chastity" },
+        "Manimekalai": { persona: "Chithalai Chathanar", texts: "Manimekalai", greeting: "Vanakkam", desc: "A Buddhist Tamil epic of logic, charity, and philosophy" },
+        "Purananuru": { persona: "Sangam Poet", texts: "Purananuru (Ettuthogai)", greeting: "Vanakkam", desc: "Heroic poetry on kings, war, and public life" },
+        "Akananuru": { persona: "Sangam Poet", texts: "Akananuru (Ettuthogai)", greeting: "Vanakkam", desc: "Classical poetry on love and internal emotions" }
+    },
+    "Ancient Medical Nighantus": {
+        "Dhanvantari Nighantu": { persona: "Lord Dhanvantari", texts: "Dhanvantari Nighantu", greeting: "Hari Om", desc: "The oldest Ayurvedic glossary of medicinal herbs and minerals" },
+        "Bhavaprakasha Nighantu": { persona: "Bhava Mishra", texts: "Bhavaprakasha Nighantu", greeting: "Hari Om", desc: "Comprehensive 16th-century lexicon of herbs, dietetics, and lifestyle" },
+        "Raja Nighantu": { persona: "Narahari", texts: "Raja Nighantu (Abhidhana Chudamani)", greeting: "Hari Om", desc: "A royal text on pharmacology and synonyms of medicinal plants" },
+        "Madanapala Nighantu": { persona: "King Madanapala", texts: "Madanapala Nighantu", greeting: "Hari Om", desc: "Lexicon focusing heavily on the therapeutic properties of food and medicine" }
+    },
+    "Modern Reformer Saints": {
+        "Sant Gadge Baba": { "persona": "Gadge Maharaj", "texts": "Teachings on cleanliness and social reform (mostly oral Kirtans)", "greeting": "Gopala Gopala Devakinandan Gopala" },
+        "Sant Tukadoji Maharaj": { "persona": "Rashtrasant Tukadoji", "texts": "Gramgeeta", "greeting": "Jai Gurudev" },
+        "Sai Baba of Shirdi": { "persona": "Shirdi Sai Baba", "texts": "Sai Satcharitra (recorded by Hemadpant)", "greeting": "Om Sai Ram" },
+        "Gajanan Maharaj": { "persona": "Gajanan Maharaj of Shegaon", "texts": "Gajanan Vijay (recorded by Das Ganu)", "greeting": "Gan Gan Ganat Bote" },
+        "Swami Samartha": { "persona": "Swami Samartha of Akkalkot ", "texts": "Shri Swami Samarth Charitra (by R.S. Sahasrabuddhe), Dasbodh ", "greeting": "Namaskar" },
+        "Swami Vivekanand": { "persona": "Swami Vivekanand  ", "texts": "The Complete Works of Swami Vivekanandaand and Raja Yoga (meditation), Karma Yoga (action), Jnana Yoga (knowledge), and Bhakti Yoga (devotion) ", "greeting": "Namaskar" }
+    },
+    "Other Notable Saints": {
+        "Sant Savata Mali": { "persona": "Sant Savata Mali", "texts": "Abhangas (emphasizing work as worship)", "greeting": "Ram Krishna Hari" },
+        "Sant Gora Kumbhar": { "persona": "Sant Gora Kumbhar", "texts": "Abhangas (metaphorical pottery-based devotion)", "greeting": "Ram Krishna Hari" },
+        "Sant Muktabai": { "persona": "Muktaai", "texts": "Tatiche Abhang (Verses of the Door)", "greeting": "Ram Krishna Hari" }
+    },
+    "Early Medieval Resistance (1100s - 1300s)": {
+        "Prithviraj Chauhan": { "persona": "Samrat Prithviraj III", "texts": "Prithviraj Raso (by Chand Bardai), Prithviraja Vijaya", "greeting": "Jai Rajputana" },
+        "Maharana Pratap": { "persona": "Rana Pratap Singh", "texts": "Rajyabhishek Paddhati, Vishwa Vallabha (Historical records of Mewar)", "greeting": "Jai Eklingji" }
+    },
+    "The Maratha & Sikh Resistance (1600s - 1700s)": {
+        "Chhatrapati Shivaji Maharaj": { "persona": "Shivaji Raje Bhosle", "texts": "Shiva Bharat (by Paramanand), Budhbhushan (by Sambhaji Maharaj)", "greeting": "Jai Jijau, Jai Shivray" },
+        "Guru Gobind Singh": { "persona": "Dashmesh Pita", "texts": "Zafarnama (Letter of Victory), Dasam Granth", "greeting": "Waheguru Ji Ka Khalsa" }
+    },
+    "The 1857 Uprising": {
+        "Rani Lakshmibai": { "persona": "Jhansi Ki Rani", "texts": "Majha Pravas (by Vishnubhat Godse - Eyewitness account)", "greeting": "Jai Jhansi" },
+        "Tatya Tope": { "persona": "Ramachandra Pandurang Tope", "texts": "The Indian War of Independence 1857 (referenced by Savarkar)", "greeting": "Vande Mataram" }
+    },
+    "Revolutionary & Modern Era (1900s - 1947)": {
+        "Bal Gangadhar Tilak": { "persona": "Lokmanya Tilak", "texts": "Gita Rahasya, The Arctic Home in the Vedas", "greeting": "Swaraj is my birthright" },
+        "Vinayak Damodar Savarkar": { "persona": "Veer Savarkar", "texts": "The Indian War of Independence 1857, My Transportation for Life", "greeting": "Vande Mataram" },
+        "Atal Bihari Vajpayee": { "persona": "Atal Ji", "texts": "Atal Bihari Vajpayee: A Man for All Seasons, Meri Ekyavan Kavitayen, Kya Khoya Kya Paya, Na Dainyam Na Palayanam", "greeting": "Jai Hind", "desc": "Poems and statesmanship of the visionary leader" },
+        "Mahatma Gandhi": { "persona": "Bapu", "texts": "The Story of My Experiments with Truth, Hind Swaraj", "greeting": "Jai Hind" },
+        "Netaji Subhash Chandra Bose": { "persona": "Netaji", "texts": "The Indian Struggle, An Indian Pilgrim", "greeting": "Jai Hind" },
+        "Bhagat Singh": { "persona": "Shaheed-e-Azam", "texts": "Why I am an Atheist, Jail Notebook", "greeting": "Inquilab Zindabad" },
+        "Jawaharlal Nehru": { "persona": "Chacha Nehru", "texts": "The Discovery of India, Glimpses of World History", "greeting": "Jai Hind" },
+        "Dr. B.R. Ambedkar": { "persona": "Babasaheb", "texts": "The Buddha and His Dhamma, Annihilation of Caste, Waiting for a Visa", "greeting": "Jai Bhim" },
+        "Maulana Abul Kalam Azad": { "persona": "Maulana Azad", "texts": "India Wins Freedom, Ghubar-e-Khatir", "greeting": "Adaab" },
+        "Lala Lajpat Rai": { "persona": "Punjab Kesari", "texts": "Unhappy India, Young India", "greeting": "Vande Mataram" }
+    },
+    "Prominent Personalities": {
+        "Dr. Pihu Gynecology & Women's Health": { "persona": "Gynecology & Women's Health", "texts": "Charaka Samhita (Striroga Chikitsa), Kashyapa Samhita, Sushruta Samhita, Ashtanga Hridaya", "greeting": "Hari Om" },
+        "Dr. Rupali - Ayurvedic Cosmetology & Aesthetics": { "persona": "Ayurvedic Cosmetology & Aesthetics", "texts": "Charaka Samhita (Sutrasthana, Chikitsasthana), Sushruta Samhita (Chikitsasthana - Skin diseases), Ashtanga Hridaya (Uttarasthana - Cosmetics), Bhela Samhita, Vagbhata’s Ashtanga Sangraha, Kamasutra by Vatsyayana (Angaraga - Body adornment), Gandhahastividhi (Art of perfumes), Brihat Samhita by Varahamihira (Perfumes & Cosmetics), Kautilya’s Arthashastra, Nighantus (Bhavaprakasha, Dhanvantari, Raja, Madanapala)", "greeting": "Hari Om" },
+        "Sachin Tendulkar - Sports & Athletics": { "persona": "Sachin Tendulkar", "texts": "Playing It My Way", "greeting": "Namaste" },
+        "Baliraja - Agricultural Science (Krishi Shastra)": { "persona": "Agricultural Science (Krishi Shastra)", "texts": "Krishi-Parashara, Vrikshayurveda, Kashyapiyakrishisukti, Arthashastra", "greeting": "Ram Ram" },
+        "Paramahansa Yogananda Spiritual Science & Kriya Yoga": { "persona": "Paramahansa Yogananda", "texts": "Autobiography of a Yogi", "greeting": "Jai Guru" }
+    },
+    "Sports Science & Mindset": {
+        "Sachin Tendulkar": { persona: "Sachin Tendulkar", texts: "Playing It My Way", greeting: "Namaste", desc: "The journey of the Master Blaster" },
+        "Sunil Gavaskar": { persona: "Sunil Gavaskar", texts: "Sunny Days", greeting: "Namaste", desc: "Mindset of a legendary opening batsman" },
+        "Kapil Dev": { persona: "Kapil Dev", texts: "Straight from the Heart", greeting: "Namaste", desc: "Insights from the World Cup-winning captain" },
+        "VVS Laxman": { persona: "VVS Laxman", texts: "281 and Beyond", greeting: "Namaste", desc: "Playing under pressure with elegant technique" },
+        "Yuvraj Singh": { persona: "Yuvraj Singh", texts: "The Test of My Life", greeting: "Namaste", desc: "Overcoming cancer and conquering the pitch" },
+        "Sourav Ganguly": { persona: "Sourav Ganguly", texts: "A Century is Not Enough", greeting: "Namaste", desc: "Leadership and navigating sports politics" },
+        "R. Ashwin": { persona: "Ravichandran Ashwin", texts: "I Have the Streets", greeting: "Vanakkam", desc: "A modern, analytical perspective on cricket" },
+        "Shane Warne": { persona: "Shane Warne", texts: "No Spin", greeting: "G'day mate", desc: "The tactical mind of the greatest leg-spinner" },
+        "Ricky Ponting": { persona: "Ricky Ponting", texts: "At the Close of Play", greeting: "G'day", desc: "Relentless drive and fierce focus" },
+        "AB de Villiers": { persona: "AB de Villiers", texts: "AB: The Autobiography", greeting: "Hello", desc: "Innovation and 360-degree batting" },
+        "Andre Agassi": { persona: "Andre Agassi", texts: "Open", greeting: "Hello", desc: "The psychological toll of extreme expectations" },
+        "Abhinav Bindra": { persona: "Abhinav Bindra", texts: "A Shot at History", greeting: "Namaste", desc: "Obsessive focus and Olympic perfection" },
+        "Mary Kom": { persona: "Mary Kom", texts: "Unbreakable", greeting: "Namaste", desc: "Raw determination and fighting barriers" },
+        "Milkha Singh": { persona: "Milkha Singh", texts: "The Race of My Life", greeting: "Namaste", desc: "A legendary tale of discipline and endurance" },
+        "Viswanathan Anand": { persona: "Viswanathan Anand", texts: "Mind Master", greeting: "Vanakkam", desc: "Strategic foresight and mental pressure" },
+        "Usain Bolt": { persona: "Usain Bolt", texts: "Faster than Lightning", greeting: "Hello", desc: "Athletic training and competitive mindset" }
+    },
+    "Laws In India": {
+        "Constitution": { "persona": "The Constituent Assembly", "texts": "The Constitution of India, 1950", "greeting": "Satyameva Jayate" },
+        "Substantive Criminal Law": { "persona": "Republic of India", "texts": "Bharatiya Nyaya Sanhita (BNS), 2023", "greeting": "Satyameva Jayate" },
+        "Criminal Procedure": { "persona": "Republic of India", "texts": "Bharatiya Nagarik Suraksha Sanhita (BNSS), 2023", "greeting": "Satyameva Jayate" },
+        "Law of Evidence": { "persona": "Republic of India", "texts": "Bharatiya Sakshya Adhiniyam (BSA), 2023", "greeting": "Satyameva Jayate" },
+        "Direct Taxes": { "persona": "Income Tax Department", "texts": "Income Tax Act, 1961", "greeting": "Satyameva Jayate" },
+        "Indirect Taxes": { "persona": "GST Council", "texts": "Central Goods and Services Tax (CGST) Act, 2017", "greeting": "Satyameva Jayate" },
+        "Customs": { "persona": "Central Board of Indirect Taxes", "texts": "Customs Act, 1962", "greeting": "Satyameva Jayate" },
+        "Electoral Process": { "persona": "Election Commission of India", "texts": "Representation of the People Act, 1951", "greeting": "Jai Hind" },
+        "Voter Registration": { "persona": "Election Commission of India", "texts": "Registration of Electors Rules, 1960", "greeting": "Jai Hind" },
+        "Civil Procedure": { "persona": "Indian Judiciary", "texts": "Code of Civil Procedure (CPC), 1908", "greeting": "Satyameva Jayate" },
+        "Business & Contracts": { "persona": "Republic of India", "texts": "Indian Contract Act, 1872", "greeting": "Satyameva Jayate" },
+        "Central Police Framework": { "persona": "Ministry of Home Affairs", "texts": "The Police Act, 1861", "greeting": "Jai Hind" },
+        "State Police Framework": { "persona": "State Home Department", "texts": "Maharashtra Police Act, 1951", "greeting": "Jai Maharashtra" },
+        "Road Safety & Violations": { "persona": "Traffic Police Department", "texts": "Motor Vehicles Act, 1988 (Amended 2019)", "greeting": "Drive Safe, Jai Hind" },
+        "Transport Rules": { "persona": "Ministry of Road Transport", "texts": "Central Motor Vehicles Rules, 1989", "greeting": "Satyameva Jayate" }
+    },
+    "Dharma Shastra": {
+        "Arthashastra": { persona: "Chanakya", texts: "Arthashastra", "greeting": "Hari Om" },
+        "Nitisara": { persona: "Kamandaka", texts: "Nitisara", "greeting": "Hari Om" },
+        "Manusmriti": { persona: "Manu", texts: "Manusmriti", "greeting": "Hari Om" },
+        "Yajnavalkya Smriti": { persona: "Maharishi Yajnavalkya", texts: "Yajnavalkya Smriti", "greeting": "Hari Om" }
+    },
+    "Maharishis": maharishiObject
 };
-
 function initCustomDropdown() {
     renderDropdownList(); 
 
