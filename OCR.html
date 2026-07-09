@@ -2,12 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#ffffff">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Eprashala OCR Scanner</title>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
     <style>
+        /* --- CORE VARIABLES & RESET --- */
         :root {
             --primary: #2563eb;
             --primary-dark: #1d4ed8;
@@ -19,6 +18,7 @@
             --warning: #f59e0b;
             --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
             --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
+            --safe-bottom: env(safe-area-inset-bottom, 15px);
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; -webkit-tap-highlight-color: transparent; }
@@ -29,120 +29,140 @@
             display: flex;
             flex-direction: column;
             height: 100vh;
-            height: 100dvh; /* Dynamic viewport handles mobile browser bars */
-            overflow: hidden; /* Lock body scrolling */
+            height: 100dvh; /* Mobile viewport fix */
+            overflow: hidden;
         }
 
         /* --- HEADER --- */
         header {
             background: var(--surface);
-            padding: env(safe-area-inset-top, 16px) 20px 16px; /* iOS notch support */
+            padding: 16px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid var(--border);
             z-index: 20;
+            box-shadow: var(--shadow-sm);
         }
-        header h1 { font-size: 20px; color: var(--primary); font-weight: 700; }
-        .header-actions { display: flex; gap: 15px; }
-        .icon-btn { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--text-light); transition: transform 0.2s;}
+        header h1 { font-size: 20px; color: var(--primary); font-weight: 700; margin: 0;}
+        .icon-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text-light); transition: transform 0.2s; padding: 4px;}
         .icon-btn:active { transform: scale(0.9); }
 
         /* --- SCREENS --- */
         .screen {
             flex: 1;
-            display: none;
+            display: none !important; /* Force hide unless active */
             flex-direction: column;
-            overflow: hidden; 
-            padding-bottom: calc(75px + env(safe-area-inset-bottom)); /* Dynamic space for bottom bar */
+            overflow: hidden;
+            padding-bottom: calc(75px + var(--safe-bottom)); 
         }
-        .screen.active { display: flex; }
+        .screen.active { display: flex !important; } /* Overrides all other display rules */
 
         /* Screen 1: Home */
         #screen-home { padding: 20px; overflow-y: auto; }
         .instructions { text-align: center; margin-top: 20px; color: var(--text-light); line-height: 1.6; }
         .instructions h2 { color: var(--text); margin-bottom: 10px; font-size: 22px; }
-        #cameraFeed { display: none; width: 100%; border-radius: 12px; margin-top: 15px; background: #000; box-shadow: var(--shadow-md); }
+        #cameraFeed { display: none; width: 100%; border-radius: 12px; margin-top: 20px; background: #000; box-shadow: var(--shadow-md); }
 
-        /* Screen 2: Tune (FIXED LAYOUT) */
-        #screen-tune { 
-            padding: 15px; 
-            justify-content: space-between; /* Pushes slider to bottom */
-        }
-        .canvas-container { 
-            width: 100%; 
-            flex: 1; /* Allows container to grow/shrink based on screen height */
-            min-height: 0; /* Crucial for flex shrinking on mobile */
-            display: flex; 
-            justify-content: center; 
+        /* Screen 2: Tune (Fixed Visibility) */
+        #screen-tune { padding: 15px; overflow-y: auto; flex-direction: column; gap: 15px; }
+        .canvas-container {
+            width: 100%;
+            height: 45vh; /* Prevents large photos from pushing the slider off screen */
+            display: flex;
             align-items: center;
-            background: #000; 
-            border-radius: 12px; 
-            overflow: hidden; 
-            box-shadow: var(--shadow-md); 
+            justify-content: center;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: var(--shadow-md);
+            flex-shrink: 0;
+            position: relative;
         }
-        canvas { 
-            max-width: 100%; 
-            max-height: 100%; 
-            object-fit: contain; /* Ensures image never overflows container */
+        canvas {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            display: block;
         }
-        .slider-panel { 
-            flex: 0 0 auto; /* PREVENTS slider from shrinking */
-            background: var(--surface); 
-            padding: 20px; 
-            border-radius: 12px; 
-            margin-top: 15px; 
-            box-shadow: var(--shadow-sm); 
-            border: 1px solid var(--border); 
+        .slider-panel {
+            background: var(--surface); padding: 20px; border-radius: 12px; box-shadow: var(--shadow-md); border: 1px solid var(--border);
         }
-        .slider-header { display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 15px; font-size: 15px;}
-        input[type="range"] { width: 100%; height: 6px; accent-color: var(--primary); }
+        .slider-header { display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 15px; font-size: 15px; color: var(--text);}
+        input[type="range"] { width: 100%; accent-color: var(--primary); height: 6px; border-radius: 3px; }
 
         /* Screen 3: Results (Tabbed) */
-        .tab-bar { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); z-index: 10; }
-        .tab-btn { flex: 1; padding: 14px 0; text-align: center; font-size: 15px; font-weight: 600; color: var(--text-light); background: transparent; border: none; border-bottom: 3px solid transparent; cursor: pointer; transition: all 0.2s; }
+        .tab-bar {
+            display: flex; background: var(--surface); border-bottom: 1px solid var(--border); z-index: 10; flex-shrink: 0;
+        }
+        .tab-btn {
+            flex: 1; padding: 16px 0; text-align: center; font-size: 15px; font-weight: 600; color: var(--text-light);
+            background: transparent; border: none; border-bottom: 3px solid transparent; cursor: pointer; transition: all 0.2s;
+        }
         .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
-        .tab-pane { flex: 1; display: none; flex-direction: column; background: var(--surface); position: relative; height: 100%;}
+        .tab-pane { flex: 1; display: none; flex-direction: column; background: var(--surface); position: relative; overflow: hidden; }
         .tab-pane.active { display: flex; }
 
-        /* Actions & Text Box */
-        .pane-actions { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; gap: 10px; background: var(--bg); }
-        select { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid var(--border); font-size: 16px; background: white; }
-        
-        .textarea-wrapper { flex: 1; position: relative; display: flex; flex-direction: column; background: var(--surface); overflow: hidden;}
-        .full-textarea { flex: 1; width: 100%; padding: 20px; padding-bottom: 90px; border: none; font-size: 17px; line-height: 1.6; resize: none; color: var(--text); background: transparent; overflow-y: auto;}
-        .full-textarea:focus { outline: none; }
+        /* Action Headers inside Tabs */
+        .pane-actions { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; gap: 10px; background: var(--bg); flex-shrink: 0;}
+        select { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid var(--border); font-size: 16px; background: white; outline: none; }
 
-        /* Floating Action Button */
-        .tts-fab { position: absolute; bottom: 20px; right: 20px; width: 60px; height: 60px; background: var(--surface); border: 1px solid var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: transform 0.2s ease, background 0.2s; color: var(--primary); z-index: 10; }
-        .tts-fab:active { transform: scale(0.9); background: var(--bg); }
+        /* Full Screen Text Area */
+        .textarea-wrapper { flex: 1; position: relative; display: flex; flex-direction: column; overflow: hidden; }
+        .full-textarea {
+            flex: 1; width: 100%; padding: 20px; padding-bottom: 90px; border: none; font-size: 17px; line-height: 1.6;
+            resize: none; color: var(--text); background: var(--surface); overflow-y: auto; outline: none;
+        }
+
+        /* Floating Action Button (TTS) */
+        .tts-fab {
+            position: absolute; bottom: 20px; right: 20px; width: 60px; height: 60px; background: var(--surface);
+            border: 1px solid var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 24px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: transform 0.2s; color: var(--primary); z-index: 10;
+        }
+        .tts-fab:active { transform: scale(0.9); }
         
-        .loader { padding: 15px; text-align: center; color: var(--primary); font-size: 15px; font-weight: 600; display: none; background: #e0e7ff; }
+        .loader { padding: 15px; text-align: center; color: var(--primary); font-size: 15px; font-weight: 600; display: none; background: #e0e7ff; flex-shrink: 0;}
 
         /* --- BOTTOM NAVIGATION --- */
         .bottom-bar {
             position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface);
-            padding: 12px 20px; border-top: 1px solid var(--border); display: flex; gap: 12px; z-index: 20;
-            padding-bottom: calc(12px + env(safe-area-inset-bottom));
+            padding: 12px 20px; padding-bottom: calc(12px + var(--safe-bottom)); 
+            border-top: 1px solid var(--border); display: flex; gap: 12px; z-index: 20; box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
         }
-        .btn { flex: 1; padding: 15px; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; color: white; transition: transform 0.1s; }
+        .btn {
+            flex: 1; padding: 16px; border: none; border-radius: 12px; font-size: 16px; font-weight: 600;
+            cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; color: white; transition: transform 0.1s;
+        }
         .btn:active { transform: scale(0.96); }
         .btn-primary { background: var(--primary); }
         .btn-action { background: var(--warning); color: #fff;}
         .btn-magic { background: linear-gradient(135deg, #8b5cf6, #d946ef); }
-        .btn-outline { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        .btn-outline { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
         
         .file-label { margin: 0; }
         input[type="file"] { display: none; }
 
-        /* --- MODALS --- */
-        .overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: flex-end; z-index: 50; }
+        /* --- MODALS (Settings & History) --- */
+        .overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6);
+            display: none; justify-content: center; align-items: flex-end; z-index: 50;
+        }
         .overlay.active { display: flex; }
-        .modal { background: var(--surface); width: 100%; max-height: 85vh; border-radius: 24px 24px 0 0; padding: 24px; padding-bottom: calc(24px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 15px; overflow-y: auto; }
-        .modal h2 { font-size: 22px; }
-        .modal input[type="text"] { width: 100%; padding: 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 16px; }
+        .modal {
+            background: var(--surface); width: 100%; max-height: 90vh; border-radius: 24px 24px 0 0;
+            padding: 24px; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; padding-bottom: 40px;
+        }
+        .modal h2 { font-size: 22px; margin: 0;}
+        .modal input[type="text"] { width: 100%; padding: 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 16px; outline: none;}
         
-        .history-item { padding: 16px; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; background: var(--bg); cursor: pointer; }
+        .radio-group { display: flex; flex-direction: column; gap: 10px; margin-top: 5px; }
+        .radio-label { display: flex; align-items: center; gap: 10px; font-size: 16px; cursor: pointer; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg);}
+        
+        .history-item {
+            padding: 16px; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 12px;
+            display: flex; justify-content: space-between; align-items: center; background: var(--bg); cursor: pointer;
+        }
         .history-item h4 { margin: 0; font-size: 16px; color: var(--text); margin-bottom: 4px;}
         .history-item span { font-size: 13px; color: var(--text-light); }
     </style>
@@ -150,17 +170,14 @@
 <body>
 
     <header>
-        <h1>Eprashala OCR</h1>
-        <div class="header-actions">
-            <button class="icon-btn" onclick="toggleFullScreen()" title="Fullscreen">⛶</button>
-            <button class="icon-btn" onclick="openSettings()" title="Settings">⚙️</button>
-        </div>
+        <h1>Eprashala OCR Scanner</h1>
+        <button class="icon-btn" onclick="openSettings()" title="Settings & History">⚙️</button>
     </header>
 
     <main id="screen-home" class="screen active">
         <div class="instructions">
             <h2>Welcome Student!</h2>
-            <p>1. Tap 'Take Photo' to scan your book.<br>2. Ensure the text is clear and well-lit.<br>3. Read, translate, or summarize it seamlessly.</p>
+            <p>1. Tap 'Take Photo' or 'Upload' to begin.<br>2. Ensure the text is clear and well-lit.<br>3. We will scan, translate, and summarize it.</p>
         </div>
         <video id="cameraFeed" autoplay playsinline></video>
     </main>
@@ -202,10 +219,10 @@
                     <option value="te">Telugu</option>
                     <option value="en">English</option>
                 </select>
-                <button class="btn btn-primary" onclick="translateText()">Translate</button>
+                <button class="btn btn-primary" style="flex: 0.5;" onclick="translateText()">Translate</button>
             </div>
             <div class="textarea-wrapper">
-                <textarea id="translatedText" class="full-textarea" placeholder="Select language and tap Translate..."></textarea>
+                <textarea id="translatedText" class="full-textarea" placeholder="Select a language and tap Translate..."></textarea>
                 <button class="tts-fab" id="tts-translatedText" onclick="toggleRead('translatedText')">🔊</button>
             </div>
         </div>
@@ -214,7 +231,7 @@
             <div class="pane-actions">
                 <button class="btn btn-magic" style="width: 100%;" onclick="summarizeText()">✨ Generate AI Summary</button>
             </div>
-            <div id="summaryLoader" class="loader">Asking Gemini...</div>
+            <div id="summaryLoader" class="loader">Communicating with Server...</div>
             <div class="textarea-wrapper">
                 <textarea id="summaryText" class="full-textarea" placeholder="Tap Generate to get a short summary..."></textarea>
                 <button class="tts-fab" id="tts-summaryText" onclick="toggleRead('summaryText')">🔊</button>
@@ -223,7 +240,7 @@
     </main>
 
     <div class="bottom-bar" id="nav-home">
-        <button class="btn btn-primary" onclick="handleUserInteraction(initCamera)">📸 Take Photo</button>
+        <button class="btn btn-primary" onclick="initCamera()">📸 Take Photo</button>
         <label class="btn btn-outline file-label">
             📁 Upload
             <input type="file" id="imageUpload" accept="image/*">
@@ -236,7 +253,7 @@
     </div>
 
     <div class="bottom-bar" id="nav-result" style="display: none;">
-        <button class="btn btn-outline" style="flex: 0.4;" onclick="goBack('tune')">⬅ Back</button>
+        <button class="btn btn-outline" style="flex: 0.5;" onclick="goBack('tune')">⬅ Back</button>
         <button class="btn btn-primary" onclick="promptSaveHistory()">💾 Save to History</button>
     </div>
 
@@ -246,63 +263,44 @@
                 <h2>Settings & History</h2>
                 <button class="icon-btn" onclick="closeSettings()">❌</button>
             </div>
+            
             <hr style="border: 0; border-top: 1px solid var(--border);">
-            <label style="font-weight: 600;">Gemini API Key</label>
-            <div style="display: flex; gap: 10px;">
-                <input type="text" id="apiKeyInput" placeholder="Paste your API Key here...">
-                <button class="btn btn-primary" style="flex: 0.4; padding: 12px;" onclick="saveApiKey()">Save</button>
+            
+            <label style="font-weight: 600; font-size: 16px;">AI Summary Backend</label>
+            <div class="radio-group">
+                <label class="radio-label">
+                    <input type="radio" name="apiChoice" id="useProxy" value="proxy" checked onchange="toggleApiInput()">
+                    Eprashala Cloud Proxy (Free)
+                </label>
+                <label class="radio-label">
+                    <input type="radio" name="apiChoice" id="useDirect" value="direct" onchange="toggleApiInput()">
+                    Personal Gemini API Key
+                </label>
             </div>
-            <hr style="border: 0; border-top: 1px solid var(--border);">
+            
+            <div id="apiKeySection" style="display: none; flex-direction: column; gap: 10px; margin-top: 5px;">
+                <input type="text" id="apiKeyInput" placeholder="Paste Gemini API Key...">
+            </div>
+            
+            <button class="btn btn-primary" style="margin-top: 5px;" onclick="saveSettings()">Save Settings</button>
+            
+            <hr style="border: 0; border-top: 1px solid var(--border); margin-top: 10px;">
+            
             <h3 style="font-size: 18px;">Saved Scans</h3>
-            <div id="historyList" style="max-height: 250px; overflow-y: auto;"></div>
+            <div id="historyList" style="max-height: 250px; overflow-y: auto;">
+                </div>
         </div>
     </div>
 
 <script>
-    // --- FULLSCREEN & WAKE LOCK APIS ---
-    let wakeLock = null;
-
-    async function requestWakeLock() {
-        if ('wakeLock' in navigator) {
-            try {
-                wakeLock = await navigator.wakeLock.request('screen');
-                wakeLock.addEventListener('release', () => console.log('Wake Lock released'));
-                console.log('Screen Wake Lock active');
-            } catch (err) { console.error(`${err.name}, ${err.message}`); }
-        }
-    }
-
-    document.addEventListener('visibilitychange', async () => {
-        if (wakeLock !== null && document.visibilityState === 'visible') { requestWakeLock(); }
-    });
-
-    function toggleFullScreen() {
-        if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(err => {
-                alert(`Cannot enable fullscreen: ${err.message}`);
-            });
-        } else {
-            if (document.exitFullscreen) document.exitFullscreen();
-        }
-    }
-
-    // Wrapper to acquire Wake Lock on the very first user tap
-    function handleUserInteraction(callback) {
-        if (!wakeLock) requestWakeLock();
-        callback();
-    }
-
-    // Bind Wake Lock to file upload too
-    document.getElementById('imageUpload').addEventListener('click', () => {
-        if (!wakeLock) requestWakeLock();
-    });
-
     // --- STATE MANAGEMENT ---
     function showScreen(screenName) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.querySelectorAll('.bottom-bar').forEach(b => b.style.display = 'none');
+        
         document.getElementById(`screen-${screenName}`).classList.add('active');
         document.getElementById(`nav-${screenName}`).style.display = 'flex';
+        
         window.speechSynthesis.cancel();
         resetAllTTSButtons();
     }
@@ -316,6 +314,7 @@
         showScreen(target);
     }
 
+    // --- TAB MANAGEMENT ---
     function switchTab(tabId) {
         window.speechSynthesis.cancel();
         resetAllTTSButtons();
@@ -340,6 +339,7 @@
         try {
             stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
             video.srcObject = stream;
+            
             const btn = document.querySelector('#nav-home .btn-primary');
             btn.innerHTML = "📸 Capture";
             btn.onclick = captureFrame;
@@ -347,11 +347,14 @@
     }
 
     function captureFrame() {
-        if (!video.videoWidth) return;
+        if (!video.videoWidth) {
+            alert("Camera is not ready yet. Try again in a moment.");
+            return;
+        }
         loadAndPrepareImage(video.videoWidth, video.videoHeight, (w, h) => { ctx.drawImage(video, 0, 0, w, h); });
         const btn = document.querySelector('#nav-home .btn-primary');
         btn.innerHTML = "📸 Take Photo";
-        btn.onclick = () => handleUserInteraction(initCamera);
+        btn.onclick = initCamera;
     }
 
     document.getElementById('imageUpload').addEventListener('change', function(e) {
@@ -404,14 +407,21 @@
         
         const loader = document.getElementById('ocrLoader');
         const extText = document.getElementById('extractedText');
-        extText.value = ""; document.getElementById('translatedText').value = ""; document.getElementById('summaryText').value = "";
+        
+        extText.value = "";
+        document.getElementById('translatedText').value = "";
+        document.getElementById('summaryText').value = "";
+        
         loader.style.display = "block";
 
         try {
-            const worker = await Tesseract.createWorker({ logger: m => { if (m.status === 'recognizing text') { loader.innerText = `Extracting... ${Math.round(m.progress * 100)}%`; } } });
+            const worker = await Tesseract.createWorker({
+                logger: m => { if (m.status === 'recognizing text') { loader.innerText = `Extracting... ${Math.round(m.progress * 100)}%`; } }
+            });
             await worker.loadLanguage('eng');
             await worker.initialize('eng');
             await worker.setParameters({ tessedit_pageseg_mode: '1', preserve_interword_spaces: '1' });
+            
             const result = await worker.recognize(currentImageBase64);
             extText.value = result.data.text;
             await worker.terminate();
@@ -426,7 +436,6 @@
         const synth = window.speechSynthesis;
         const text = document.getElementById(elementId).value;
         const btn = document.getElementById(`tts-${elementId}`);
-
         if (!text) return;
 
         if (currentReadingId === elementId) {
@@ -435,9 +444,10 @@
             return;
         }
 
-        synth.cancel(); resetAllTTSButtons(); 
+        synth.cancel(); 
+        resetAllTTSButtons(); 
+
         currentReadingId = elementId;
-        
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = elementId === 'translatedText' ? document.getElementById('languageSelect').value : 'en-US';
         utterance.onend = () => { resetAllTTSButtons(); currentReadingId = null; };
@@ -446,10 +456,9 @@
         btn.innerText = '⏸️';
         synth.speak(utterance);
     }
-
     function resetAllTTSButtons() { document.querySelectorAll('.tts-fab').forEach(b => b.innerText = '🔊'); }
 
-    // --- APIs ---
+    // --- TRANSLATION API ---
     async function translateText() {
         const sourceText = document.getElementById('extractedText').value;
         const targetLang = document.getElementById('languageSelect').value;
@@ -473,46 +482,93 @@
         } catch (error) { textArea.value = "Translation Error."; }
     }
 
+    // --- AI SUMMARIZATION (PROXY & DIRECT MULTIPLEXING) ---
     async function summarizeText() {
         const text = document.getElementById('extractedText').value;
-        const key = localStorage.getItem('geminiApiKey');
+        const useProxy = document.getElementById('useProxy').checked;
+        const key = document.getElementById('apiKeyInput').value;
+        
         const textArea = document.getElementById('summaryText');
         const loader = document.getElementById('summaryLoader');
         
         if (!text) { alert("Please extract text first."); return; }
-        if (!key) { alert("Please save your Gemini API Key in Settings first."); openSettings(); return; }
+        if (!useProxy && !key) {
+            alert("Please provide a Gemini API Key in Settings, or select Eprashala Proxy.");
+            openSettings(); return;
+        }
 
-        loader.style.display = "block"; textArea.value = "";
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
-        
+        loader.style.display = "block";
+        textArea.value = "";
+
         try {
-            const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: `Summarize this text in a short, clear paragraph:\n\n${text}` }] }] }) });
-            const data = await response.json();
-            if(data.error) throw new Error(data.error.message);
-            textArea.value = data.candidates[0].content.parts[0].text;
-        } catch (error) { textArea.value = `API Error: Check if your API key is valid.`; } 
-        finally { loader.style.display = "none"; }
+            if (useProxy) {
+                // Route 1: Eprashala PythonAnywhere Proxy
+                const proxyUrl = "https://eprashala.pythonanywhere.com/api/chat";
+                const response = await fetch(proxyUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: `Summarize this text in a short, clear paragraph:\n\n${text}` })
+                });
+                
+                const data = await response.json();
+                textArea.value = data.summary || data.response || data.reply || data.text || JSON.stringify(data);
+                
+            } else {
+                // Route 2: Direct to Google's Gemini API
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: `Summarize this text in a short, clear paragraph:\n\n${text}` }] }]
+                    })
+                });
+                
+                const data = await response.json();
+                if(data.error) throw new Error(data.error.message);
+                textArea.value = data.candidates[0].content.parts[0].text;
+            }
+        } catch (error) { 
+            textArea.value = `Server Error: ${error.message}. Please check your connection or API key.`; 
+            console.error(error);
+        } finally { 
+            loader.style.display = "none"; 
+        }
     }
 
-    // --- INDEXED DB ---
+    // --- INDEXED DB (LOCAL HISTORY STORAGE) ---
     let db;
     const request = indexedDB.open("EprashalaDB", 1);
-    request.onupgradeneeded = (e) => { db = e.target.result; db.createObjectStore("history", { keyPath: "id", autoIncrement: true }); };
+    request.onupgradeneeded = (e) => {
+        db = e.target.result;
+        db.createObjectStore("history", { keyPath: "id", autoIncrement: true });
+    };
     request.onsuccess = (e) => { db = e.target.result; };
 
     function promptSaveHistory() {
-        const name = prompt("Name this scan:", `Scan ${new Date().toLocaleDateString()}`);
+        const name = prompt("Name this scan (e.g., 'Science Chapter 4'):", `Scan ${new Date().toLocaleDateString()}`);
         if(!name) return;
-        const record = { title: name, date: new Date().toLocaleString(), image: currentImageBase64, extracted: document.getElementById('extractedText').value, translated: document.getElementById('translatedText').value, summary: document.getElementById('summaryText').value };
+        
+        const record = {
+            title: name,
+            date: new Date().toLocaleString(),
+            image: currentImageBase64,
+            extracted: document.getElementById('extractedText').value,
+            translated: document.getElementById('translatedText').value,
+            summary: document.getElementById('summaryText').value
+        };
+
         const tx = db.transaction("history", "readwrite");
         tx.objectStore("history").add(record);
-        tx.oncomplete = () => { alert("Saved to phone memory!"); };
+        tx.oncomplete = () => { alert("Saved to phone memory!"); loadHistoryList(); };
     }
 
     function loadHistoryList() {
         if(!db) return;
         const tx = db.transaction("history", "readonly");
-        const req = tx.objectStore("history").getAll();
+        const store = tx.objectStore("history");
+        const req = store.getAll();
+        
         req.onsuccess = () => {
             const list = document.getElementById('historyList');
             list.innerHTML = "";
@@ -531,15 +587,59 @@
         req.onsuccess = () => {
             const data = req.result;
             if(!data) return;
-            currentImageBase64 = data.image; document.getElementById('extractedText').value = data.extracted || ""; document.getElementById('translatedText').value = data.translated || ""; document.getElementById('summaryText').value = data.summary || "";
-            closeSettings(); showScreen('result'); switchTab('extracted');
+            
+            currentImageBase64 = data.image;
+            document.getElementById('extractedText').value = data.extracted || "";
+            document.getElementById('translatedText').value = data.translated || "";
+            document.getElementById('summaryText').value = data.summary || "";
+            
+            closeSettings();
+            showScreen('result');
+            switchTab('extracted');
         };
     }
 
     // --- SETTINGS OVERLAY ---
-    function openSettings() { document.getElementById('apiKeyInput').value = localStorage.getItem('geminiApiKey') || ""; document.getElementById('settingsOverlay').classList.add('active'); loadHistoryList(); }
+    function toggleApiInput() {
+        const isDirect = document.getElementById('useDirect').checked;
+        document.getElementById('apiKeySection').style.display = isDirect ? 'flex' : 'none';
+    }
+
+    function openSettings() {
+        const savedKey = localStorage.getItem('geminiApiKey');
+        const savedBackend = localStorage.getItem('summaryBackend') || 'proxy';
+        
+        if (savedKey) document.getElementById('apiKeyInput').value = savedKey;
+        if (savedBackend === 'direct') {
+            document.getElementById('useDirect').checked = true;
+        } else {
+            document.getElementById('useProxy').checked = true;
+        }
+        toggleApiInput();
+        
+        document.getElementById('settingsOverlay').classList.add('active');
+        loadHistoryList();
+    }
+    
     function closeSettings() { document.getElementById('settingsOverlay').classList.remove('active'); }
-    function saveApiKey() { localStorage.setItem('geminiApiKey', document.getElementById('apiKeyInput').value.trim()); alert("API Key Saved!"); }
+    
+    function saveSettings() {
+        const key = document.getElementById('apiKeyInput').value.trim();
+        const useDirect = document.getElementById('useDirect').checked;
+        
+        localStorage.setItem('geminiApiKey', key);
+        localStorage.setItem('summaryBackend', useDirect ? 'direct' : 'proxy');
+        
+        alert("Settings Saved!");
+        closeSettings();
+    }
+    
+    window.onload = () => {
+        const savedBackend = localStorage.getItem('summaryBackend');
+        if (savedBackend === 'direct') { document.getElementById('useDirect').checked = true; } 
+        else { document.getElementById('useProxy').checked = true; }
+        toggleApiInput();
+    }
 </script>
 
 </body>
