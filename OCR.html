@@ -2,355 +2,544 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scanner, Uploader & Translator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#ffffff">
+    <title>Eprashala OCR Scanner</title>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
     <style>
         :root {
             --primary: #2563eb;
-            --secondary: #10b981; /* Green for upload */
-            --bg-color: #f8fafc;
-            --card-bg: #ffffff;
-            --text: #1e293b;
+            --primary-dark: #1d4ed8;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text: #0f172a;
+            --text-light: #64748b;
+            --border: #e2e8f0;
+            --warning: #f59e0b;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
         }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text);
-            margin: 0;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        .container {
-            width: 100%;
-            max-width: 600px;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-        .video-container {
-            width: 100%;
-            border-radius: 12px;
-            overflow: hidden;
-            background: #000;
-            position: relative;
-            min-height: 200px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        video {
-            width: 100%;
-            display: block;
-        }
-        canvas {
-            display: none;
-            max-width: 100%;
-            height: auto;
-        }
-        .action-row {
-            display: flex;
-            gap: 10px;
-            width: 100%;
-        }
-        button, .file-label {
-            flex: 1;
-            color: white;
-            border: none;
-            padding: 12px 16px;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-            text-align: center;
-            box-sizing: border-box;
-        }
-        button:active, .file-label:active {
-            transform: scale(0.98);
-        }
-        .btn-primary { background-color: var(--primary); }
-        .btn-upload { background-color: var(--secondary); }
-        .btn-read { background-color: #475569; flex: none; padding: 8px 12px; font-size: 14px;}
-        .btn-magic { background: linear-gradient(135deg, #8b5cf6, #d946ef); }
-        
-        /* Hide the default file input */
-        input[type="file"] { display: none; }
 
-        .card {
-            background: var(--card-bg);
-            padding: 15px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            height: 100vh;
+            height: 100dvh; /* Dynamic viewport handles mobile browser bars */
+            overflow: hidden; /* Lock body scrolling */
         }
-        textarea {
-            width: 100%;
-            min-height: 100px;
-            padding: 10px;
-            border: 1px solid #cbd5e1;
-            border-radius: 8px;
-            font-size: 16px;
-            resize: vertical;
-            box-sizing: border-box;
-        }
-        select {
-            width: 100%;
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid #cbd5e1;
-            font-size: 16px;
-            background: white;
-        }
-        .header-row {
+
+        /* --- HEADER --- */
+        header {
+            background: var(--surface);
+            padding: env(safe-area-inset-top, 16px) 20px 16px; /* iOS notch support */
             display: flex;
             justify-content: space-between;
             align-items: center;
+            border-bottom: 1px solid var(--border);
+            z-index: 20;
         }
-        h3 {
-            margin: 0;
-            font-size: 16px;
-            color: #334155;
-        }
-        .loader {
+        header h1 { font-size: 20px; color: var(--primary); font-weight: 700; }
+        .header-actions { display: flex; gap: 15px; }
+        .icon-btn { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--text-light); transition: transform 0.2s;}
+        .icon-btn:active { transform: scale(0.9); }
+
+        /* --- SCREENS --- */
+        .screen {
+            flex: 1;
             display: none;
-            font-size: 14px;
-            color: #64748b;
-            text-align: center;
-            width: 100%;
+            flex-direction: column;
+            overflow: hidden; 
+            padding-bottom: calc(75px + env(safe-area-inset-bottom)); /* Dynamic space for bottom bar */
         }
+        .screen.active { display: flex; }
+
+        /* Screen 1: Home */
+        #screen-home { padding: 20px; overflow-y: auto; }
+        .instructions { text-align: center; margin-top: 20px; color: var(--text-light); line-height: 1.6; }
+        .instructions h2 { color: var(--text); margin-bottom: 10px; font-size: 22px; }
+        #cameraFeed { display: none; width: 100%; border-radius: 12px; margin-top: 15px; background: #000; box-shadow: var(--shadow-md); }
+
+        /* Screen 2: Tune (FIXED LAYOUT) */
+        #screen-tune { 
+            padding: 15px; 
+            justify-content: space-between; /* Pushes slider to bottom */
+        }
+        .canvas-container { 
+            width: 100%; 
+            flex: 1; /* Allows container to grow/shrink based on screen height */
+            min-height: 0; /* Crucial for flex shrinking on mobile */
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            background: #000; 
+            border-radius: 12px; 
+            overflow: hidden; 
+            box-shadow: var(--shadow-md); 
+        }
+        canvas { 
+            max-width: 100%; 
+            max-height: 100%; 
+            object-fit: contain; /* Ensures image never overflows container */
+        }
+        .slider-panel { 
+            flex: 0 0 auto; /* PREVENTS slider from shrinking */
+            background: var(--surface); 
+            padding: 20px; 
+            border-radius: 12px; 
+            margin-top: 15px; 
+            box-shadow: var(--shadow-sm); 
+            border: 1px solid var(--border); 
+        }
+        .slider-header { display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 15px; font-size: 15px;}
+        input[type="range"] { width: 100%; height: 6px; accent-color: var(--primary); }
+
+        /* Screen 3: Results (Tabbed) */
+        .tab-bar { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); z-index: 10; }
+        .tab-btn { flex: 1; padding: 14px 0; text-align: center; font-size: 15px; font-weight: 600; color: var(--text-light); background: transparent; border: none; border-bottom: 3px solid transparent; cursor: pointer; transition: all 0.2s; }
+        .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+        .tab-pane { flex: 1; display: none; flex-direction: column; background: var(--surface); position: relative; height: 100%;}
+        .tab-pane.active { display: flex; }
+
+        /* Actions & Text Box */
+        .pane-actions { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; gap: 10px; background: var(--bg); }
+        select { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid var(--border); font-size: 16px; background: white; }
+        
+        .textarea-wrapper { flex: 1; position: relative; display: flex; flex-direction: column; background: var(--surface); overflow: hidden;}
+        .full-textarea { flex: 1; width: 100%; padding: 20px; padding-bottom: 90px; border: none; font-size: 17px; line-height: 1.6; resize: none; color: var(--text); background: transparent; overflow-y: auto;}
+        .full-textarea:focus { outline: none; }
+
+        /* Floating Action Button */
+        .tts-fab { position: absolute; bottom: 20px; right: 20px; width: 60px; height: 60px; background: var(--surface); border: 1px solid var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: transform 0.2s ease, background 0.2s; color: var(--primary); z-index: 10; }
+        .tts-fab:active { transform: scale(0.9); background: var(--bg); }
+        
+        .loader { padding: 15px; text-align: center; color: var(--primary); font-size: 15px; font-weight: 600; display: none; background: #e0e7ff; }
+
+        /* --- BOTTOM NAVIGATION --- */
+        .bottom-bar {
+            position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface);
+            padding: 12px 20px; border-top: 1px solid var(--border); display: flex; gap: 12px; z-index: 20;
+            padding-bottom: calc(12px + env(safe-area-inset-bottom));
+        }
+        .btn { flex: 1; padding: 15px; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; color: white; transition: transform 0.1s; }
+        .btn:active { transform: scale(0.96); }
+        .btn-primary { background: var(--primary); }
+        .btn-action { background: var(--warning); color: #fff;}
+        .btn-magic { background: linear-gradient(135deg, #8b5cf6, #d946ef); }
+        .btn-outline { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+        
+        .file-label { margin: 0; }
+        input[type="file"] { display: none; }
+
+        /* --- MODALS --- */
+        .overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: flex-end; z-index: 50; }
+        .overlay.active { display: flex; }
+        .modal { background: var(--surface); width: 100%; max-height: 85vh; border-radius: 24px 24px 0 0; padding: 24px; padding-bottom: calc(24px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 15px; overflow-y: auto; }
+        .modal h2 { font-size: 22px; }
+        .modal input[type="text"] { width: 100%; padding: 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 16px; }
+        
+        .history-item { padding: 16px; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; background: var(--bg); cursor: pointer; }
+        .history-item h4 { margin: 0; font-size: 16px; color: var(--text); margin-bottom: 4px;}
+        .history-item span { font-size: 13px; color: var(--text-light); }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="video-container">
+    <header>
+        <h1>Eprashala OCR</h1>
+        <div class="header-actions">
+            <button class="icon-btn" onclick="toggleFullScreen()" title="Fullscreen">⛶</button>
+            <button class="icon-btn" onclick="openSettings()" title="Settings">⚙️</button>
+        </div>
+    </header>
+
+    <main id="screen-home" class="screen active">
+        <div class="instructions">
+            <h2>Welcome Student!</h2>
+            <p>1. Tap 'Take Photo' to scan your book.<br>2. Ensure the text is clear and well-lit.<br>3. Read, translate, or summarize it seamlessly.</p>
+        </div>
         <video id="cameraFeed" autoplay playsinline></video>
-        <canvas id="displayCanvas"></canvas>
-    </div>
-    
-    <div class="action-row">
-        <button class="btn-primary" onclick="captureFromCamera()" id="captureBtn">📸 Camera</button>
-        
-        <label class="file-label btn-upload" id="uploadLabel">
-            📁 Gallery
+    </main>
+
+    <main id="screen-tune" class="screen">
+        <div class="canvas-container">
+            <canvas id="displayCanvas"></canvas>
+        </div>
+        <div class="slider-panel">
+            <div class="slider-header">
+                <span>Text Clarity Filter</span>
+                <span id="thresholdValue">128</span>
+            </div>
+            <input type="range" id="thresholdSlider" min="0" max="255" value="128" oninput="applyFilter()">
+        </div>
+    </main>
+
+    <main id="screen-result" class="screen">
+        <div class="tab-bar">
+            <button class="tab-btn active" onclick="switchTab('extracted')" id="tab-extracted">Original</button>
+            <button class="tab-btn" onclick="switchTab('translated')" id="tab-translated">Translated</button>
+            <button class="tab-btn" onclick="switchTab('summary')" id="tab-summary">Summary</button>
+        </div>
+
+        <div id="pane-extracted" class="tab-pane active">
+            <div id="ocrLoader" class="loader">Extracting text... please wait.</div>
+            <div class="textarea-wrapper">
+                <textarea id="extractedText" class="full-textarea" placeholder="Scanned text will appear here..."></textarea>
+                <button class="tts-fab" id="tts-extractedText" onclick="toggleRead('extractedText')">🔊</button>
+            </div>
+        </div>
+
+        <div id="pane-translated" class="tab-pane">
+            <div class="pane-actions">
+                <select id="languageSelect">
+                    <option value="mr">Marathi</option>
+                    <option value="hi">Hindi</option>
+                    <option value="gu">Gujarati</option>
+                    <option value="te">Telugu</option>
+                    <option value="en">English</option>
+                </select>
+                <button class="btn btn-primary" onclick="translateText()">Translate</button>
+            </div>
+            <div class="textarea-wrapper">
+                <textarea id="translatedText" class="full-textarea" placeholder="Select language and tap Translate..."></textarea>
+                <button class="tts-fab" id="tts-translatedText" onclick="toggleRead('translatedText')">🔊</button>
+            </div>
+        </div>
+
+        <div id="pane-summary" class="tab-pane">
+            <div class="pane-actions">
+                <button class="btn btn-magic" style="width: 100%;" onclick="summarizeText()">✨ Generate AI Summary</button>
+            </div>
+            <div id="summaryLoader" class="loader">Asking Gemini...</div>
+            <div class="textarea-wrapper">
+                <textarea id="summaryText" class="full-textarea" placeholder="Tap Generate to get a short summary..."></textarea>
+                <button class="tts-fab" id="tts-summaryText" onclick="toggleRead('summaryText')">🔊</button>
+            </div>
+        </div>
+    </main>
+
+    <div class="bottom-bar" id="nav-home">
+        <button class="btn btn-primary" onclick="handleUserInteraction(initCamera)">📸 Take Photo</button>
+        <label class="btn btn-outline file-label">
+            📁 Upload
             <input type="file" id="imageUpload" accept="image/*">
         </label>
     </div>
-    <div id="ocrLoader" class="loader">Extracting text locally... Please wait.</div>
 
-    <div class="card">
-        <div class="header-row">
-            <h3>Extracted Text</h3>
-            <button class="btn-read" onclick="readAloud('extractedText')">🔊 Read</button>
-        </div>
-        <textarea id="extractedText" placeholder="Scanned text will appear here..."></textarea>
+    <div class="bottom-bar" id="nav-tune" style="display: none;">
+        <button class="btn btn-outline" style="flex: 0.4;" onclick="goBack('home')">⬅ Back</button>
+        <button class="btn btn-action" onclick="executeOCR()">⚙️ Start OCR</button>
     </div>
 
-    <div class="card">
-        <div class="header-row">
-            <h3>Translation</h3>
-            <button class="btn-read" onclick="readAloud('translatedText')">🔊 Read</button>
-        </div>
-        <select id="languageSelect">
-            <option value="mr">Marathi</option>
-            <option value="hi">Hindi</option>
-            <option value="gu">Gujarati</option>
-            <option value="ta">Tamil</option>
-            <option value="te">Telugu</option>
-            <option value="kn">Kannada</option>
-            <option value="ml">Malayalam</option>
-            <option value="bn">Bengali</option>
-            <option value="pa">Punjabi</option>
-            <option value="or">Odia</option>
-            <option value="en">English</option>
-        </select>
-        <button class="btn-primary" onclick="translateText()">🌐 Translate</button>
-        <textarea id="translatedText" placeholder="Translation will appear here..."></textarea>
+    <div class="bottom-bar" id="nav-result" style="display: none;">
+        <button class="btn btn-outline" style="flex: 0.4;" onclick="goBack('tune')">⬅ Back</button>
+        <button class="btn btn-primary" onclick="promptSaveHistory()">💾 Save to History</button>
     </div>
 
-    <div class="card">
-        <div class="header-row">
-            <h3>AI Summary</h3>
-            <button class="btn-read" onclick="readAloud('summaryText')">🔊 Read</button>
+    <div class="overlay" id="settingsOverlay">
+        <div class="modal">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2>Settings & History</h2>
+                <button class="icon-btn" onclick="closeSettings()">❌</button>
+            </div>
+            <hr style="border: 0; border-top: 1px solid var(--border);">
+            <label style="font-weight: 600;">Gemini API Key</label>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="apiKeyInput" placeholder="Paste your API Key here...">
+                <button class="btn btn-primary" style="flex: 0.4; padding: 12px;" onclick="saveApiKey()">Save</button>
+            </div>
+            <hr style="border: 0; border-top: 1px solid var(--border);">
+            <h3 style="font-size: 18px;">Saved Scans</h3>
+            <div id="historyList" style="max-height: 250px; overflow-y: auto;"></div>
         </div>
-        <button class="btn-magic" onclick="summarizeText()">✨ Magic Summarize</button>
-        <div id="summaryLoader" class="loader">Communicating with Gemini proxy...</div>
-        <textarea id="summaryText" placeholder="Short paragraph summary will appear here..."></textarea>
     </div>
-</div>
 
 <script>
+    // --- FULLSCREEN & WAKE LOCK APIS ---
+    let wakeLock = null;
+
+    async function requestWakeLock() {
+        if ('wakeLock' in navigator) {
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+                wakeLock.addEventListener('release', () => console.log('Wake Lock released'));
+                console.log('Screen Wake Lock active');
+            } catch (err) { console.error(`${err.name}, ${err.message}`); }
+        }
+    }
+
+    document.addEventListener('visibilitychange', async () => {
+        if (wakeLock !== null && document.visibilityState === 'visible') { requestWakeLock(); }
+    });
+
+    function toggleFullScreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                alert(`Cannot enable fullscreen: ${err.message}`);
+            });
+        } else {
+            if (document.exitFullscreen) document.exitFullscreen();
+        }
+    }
+
+    // Wrapper to acquire Wake Lock on the very first user tap
+    function handleUserInteraction(callback) {
+        if (!wakeLock) requestWakeLock();
+        callback();
+    }
+
+    // Bind Wake Lock to file upload too
+    document.getElementById('imageUpload').addEventListener('click', () => {
+        if (!wakeLock) requestWakeLock();
+    });
+
+    // --- STATE MANAGEMENT ---
+    function showScreen(screenName) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.bottom-bar').forEach(b => b.style.display = 'none');
+        document.getElementById(`screen-${screenName}`).classList.add('active');
+        document.getElementById(`nav-${screenName}`).style.display = 'flex';
+        window.speechSynthesis.cancel();
+        resetAllTTSButtons();
+    }
+
+    function goBack(target) {
+        if(target === 'home') {
+            document.getElementById('cameraFeed').style.display = 'none';
+            if(stream) { stream.getTracks().forEach(t => t.stop()); }
+            document.querySelector('.instructions').style.display = 'block';
+        }
+        showScreen(target);
+    }
+
+    function switchTab(tabId) {
+        window.speechSynthesis.cancel();
+        resetAllTTSButtons();
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`tab-${tabId}`).classList.add('active');
+        document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+        document.getElementById(`pane-${tabId}`).classList.add('active');
+    }
+
+    // --- CAMERA & IMAGE PROCESSING ---
     const video = document.getElementById('cameraFeed');
     const canvas = document.getElementById('displayCanvas');
     const ctx = canvas.getContext('2d');
     let stream;
+    let baseImageData = null; 
+    let currentImageBase64 = null;
+    const MAX_IMAGE_SIZE = 1200;
 
-    // 1. Initialize Rear Camera
-    async function startCamera() {
+    async function initCamera() {
+        video.style.display = 'block';
+        document.querySelector('.instructions').style.display = 'none';
         try {
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: "environment" }
-            });
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
             video.srcObject = stream;
-            video.style.display = 'block';
-            canvas.style.display = 'none';
-        } catch (err) {
-            console.error("Camera error:", err);
-            // Don't alert here; they might just want to use the upload feature on a PC without a cam.
-        }
-    }
-    startCamera();
-
-    // 2. Handle Camera Capture
-    function captureFromCamera() {
-        if (!video.videoWidth) return alert("Camera not ready.");
-        
-        // Draw video frame to canvas
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        // Convert canvas to base64 image
-        const imageData = canvas.toDataURL('image/png');
-        
-        // Show snapshot, hide live feed temporarily
-        video.style.display = 'none';
-        canvas.style.display = 'block';
-
-        runOCR(imageData);
-        
-        // Restart live feed after a delay if you want, or leave it showing the snapshot.
-        // setTimeout(() => { video.style.display = 'block'; canvas.style.display = 'none'; }, 3000);
+            const btn = document.querySelector('#nav-home .btn-primary');
+            btn.innerHTML = "📸 Capture";
+            btn.onclick = captureFrame;
+        } catch (err) { alert("Camera error. Please check permissions."); }
     }
 
-    // 3. Handle Gallery Upload
+    function captureFrame() {
+        if (!video.videoWidth) return;
+        loadAndPrepareImage(video.videoWidth, video.videoHeight, (w, h) => { ctx.drawImage(video, 0, 0, w, h); });
+        const btn = document.querySelector('#nav-home .btn-primary');
+        btn.innerHTML = "📸 Take Photo";
+        btn.onclick = () => handleUserInteraction(initCamera);
+    }
+
     document.getElementById('imageUpload').addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (!file) return;
-
         const reader = new FileReader();
         reader.onload = function(event) {
             const img = new Image();
-            img.onload = function() {
-                // Show uploaded image in the UI, hide live camera
-                video.style.display = 'none';
-                canvas.style.display = 'block';
-                
-                // Scale canvas to fit image while maintaining aspect ratio
-                canvas.width = img.width;
-                canvas.height = img.height;
-                ctx.drawImage(img, 0, 0);
-
-                // Pass the data URL directly to OCR
-                runOCR(event.target.result);
-            }
+            img.onload = function() { loadAndPrepareImage(img.width, img.height, (w, h) => { ctx.drawImage(img, 0, 0, w, h); }); }
             img.src = event.target.result;
         }
         reader.readAsDataURL(file);
     });
 
-    // 4. Core OCR Engine (Runs entirely locally)
-    async function runOCR(imageSource) {
-        const captureBtn = document.getElementById('captureBtn');
-        const uploadLabel = document.getElementById('uploadLabel');
-        const loader = document.getElementById('ocrLoader');
+    function loadAndPrepareImage(sourceWidth, sourceHeight, drawCallback) {
+        let width = sourceWidth, height = sourceHeight;
+        if (width > MAX_IMAGE_SIZE || height > MAX_IMAGE_SIZE) {
+            const ratio = Math.min(MAX_IMAGE_SIZE / width, MAX_IMAGE_SIZE / height);
+            width = Math.round(width * ratio); height = Math.round(height * ratio);
+        }
+        canvas.width = width; canvas.height = height;
+        drawCallback(width, height);
+        baseImageData = ctx.getImageData(0, 0, width, height);
+        document.getElementById('thresholdSlider').value = 128;
+        applyFilter();
         
-        // Disable UI during extraction
-        captureBtn.disabled = true;
-        uploadLabel.style.pointerEvents = "none";
-        uploadLabel.style.opacity = "0.6";
+        if(stream) { stream.getTracks().forEach(t => t.stop()); video.style.display = 'none'; }
+        showScreen('tune');
+    }
+
+    function applyFilter() {
+        if (!baseImageData) return;
+        const threshold = parseInt(document.getElementById('thresholdSlider').value);
+        document.getElementById('thresholdValue').innerText = threshold;
+        const imageData = new ImageData(new Uint8ClampedArray(baseImageData.data), baseImageData.width, baseImageData.height);
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+            const luminance = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
+            const color = luminance > threshold ? 255 : 0; 
+            data[i] = color; data[i + 1] = color; data[i + 2] = color; 
+        }
+        ctx.putImageData(imageData, 0, 0);
+        currentImageBase64 = canvas.toDataURL('image/png');
+    }
+
+    // --- OCR ENGINE ---
+    async function executeOCR() {
+        showScreen('result');
+        switchTab('extracted'); 
+        
+        const loader = document.getElementById('ocrLoader');
+        const extText = document.getElementById('extractedText');
+        extText.value = ""; document.getElementById('translatedText').value = ""; document.getElementById('summaryText').value = "";
         loader.style.display = "block";
-        document.getElementById('extractedText').value = "";
 
         try {
-            const result = await Tesseract.recognize(
-                imageSource,
-                'eng', // To support Marathi/Hindi OCR locally, you'd load 'mar+hin+eng' here (requires more bandwidth upfront)
-                { logger: m => console.log(m) }
-            );
-            document.getElementById('extractedText').value = result.data.text;
-        } catch (error) {
-            console.error("OCR Error:", error);
-            alert("Failed to extract text. Ensure the image is clear.");
-        } finally {
-            // Re-enable UI
-            captureBtn.disabled = false;
-            uploadLabel.style.pointerEvents = "auto";
-            uploadLabel.style.opacity = "1";
-            loader.style.display = "none";
-        }
+            const worker = await Tesseract.createWorker({ logger: m => { if (m.status === 'recognizing text') { loader.innerText = `Extracting... ${Math.round(m.progress * 100)}%`; } } });
+            await worker.loadLanguage('eng');
+            await worker.initialize('eng');
+            await worker.setParameters({ tessedit_pageseg_mode: '1', preserve_interword_spaces: '1' });
+            const result = await worker.recognize(currentImageBase64);
+            extText.value = result.data.text;
+            await worker.terminate();
+        } catch (error) { extText.value = `Error: ${error.message}`; } 
+        finally { loader.style.display = "none"; loader.innerText = "Extracting text... please wait."; }
     }
 
-    // 5. Text-to-Speech (Native)
-    function readAloud(elementId) {
+    // --- TEXT TO SPEECH ---
+    let currentReadingId = null;
+
+    function toggleRead(elementId) {
+        const synth = window.speechSynthesis;
         const text = document.getElementById(elementId).value;
-        if (!text) return alert("No text to read!");
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        if (elementId === 'translatedText') {
-            utterance.lang = document.getElementById('languageSelect').value;
-        } else {
-            utterance.lang = 'en-US'; 
+        const btn = document.getElementById(`tts-${elementId}`);
+
+        if (!text) return;
+
+        if (currentReadingId === elementId) {
+            if (synth.speaking && !synth.paused) { synth.pause(); btn.innerText = '▶️'; } 
+            else if (synth.paused) { synth.resume(); btn.innerText = '⏸️'; }
+            return;
         }
-        window.speechSynthesis.speak(utterance);
+
+        synth.cancel(); resetAllTTSButtons(); 
+        currentReadingId = elementId;
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = elementId === 'translatedText' ? document.getElementById('languageSelect').value : 'en-US';
+        utterance.onend = () => { resetAllTTSButtons(); currentReadingId = null; };
+        utterance.onerror = () => { resetAllTTSButtons(); currentReadingId = null; };
+
+        btn.innerText = '⏸️';
+        synth.speak(utterance);
     }
 
-    // 6. Proxy Translation
+    function resetAllTTSButtons() { document.querySelectorAll('.tts-fab').forEach(b => b.innerText = '🔊'); }
+
+    // --- APIs ---
     async function translateText() {
         const sourceText = document.getElementById('extractedText').value;
         const targetLang = document.getElementById('languageSelect').value;
-        if (!sourceText) return;
-
-        // Replace with your proxy
-        const apiUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(sourceText)}&langpair=en|${targetLang}`;
+        const textArea = document.getElementById('translatedText');
+        if (!sourceText) { alert("Please extract text first."); return; }
+        
+        textArea.value = "Translating...";
+        const chunks = sourceText.match(/[^.!?\n]+[.!?\n]+/g) || [sourceText]; 
+        let finalTranslation = "";
         
         try {
-            const response = await fetch(apiUrl);
-            const data = await response.json();
-            if(data?.responseData?.translatedText) {
-                document.getElementById('translatedText').value = data.responseData.translatedText;
+            for (let chunk of chunks) {
+                if(chunk.trim() === "") continue;
+                const apiUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(chunk)}&langpair=en|${targetLang}`;
+                const response = await fetch(apiUrl);
+                const data = await response.json();
+                if (data?.responseData?.translatedText) finalTranslation += data.responseData.translatedText + " ";
+                await new Promise(r => setTimeout(r, 250)); 
             }
-        } catch (error) {
-            document.getElementById('translatedText').value = "Error connecting to translation service.";
-        }
+            textArea.value = finalTranslation.trim();
+        } catch (error) { textArea.value = "Translation Error."; }
     }
 
-    // 7. Gemini Summarize Proxy
     async function summarizeText() {
-        const textToSummarize = document.getElementById('extractedText').value;
+        const text = document.getElementById('extractedText').value;
+        const key = localStorage.getItem('geminiApiKey');
+        const textArea = document.getElementById('summaryText');
         const loader = document.getElementById('summaryLoader');
-        if (!textToSummarize) return;
+        
+        if (!text) { alert("Please extract text first."); return; }
+        if (!key) { alert("Please save your Gemini API Key in Settings first."); openSettings(); return; }
 
-        loader.style.display = "block";
-        document.getElementById('summaryText').value = "";
-
-        const proxyUrl = "https://your-domain.com/api/gemini-proxy"; // YOUR PROXY
+        loader.style.display = "block"; textArea.value = "";
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
         
         try {
-            const response = await fetch(proxyUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    prompt: `Summarize the following text into a short, clear paragraph:\n\n${textToSummarize}`
-                })
-            });
+            const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: `Summarize this text in a short, clear paragraph:\n\n${text}` }] }] }) });
             const data = await response.json();
-            document.getElementById('summaryText').value = data.summary || "Summary received.";
-        } catch (error) {
-            document.getElementById('summaryText').value = "Proxy connection failed. Awaiting backend integration.";
-        } finally {
-            loader.style.display = "none";
-        }
+            if(data.error) throw new Error(data.error.message);
+            textArea.value = data.candidates[0].content.parts[0].text;
+        } catch (error) { textArea.value = `API Error: Check if your API key is valid.`; } 
+        finally { loader.style.display = "none"; }
     }
+
+    // --- INDEXED DB ---
+    let db;
+    const request = indexedDB.open("EprashalaDB", 1);
+    request.onupgradeneeded = (e) => { db = e.target.result; db.createObjectStore("history", { keyPath: "id", autoIncrement: true }); };
+    request.onsuccess = (e) => { db = e.target.result; };
+
+    function promptSaveHistory() {
+        const name = prompt("Name this scan:", `Scan ${new Date().toLocaleDateString()}`);
+        if(!name) return;
+        const record = { title: name, date: new Date().toLocaleString(), image: currentImageBase64, extracted: document.getElementById('extractedText').value, translated: document.getElementById('translatedText').value, summary: document.getElementById('summaryText').value };
+        const tx = db.transaction("history", "readwrite");
+        tx.objectStore("history").add(record);
+        tx.oncomplete = () => { alert("Saved to phone memory!"); };
+    }
+
+    function loadHistoryList() {
+        if(!db) return;
+        const tx = db.transaction("history", "readonly");
+        const req = tx.objectStore("history").getAll();
+        req.onsuccess = () => {
+            const list = document.getElementById('historyList');
+            list.innerHTML = "";
+            req.result.reverse().forEach(item => {
+                const div = document.createElement('div');
+                div.className = "history-item";
+                div.innerHTML = `<div><h4>${item.title}</h4><span>${item.date}</span></div> <button class="btn btn-outline" style="padding: 6px 12px;" onclick="loadRecord(${item.id})">Open</button>`;
+                list.appendChild(div);
+            });
+        };
+    }
+
+    function loadRecord(id) {
+        const tx = db.transaction("history", "readonly");
+        const req = tx.objectStore("history").get(id);
+        req.onsuccess = () => {
+            const data = req.result;
+            if(!data) return;
+            currentImageBase64 = data.image; document.getElementById('extractedText').value = data.extracted || ""; document.getElementById('translatedText').value = data.translated || ""; document.getElementById('summaryText').value = data.summary || "";
+            closeSettings(); showScreen('result'); switchTab('extracted');
+        };
+    }
+
+    // --- SETTINGS OVERLAY ---
+    function openSettings() { document.getElementById('apiKeyInput').value = localStorage.getItem('geminiApiKey') || ""; document.getElementById('settingsOverlay').classList.add('active'); loadHistoryList(); }
+    function closeSettings() { document.getElementById('settingsOverlay').classList.remove('active'); }
+    function saveApiKey() { localStorage.setItem('geminiApiKey', document.getElementById('apiKeyInput').value.trim()); alert("API Key Saved!"); }
 </script>
 
 </body>
