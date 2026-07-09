@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanner, Uploader & Translator</title>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --secondary: #10b981; /* Green for upload */
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text);
+            margin: 0;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .video-container {
+            width: 100%;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #000;
+            position: relative;
+            min-height: 200px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        video {
+            width: 100%;
+            display: block;
+        }
+        canvas {
+            display: none;
+            max-width: 100%;
+            height: auto;
+        }
+        .action-row {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+        }
+        button, .file-label {
+            flex: 1;
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            text-align: center;
+            box-sizing: border-box;
+        }
+        button:active, .file-label:active {
+            transform: scale(0.98);
+        }
+        .btn-primary { background-color: var(--primary); }
+        .btn-upload { background-color: var(--secondary); }
+        .btn-read { background-color: #475569; flex: none; padding: 8px 12px; font-size: 14px;}
+        .btn-magic { background: linear-gradient(135deg, #8b5cf6, #d946ef); }
+        
+        /* Hide the default file input */
+        input[type="file"] { display: none; }
+
+        .card {
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 16px;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+        select {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #cbd5e1;
+            font-size: 16px;
+            background: white;
+        }
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        h3 {
+            margin: 0;
+            font-size: 16px;
+            color: #334155;
+        }
+        .loader {
+            display: none;
+            font-size: 14px;
+            color: #64748b;
+            text-align: center;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="video-container">
+        <video id="cameraFeed" autoplay playsinline></video>
+        <canvas id="displayCanvas"></canvas>
+    </div>
+    
+    <div class="action-row">
+        <button class="btn-primary" onclick="captureFromCamera()" id="captureBtn">📸 Camera</button>
+        
+        <label class="file-label btn-upload" id="uploadLabel">
+            📁 Gallery
+            <input type="file" id="imageUpload" accept="image/*">
+        </label>
+    </div>
+    <div id="ocrLoader" class="loader">Extracting text locally... Please wait.</div>
+
+    <div class="card">
+        <div class="header-row">
+            <h3>Extracted Text</h3>
+            <button class="btn-read" onclick="readAloud('extractedText')">🔊 Read</button>
+        </div>
+        <textarea id="extractedText" placeholder="Scanned text will appear here..."></textarea>
+    </div>
+
+    <div class="card">
+        <div class="header-row">
+            <h3>Translation</h3>
+            <button class="btn-read" onclick="readAloud('translatedText')">🔊 Read</button>
+        </div>
+        <select id="languageSelect">
+            <option value="mr">Marathi</option>
+            <option value="hi">Hindi</option>
+            <option value="gu">Gujarati</option>
+            <option value="ta">Tamil</option>
+            <option value="te">Telugu</option>
+            <option value="kn">Kannada</option>
+            <option value="ml">Malayalam</option>
+            <option value="bn">Bengali</option>
+            <option value="pa">Punjabi</option>
+            <option value="or">Odia</option>
+            <option value="en">English</option>
+        </select>
+        <button class="btn-primary" onclick="translateText()">🌐 Translate</button>
+        <textarea id="translatedText" placeholder="Translation will appear here..."></textarea>
+    </div>
+
+    <div class="card">
+        <div class="header-row">
+            <h3>AI Summary</h3>
+            <button class="btn-read" onclick="readAloud('summaryText')">🔊 Read</button>
+        </div>
+        <button class="btn-magic" onclick="summarizeText()">✨ Magic Summarize</button>
+        <div id="summaryLoader" class="loader">Communicating with Gemini proxy...</div>
+        <textarea id="summaryText" placeholder="Short paragraph summary will appear here..."></textarea>
+    </div>
+</div>
+
+<script>
+    const video = document.getElementById('cameraFeed');
+    const canvas = document.getElementById('displayCanvas');
+    const ctx = canvas.getContext('2d');
+    let stream;
+
+    // 1. Initialize Rear Camera
+    async function startCamera() {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "environment" }
+            });
+            video.srcObject = stream;
+            video.style.display = 'block';
+            canvas.style.display = 'none';
+        } catch (err) {
+            console.error("Camera error:", err);
+            // Don't alert here; they might just want to use the upload feature on a PC without a cam.
+        }
+    }
+    startCamera();
+
+    // 2. Handle Camera Capture
+    function captureFromCamera() {
+        if (!video.videoWidth) return alert("Camera not ready.");
+        
+        // Draw video frame to canvas
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Convert canvas to base64 image
+        const imageData = canvas.toDataURL('image/png');
+        
+        // Show snapshot, hide live feed temporarily
+        video.style.display = 'none';
+        canvas.style.display = 'block';
+
+        runOCR(imageData);
+        
+        // Restart live feed after a delay if you want, or leave it showing the snapshot.
+        // setTimeout(() => { video.style.display = 'block'; canvas.style.display = 'none'; }, 3000);
+    }
+
+    // 3. Handle Gallery Upload
+    document.getElementById('imageUpload').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const img = new Image();
+            img.onload = function() {
+                // Show uploaded image in the UI, hide live camera
+                video.style.display = 'none';
+                canvas.style.display = 'block';
+                
+                // Scale canvas to fit image while maintaining aspect ratio
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+
+                // Pass the data URL directly to OCR
+                runOCR(event.target.result);
+            }
+            img.src = event.target.result;
+        }
+        reader.readAsDataURL(file);
+    });
+
+    // 4. Core OCR Engine (Runs entirely locally)
+    async function runOCR(imageSource) {
+        const captureBtn = document.getElementById('captureBtn');
+        const uploadLabel = document.getElementById('uploadLabel');
+        const loader = document.getElementById('ocrLoader');
+        
+        // Disable UI during extraction
+        captureBtn.disabled = true;
+        uploadLabel.style.pointerEvents = "none";
+        uploadLabel.style.opacity = "0.6";
+        loader.style.display = "block";
+        document.getElementById('extractedText').value = "";
+
+        try {
+            const result = await Tesseract.recognize(
+                imageSource,
+                'eng', // To support Marathi/Hindi OCR locally, you'd load 'mar+hin+eng' here (requires more bandwidth upfront)
+                { logger: m => console.log(m) }
+            );
+            document.getElementById('extractedText').value = result.data.text;
+        } catch (error) {
+            console.error("OCR Error:", error);
+            alert("Failed to extract text. Ensure the image is clear.");
+        } finally {
+            // Re-enable UI
+            captureBtn.disabled = false;
+            uploadLabel.style.pointerEvents = "auto";
+            uploadLabel.style.opacity = "1";
+            loader.style.display = "none";
+        }
+    }
+
+    // 5. Text-to-Speech (Native)
+    function readAloud(elementId) {
+        const text = document.getElementById(elementId).value;
+        if (!text) return alert("No text to read!");
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        if (elementId === 'translatedText') {
+            utterance.lang = document.getElementById('languageSelect').value;
+        } else {
+            utterance.lang = 'en-US'; 
+        }
+        window.speechSynthesis.speak(utterance);
+    }
+
+    // 6. Proxy Translation
+    async function translateText() {
+        const sourceText = document.getElementById('extractedText').value;
+        const targetLang = document.getElementById('languageSelect').value;
+        if (!sourceText) return;
+
+        // Replace with your proxy
+        const apiUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(sourceText)}&langpair=en|${targetLang}`;
+        
+        try {
+            const response = await fetch(apiUrl);
+            const data = await response.json();
+            if(data?.responseData?.translatedText) {
+                document.getElementById('translatedText').value = data.responseData.translatedText;
+            }
+        } catch (error) {
+            document.getElementById('translatedText').value = "Error connecting to translation service.";
+        }
+    }
+
+    // 7. Gemini Summarize Proxy
+    async function summarizeText() {
+        const textToSummarize = document.getElementById('extractedText').value;
+        const loader = document.getElementById('summaryLoader');
+        if (!textToSummarize) return;
+
+        loader.style.display = "block";
+        document.getElementById('summaryText').value = "";
+
+        const proxyUrl = "https://your-domain.com/api/gemini-proxy"; // YOUR PROXY
+        
+        try {
+            const response = await fetch(proxyUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    prompt: `Summarize the following text into a short, clear paragraph:\n\n${textToSummarize}`
+                })
+            });
+            const data = await response.json();
+            document.getElementById('summaryText').value = data.summary || "Summary received.";
+        } catch (error) {
+            document.getElementById('summaryText').value = "Proxy connection failed. Awaiting backend integration.";
+        } finally {
+            loader.style.display = "none";
+        }
+    }
+</script>
+
+</body>
+</html>
