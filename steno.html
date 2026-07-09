@@ -296,6 +296,7 @@
             <button class="fmt-btn" onclick="execCmd('justifyLeft')" title="Align Left">⬅️</button>
             <button class="fmt-btn" onclick="execCmd('justifyCenter')" title="Center">↔️</button>
             <button class="fmt-btn" onclick="execCmd('justifyRight')" title="Align Right">➡️</button>
+			<button class="fmt-btn" onclick="insertTab()" title="Insert Tab Indent" style="font-weight: bold;">⇥</button>
             <div class="fmt-divider"></div>
             <button class="fmt-btn" onclick="execCmd('insertUnorderedList')" title="Bullet List">●</button>
             <button class="fmt-btn" onclick="execCmd('insertOrderedList')" title="Numbered List">1.</button>
@@ -464,6 +465,34 @@
     function closeMsgFs() {
         document.getElementById('msgFsModal').style.display = 'none';
     }
+
+
+// ==========================================
+    // TABBING ENGINE
+    // ==========================================
+    function insertTab() {
+        // Inject 4 non-breaking spaces directly at the cursor's current position
+        document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;');
+        
+        // Find the active editor and force it to keep focus so the keyboard stays open on mobile
+        const activeEditor = document.activeElement;
+        if (activeEditor && activeEditor.hasAttribute('contenteditable')) {
+            activeEditor.focus();
+        }
+        
+        autoSaveSession();
+    }
+
+    // Intercept the physical Tab key on the keyboard
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Tab') {
+            // Check if the user is currently typing inside the text editor
+            if (document.activeElement && document.activeElement.classList.contains('content-editable')) {
+                e.preventDefault(); // Stop the browser from jumping to the next button/dropdown
+                insertTab();        // Inject the indent instead
+            }
+        }
+    });
 
     // ==========================================
     // TEXT-TO-SPEECH (TTS) ENGINE
