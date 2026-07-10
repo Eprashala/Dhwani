@@ -124,7 +124,51 @@ function closeDisclaimer() {
     if (modal) modal.classList.add('hidden-modal');
 }
 
-document.addEventListener("DOMContentLoaded", async () => {
+function updateNetworkStatus() {
+    const isOnline = navigator.onLine;
+    const inputArea = document.getElementById('text-input');
+    const sendBtn = document.getElementById('btn-send');
+    const micBtn = document.getElementById('btn-mic');
+    const statusIndicator = document.getElementById('status-indicator');
+
+    if (!isOnline) {
+        // Switch to Offline Mode
+        statusIndicator.style.backgroundColor = '#ef4444'; // Red
+        inputArea.placeholder = "Offline Mode: Viewing History Only";
+        inputArea.disabled = true;
+        sendBtn.disabled = true;
+        sendBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        micBtn.disabled = true;
+        micBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        
+        // Optional: Show a subtle banner
+        const banner = document.createElement('div');
+        banner.id = 'offline-banner';
+        banner.className = 'w-full bg-red-900/80 text-white text-xs text-center py-1 absolute top-0 z-[200]';
+        banner.innerText = 'No internet connection. Viewing library archives.';
+        document.body.prepend(banner);
+    } else {
+        // Restore Online Mode
+        statusIndicator.style.backgroundColor = '#4b5563'; // Normal gray
+        inputArea.placeholder = "Type your message...";
+        inputArea.disabled = false;
+        sendBtn.disabled = false;
+        sendBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        micBtn.disabled = false;
+        micBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        
+        const banner = document.getElementById('offline-banner');
+        if (banner) banner.remove();
+    }
+}
+
+// Listen for network changes
+window.addEventListener('online', updateNetworkStatus);
+window.addEventListener('offline', updateNetworkStatus);
+
+// Initial check on load
+document.addEventListener("DOMContentLoaded", () => {
+    updateNetworkStatus();
     const modal = document.getElementById('disclaimerModal');
     if (modal && localStorage.getItem('hideLibraryDisclaimer') === 'true') {
         modal.classList.add('hidden-modal');
@@ -251,7 +295,7 @@ document.addEventListener('touchstart', enforceFullScreen, { capture: true, pass
 // --- 2. THE ANCIENT LIBRARY CONFIGURATION ---
 const PROXY_URL = "https://eprashala.pythonanywhere.com/api/chat"; 
 
-const LIBRARY_CONFIG = {};
+let LIBRARY_CONFIG = {};
 async function loadLibraryConfig() {
     try {
         const response = await fetch('library_config.json');
