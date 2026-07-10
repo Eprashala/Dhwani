@@ -1664,6 +1664,7 @@ function renderMessage(sender, text, isModel) {
             .replace(/[*_#`~]/g, '')
             .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
             .replace(/<[^>]+>/g, '')
+			.replace(/[<>()\[\]{}]/g, ' ')
             .trim();
             
         const speechText = prepareTextForTTSAndHighlighting(mdBody, msgId);
