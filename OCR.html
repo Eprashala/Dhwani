@@ -37,7 +37,7 @@
         .icon-btn { background: none; border: none; font-size: 18px; cursor: pointer; color: var(--text-light); transition: transform 0.2s; padding: 2px; display: flex; align-items: center; justify-content: center;}
         .icon-btn:active { transform: scale(0.9); }
 
-        /* --- SCREENS (Flex-1 takes exact remaining space) --- */
+        /* --- SCREENS --- */
         .screen { flex: 1; min-height: 0; display: none !important; flex-direction: column; overflow: hidden; position: relative; }
         .screen.active { display: flex !important; }
 
@@ -77,7 +77,6 @@
         .loader { padding: 8px; text-align: center; color: var(--primary); font-size: 12px; font-weight: 600; display: none; background: #e0e7ff; flex-shrink: 0;}
 
         /* --- FLEXIBLE BOTTOM NAVIGATION --- */
-        /* Changed to relative flow. This physically prevents ANY overlap with the screen above it */
         .bottom-bar { 
             width: 100%; background: var(--surface); padding: 8px 12px; padding-bottom: calc(8px + var(--safe-bottom)); 
             border-top: 1px solid var(--border); display: flex; gap: 8px; z-index: 20; box-shadow: 0 -2px 8px rgba(0,0,0,0.05); flex-shrink: 0; position: relative;
@@ -140,7 +139,7 @@
     <main id="screen-home" class="screen active">
         <div class="instructions">
             <h2>Welcome Student!</h2>
-            <p>1. Ensure your document language is selected.<br>2. Tap 'Take Photo' or 'Upload'.<br>3. Adjust the crop and apply filters.</p>
+            <p>1. Ensure your document language is selected above.<br>2. Tap 'Take Photo' or 'Upload'.<br>3. Adjust the crop and apply filters.</p>
         </div>
         
         <div id="cameraWrapper">
@@ -170,7 +169,7 @@
         </div>
 
         <div id="pane-extracted" class="tab-pane active">
-            <div id="ocrLoader" class="loader">Loading language pack...</div>
+            <div id="ocrLoader" class="loader">Loading language pack... please wait.</div>
             <div class="textarea-wrapper">
                 <textarea id="extractedText" class="full-textarea" placeholder="Scanned text will appear here..."></textarea>
                 <button class="tts-fab" id="tts-extractedText" onclick="toggleRead('extractedText')">🔊</button>
@@ -677,23 +676,35 @@
     }
     function resetAllTTSButtons() { document.querySelectorAll('.tts-fab').forEach(b => b.innerText = '🔊'); }
 
-    // --- TRANSLATION API ---
+    // --- FIX: TRANSLATION API (DYNAMIC SOURCE LANGUAGE) ---
     async function translateText() {
         if (isExtracting) { alert("Please wait for text extraction to finish."); return; }
         
         const sourceText = document.getElementById('extractedText').value;
-        const targetLang = document.getElementById('languageSelect').value;
-        const textArea = document.getElementById('translatedText');
         if (!sourceText) { alert("Please extract text first."); return; }
         
+        const targetLang = document.getElementById('languageSelect').value;
+        
+        // Map Tesseract Language to Translation API (ISO) Language
+        const tesseractLang = document.getElementById('ocrLangSelect').value;
+        const langMap = { 'eng':'en', 'mar':'mr', 'hin':'hi', 'guj':'gu', 'tam':'ta', 'tel':'te', 'kan':'kn', 'mal':'ml', 'ben':'bn', 'pan':'pa', 'ori':'or' };
+        const sourceLang = langMap[tesseractLang] || 'en';
+
+        if (sourceLang === targetLang) {
+            alert("Source document and target translation language are the same. Please select a distinct language to translate to.");
+            return;
+        }
+
+        const textArea = document.getElementById('translatedText');
         textArea.value = "Translating...";
+        
         const chunks = sourceText.match(/[^.!?\n]+[.!?\n]+/g) || [sourceText]; 
         let finalTranslation = "";
         
         try {
             for (let chunk of chunks) {
                 if(chunk.trim() === "") continue;
-                const apiUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(chunk)}&langpair=en|${targetLang}`;
+                const apiUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(chunk)}&langpair=${sourceLang}|${targetLang}`;
                 const response = await fetch(apiUrl);
                 const data = await response.json();
                 if (data?.responseData?.translatedText) finalTranslation += data.responseData.translatedText + " ";
@@ -703,7 +714,7 @@
         } catch (error) { textArea.value = "Translation Error."; }
     }
 
-    // --- API & PROXY LOGIC (IMPLEMENTED FROM STENO.HTML) ---
+    // --- FIX: CRASH-PROOF AI SUMMARIZATION (PRESERVES REGIONAL LANGUAGES) ---
     async function summarizeText() {
         if (isExtracting) { alert("Please wait for text extraction to finish."); return; }
         
@@ -719,11 +730,10 @@
         loader.style.display = "block"; 
         textArea.value = "";
         
-        // CRITICAL PROTECTION: Sanitize payload to prevent JSON Decode errors & Memory Crashes on PythonAnywhere
-        const safeText = text.replace(/[\r\n\t\f\v]/g, ' ')
-                             .replace(/["'\\]/g, '')
-                             .replace(/[^\x20-\x7E]/g, '')
-                             .substring(0, 1500).trim();
+        // CRITICAL PROTECTION FIX: 
+        // We only limit the string length to 3,000 characters to prevent Python Memory exhaustion.
+        // We DO NOT strip Unicode characters so Marathi, Hindi, etc., are preserved perfectly.
+        const safeText = text.substring(0, 3000).trim();
 
         try {
             const promptText = `Summarize this text in a short, clear paragraph:\n\n${safeText}`;
@@ -757,11 +767,11 @@
             
             if(data.error) throw new Error(data.error.message);
             
-            // Standard parse matching steno.html extraction logic
+            // Advanced Parse: Handles generic proxies or raw Gemini JSON passthroughs
             if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
                 textArea.value = data.candidates[0].content.parts[0].text.replace(/```html/gi, '').replace(/```/g, '').trim();
             } else {
-                throw new Error("Invalid API Response format");
+                textArea.value = data.summary || data.response || data.reply || data.text || JSON.stringify(data);
             }
             
         } catch (error) { 
