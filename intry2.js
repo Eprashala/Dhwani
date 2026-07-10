@@ -3,6 +3,7 @@ let UI = {};
 let chatHistory = [];
 let recognition = null;
 let isListening = false; 
+let isManuallyPaused = false;
 let selectedLibraryItem = "Bhagavad Gita|Bhagavad Gita";
 let state = { isProcessing: false, isMuted: false, lastAIMessage: "", sessionActive: false };
 
@@ -1229,29 +1230,16 @@ function appendToExistingMessage(msgId, newText) {
                 updatePlayBtnUI(btnElem, true);
                 playNextChunk(UI.lang ? UI.lang.value.split('-')[0] : 'hi', msgId, btnElem);
             }
-        } else {
-            const langCode = UI.lang ? UI.lang.value : 'hi-IN';
-            const utterance = new SpeechSynthesisUtterance(cleanNewTextForTTS);
-            utterance.lang = langCode;
-            utterance.rate = parseFloat(UI.ttsSpeedSlider ? UI.ttsSpeedSlider.value : 1.0);
-            utterance.pitch = parseFloat(UI.ttsPitchSlider ? UI.ttsPitchSlider.value : 1.0);
-            
-            utterance.onstart = () => { if (!highlightTimer) startHighlightTimer(msgId); };
-            
-            // ANDROID BUG FIX: Only reset if the highlighter reached the end of the combined text
-            utterance.onend = () => { 
-                setTimeout(() => {
-                    if (globalWordIndex >= wordsArray.length - 2) {
-                        resetCurrentTTS();
-                    }
-                }, 150);
-            };
-            
-            window.speechSynthesis.speak(utterance);
-            
+	} else {
+            // Native Audio Engine Append
             if (ttsStatus === 'STOPPED') {
                 ttsStatus = 'PLAYING';
                 updatePlayBtnUI(btnElem, true);
+                playNativeAudioSegment(cleanNewTextForTTS, msgId, UI.lang ? UI.lang.value : 'hi-IN');
+            } else {
+                // --- ANDROID BUG FIX 4: Do not trigger .speak() while it's already talking ---
+                // We simply do nothing here! The words were already added to wordsArray above.
+                // The onend handler in playNativeAudioSegment will automatically detect them and keep reading.
             }
         }
     }
@@ -1270,18 +1258,18 @@ async function processInput(userText) {
     state.isProcessing = true;
     UI.status.style.backgroundColor = '#facc15'; 
     setMicThinkingState(true);
-    
     updateStopButtonVisibility(); 
 
     const config = getSelectedConfig();
     const isFirstMessage = (chatHistory.length === 0);
     const userName = UI.name.value || "Bhakt";
 
+    // 1. Render User Message First
     renderMessage(userName, userText, false);
-    await new Promise(resolve => setTimeout(resolve, 2500));
 
     let introMsgId = null;
 
+    // 2. INSTANT GREETING: Catch the user gesture before it expires!
     if (isFirstMessage) {
         const greetingText = getDhwaniGreeting(UI.lang.value, config.persona, config.texts);
         
@@ -1291,12 +1279,16 @@ async function processInput(userText) {
         introMsgId = renderMessage("Dhwani", greetingText, true);
         if (!state.isMuted) {
             const btn = document.getElementById(`play-btn-${introMsgId}`);
-            if (btn) window.toggleSingleMessagePlay(btn);
+            if (btn) window.toggleSingleMessagePlay(btn); // Plays instantly
         }
     }
 
+    // 3. NOW trigger the 2.5 second delay while the API prepares to fetch
+    await new Promise(resolve => setTimeout(resolve, 2500));
+
     chatHistory.push({ role: 'user', parts: [{ text: userText }] });
     saveData();
+
 
     try {
         const rawRes = await getAIResponse(chatHistory, config);
@@ -1535,36 +1527,35 @@ window.toggleSingleMessagePlay = (btnElem) => {
     if (currentActiveBtn === btnElem && window.currentPlayingText === plainText) {
         if (ttsStatus === 'PAUSED') {
             ttsStatus = 'PLAYING';
+            isManuallyPaused = false; // Reset the flag
             updatePlayBtnUI(btnElem, true);
             updateStopButtonVisibility(); 
             
             if (activeEngine === 'cloud') {
                 if (currentAudio && currentAudio.src) currentAudio.play();
+                startHighlightTimer(msgId);
             } else {
-                window.speechSynthesis.resume();
-                
-                // ANDROID BUG FIX: Force the engine to unfreeze
-                // Sending a silent, zero-width utterance kicks the queue back into motion
+                // ANDROID NATIVE RESUME: Wait 50ms for engine to clear, then resume remaining text
+                window.speechSynthesis.cancel();
                 setTimeout(() => {
-                    if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+                    const remainingText = wordsArray.slice(globalWordIndex).join(" ");
+                    if (remainingText.trim()) {
+                        playNativeAudioSegment(remainingText, msgId, UI.lang ? UI.lang.value : 'hi-IN');
+                    } else {
+                        resetCurrentTTS();
+                    }
                 }, 50);
-                const wakeUpUtterance = new SpeechSynthesisUtterance('\u200B'); 
-                wakeUpUtterance.volume = 0;
-                window.speechSynthesis.speak(wakeUpUtterance);
             }
-            
-            startHighlightTimer(msgId);
             return;
         } else if (ttsStatus === 'PLAYING') {
             ttsStatus = 'PAUSED';
+            isManuallyPaused = true; // Set the flag so onend/onerror ignores this!
             updatePlayBtnUI(btnElem, false);
-            const textSpan = btnElem.querySelector('.play-text');
-            if (textSpan) textSpan.innerText = "Resume";
             
             if (activeEngine === 'cloud') {
                 if (currentAudio) currentAudio.pause();
             } else {
-                window.speechSynthesis.pause();
+                window.speechSynthesis.cancel(); // Stop Android instantly
             }
             if (highlightTimer) clearTimeout(highlightTimer);
             return;
@@ -1575,6 +1566,7 @@ window.toggleSingleMessagePlay = (btnElem) => {
     currentActiveBtn = btnElem;
     window.currentPlayingText = plainText;
     ttsStatus = 'PLAYING';
+    isManuallyPaused = false; // Ensure flag is clean on new playback
     updatePlayBtnUI(btnElem, true);
     updateStopButtonVisibility(); 
 
@@ -1592,36 +1584,42 @@ function playNativeAudio(fullText, btnElement) {
     
     wordsArray = fullText.match(/\S+/g) || [];
     globalWordIndex = 0;
+    
+    playNativeAudioSegment(fullText, msgId, langCode);
+}
 
-    const utterance = new SpeechSynthesisUtterance(fullText);
+function playNativeAudioSegment(text, msgId, langCode) {
+    if (!text.trim()) return;
+    const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = langCode;
     utterance.rate = parseFloat(UI.ttsSpeedSlider ? UI.ttsSpeedSlider.value : 1.0);
     utterance.pitch = parseFloat(UI.ttsPitchSlider ? UI.ttsPitchSlider.value : 1.0);
     
     utterance.onstart = () => {
-        startHighlightTimer(msgId);
+        if (!highlightTimer) startHighlightTimer(msgId);
     };
 
 	utterance.onend = () => {
+        if (isManuallyPaused) return; // Prevent Android from killing the session on pause!
+        
         setTimeout(() => {
-            // ANDROID BUG FIX: Don't rely on .pending. 
-            // If words are still left, it means appended text is queued or got dropped by Android.
+            if (isManuallyPaused) return; // Double check
+            
             if (globalWordIndex >= wordsArray.length - 2) {
                 resetCurrentTTS();
-            } else if (!window.speechSynthesis.speaking && ttsStatus === 'PLAYING') {
-                // Auto-recover: Android dropped the queue! Manually restart from where it died.
+            } else if (ttsStatus === 'PLAYING') {
                 const remainingText = wordsArray.slice(globalWordIndex).join(" ");
-                if (remainingText.trim()) {
-                    const recoveryUtterance = new SpeechSynthesisUtterance(remainingText);
-                    recoveryUtterance.lang = langCode;
-                    recoveryUtterance.rate = parseFloat(UI.ttsSpeedSlider ? UI.ttsSpeedSlider.value : 1.0);
-                    recoveryUtterance.pitch = parseFloat(UI.ttsPitchSlider ? UI.ttsPitchSlider.value : 1.0);
-                    recoveryUtterance.onend = () => { resetCurrentTTS(); };
-                    window.speechSynthesis.speak(recoveryUtterance);
-                }
+                playNativeAudioSegment(remainingText, msgId, langCode);
             }
         }, 150);
     };
+
+    utterance.onerror = (e) => {
+        if (isManuallyPaused) return; // Ignore errors thrown by our intentional cancel()
+        if (e.error !== 'canceled' && e.error !== 'interrupted') resetCurrentTTS();
+    };
+
+    window.speechSynthesis.speak(utterance);
 }
 
 // -- ENGINE 2: CLOUD TTS --
