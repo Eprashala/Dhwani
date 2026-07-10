@@ -1237,7 +1237,15 @@ function appendToExistingMessage(msgId, newText) {
             utterance.pitch = parseFloat(UI.ttsPitchSlider ? UI.ttsPitchSlider.value : 1.0);
             
             utterance.onstart = () => { if (!highlightTimer) startHighlightTimer(msgId); };
-            utterance.onend = () => { if (!window.speechSynthesis.pending) resetCurrentTTS(); };
+            
+            // ANDROID BUG FIX: Only reset if the highlighter reached the end of the combined text
+            utterance.onend = () => { 
+                setTimeout(() => {
+                    if (globalWordIndex >= wordsArray.length - 2) {
+                        resetCurrentTTS();
+                    }
+                }, 150);
+            };
             
             window.speechSynthesis.speak(utterance);
             
@@ -1534,6 +1542,15 @@ window.toggleSingleMessagePlay = (btnElem) => {
                 if (currentAudio && currentAudio.src) currentAudio.play();
             } else {
                 window.speechSynthesis.resume();
+                
+                // ANDROID BUG FIX: Force the engine to unfreeze
+                // Sending a silent, zero-width utterance kicks the queue back into motion
+                setTimeout(() => {
+                    if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+                }, 50);
+                const wakeUpUtterance = new SpeechSynthesisUtterance('\u200B'); 
+                wakeUpUtterance.volume = 0;
+                window.speechSynthesis.speak(wakeUpUtterance);
             }
             
             startHighlightTimer(msgId);
@@ -1585,17 +1602,26 @@ function playNativeAudio(fullText, btnElement) {
         startHighlightTimer(msgId);
     };
 
-    utterance.onend = () => {
-		if (!window.speechSynthesis.pending) {
-        resetCurrentTTS();
-		}
+	utterance.onend = () => {
+        setTimeout(() => {
+            // ANDROID BUG FIX: Don't rely on .pending. 
+            // If words are still left, it means appended text is queued or got dropped by Android.
+            if (globalWordIndex >= wordsArray.length - 2) {
+                resetCurrentTTS();
+            } else if (!window.speechSynthesis.speaking && ttsStatus === 'PLAYING') {
+                // Auto-recover: Android dropped the queue! Manually restart from where it died.
+                const remainingText = wordsArray.slice(globalWordIndex).join(" ");
+                if (remainingText.trim()) {
+                    const recoveryUtterance = new SpeechSynthesisUtterance(remainingText);
+                    recoveryUtterance.lang = langCode;
+                    recoveryUtterance.rate = parseFloat(UI.ttsSpeedSlider ? UI.ttsSpeedSlider.value : 1.0);
+                    recoveryUtterance.pitch = parseFloat(UI.ttsPitchSlider ? UI.ttsPitchSlider.value : 1.0);
+                    recoveryUtterance.onend = () => { resetCurrentTTS(); };
+                    window.speechSynthesis.speak(recoveryUtterance);
+                }
+            }
+        }, 150);
     };
-
-    utterance.onerror = (e) => {
-        resetCurrentTTS();
-    };
-
-    window.speechSynthesis.speak(utterance);
 }
 
 // -- ENGINE 2: CLOUD TTS --
