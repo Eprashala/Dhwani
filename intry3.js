@@ -186,10 +186,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         btnMic: document.getElementById('btn-mic'),
         iconMicDefault: document.getElementById('icon-mic-default'),
         iconMicThinking: document.getElementById('icon-mic-thinking'),
-        btnRepeat: document.getElementById('btn-repeat'),
         btnMute: document.getElementById('btn-mute'),
         btnRestart: document.getElementById('btn-restart'),
-        btnSharePdf: document.getElementById('btn-share-pdf'), 
         btnPasteKey: document.getElementById('btn-paste-key'),
         iconVol: document.getElementById('icon-vol'),
         iconMute: document.getElementById('icon-mute'),
@@ -234,13 +232,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 		btnCloseApp: document.getElementById('btn-close-app')
     };
 
-    if (UI.ddBtn) initCustomDropdown();
-
-    if (UI.overlay) {
+	if (UI.overlay) {
         await ChatDB.init(); // Initialize robust database layer
         await loadLibraryConfig();
-		if (UI.ddBtn) initCustomDropdown();
-		await loadData();
+        if (UI.ddBtn) initCustomDropdown(); // Only call this ONCE, after the config loads!
+        await loadData();
         initSpeechRecognition();
         setupEventListeners();
 
