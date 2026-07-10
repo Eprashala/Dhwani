@@ -229,7 +229,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         ddList: document.getElementById('dropdown-list'),
         ddText: document.getElementById('dropdown-selected-text'),
         
-		btnCloseApp: document.getElementById('btn-close-app')
+		btnCloseApp: document.getElementById('btn-close-app'),
+		btnExport: document.getElementById('btn-export-session'),
+        btnImport: document.getElementById('btn-import-session'),
+        fileImport: document.getElementById('file-import-input')
     };
 
 	if (UI.overlay) {
@@ -301,6 +304,109 @@ async function loadLibraryConfig() {
         alert("Failed to load the library catalog. Please check your connection or JSON syntax.");
     }
 }
+
+
+// --- EXPORT & IMPORT LOGIC (TEACHER/STUDENT SHARING & MIGRATION) ---
+
+// 1. GLOBAL EXPORT: Full Database Backup
+window.exportAllSessions = async () => {
+    const allData = await ChatDB.getAllSessions();
+    
+    if (!allData || allData.length === 0) {
+        alert("The library archive is empty. There is nothing to export.");
+        return;
+    }
+    
+    // Package the entire database
+    const backupData = {
+        type: "eprashala_full_backup",
+        exportDate: new Date().toISOString(),
+        sessions: allData
+    };
+    
+    // Create a downloadable JSON file
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", `Eprashala_Full_Backup_${new Date().toISOString().split('T')[0]}.json`);
+    document.body.appendChild(downloadAnchorNode); 
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+};
+
+// 2. SMART IMPORT: Handles both Single Lessons and Full Backups
+window.importSessionData = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const importedData = JSON.parse(e.target.result);
+            
+            // CASE A: FULL DATABASE MIGRATION (From Global Export)
+            if (importedData.type === "eprashala_full_backup" && Array.isArray(importedData.sessions)) {
+                let importedCount = 0;
+                for (const session of importedData.sessions) {
+                    // Generate a new ID to prevent overwriting existing local data
+                    const newSession = {
+                        id: Date.now() + Math.floor(Math.random() * 1000),
+                        date: session.date || new Date().toISOString().split('T')[0],
+                        title: session.title.includes('[Imported]') ? session.title : `[Imported] ${session.title}`,
+                        messages: session.messages
+                    };
+                    await ChatDB.saveSession(newSession);
+                    importedCount++;
+                    // Tiny delay to ensure IDs are unique
+                    await new Promise(r => setTimeout(r, 2));
+                }
+                
+                allSessions = await ChatDB.getAllSessions();
+                
+                if (UI.historyView && !UI.historyView.classList.contains('hidden')) {
+                    renderHistoryList(); 
+                }
+                alert(`Migration Complete! Successfully imported ${importedCount} sessions into your archives.`);
+            } 
+            
+            // CASE B: SINGLE LESSON IMPORT (Teacher sharing with Student)
+            else if (importedData.messages && Array.isArray(importedData.messages)) {
+                const newSessionId = Date.now();
+                const newSession = {
+                    id: newSessionId,
+                    date: new Date().toISOString().split('T')[0],
+                    title: `[Shared] ${importedData.title || 'Imported Lesson'}`,
+                    messages: importedData.messages
+                };
+
+                await ChatDB.saveSession(newSession);
+                allSessions = await ChatDB.getAllSessions();
+
+                // Load it instantly into the UI
+                loadSpecificSession(newSessionId);
+                
+                // Auto-switch to the correct book context if it exists in the file
+                if (importedData.libraryItem && importedData.libraryItem.includes('|')) {
+                    selectedLibraryItem = importedData.libraryItem;
+                    if (UI.ddText) UI.ddText.innerText = selectedLibraryItem.split('|')[1];
+                }
+
+                if (UI.settingsModal) UI.settingsModal.classList.add('hidden');
+                alert("Lesson imported successfully! You can now press Play to listen.");
+            } 
+            
+            else {
+                throw new Error("Unrecognized file structure");
+            }
+            
+        } catch (err) {
+            console.error(err);
+            alert("Failed to import. Please make sure this is a valid Eprashala JSON file.");
+        }
+        event.target.value = ''; // Reset the input
+    };
+    reader.readAsText(file);
+};
 
 function initCustomDropdown() {
     renderDropdownList(); 
@@ -564,6 +670,7 @@ function updateStopButtonVisibility() {
 }
 
 // --- HISTORY VIEW RENDERER ---
+// --- HISTORY VIEW RENDERER ---
 function renderHistoryList() {
     const container = document.getElementById('history-list-container');
     container.innerHTML = '';
@@ -583,9 +690,15 @@ function renderHistoryList() {
             <div class="flex justify-between items-center w-full">
                 <div class="flex items-center gap-2 overflow-hidden flex-1">
                     <span class="font-bold tracking-wide text-cyan-100 truncate">${session.title}</span>
+                    
                     <button class="rename-btn p-1 text-slate-500 hover:text-cyan-400 transition-colors focus:outline-none" title="Rename Session">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                     </button>
+                    
+                    <button class="share-btn p-1 text-slate-500 hover:text-yellow-400 transition-colors focus:outline-none" title="Export & Share this Lesson">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                    </button>
+                    
                 </div>
                 <span class="text-[10px] text-cyan-400 bg-cyan-900/40 border border-cyan-800/50 px-2 py-1 rounded-full font-bold uppercase ml-2 flex-shrink-0">${session.messages.length} msgs</span>
             </div>
@@ -594,6 +707,7 @@ function renderHistoryList() {
             </div>
         `;
         
+        // 1. Rename Logic
         const renameBtn = card.querySelector('.rename-btn');
         renameBtn.onclick = async (e) => {
             e.stopPropagation(); 
@@ -613,6 +727,30 @@ function renderHistoryList() {
             }
         };
 
+        // 2. NEW: Share/Export Logic
+        const shareBtn = card.querySelector('.share-btn');
+        shareBtn.onclick = (e) => {
+            e.stopPropagation(); // Stops the card from loading the chat in the background
+            
+            const sessionData = {
+                title: session.title,
+                messages: session.messages,
+                libraryItem: selectedLibraryItem 
+            };
+            
+            // Clean up the title to make a valid, pretty file name (e.g., "Lesson_Gravity.json")
+            const safeTitle = session.title.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
+            
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(sessionData));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", `Lesson_${safeTitle}.json`);
+            document.body.appendChild(downloadAnchorNode); 
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        };
+
+        // 3. Load Session Logic
         card.onclick = (e) => {
             e.stopPropagation();
             loadSpecificSession(session.id); 
@@ -681,6 +819,25 @@ function setupEventListeners() {
 			});
 		}
     });
+	// --- EXPORT & IMPORT LISTENERS ---
+// --- EXPORT & IMPORT LISTENERS ---
+    if (UI.btnExport) {
+        UI.btnExport.addEventListener('click', (e) => {
+            e.stopPropagation();
+            window.exportAllSessions(); // <--- Calls the new Full Backup function
+        });
+    }
+
+    if (UI.btnImport) {
+        UI.btnImport.addEventListener('click', (e) => {
+            e.stopPropagation();
+            UI.fileImport.click(); 
+        });
+    }
+
+    if (UI.fileImport) {
+        UI.fileImport.addEventListener('change', window.importSessionData);
+    }
 	
     UI.ratioSlider.addEventListener('input', updateSliderLabels);
     UI.modelSlider.addEventListener('input', updateSliderLabels);
