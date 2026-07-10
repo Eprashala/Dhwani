@@ -1511,6 +1511,7 @@ function resetCurrentTTS() {
     globalWordIndex = 0;
     window.currentPlayingText = "";
     
+	isManuallyPaused = false;
     setTimeout(updateStopButtonVisibility, 50); 
 }
 
@@ -1862,6 +1863,7 @@ function renderMessage(sender, text, isModel) {
             .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
             .replace(/<[^>]+>/g, '')
 			.replace(/[<>()\[\]{}]/g, ' ')
+			.replace(/-{2,}/g, ' ')
             .trim();
             
         const speechText = prepareTextForTTSAndHighlighting(mdBody, msgId);
