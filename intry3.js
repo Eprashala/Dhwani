@@ -1012,16 +1012,13 @@ function appendToExistingMessage(msgId, newText) {
                 updatePlayBtnUI(btnElem, true);
                 playNextChunk(UI.lang ? UI.lang.value.split('-')[0] : 'hi', msgId, btnElem);
             }
-		}
-	} else {
+        } else {
             // Native Audio Engine Append
             if (ttsStatus === 'STOPPED') {
                 ttsStatus = 'PLAYING';
                 updatePlayBtnUI(btnElem, true);
                 playNativeAudioSegment(cleanNewTextForTTS, msgId, UI.lang ? UI.lang.value : 'hi-IN');
             } else {
-                // --- ANDROID BUG FIX 4: Do not trigger .speak() while it's already talking ---
-                // We simply do nothing here! The words were already added to wordsArray above.
                 // The onend handler in playNativeAudioSegment will automatically detect them and keep reading.
             }
         }
@@ -1029,6 +1026,7 @@ function appendToExistingMessage(msgId, newText) {
 
     setTimeout(() => { UI.log.scrollTop = UI.log.scrollHeight; }, 100);
 }
+
 
 async function processInput(userText) {
     userText = userText.trim();
