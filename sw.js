@@ -2,12 +2,13 @@ const CACHE_NAME = 'eprashala-library-v1';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
+    '/index3.html',	
     '/intry3.js',
     '/library_config.json',
     '/manifest.json',
-    // Add any local CSS, fonts, or images here if you host them
-    // Note: External CDNs (like Tailwind) should ideally be cached too, 
-    // but caching external cross-origin requests requires specific CORS headers.
+    '/tailwind.js',
+    '/html2pdf.bundle.min.js',
+    '/marked.min.js'
 ];
 
 // Install Event: Pre-cache essential assets

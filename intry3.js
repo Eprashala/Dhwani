@@ -1012,6 +1012,7 @@ function appendToExistingMessage(msgId, newText) {
                 updatePlayBtnUI(btnElem, true);
                 playNextChunk(UI.lang ? UI.lang.value.split('-')[0] : 'hi', msgId, btnElem);
             }
+		}
 	} else {
             // Native Audio Engine Append
             if (ttsStatus === 'STOPPED') {
