@@ -166,8 +166,7 @@ function updateNetworkStatus() {
 window.addEventListener('online', updateNetworkStatus);
 window.addEventListener('offline', updateNetworkStatus);
 
-// Initial check on load
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
     updateNetworkStatus();
     const modal = document.getElementById('disclaimerModal');
     if (modal && localStorage.getItem('hideLibraryDisclaimer') === 'true') {
