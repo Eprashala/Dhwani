@@ -23,7 +23,7 @@
 
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; -webkit-tap-highlight-color: transparent; }
 
-        /* STRICT FLEXBOX LAYOUT: Eliminates overlap permanently */
+        /* STRICT FLEXBOX LAYOUT */
         body { background-color: var(--bg); color: var(--text); display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; }
 
         /* --- COMPACT MOBILE HEADER --- */
@@ -90,15 +90,20 @@
         .slider-wrapper { display: flex; flex-direction: column; gap: 4px; width: 100%; }
         .slider-header { display: flex; justify-content: space-between; font-weight: 600; font-size: 11px; color: var(--text); }
         input[type="range"] { width: 100%; accent-color: var(--primary); height: 3px; border-radius: 2px; }
-        .button-row { display: flex; gap: 8px; width: 100%; }
+        .button-row { display: flex; gap: 6px; width: 100%; }
 
-        .btn { flex: 1; padding: 8px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 5px; color: white; transition: transform 0.1s; }
+        /* Unified Button Styling */
+        .btn { flex: 1; padding: 8px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 4px; color: white; transition: transform 0.1s; white-space: nowrap; }
         .btn:active { transform: scale(0.96); }
         .btn-primary { background: var(--primary); }
         .btn-success { background: #10b981; }
         .btn-action { background: var(--warning); color: #fff;}
         .btn-magic { background: linear-gradient(135deg, #8b5cf6, #d946ef); }
         .btn-outline { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+        
+        /* Specialized mini buttons for the Tune row */
+        .btn-mini { font-size: 11px; padding: 6px 4px; }
+        
         input[type="file"] { display: none; }
 
         /* --- MODALS --- */
@@ -237,8 +242,9 @@
             </div>
             
             <div class="button-row">
-                <button class="btn btn-outline" style="flex: 0.4;" onclick="resetToCrop()">⬅ Crop</button>
-                <button class="btn btn-action" onclick="executeOCR()">⚙️ Start OCR</button>
+                <button class="btn btn-outline btn-mini" style="flex: 0.5;" onclick="resetToCrop()">⬅ Crop</button>
+                <button class="btn btn-action btn-mini" onclick="executeOCR()">⚙️ Text OCR</button>
+                <button class="btn btn-magic btn-mini" onclick="executeDirectVision()">✨ Direct AI</button>
             </div>
         </div>
     </div>
@@ -290,7 +296,7 @@
     }
 
     function goBack(target) {
-        if (isExtracting) { alert("Please wait for OCR to finish before navigating."); return; }
+        if (isExtracting) { alert("Please wait for processing to finish before navigating."); return; }
         if(target === 'home') {
             document.getElementById('cameraWrapper').style.display = 'none';
             if(stream) { stream.getTracks().forEach(t => t.stop()); }
@@ -602,7 +608,7 @@
         ctx.putImageData(outData, 0, 0);
     }
 
-    // --- OCR ENGINE ---
+    // --- STANDARD TESSERACT OCR ENGINE ---
     async function executeOCR() {
         if (isExtracting) return;
         isExtracting = true;
@@ -642,6 +648,81 @@
         }
     }
 
+    // --- NEW: DIRECT AI VISION MULTIMODAL ENGINE ---
+    async function executeDirectVision() {
+        if (isExtracting) return;
+        isExtracting = true;
+        
+        const finalImageBase64 = canvas.toDataURL('image/png'); 
+        showScreen('result');
+        switchTab('summary'); 
+        
+        const loader = document.getElementById('summaryLoader');
+        const summaryTextArea = document.getElementById('summaryText');
+        
+        const useProxy = document.getElementById('useProxy').checked;
+        const key = document.getElementById('apiKeyInput').value;
+        
+        if (!useProxy && (!key || key.trim() === "")) { 
+            alert("Please provide a Gemini API Key in Settings, or select Eprashala Proxy."); 
+            openSettings(); 
+            isExtracting = false;
+            return; 
+        }
+
+        summaryTextArea.value = "";
+        loader.style.display = "block";
+        loader.innerText = "Analyzing image with AI Vision...";
+
+        try {
+            // Strip the Data URL header to get raw base64
+            const base64Data = finalImageBase64.split(',')[1];
+            const promptText = "Extract all the text from this image and provide a short, clear summary of it in a single paragraph. Maintain the original language context of the document.";
+            
+            // Format strictly to match Gemini Multimodal JSON payload
+            const payload = {
+                model: "gemini-3.1-flash-lite",
+                contents: [{ 
+                    role: "user", 
+                    parts: [
+                        { inlineData: { mimeType: "image/png", data: base64Data } },
+                        { text: promptText }
+                    ] 
+                }]
+            };
+
+            let url = "";
+            let headers = { 'Content-Type': 'application/json' };
+
+            if (useProxy) {
+                url = "https://eprashala.pythonanywhere.com/api/chat";
+                if (key && key.trim().length > 10) {
+                    headers['X-Custom-Api-Key'] = key.trim();
+                }
+            } else {
+                url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key.trim()}`;
+            }
+
+            const response = await fetch(url, { method: 'POST', headers: headers, body: JSON.stringify(payload) });
+            const data = await response.json();
+            
+            if(data.error) throw new Error(data.error.message);
+            
+            if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
+                summaryTextArea.value = data.candidates[0].content.parts[0].text.replace(/```html/gi, '').replace(/```/g, '').trim();
+            } else {
+                summaryTextArea.value = data.summary || data.response || data.reply || data.text || JSON.stringify(data);
+            }
+        } catch (error) { 
+            summaryTextArea.value = `Vision API Error: ${error.message}. If using proxy, it may only support text.`; 
+            console.error(error);
+        } finally { 
+            loader.style.display = "none"; 
+            loader.innerText = "Communicating with Server...";
+            isExtracting = false; 
+        }
+    }
+
     // --- TEXT TO SPEECH ---
     let currentReadingId = null;
     function toggleRead(elementId) {
@@ -676,7 +757,7 @@
     }
     function resetAllTTSButtons() { document.querySelectorAll('.tts-fab').forEach(b => b.innerText = '🔊'); }
 
-    // --- FIX: TRANSLATION API (DYNAMIC SOURCE LANGUAGE) ---
+    // --- TRANSLATION API ---
     async function translateText() {
         if (isExtracting) { alert("Please wait for text extraction to finish."); return; }
         
@@ -685,7 +766,6 @@
         
         const targetLang = document.getElementById('languageSelect').value;
         
-        // Map Tesseract Language to Translation API (ISO) Language
         const tesseractLang = document.getElementById('ocrLangSelect').value;
         const langMap = { 'eng':'en', 'mar':'mr', 'hin':'hi', 'guj':'gu', 'tam':'ta', 'tel':'te', 'kan':'kn', 'mal':'ml', 'ben':'bn', 'pan':'pa', 'ori':'or' };
         const sourceLang = langMap[tesseractLang] || 'en';
@@ -714,7 +794,7 @@
         } catch (error) { textArea.value = "Translation Error."; }
     }
 
-    // --- FIX: CRASH-PROOF AI SUMMARIZATION (PRESERVES REGIONAL LANGUAGES) ---
+    // --- AI SUMMARIZATION (FROM TEXT) ---
     async function summarizeText() {
         if (isExtracting) { alert("Please wait for text extraction to finish."); return; }
         
@@ -730,15 +810,11 @@
         loader.style.display = "block"; 
         textArea.value = "";
         
-        // CRITICAL PROTECTION FIX: 
-        // We only limit the string length to 3,000 characters to prevent Python Memory exhaustion.
-        // We DO NOT strip Unicode characters so Marathi, Hindi, etc., are preserved perfectly.
         const safeText = text.substring(0, 3000).trim();
 
         try {
             const promptText = `Summarize this text in a short, clear paragraph:\n\n${safeText}`;
             
-            // Replicate Steno.html exact payload structure
             const payload = {
                 model: "gemini-1.5-flash",
                 contents: [{ role: "user", parts: [{ text: "Please provide the summary." }] }],
@@ -767,7 +843,6 @@
             
             if(data.error) throw new Error(data.error.message);
             
-            // Advanced Parse: Handles generic proxies or raw Gemini JSON passthroughs
             if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
                 textArea.value = data.candidates[0].content.parts[0].text.replace(/```html/gi, '').replace(/```/g, '').trim();
             } else {
@@ -789,7 +864,7 @@
     request.onsuccess = (e) => { db = e.target.result; };
 
     function promptSaveHistory() {
-        if (isExtracting) { alert("Please wait for text extraction to finish."); return; }
+        if (isExtracting) { alert("Please wait for processing to finish."); return; }
         const name = prompt("Name this scan (e.g., 'Science Chapter 4'):", `Scan ${new Date().toLocaleDateString()}`);
         if(!name) return;
         const record = { title: name, date: new Date().toLocaleString(), image: canvas.toDataURL('image/png'), extracted: document.getElementById('extractedText').value, translated: document.getElementById('translatedText').value, summary: document.getElementById('summaryText').value };
