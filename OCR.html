@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Eprashala OCR Scanner</title>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         /* --- CORE VARIABLES & RESET --- */
         :root {
@@ -66,7 +67,7 @@
         .tab-pane { flex: 1; display: none; flex-direction: column; background: var(--surface); position: relative; overflow: hidden; }
         .tab-pane.active { display: flex; }
         
-        .pane-actions { padding: 6px 10px; border-bottom: 1px solid var(--border); display: flex; gap: 6px; background: var(--bg); flex-shrink: 0;}
+        .pane-actions { padding: 6px 10px; border-bottom: 1px solid var(--border); display: flex; gap: 6px; background: var(--bg); flex-shrink: 0; align-items: stretch;}
         select.action-select { flex: 1; padding: 6px; border-radius: 4px; border: 1px solid var(--border); font-size: 13px; background: white; outline: none; }
         
         .textarea-wrapper { flex: 1; position: relative; display: flex; flex-direction: column; overflow: hidden; }
@@ -97,11 +98,10 @@
         .btn:active { transform: scale(0.96); }
         .btn-primary { background: var(--primary); }
         .btn-success { background: #10b981; }
+        .btn-secondary { background: #64748b; color: white; }
         .btn-action { background: var(--warning); color: #fff;}
         .btn-magic { background: linear-gradient(135deg, #8b5cf6, #d946ef); }
         .btn-outline { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
-        
-        /* Specialized mini buttons for the Tune row */
         .btn-mini { font-size: 11px; padding: 6px 4px; }
         
         input[type="file"] { display: none; }
@@ -170,7 +170,7 @@
         <div class="tab-bar">
             <button class="tab-btn active" onclick="switchTab('extracted')" id="tab-extracted">Original</button>
             <button class="tab-btn" onclick="switchTab('translated')" id="tab-translated">Translated</button>
-            <button class="tab-btn" onclick="switchTab('summary')" id="tab-summary">Summary</button>
+            <button class="tab-btn" onclick="switchTab('summary')" id="tab-summary">AI Output</button>
         </div>
 
         <div id="pane-extracted" class="tab-pane active">
@@ -202,11 +202,12 @@
 
         <div id="pane-summary" class="tab-pane">
             <div class="pane-actions">
-                <button class="btn btn-magic" style="width: 100%;" onclick="summarizeText()">✨ Generate AI Summary</button>
+                <input type="text" id="customPrompt" placeholder="e.g. Write a 100-word essay based on this..." style="flex: 1; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); font-size: 13px; outline: none;">
+                <button class="btn btn-magic" style="flex: 0 0 45px; border-radius: 6px; padding: 0; font-size: 18px; display: flex; align-items: center; justify-content: center;" onclick="executeAIAction()" title="Run AI">✨</button>
             </div>
             <div id="summaryLoader" class="loader">Communicating with Server...</div>
             <div class="textarea-wrapper">
-                <textarea id="summaryText" class="full-textarea" placeholder="Tap Generate to get a short summary..."></textarea>
+                <textarea id="summaryText" class="full-textarea" placeholder="Your AI output will appear here..."></textarea>
                 <button class="tts-fab" id="tts-summaryText" onclick="toggleRead('summaryText')">🔊</button>
             </div>
         </div>
@@ -244,14 +245,15 @@
             <div class="button-row">
                 <button class="btn btn-outline btn-mini" style="flex: 0.5;" onclick="resetToCrop()">⬅ Crop</button>
                 <button class="btn btn-action btn-mini" onclick="executeOCR()">⚙️ Text OCR</button>
-                <button class="btn btn-magic btn-mini" onclick="executeDirectVision()">✨ Direct AI</button>
+                <button class="btn btn-magic btn-mini" onclick="prepareDirectVision()">✨ Direct AI</button>
             </div>
         </div>
     </div>
 
     <div class="bottom-bar" id="nav-result" style="display: none;">
-        <button class="btn btn-outline" style="flex: 0.4;" onclick="goBack('tune')">⬅ Back</button>
-        <button class="btn btn-primary" onclick="promptSaveHistory()">💾 Save to History</button>
+        <button class="btn btn-outline" style="flex: 1;" onclick="goBack('tune')">⬅ Back</button>
+        <button class="btn btn-secondary" style="flex: 1;" onclick="exportPDF()">📄 PDF</button>
+        <button class="btn btn-primary" style="flex: 1;" onclick="promptSaveHistory()">💾 Save</button>
     </div>
 
     <div class="overlay" id="settingsOverlay">
@@ -261,7 +263,7 @@
                 <button class="icon-btn" onclick="closeSettings()">❌</button>
             </div>
             <hr style="border: 0; border-top: 1px solid var(--border);">
-            <label style="font-weight: 600; font-size: 13px;">AI Summary Backend</label>
+            <label style="font-weight: 600; font-size: 13px;">AI Backend</label>
             <div class="radio-group">
                 <label class="radio-label">
                     <input type="radio" name="apiChoice" id="useProxy" value="proxy" checked onchange="toggleApiInput()">
@@ -285,6 +287,7 @@
 <script>
     // --- STATE MANAGEMENT ---
     let isExtracting = false; 
+    let aiProcessingMode = 'text'; 
 
     function showScreen(screenName) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -612,7 +615,9 @@
     async function executeOCR() {
         if (isExtracting) return;
         isExtracting = true;
+        aiProcessingMode = 'text'; 
         
+        document.getElementById('customPrompt').placeholder = "Ask AI about the extracted text...";
         const finalImageBase64 = canvas.toDataURL('image/png'); 
         showScreen('result');
         switchTab('extracted'); 
@@ -648,15 +653,33 @@
         }
     }
 
-    // --- NEW: DIRECT AI VISION MULTIMODAL ENGINE ---
+    // --- PREPARE DIRECT AI VISION (Bypasses OCR) ---
+    function prepareDirectVision() {
+        if (isExtracting) return;
+        aiProcessingMode = 'image'; 
+        
+        document.getElementById('customPrompt').placeholder = "Ask AI about this image...";
+        document.getElementById('summaryText').value = "Image filtered and ready for Direct AI. Type your instructions above and tap ✨.";
+        
+        showScreen('result');
+        switchTab('summary');
+    }
+
+    // --- UNIVERSAL AI ACTION HANDLER ---
+    function executeAIAction() {
+        if (aiProcessingMode === 'image') {
+            executeDirectVision();
+        } else {
+            summarizeText();
+        }
+    }
+
+    // --- DIRECT AI VISION MULTIMODAL ENGINE ---
     async function executeDirectVision() {
         if (isExtracting) return;
         isExtracting = true;
         
         const finalImageBase64 = canvas.toDataURL('image/png'); 
-        showScreen('result');
-        switchTab('summary'); 
-        
         const loader = document.getElementById('summaryLoader');
         const summaryTextArea = document.getElementById('summaryText');
         
@@ -670,17 +693,18 @@
             return; 
         }
 
+        const customInstruction = document.getElementById('customPrompt').value.trim();
+        const promptText = customInstruction || "Extract all the text from this image and provide a well-formatted summary of it in a single paragraph. Maintain the original language context of the document. Do not use excessive markdown symbols like asterisks or brackets.";
+
         summaryTextArea.value = "";
         loader.style.display = "block";
         loader.innerText = "Analyzing image with AI Vision...";
 
         try {
-            // Strip the Data URL header to get raw base64
             const base64Data = finalImageBase64.split(',')[1];
-            const promptText = "Extract all the text from this image and provide a short, clear summary of it in a single paragraph. Maintain the original language context of the document.";
             
-            // Format strictly to match Gemini Multimodal JSON payload
             const payload = {
+                // UPDATE: Upgraded model to latest 2026 standard
                 model: "gemini-3.1-flash-lite",
                 contents: [{ 
                     role: "user", 
@@ -700,7 +724,7 @@
                     headers['X-Custom-Api-Key'] = key.trim();
                 }
             } else {
-                url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key.trim()}`;
+                url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${key.trim()}`;
             }
 
             const response = await fetch(url, { method: 'POST', headers: headers, body: JSON.stringify(payload) });
@@ -714,7 +738,7 @@
                 summaryTextArea.value = data.summary || data.response || data.reply || data.text || JSON.stringify(data);
             }
         } catch (error) { 
-            summaryTextArea.value = `Vision API Error: ${error.message}. If using proxy, it may only support text.`; 
+            summaryTextArea.value = `Vision API Error: ${error.message}. If using proxy, it may only support text. Try using a personal API key.`; 
             console.error(error);
         } finally { 
             loader.style.display = "none"; 
@@ -723,7 +747,72 @@
         }
     }
 
-    // --- TEXT TO SPEECH ---
+    // --- AI SUMMARIZATION (FROM TEXT) ---
+    async function summarizeText() {
+        if (isExtracting) { alert("Please wait for processing to finish."); return; }
+        
+        const text = document.getElementById('extractedText').value;
+        const useProxy = document.getElementById('useProxy').checked;
+        const key = document.getElementById('apiKeyInput').value;
+        const textArea = document.getElementById('summaryText');
+        const loader = document.getElementById('summaryLoader');
+        
+        if (!text) { alert("Please extract text first."); return; }
+        if (!useProxy && (!key || key.trim() === "")) { alert("Please provide a Gemini API Key in Settings, or select Eprashala Proxy."); openSettings(); return; }
+
+        loader.style.display = "block"; 
+        textArea.value = "";
+        
+        const safeText = text.substring(0, 3000).trim();
+        const customInstruction = document.getElementById('customPrompt').value.trim() || "Summarize this text in a short, clear, well-formatted paragraph.";
+
+        try {
+            const promptText = `${customInstruction}. Please format cleanly and do not use excessive markdown symbols like asterisks or brackets:\n\n${safeText}`;
+            
+            const payload = {
+                // UPDATE: Upgraded model to latest 2026 standard
+                model: "gemini-3.1-flash-lite",
+                contents: [{ role: "user", parts: [{ text: "Please process the input." }] }],
+                systemInstruction: { parts: [{ text: promptText }] }
+            };
+
+            let url = "";
+            let headers = { 'Content-Type': 'application/json' };
+
+            if (useProxy) {
+                url = "https://eprashala.pythonanywhere.com/api/chat";
+                if (key && key.trim().length > 10) {
+                    headers['X-Custom-Api-Key'] = key.trim();
+                }
+            } else {
+                url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${key.trim()}`;
+            }
+
+            const response = await fetch(url, { 
+                method: 'POST', 
+                headers: headers, 
+                body: JSON.stringify(payload) 
+            });
+            
+            const data = await response.json();
+            
+            if(data.error) throw new Error(data.error.message);
+            
+            if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
+                textArea.value = data.candidates[0].content.parts[0].text.replace(/```html/gi, '').replace(/```/g, '').trim();
+            } else {
+                textArea.value = data.summary || data.response || data.reply || data.text || JSON.stringify(data);
+            }
+            
+        } catch (error) { 
+            textArea.value = `Server Error: Ensure your proxy is running. Details: ${error.message}`; 
+            console.error("API Error Details:", error);
+        } finally { 
+            loader.style.display = "none"; 
+        }
+    }
+
+    // --- TEXT TO SPEECH (Sanitized) ---
     let currentReadingId = null;
     function toggleRead(elementId) {
         const synth = window.speechSynthesis;
@@ -739,7 +828,10 @@
 
         synth.cancel(); resetAllTTSButtons(); 
         currentReadingId = elementId;
-        const utterance = new SpeechSynthesisUtterance(text);
+        
+        // NEW FIX: Strip out distracting markdown formatting marks so the AI voice sounds natural
+        const cleanText = text.replace(/[*_<>{}\[\]()\-#]/g, ' ').replace(/\s+/g, ' ');
+        const utterance = new SpeechSynthesisUtterance(cleanText);
         
         if (elementId === 'translatedText') {
             utterance.lang = document.getElementById('languageSelect').value;
@@ -794,67 +886,51 @@
         } catch (error) { textArea.value = "Translation Error."; }
     }
 
-    // --- AI SUMMARIZATION (FROM TEXT) ---
-    async function summarizeText() {
-        if (isExtracting) { alert("Please wait for text extraction to finish."); return; }
+    // --- NEW: PDF EXPORT ENGINE (A4 Formatting) ---
+    function exportPDF() {
+        // Determine which tab is currently active to decide what text to export
+        let contentToExport = "";
+        let title = "Document";
         
-        const text = document.getElementById('extractedText').value;
-        const useProxy = document.getElementById('useProxy').checked;
-        const key = document.getElementById('apiKeyInput').value;
-        const textArea = document.getElementById('summaryText');
-        const loader = document.getElementById('summaryLoader');
-        
-        if (!text) { alert("Please extract text first."); return; }
-        if (!useProxy && (!key || key.trim() === "")) { alert("Please provide a Gemini API Key in Settings, or select Eprashala Proxy."); openSettings(); return; }
-
-        loader.style.display = "block"; 
-        textArea.value = "";
-        
-        const safeText = text.substring(0, 3000).trim();
-
-        try {
-            const promptText = `Summarize this text in a short, clear paragraph:\n\n${safeText}`;
-            
-            const payload = {
-                model: "gemini-1.5-flash",
-                contents: [{ role: "user", parts: [{ text: "Please provide the summary." }] }],
-                systemInstruction: { parts: [{ text: promptText }] }
-            };
-
-            let url = "";
-            let headers = { 'Content-Type': 'application/json' };
-
-            if (useProxy) {
-                url = "https://eprashala.pythonanywhere.com/api/chat";
-                if (key && key.trim().length > 10) {
-                    headers['X-Custom-Api-Key'] = key.trim();
-                }
-            } else {
-                url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key.trim()}`;
-            }
-
-            const response = await fetch(url, { 
-                method: 'POST', 
-                headers: headers, 
-                body: JSON.stringify(payload) 
-            });
-            
-            const data = await response.json();
-            
-            if(data.error) throw new Error(data.error.message);
-            
-            if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) {
-                textArea.value = data.candidates[0].content.parts[0].text.replace(/```html/gi, '').replace(/```/g, '').trim();
-            } else {
-                textArea.value = data.summary || data.response || data.reply || data.text || JSON.stringify(data);
-            }
-            
-        } catch (error) { 
-            textArea.value = `Server Error: Ensure your proxy is running. Details: ${error.message}`; 
-            console.error("API Error Details:", error);
-        } finally { 
-            loader.style.display = "none"; 
+        if (document.getElementById('tab-extracted').classList.contains('active')) {
+            contentToExport = document.getElementById('extractedText').value;
+            title = "Extracted Text";
+        } else if (document.getElementById('tab-translated').classList.contains('active')) {
+            contentToExport = document.getElementById('translatedText').value;
+            title = "Translated Text";
+        } else {
+            contentToExport = document.getElementById('summaryText').value;
+            title = "AI Document";
         }
+
+        if (!contentToExport || !contentToExport.trim()) {
+            alert("There is no text to export from this tab.");
+            return;
+        }
+
+        // Create a temporary, hidden div styled strictly for A4 printing
+        const element = document.createElement('div');
+        element.innerHTML = `
+            <div style="padding: 30px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #0f172a; line-height: 1.6; text-align: justify;">
+                <h2 style="color: #2563eb; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 20px;">Eprashala OCR - ${title}</h2>
+                <div style="white-space: pre-wrap; font-size: 14px;">${contentToExport}</div>
+                <div style="margin-top: 50px; font-size: 10px; color: #64748b; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 10px;">
+                    Generated by Eprashala OCR Scanner • ${new Date().toLocaleString()}
+                </div>
+            </div>
+        `;
+        
+        // Configuration for html2pdf
+        const opt = {
+            margin:       0.5,
+            filename:     `Eprashala_${title.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2 },
+            jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+        };
+        
+        // Execute generation
+        html2pdf().set(opt).from(element).save();
     }
 
     // --- INDEXED DB ---
