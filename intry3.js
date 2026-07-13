@@ -795,6 +795,7 @@ function loadSpecificSession(targetId) {
 }
 
 function setupEventListeners() {
+    // 1. Chat Log Listener (Plays audio and single PDFs)
     UI.log.addEventListener('click', (e) => {
         const playBtn = e.target.closest('.btn-play-msg');
         if (playBtn) {
@@ -812,21 +813,16 @@ function setupEventListeners() {
             window.downloadSinglePDF(pdfBtn, sender);
             return;
         }
-		if (UI.btnDownloadAllPdf) {
-			UI.btnDownloadAllPdf.addEventListener('click', (e) => {
-				e.stopPropagation();
-				downloadEntireSessionPDF();
-			});
-		}
     });
-	// --- EXPORT & IMPORT LISTENERS ---
-// --- EXPORT & IMPORT LISTENERS ---
-    if (UI.btnExport) {
-        UI.btnExport.addEventListener('click', (e) => {
+
+    // 2. Entire Session PDF Listener (Moved OUTSIDE the log listener)
+    if (UI.btnDownloadAllPdf) {
+        UI.btnDownloadAllPdf.addEventListener('click', (e) => {
             e.stopPropagation();
-            window.exportAllSessions(); // <--- Calls the new Full Backup function
+            window.downloadEntireSessionPDF();
         });
     }
+	
 
     if (UI.btnImport) {
         UI.btnImport.addEventListener('click', (e) => {
@@ -1728,7 +1724,7 @@ window.downloadSinglePDF = (btnElem, senderName) => {
 
     const title = document.createElement('h3');
     title.innerText = `Ancient Library: ${getSelectedItemName()}`;
-    title.style.color = '#0891b2'; // cyan-600
+    title.style.color = '#0891b2'; 
     title.style.marginBottom = '15px';
     container.appendChild(title);
 
@@ -1736,6 +1732,7 @@ window.downloadSinglePDF = (btnElem, senderName) => {
     content.innerHTML = marked.parse(rawText);
     content.style.lineHeight = '1.6';
     
+    // Force text colors so they don't render white-on-white
     const allElements = content.querySelectorAll('*');
     allElements.forEach(el => { el.style.color = '#1e293b'; });
 
@@ -1744,6 +1741,149 @@ window.downloadSinglePDF = (btnElem, senderName) => {
     const opt = {
         margin:       0.5,
         filename:     `Ancient_Library_Note_${new Date().toISOString().slice(0,10)}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+    
+    // Exact logic from appteach1.js - direct from container to save
+    html2pdf().set(opt).from(container).save();
+};
+
+window.downloadSinglePDF = (btnElem, senderName) => {
+    if (typeof html2pdf === 'undefined') {
+        alert("PDF engine is still loading. Please try again in a moment.");
+        return;
+    }
+
+    // Now this will correctly grab the ID and the text!
+    const msgId = btnElem.getAttribute('data-msg-id');
+    const rawText = (rawTextMap[msgId] || "")
+        .replace(/YT_SEARCH:.*$/gm, '')
+        .replace(/IMG_SEARCH:.*$/gm, '')
+        .trim();
+
+    const container = document.createElement('div');
+    container.style.padding = '30px';
+    container.style.fontFamily = 'Arial, sans-serif';
+    container.style.backgroundColor = '#FFFFFF'; 
+    container.style.color = '#000000'; 
+
+    const header = document.createElement('div');
+    header.innerText = "ai.eprashala.com";
+    header.style.textAlign = 'center';
+    header.style.color = '#6b7280'; 
+    header.style.fontSize = '14px'; 
+    header.style.fontWeight = 'bold';
+    header.style.letterSpacing = '2px';
+    header.style.paddingBottom = '15px';
+    header.style.marginBottom = '20px';
+    header.style.borderBottom = '2px solid #e5e7eb';
+    container.appendChild(header);
+
+    const title = document.createElement('h3');
+    title.innerText = `Ancient Library: ${getSelectedItemName()}`;
+    title.style.color = '#0891b2'; 
+    title.style.marginBottom = '15px';
+    container.appendChild(title);
+
+    const content = document.createElement('div');
+    content.innerHTML = marked.parse(rawText);
+    content.style.lineHeight = '1.6';
+    
+    // Force text colors so they don't render white-on-white
+    const allElements = content.querySelectorAll('*');
+    allElements.forEach(el => { el.style.color = '#1e293b'; });
+
+    container.appendChild(content);
+
+    const opt = {
+        margin:       0.5,
+        filename:     `Ancient_Library_Note_${new Date().toISOString().slice(0,10)}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+    
+    html2pdf().set(opt).from(container).save();
+};
+
+window.downloadEntireSessionPDF = () => {
+    if (typeof html2pdf === 'undefined') {
+        alert("PDF engine is still loading. Please try again in a moment.");
+        return;
+    }
+    
+    if (chatHistory.length === 0) {
+        alert("The library is currently empty. Speak to a sage first.");
+        return;
+    }
+
+    const container = document.createElement('div');
+    container.style.padding = '30px';
+    container.style.fontFamily = 'Arial, sans-serif';
+    container.style.backgroundColor = '#FFFFFF'; 
+    container.style.color = '#000000'; 
+
+    const header = document.createElement('div');
+    header.innerText = "ai.eprashala.com - Ancient Library Session";
+    header.style.textAlign = 'center';
+    header.style.color = '#6b7280'; 
+    header.style.fontSize = '14px'; 
+    header.style.fontWeight = 'bold';
+    header.style.letterSpacing = '2px';
+    header.style.paddingBottom = '15px';
+    header.style.marginBottom = '20px';
+    header.style.borderBottom = '2px solid #e5e7eb';
+    container.appendChild(header);
+    
+    const title = document.createElement('h3');
+    title.innerText = currentSessionTitle || `Session: ${new Date().toLocaleDateString()}`;
+    title.style.color = '#0891b2'; 
+    title.style.marginBottom = '20px';
+    container.appendChild(title);
+
+    chatHistory.forEach(msg => {
+        const isModel = msg.role === 'model';
+        const senderName = isModel ? getSelectedItemName() : (UI.name.value || "Bhakt");
+        let rawText = msg.parts[0].text || "";
+
+        if (isModel) {
+            rawText = rawText.replace(/YT_SEARCH:.*$/gm, '').replace(/IMG_SEARCH:.*$/gm, '').trim();
+        }
+
+        const msgDiv = document.createElement('div');
+        msgDiv.style.backgroundColor = isModel ? '#f8fafc' : '#f0f9ff'; 
+        msgDiv.style.border = '1px solid #e2e8f0';
+        msgDiv.style.marginBottom = '15px';
+        msgDiv.style.padding = '15px';
+        msgDiv.style.borderRadius = '8px';
+
+        const senderDiv = document.createElement('div');
+        senderDiv.innerText = senderName;
+        senderDiv.style.fontSize = '10px';
+        senderDiv.style.fontWeight = 'bold';
+        senderDiv.style.textTransform = 'uppercase';
+        senderDiv.style.color = isModel ? '#0284c7' : '#64748b';
+        senderDiv.style.marginBottom = '5px';
+        msgDiv.appendChild(senderDiv);
+
+        const contentDiv = document.createElement('div');
+        contentDiv.innerHTML = isModel ? marked.parse(rawText) : rawText;
+        contentDiv.style.fontSize = '14px';
+        contentDiv.style.lineHeight = '1.6';
+        
+        // Force text colors so they don't render white-on-white
+        const allElements = contentDiv.querySelectorAll('*');
+        allElements.forEach(el => { el.style.color = '#0f172a'; });
+
+        msgDiv.appendChild(contentDiv);
+        container.appendChild(msgDiv);
+    });
+
+    const opt = {
+        margin:       0.5,
+        filename:     `Eprashala_Session_${new Date().toISOString().slice(0,10)}.pdf`,
         image:        { type: 'jpeg', quality: 0.98 },
         html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
         jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
@@ -1797,8 +1937,8 @@ function renderMessage(sender, text, isModel) {
     
     if (isModel) {
         htmlContent += `
-            <div class="msg-action-bar mt-3 flex justify-end gap-2">
-                <button class="btn-pdf-msg p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-full text-slate-400 hover:text-red-400 transition-colors shadow-sm focus:outline-none" data-sender="${sender}" title="Download Answer as PDF">
+				<div class="msg-action-bar mt-3 flex justify-end gap-2">
+                <button class="btn-pdf-msg p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-full text-slate-400 hover:text-red-400 transition-colors shadow-sm focus:outline-none" data-sender="${sender}" data-msg-id="${msgId}" title="Download Answer as PDF">
                     <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                 </button>
                 <button class="btn-copy-msg p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-full text-slate-400 hover:text-green-400 transition-colors shadow-sm focus:outline-none" onclick="window.copySingleMessage(this)" data-msg-id="${msgId}" title="Copy Answer">
@@ -1839,75 +1979,3 @@ function renderMessage(sender, text, isModel) {
     return msgId;
 }
 
-window.downloadEntireSessionPDF = () => {
-    if (typeof html2pdf === 'undefined') {
-        alert("PDF engine is still loading. Please try again in a moment.");
-        return;
-    }
-    
-    if (chatHistory.length === 0) {
-        alert("The library is currently empty. Speak to a sage first.");
-        return;
-    }
-
-    // Clone the conversation log so we don't alter the actual UI
-    const logClone = UI.log.cloneNode(true);
-    
-    // Remove UI elements we don't want in the PDF (buttons, welcome message, etc.)
-    const elementsToRemove = logClone.querySelectorAll('.msg-action-bar, .user-edit-btn, #welcome-msg, #archive-notice-banner');
-    elementsToRemove.forEach(el => el.remove());
-
-    // Create a printable container
-    const container = document.createElement('div');
-    container.style.padding = '30px';
-    container.style.fontFamily = 'Arial, sans-serif';
-    container.style.backgroundColor = '#FFFFFF'; 
-    container.style.color = '#000000'; 
-
-    // Add Header
-    const header = document.createElement('div');
-    header.innerText = "ai.eprashala.com - Ancient Library Session";
-    header.style.textAlign = 'center';
-    header.style.color = '#6b7280'; 
-    header.style.fontSize = '14px'; 
-    header.style.fontWeight = 'bold';
-    header.style.letterSpacing = '2px';
-    header.style.paddingBottom = '15px';
-    header.style.marginBottom = '20px';
-    header.style.borderBottom = '2px solid #e5e7eb';
-    container.appendChild(header);
-    
-    // Title
-    const title = document.createElement('h3');
-    title.innerText = currentSessionTitle || `Session: ${new Date().toLocaleDateString()}`;
-    title.style.color = '#0891b2'; 
-    title.style.marginBottom = '20px';
-    container.appendChild(title);
-
-    // Format the cloned messages for a white background
-    const messages = logClone.querySelectorAll('.msg-container');
-    messages.forEach(msg => {
-        msg.style.backgroundColor = '#f8fafc'; // light slate
-        msg.style.border = '1px solid #e2e8f0';
-        msg.style.color = '#0f172a';
-        msg.style.marginBottom = '15px';
-        msg.style.padding = '15px';
-        msg.style.borderRadius = '8px';
-        
-        // Force text color inside markdown body to black for printing
-        const textElements = msg.querySelectorAll('*');
-        textElements.forEach(el => el.style.color = '#0f172a');
-    });
-
-    container.appendChild(logClone);
-
-    const opt = {
-        margin:       0.5,
-        filename:     `Eprashala_Session_${new Date().toISOString().slice(0,10)}.pdf`,
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-    
-    html2pdf().set(opt).from(container).save();
-};
