@@ -313,12 +313,17 @@ document.getElementById('santanForm').addEventListener('submit', async function(
                - Brahmacharya (Celibacy): Strict physical and mental celibacy for at least 3-4 days prior. Scientific reason: Builds Ojas, reduces psychological stress, improves sperm count/motility.
                - Diet (Ritucharya): Sattvic diet. Husband: warm milk with Ashwagandha/Saffron. Wife: milk with Shatavari/Ghee. Scientific reason: Optimizes hormonal balance and creates an alkaline uterine environment.
                - Mantra Jaap: Husband chants "Om Namo Bhagavate Vasudevaya" (108 times). Wife chants Santan Gopal Mantra: "Om Devaki Sudha Govinda Vasudeva Jagatpathe Dehime Tanayam Krishna Twamaham Sharanam Gata" (108 times).`;
-        } else {
-            promptContent += `\nINSTRUCTIONS FOR C-SECTION ANALYSIS:
+		} else {
+            promptContent += `\nINSTRUCTIONS FOR C-SECTION (JANMA MUHURTA) ANALYSIS:
             1. STRICT FUTURE TIMING: Provide dates strictly in the future.
             2. MOTHER'S AGE ANALYSIS: Prioritize safety and recovery.
-            3. Based on the Doctor's date range and the "EXACT VEDIC EPHEMERIS", find the best Lagna window. 
-            4. ECLIPSE CHECK: Warn fiercely if an eclipse is near the delivery date.`;
+            3. MUHURTA SELECTION: Based on the Doctor's date range and the "EXACT VEDIC EPHEMERIS", find the absolute best Lagna window. Place benefics (Jupiter, Venus) in Kendras/Trikonas. 
+            4. ECLIPSE CHECK: Warn fiercely if an eclipse is near the delivery date.
+            5. SCIENTIFIC GROUNDING: Follow every time-frame suggested with a Medical/Scientific reason.
+            6. AYURVEDIC LABOR MANIPULATION (Charaka & Sushruta Samhita): Include a section titled "🌿 Ayurvedic Guidance for Natural Timing". Explain how to subtly adjust the timing of natural labor by manipulating 'Apana Vata':
+               - To PREPONE (Accelerate/Induce): Advise stimulating Apana Vata. Suggest consuming warm milk with a spoon of Castor Oil (Eranda Taila), eating warm/spicy foods, walking, squatting, and remaining physically active.
+               - To POSTPONE (Delay/Sustain): Advise pacifying Apana Vata to prevent premature uterine contractions. Suggest strict bed rest, maintaining a cool physical environment, avoiding mental stress, and consuming cool, sweet liquids like milk with Ghee and Shatavari.
+            7. STRICT MEDICAL DISCLAIMER: You MUST conclude with a fierce warning that manipulating the onset of labor carries immense biological risks to both mother and child, and these Ayurvedic methods must ONLY be discussed with and approved by their modern obstetrician.`;
         }
 
         promptContent += `\nCRITICAL REQUIREMENT: Provide the final answer entirely in ${selectedLanguageName}. Use markdown styling.`;
