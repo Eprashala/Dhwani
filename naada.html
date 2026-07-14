@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nada Yoga - Bio-Rhythm Synthesizer</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.4);
+            --danger: #ef4444;
+            --success: #10b981;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 850px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 20px;
+        }
+        .header h1 {
+            margin: 0 0 10px 0;
+            color: var(--accent);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        .header p { margin: 0; color: var(--text-muted); font-size: 14px; }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 700px) { .dashboard { grid-template-columns: 1fr; } }
+        
+        .panel {
+            background-color: var(--panel-bg);
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .panel h3 { margin-top: 0; color: var(--text-muted); font-size: 14px; text-transform: uppercase; border-bottom: 1px solid #334155; padding-bottom: 8px; }
+        
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            font-size: 15px;
+        }
+        .data-row span:last-child { font-weight: bold; color: var(--accent); }
+        
+        .controls { display: flex; flex-direction: column; gap: 15px; }
+        label { font-size: 13px; color: var(--text-muted); font-weight: bold; margin-bottom: 5px; display: block;}
+        select {
+            width: 100%; padding: 10px; background: #0f172a; color: white;
+            border: 1px solid #334155; border-radius: 6px; outline: none; font-size: 14px;
+        }
+        
+        .btn-main {
+            width: 100%; padding: 15px; background: var(--success); color: #0f172a;
+            border: none; border-radius: 8px; font-size: 16px; font-weight: bold;
+            cursor: pointer; transition: 0.3s; box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+            text-transform: uppercase; letter-spacing: 1px; margin-top: 10px;
+        }
+        .btn-main:hover { background: #059669; }
+        .btn-main.active { background: var(--danger); box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); color: white; }
+        
+        #visualizer-container {
+            width: 100%; height: 150px; background: #000; border-radius: 8px;
+            overflow: hidden; position: relative; border: 1px solid #334155;
+        }
+        canvas { width: 100%; height: 100%; display: block; }
+        
+        .status { font-size: 12px; color: #f59e0b; text-align: center; margin-top: 10px; min-height: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>Gandharva Veda Engine</h1>
+        <p>Generative Synthesis • Binaural Entrainment • Atmospheric Sync</p>
+    </div>
+
+    <div class="dashboard">
+        <div class="panel">
+            <h3>Cosmic State (Live Data)</h3>
+            <div class="data-row"><span>Location</span><span id="ui-location">Acquiring...</span></div>
+            <div class="data-row"><span>Weather Phase</span><span id="ui-weather">Analyzing...</span></div>
+            <div class="data-row"><span>Astronomical Prahar</span><span id="ui-prahar">Calculating...</span></div>
+            <div class="data-row"><span>Active Raga</span><span id="ui-raga" style="color: #f59e0b; font-size: 18px;">Standby</span></div>
+            <div class="data-row"><span>Rhythm (Laya)</span><span id="ui-laya">Standby</span></div>
+            
+            <div style="margin-top: 20px; border-top: 1px dashed #334155; padding-top: 15px;">
+                <div class="data-row"><span>Base Shruti (Sa)</span><span>136.10 Hz</span></div>
+                <div class="data-row"><span>Left Hemisphere</span><span id="ui-freq-l">0.00 Hz</span></div>
+                <div class="data-row"><span>Right Hemisphere</span><span id="ui-freq-r">0.00 Hz</span></div>
+            </div>
+        </div>
+
+        <div class="panel controls">
+            <h3>Audio Controls & Neural Entrainment</h3>
+            <div>
+                <label>Select Desired Rasa (Emotional State)</label>
+                <select id="rasa-select">
+                    <option value="Shanti">Shanti (Peace / Deep Focus) - Theta 6Hz</option>
+                    <option value="Veera">Veera (Energy / Courage) - Beta 16Hz</option>
+                    <option value="Karuna">Karuna (Healing / Compassion) - Delta 4Hz</option>
+                    <option value="Shringara">Shringara (Joy / Devotion) - Alpha 10Hz</option>
+                </select>
+            </div>
+            
+            <div style="margin-top: 10px;">
+                <label>Select Traditional Instrument</label>
+                <select id="instrument-select">
+                    <option value="Bansuri">Bansuri (Bamboo Flute)</option>
+                    <option value="Sitar">Sitar (Plucked String)</option>
+                    <option value="Santoor">Santoor (Hammered Dulcimer)</option>
+                    <option value="Harmonium">Harmonium (Free Reed)</option>
+                </select>
+            </div>
+
+            <button class="btn-main" id="audio-toggle">Initialize Engine</button>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h3>Acoustic Visualization</h3>
+        <div id="visualizer-container">
+            <canvas id="canvas"></canvas>
+        </div>
+        <div class="status" id="system-status">Awaiting Initialization...</div>
+    </div>
+</div>
+
+<script>
+    // --- 1. RAGA KNOWLEDGE BASE (Gandharva Veda Mapping) ---
+    // Mapping Prahars and Emotions to Specific Ragas
+    const RAGA_DATABASE = {
+        1: { Shanti: "Ahir Bhairav", Veera: "Bhatiyar", Karuna: "Bhairav", Shringara: "Hindol" }, 
+        2: { Shanti: "Alhiya Bilawal", Veera: "Deshkar", Karuna: "Asavari", Shringara: "Jaunpuri" }, 
+        3: { Shanti: "Shuddha Sarang", Veera: "Brindavani Sarang", Karuna: "Gaud Sarang", Shringara: "Madhmad Sarang" }, 
+        4: { Shanti: "Bhimpalasi", Veera: "Patdeep", Karuna: "Multani", Shringara: "Pilu" }, 
+        5: { Shanti: "Yaman", Veera: "Hamsadhwani", Karuna: "Puriya Dhanashree", Shringara: "Khamaj" }, 
+        6: { Shanti: "Bageshri", Veera: "Shankara", Karuna: "Darbari Kanada", Shringara: "Desh" }, 
+        7: { Shanti: "Malkauns", Veera: "Adana", Karuna: "Shahana", Shringara: "Kaushik Dhwani" }, 
+        8: { Shanti: "Lalit", Veera: "Sohini", Karuna: "Paraj", Shringara: "Basant" }, 
+        Rain: { Shanti: "Megh Malhar", Veera: "Mian Ki Malhar", Karuna: "Gaud Malhar", Shringara: "Sur Malhar" }
+    };
+
+    // Mapping Ragas to MIDI Notes (C#3 / MIDI 49 as Base Sa)
+    // Formula: Sa=49, re=50, Re=51, ga=52, Ga=53, ma=54, Ma=55, Pa=56, dha=57, Dha=58, ni=59, Ni=60, SA=61
+    const RAGA_SCALES = {
+        "Ahir Bhairav": [49, 50, 53, 54, 56, 58, 59, 61, 62],     // S r G m P D n S'
+        "Bhatiyar": [49, 50, 53, 54, 55, 56, 58, 60, 61],         // S r G m M P D N S'
+        "Bhairav": [49, 50, 53, 54, 56, 57, 60, 61, 62],          // S r G m P d N S'
+        "Yaman": [49, 51, 53, 55, 56, 58, 60, 61, 63],            // S R G M P D N S'
+        "Bhimpalasi": [49, 52, 54, 56, 59, 61, 64],               // S g m P n S'
+        "Malkauns": [49, 52, 54, 57, 59, 61, 64],                 // S g m d n S'
+        "Megh Malhar": [49, 51, 54, 56, 59, 61, 63],              // S R m P n S'
+        "Darbari Kanada": [49, 51, 52, 54, 56, 57, 59, 61],       // S R g m P d n S'
+        "Default": [49, 51, 53, 54, 56, 58, 60, 61]               // Standard Bilawal (Ionian) Fallback
+    };
+
+    const BINAURAL_MAP = {
+        Shanti: { offset: 6, color: '#38bdf8' },    // Theta
+        Veera: { offset: 16, color: '#ef4444' },    // Beta
+        Karuna: { offset: 4, color: '#10b981' },    // Delta
+        Shringara: { offset: 10, color: '#d946ef' } // Alpha
+    };
+
+    const BASE_FREQ = 136.1; // Om Frequency (Earth Year)
+
+    // --- 2. STATE MANAGEMENT ---
+    let appState = {
+        isPlaying: false,
+        lat: null, lon: null,
+        sunrise: null, sunset: null,
+        weatherCode: null, weatherType: 'Clear',
+        currentPrahar: 1, activeRaga: '',
+        rasa: 'Shanti', instrument: 'Bansuri',
+        tempo: 'Madhya Laya (60 BPM)', speedMs: 1000
+    };
+
+    // --- 3. ENVIRONMENTAL DATA FETCHING ---
+    async function fetchEnvironment() {
+        const statusEl = document.getElementById('system-status');
+        try {
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                appState.lat = pos.coords.latitude;
+                appState.lon = pos.coords.longitude;
+                document.getElementById('ui-location').innerText = `${appState.lat.toFixed(2)}°, ${appState.lon.toFixed(2)}°`;
+                
+                statusEl.innerText = "Fetching atmospheric data...";
+                const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${appState.lat}&longitude=${appState.lon}&current_weather=true&daily=sunrise,sunset&timezone=auto`);
+                const data = await res.json();
+                
+                appState.weatherCode = data.current_weather.weathercode;
+                appState.sunrise = new Date(data.daily.sunrise[0]);
+                appState.sunset = new Date(data.daily.sunset[0]);
+                
+                // Weather Mapping
+                if ([51,53,55,56,57,61,63,65,66,67,80,81,82,95,96,99].includes(appState.weatherCode)) {
+                    appState.weatherType = 'Rain';
+                    appState.tempo = 'Vilambit Laya (Slow & Sweeping)';
+                    appState.speedMs = 1500;
+                } else if ([1,2,3,45,48].includes(appState.weatherCode)) {
+                    appState.weatherType = 'Overcast';
+                    appState.tempo = 'Madhya Laya (Clouded)';
+                    appState.speedMs = 1000;
+                } else {
+                    appState.weatherType = 'Clear';
+                    appState.tempo = 'Drut Laya (Active)';
+                    appState.speedMs = 700;
+                }
+                document.getElementById('ui-weather').innerText = appState.weatherType;
+                
+                calculatePrahar();
+                statusEl.innerText = "Environment synced successfully.";
+            }, (err) => {
+                statusEl.innerText = "Geolocation denied. Using default Vedic Time (6AM/6PM).";
+                document.getElementById('ui-location').innerText = "Default (Manual)";
+                appState.sunrise = new Date(); appState.sunrise.setHours(6, 0, 0);
+                appState.sunset = new Date(); appState.sunset.setHours(18, 0, 0);
+                calculatePrahar();
+            });
+        } catch (error) {
+            statusEl.innerText = "API Error. Defaulting values.";
+        }
+    }
+
+    function calculatePrahar() {
+        const now = new Date();
+        let dayDuration = (appState.sunset - appState.sunrise); 
+        let nightDuration = (24 * 60 * 60 * 1000) - dayDuration;
+        let praharLengthDay = dayDuration / 4;
+        let praharLengthNight = nightDuration / 4;
+        let msSinceSunrise = now - appState.sunrise;
+        let msSinceSunset = now - appState.sunset;
+        
+        if (msSinceSunrise >= 0 && msSinceSunset < 0) {
+            appState.currentPrahar = Math.floor(msSinceSunrise / praharLengthDay) + 1; // Day
+        } else {
+            if (msSinceSunset < 0) msSinceSunset += (24 * 60 * 60 * 1000); 
+            appState.currentPrahar = Math.floor(msSinceSunset / praharLengthNight) + 5; // Night
+        }
+        
+        appState.currentPrahar = Math.max(1, Math.min(8, appState.currentPrahar));
+        document.getElementById('ui-prahar').innerText = `Prahar ${appState.currentPrahar} / 8`;
+        updateRaga();
+    }
+
+    function updateRaga() {
+        appState.rasa = document.getElementById('rasa-select').value;
+        appState.instrument = document.getElementById('instrument-select').value;
+        
+        if (appState.weatherType === 'Rain') {
+            appState.activeRaga = RAGA_DATABASE['Rain'][appState.rasa];
+            document.getElementById('ui-prahar').innerText = `Overridden by Rain`;
+        } else {
+            appState.activeRaga = RAGA_DATABASE[appState.currentPrahar][appState.rasa];
+        }
+        
+        document.getElementById('ui-raga').innerText = `Raga ${appState.activeRaga}`;
+        document.getElementById('ui-laya').innerText = appState.tempo;
+        
+        let offset = BINAURAL_MAP[appState.rasa].offset;
+        document.getElementById('ui-freq-l').innerText = (BASE_FREQ - (offset/2)).toFixed(2) + " Hz";
+        document.getElementById('ui-freq-r').innerText = (BASE_FREQ + (offset/2)).toFixed(2) + " Hz";
+
+        if (appState.isPlaying) updateBinauralParams();
+    }
+
+    // --- 4. WEB AUDIO API SYNTHESIS & GENERATIVE ENGINE ---
+    let audioCtx, masterGain, analyser;
+    let oscLeft, oscRight, droneOsc1, droneOsc2;
+    let pannerLeft, pannerRight;
+    let melodyInterval;
+    let currentScaleIndex = 0;
+
+    function initAudio() {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+        masterGain = audioCtx.createGain();
+        masterGain.gain.value = 0.6;
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 2048;
+        masterGain.connect(analyser);
+        analyser.connect(audioCtx.destination);
+    }
+
+    function playInstrumentNote(midiNote, durationSec, instrumentType) {
+        if (!audioCtx) return;
+        
+        // Exact mathematical ratio tuning relative to Base Sa (136.1)
+        // Standard MIDI 49 is C#3. We map note 49 to 136.1 Hz.
+        const semitoneRatio = Math.pow(2, 1/12);
+        const freq = BASE_FREQ * Math.pow(semitoneRatio, (midiNote - 49));
+        
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        
+        // Physical Modeling Configurations
+        if (instrumentType === "Bansuri") {
+            osc.type = 'sine';
+            // LFO Vibrato
+            const lfo = audioCtx.createOscillator();
+            lfo.type = 'sine'; lfo.frequency.value = 5.5; 
+            const lfoGain = audioCtx.createGain();
+            lfoGain.gain.value = freq * 0.015; 
+            lfo.connect(lfoGain).connect(osc.frequency);
+            lfo.start(now); lfo.stop(now + durationSec);
+            // ADSR
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(0.5, now + 0.2); // Soft breath attack
+            gainNode.gain.setTargetAtTime(0.3, now + 0.3, 0.2);
+            gainNode.gain.linearRampToValueAtTime(0, now + durationSec);
+            
+        } else if (instrumentType === "Sitar") {
+            osc.type = 'sawtooth'; // Rich harmonics for strings
+            // Pluck Filter (Lowpass closing rapidly)
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(8000, now);
+            filter.frequency.exponentialRampToValueAtTime(freq, now + 0.5);
+            // Pluck Envelope
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(0.6, now + 0.02); // Sharp attack
+            gainNode.gain.exponentialRampToValueAtTime(0.001, now + durationSec); // Long decay
+            osc.connect(filter).connect(gainNode);
+            filter.connect(gainNode);
+            
+        } else if (instrumentType === "Santoor") {
+            osc.type = 'triangle'; // Bell-like
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(0.7, now + 0.01); // Very sharp strike
+            gainNode.gain.exponentialRampToValueAtTime(0.001, now + (durationSec * 0.6)); // Fast decay
+            
+        } else if (instrumentType === "Harmonium") {
+            osc.type = 'sawtooth';
+            // Dual oscillator for reed thickness
+            const osc2 = audioCtx.createOscillator();
+            osc2.type = 'square';
+            osc2.frequency.value = freq;
+            osc2.detune.value = 8; // Chorus effect
+            osc2.connect(gainNode);
+            osc2.start(now); osc2.stop(now + durationSec);
+            // Accordion Envelope
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(0.3, now + 0.2); // Slow swell
+            gainNode.gain.setTargetAtTime(0.25, now + 0.4, 0.1); // Sustain
+            gainNode.gain.linearRampToValueAtTime(0, now + durationSec);
+        }
+
+        // Connect and play
+        if (instrumentType !== "Sitar") osc.connect(gainNode);
+        gainNode.connect(masterGain);
+        osc.start(now);
+        osc.stop(now + durationSec);
+    }
+
+    function startEngine() {
+        if (!audioCtx) initAudio();
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+        
+        let offset = BINAURAL_MAP[appState.rasa].offset;
+        let freqL = BASE_FREQ - (offset/2);
+        let freqR = BASE_FREQ + (offset/2);
+
+        // 1. Binaural Entrainment (Subconscious Layer)
+        oscLeft = audioCtx.createOscillator(); oscLeft.type = 'sine'; oscLeft.frequency.value = freqL;
+        pannerLeft = audioCtx.createStereoPanner(); pannerLeft.pan.value = -1;
+        oscLeft.connect(pannerLeft).connect(masterGain); oscLeft.start();
+
+        oscRight = audioCtx.createOscillator(); oscRight.type = 'sine'; oscRight.frequency.value = freqR;
+        pannerRight = audioCtx.createStereoPanner(); pannerRight.pan.value = 1;
+        oscRight.connect(pannerRight).connect(masterGain); oscRight.start();
+
+        // 2. Tanpura Drone Layer (Sa-Pa / Base-Fifth)
+        droneOsc1 = audioCtx.createOscillator(); droneOsc1.type = 'triangle'; droneOsc1.frequency.value = BASE_FREQ; 
+        let dGain1 = audioCtx.createGain(); dGain1.gain.value = 0.15;
+        droneOsc1.connect(dGain1).connect(masterGain); droneOsc1.start();
+        
+        droneOsc2 = audioCtx.createOscillator(); droneOsc2.type = 'triangle'; droneOsc2.frequency.value = BASE_FREQ * 1.5; 
+        let dGain2 = audioCtx.createGain(); dGain2.gain.value = 0.08;
+        droneOsc2.connect(dGain2).connect(masterGain); droneOsc2.start();
+
+        // 3. Generative Melody Engine (The Instrument)
+        currentScaleIndex = 0;
+        let scale = RAGA_SCALES[appState.activeRaga] || RAGA_SCALES["Default"];
+        
+        melodyInterval = setInterval(() => {
+            // Markov-chain style melody generation
+            const step = Math.floor(Math.random() * 5) - 2; // -2, -1, 0, 1, 2
+            currentScaleIndex += step;
+            
+            // Keep within octave bounds
+            if (currentScaleIndex < 0) currentScaleIndex = 0;
+            if (currentScaleIndex >= scale.length) currentScaleIndex = scale.length - 1;
+
+            const noteToPlay = scale[currentScaleIndex];
+            const durationSec = (appState.speedMs / 1000) * (Math.random() * 0.5 + 0.8); 
+            
+            playInstrumentNote(noteToPlay, durationSec, appState.instrument);
+            
+        }, appState.speedMs);
+
+        // UI Updates
+        appState.isPlaying = true;
+        const btn = document.getElementById('audio-toggle');
+        btn.innerText = "Stop Engine";
+        btn.classList.add('active');
+        document.getElementById('system-status').innerText = `Engine Active. Playing ${appState.instrument} with Binaural Entrainment.`;
+        drawVisualizer();
+    }
+
+    function stopEngine() {
+        if (oscLeft) oscLeft.stop(); if (oscRight) oscRight.stop();
+        if (droneOsc1) droneOsc1.stop(); if (droneOsc2) droneOsc2.stop();
+        clearInterval(melodyInterval);
+        
+        appState.isPlaying = false;
+        const btn = document.getElementById('audio-toggle');
+        btn.innerText = "Initialize Engine";
+        btn.classList.remove('active');
+        document.getElementById('system-status').innerText = "Engine Stopped.";
+    }
+
+    function updateBinauralParams() {
+        if (!appState.isPlaying) return;
+        let offset = BINAURAL_MAP[appState.rasa].offset;
+        oscLeft.frequency.setTargetAtTime(BASE_FREQ - (offset/2), audioCtx.currentTime, 0.5);
+        oscRight.frequency.setTargetAtTime(BASE_FREQ + (offset/2), audioCtx.currentTime, 0.5);
+        
+        // Update Melody Scale seamlessly
+        clearInterval(melodyInterval);
+        stopEngine(); // Quick stop and restart to apply new instrument/raga cleanly
+        startEngine();
+    }
+
+    // --- 5. CANVAS VISUALIZATION ---
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    function drawVisualizer() {
+        if (!appState.isPlaying) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            return;
+        }
+        requestAnimationFrame(drawVisualizer);
+        
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        analyser.getByteTimeDomainData(dataArray);
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.2)'; 
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = BINAURAL_MAP[appState.rasa].color;
+        ctx.beginPath();
+        
+        const sliceWidth = canvas.width * 1.0 / bufferLength;
+        let x = 0;
+        
+        for (let i = 0; i < bufferLength; i++) {
+            const v = dataArray[i] / 128.0;
+            const y = v * (canvas.height / 2);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+            x += sliceWidth;
+        }
+        ctx.lineTo(canvas.width, canvas.height / 2);
+        ctx.stroke();
+    }
+
+    // --- 6. EVENT LISTENERS ---
+    document.getElementById('audio-toggle').addEventListener('click', () => {
+        if (appState.isPlaying) stopEngine();
+        else startEngine();
+    });
+
+    document.getElementById('rasa-select').addEventListener('change', updateRaga);
+    document.getElementById('instrument-select').addEventListener('change', updateRaga);
+
+    // Init
+    function resizeCanvas() {
+        canvas.width = document.getElementById('visualizer-container').clientWidth;
+        canvas.height = document.getElementById('visualizer-container').clientHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    fetchEnvironment();
+    
+    setInterval(() => {
+        if (appState.sunrise) calculatePrahar();
+    }, 60000);
+</script>
+</body>
+</html>
