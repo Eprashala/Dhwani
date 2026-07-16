@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Enterprise Cognitive Assessment & Career Architect</title>
+	<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         :root {
             --bg-primary: #f8fafc;
@@ -161,17 +162,64 @@
         <h2>Master Cognitive Profile</h2>
         <p class="subtitle">Biometric telemetry compiled securely across 50 objective data points.</p>
         <table class="results-table"><thead><tr><th>Cognitive Domain</th><th>Accuracy / Status</th><th>Processing Speed</th></tr></thead><tbody id="results-body"></tbody></table>
-        <div class="ai-prompt-box">
+		<div class="ai-prompt-box">
             <h3 style="color:#3730a3; margin-bottom: 8px;">Architect Your Career</h3>
-            <p style="font-size: 15px; color: #475569;">Click below to securely generate an exact prompt containing your telemetry matrix. Paste it into Gemini to receive objective, clinical career placement.</p>
-            <button id="btn-copy-prompt" class="ai-btn">📋 Copy Secure Prompt & Open Gemini</button>
+            <p style="font-size: 15px; color: #475569;">Enter your personal Gemini API Key below to bypass proxy limits, or leave it blank to use the centralized server.</p>
+            <div class="form-group" style="margin-top: 15px; text-align: left;">
+                <input type="password" id="api-key-input" placeholder="AIzaSy... (Optional API Key)">
+            </div>
+            <button id="btn-generate-ai" class="ai-btn">🧠 Generate Clinical Career Placement</button>
+            <div id="ai-loading" style="display: none; margin-top: 15px; font-weight: bold; color: #4f46e5; animation: pulse 1.5s infinite;">Analyzing telemetry matrix... Please wait.</div>
         </div>
+        <div id="ai-results-output" style="margin-top: 20px; text-align: left; background: #ffffff; padding: 25px; border-radius: 12px; border: 1px solid var(--border); display: none; line-height: 1.6; box-shadow: 0 4px 15px rgba(0,0,0,0.05);"></div>
     </div>
 
 </div>
 
 <script>
-    let state = { user: {}, metrics: [], globalTime: [], flags: { stroop: false, bart: false, gng: false, rapid: false } };
+let state = { user: {}, metrics: [], globalTime: [], flags: { stroop: false, bart: false, gng: false, rapid: false } };
+
+    // --- CENTRAL PROXY ROUTER ---
+    const PROXY_BASE_URL = "https://eprashala.pythonanywhere.com";
+
+    async function fetchGeminiChat(payloadObject) {
+        const userKey = document.getElementById('api-key-input').value.trim() || '';
+
+        // TIER 1: User has their own key -> Direct browser handoff to Google
+        if (userKey && userKey.length > 10) {
+            try {
+                console.log("Direct Route Active: Targeting gemini-flash-latest...");
+                const primaryUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${userKey}`;
+                const response = await fetch(primaryUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payloadObject)
+                });
+                
+                if (!response.ok) throw new Error(`Primary model status: ${response.status}`);
+                return response;
+
+            } catch (error) {
+                console.warn("Primary channel busy/unavailable. Re-routing to fallback...", error);
+                const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${userKey}`;
+                return await fetch(fallbackUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payloadObject)
+                });
+            }
+        } 
+        
+        // TIER 2: No personal key provided -> Route to your centralized Mumbai server
+        else {
+            console.log("Proxy Route Active: Routing through centralized server...");
+            return await fetch(`${PROXY_BASE_URL}/api/chat`, {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payloadObject)
+            });
+        }
+    }
 
     function nav(id) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
     
@@ -433,13 +481,21 @@
         nav('screen-results');
     });
 
-    document.getElementById('btn-copy-prompt').addEventListener('click', async () => {
+document.getElementById('btn-generate-ai').addEventListener('click', async () => {
+        const btn = document.getElementById('btn-generate-ai');
+        const loader = document.getElementById('ai-loading');
+        const outputBox = document.getElementById('ai-results-output');
+
+        btn.style.display = 'none';
+        loader.style.display = 'block';
+        outputBox.style.display = 'none';
+
         let tStr = "Cognitive Domain | Score / Error Rate | Processing Time\n---|---|---\n";
         state.metrics.forEach(m => { tStr += `${m.trait} | ${m.score} | ${m.time}\n`; });
         
         const globalVelocity = state.globalTime.length > 0 ? Math.round(state.globalTime.reduce((a,b)=>a+b, 0) / state.globalTime.length) : 0;
 
-        const prompt = `System Directive: Act as a Master Career Architect and Elite Industrial-Organizational Psychologist. The professional trajectory of this candidate depends on your clinical, mathematically sound analysis. Do NOT provide generic career advice. You must anchor every recommendation to the objective biometric telemetry provided below.
+        const systemPrompt = `System Directive: Act as a Master Career Architect and Elite Industrial-Organizational Psychologist. The professional trajectory of this candidate depends on your clinical, mathematically sound analysis. Do NOT provide generic career advice. You must anchor every recommendation to the objective biometric telemetry provided below.
 
 I have completed a clinical-grade, high-stress Cognitive Assessment Battery testing reaction times, working memory, impulse control, risk tolerance, and fluid intelligence under extreme constraints.
 
@@ -462,18 +518,39 @@ Perform a ruthless, objective analysis of this cognitive architecture. Tell the 
 You MUST select exactly 3 specific career roles. If a Target Domain was specified (other than "Open Evaluation"), prioritize roles strictly within that domain. Otherwise, select the best fits from across these industries: Technology, Healthcare, Finance, Education, Media, Law, Hospitality, or Skilled Trades.
 
 FORMAT YOUR OUTPUT EXACTLY AS FOLLOWS (Do not deviate):
-1st Option: [Specific Role] - [Provide 3-4 sentences of deep reasoning directly referencing specific numerical metrics from the table (e.g., "Your Stroop accuracy of X% and Global Velocity of Y ms proves you excel at...") to mathematically justify this placement].
-2nd Option: [Specific Role] - [Detailed reasoning referencing specific metrics].
-3rd Option: [Specific Role] - [Detailed reasoning referencing specific metrics].
+### 1st Option: [Specific Role]
+[Provide 3-4 sentences of deep reasoning directly referencing specific numerical metrics from the table (e.g., "Your Stroop accuracy of X% and Global Velocity of Y ms proves you excel at...") to mathematically justify this placement].
+
+### 2nd Option: [Specific Role]
+[Detailed reasoning referencing specific metrics].
+
+### 3rd Option: [Specific Role]
+[Detailed reasoning referencing specific metrics].
 
 Tone: Highly professional, clinical, objective, and constructive.`;
 
-        try { 
-            await navigator.clipboard.writeText(prompt); 
-            alert(`✅ Secure Telemetry Matrix Copied!\nGlobal Cognitive Velocity: ${globalVelocity} ms\n\nOpening Gemini now. Paste (Ctrl+V / Cmd+V) to receive your clinical career placement.`); 
-            window.open('https://gemini.google.com', '_blank'); 
-        } 
-        catch (err) { alert("Error copying prompt. Please check your browser's clipboard permissions."); }
+        const payloadObject = {
+            contents: [{ role: "user", parts: [{ text: systemPrompt }] }]
+        };
+
+        try {
+            const response = await fetchGeminiChat(payloadObject);
+            const data = await response.json();
+            
+            if (data.error) throw new Error(data.error.message);
+
+            let rawExpertText = data.candidates[0].content.parts[0].text;
+            
+            outputBox.innerHTML = typeof marked !== 'undefined' ? marked.parse(rawExpertText) : rawExpertText.replace(/\n/g, '<br>');
+            outputBox.style.display = 'block';
+
+        } catch (error) {
+            console.error("AI Error:", error);
+            alert("Failed to generate career placement: " + error.message);
+            btn.style.display = 'block';
+        } finally {
+            loader.style.display = 'none';
+        }
     });
 </script>
 </body>

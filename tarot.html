@@ -142,10 +142,49 @@
         </div>
     </div>
 
-    <script>
-        const PROXY_API_ENDPOINT = "https://eprashala.pythonanywhere.com/api/chat";
+	<script>
+        const PROXY_BASE_URL = "https://eprashala.pythonanywhere.com";
+
+        async function fetchGeminiChat(payloadObject) {
+            const userKey = localStorage.getItem('tarot_api_key') || '';
+
+            // TIER 1: User has their own key -> Direct browser handoff to Google
+            if (userKey && userKey.trim().length > 10) {
+                try {
+                    console.log("Direct Route Active: Targeting gemini-flash-latest...");
+                    const primaryUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${userKey.trim()}`;
+                    const response = await fetch(primaryUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payloadObject)
+                    });
+                    
+                    if (!response.ok) throw new Error(`Primary model status: ${response.status}`);
+                    return response;
+
+                } catch (error) {
+                    console.warn("Primary channel busy/unavailable. Re-routing to fallback...", error);
+                    const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${userKey.trim()}`;
+                    return await fetch(fallbackUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payloadObject)
+                    });
+                }
+            } 
+            
+            // TIER 2: No personal key provided -> Route to your centralized Mumbai server
+            else {
+                console.log("Proxy Route Active: Routing through centralized server...");
+                return await fetch(`${PROXY_BASE_URL}/api/chat`, {
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payloadObject)
+                });
+            }
+        }
+        
         let customApiKey = localStorage.getItem('tarot_api_key') || ""; 
-        function getActiveEndpoint() { return customApiKey ? `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${customApiKey}` : PROXY_API_ENDPOINT; }
 
         let currentSpread = [];
         let activeDeck = [];
@@ -295,8 +334,10 @@ Speak directly to the seeker's soul. Use strictly gender-neutral language ("you"
 
 CRITICAL INSTRUCTION: You MUST translate and write this entire reading natively in the following language: ${selectedLangName}. Ensure that the translated language also adheres to gender-neutral phrasing as much as the grammar allows.`;
 
-            try {
-                const response = await fetch(getActiveEndpoint(), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Custom-Api-Key': customApiKey }, body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] }) });
+		try {
+                const payloadObject = { contents: [{ parts: [{ text: promptText }] }] };
+                const response = await fetchGeminiChat(payloadObject);
+                
                 const data = await response.json();
                 let readingText = data.candidates?.[0]?.content?.parts?.[0]?.text || "The Oracle is silent.";
                 if (data.error) throw new Error(data.error.message);

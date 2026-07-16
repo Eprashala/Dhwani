@@ -565,10 +565,51 @@
 
 
 
+// ==========================================
+    // API & CENTRAL ROUTING ENGINE
     // ==========================================
-    // API & DATABASE
-    // ==========================================
-    const PROXY_URL = "https://eprashala.pythonanywhere.com/api/chat";
+    const PROXY_BASE_URL = "https://eprashala.pythonanywhere.com";
+
+    async function fetchGeminiChat(payloadObject) {
+        // Steno Pro stores its API key in the active profile's stenoData object
+        const customKey = stenoData['apikey'] || '';
+
+        // TIER 1: User has their own key -> Direct browser handoff to Google
+        if (customKey && customKey.trim().length > 10) {
+            try {
+                console.log("Direct Route Active: Targeting gemini-flash-latest...");
+                const primaryUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${customKey.trim()}`;
+                const response = await fetch(primaryUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payloadObject)
+                });
+                
+                if (!response.ok) throw new Error(`Primary model status: ${response.status}`);
+                return response;
+
+            } catch (error) {
+                console.warn("Primary channel busy/unavailable. Re-routing to gemini-2.5-flash-lite fallback...", error);
+                const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${customKey.trim()}`;
+                return await fetch(fallbackUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payloadObject)
+                });
+            }
+        } 
+        
+        // TIER 2: No personal key provided -> Route to your centralized Mumbai server
+        else {
+            console.log("Proxy Route Active: Routing through centralized server infrastructure...");
+            return await fetch(`${PROXY_BASE_URL}/api/chat`, {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payloadObject)
+            });
+        }
+    }
+
     const DB_NAME = 'StenoProDB';
     const DB_VERSION = 1;
     let db;
@@ -1235,24 +1276,13 @@ STRICT OUTPUT RULES:
         const originalText = btn.innerHTML;
         btn.innerHTML = '⏳ Drafting...'; btn.disabled = true;
 
-        try {
-            const customKey = stenoData['apikey'];
-            const headers = { 'Content-Type': 'application/json' };
-            if (customKey && customKey.trim().length > 10) {
-                headers['X-Custom-Api-Key'] = customKey.trim();
-            }
-
-            const payload = {
-                model: "gemini-1.5-flash",
+		try {
+            const payloadObject = {
                 contents: [{ role: "user", parts: [{ text: "Please draft the document based on the system instructions." }] }],
                 systemInstruction: { parts: [{ text: prompt }] }
             };
 
-            const res = await fetch(PROXY_URL, {
-                method: 'POST', 
-                headers: headers,
-                body: JSON.stringify(payload)
-            });
+            const res = await fetchGeminiChat(payloadObject);
             
             if (!res.ok) throw new Error("API Error or Server Unreachable");
             const data = await res.json();

@@ -305,6 +305,46 @@
     const rashis = ['Mesh (Aries)', 'Vrish (Taurus)', 'Mithun (Gemini)', 'Karka (Cancer)', 'Simha (Leo)', 'Kanya (Virgo)', 'Tula (Libra)', 'Vrishchik (Scorpio)', 'Dhanu (Sagittarius)', 'Makar (Capricorn)', 'Kumbha (Aquarius)', 'Meen (Pisces)'];
 
     let chatHistoryForAPI = []; 
+		
+		const PROXY_BASE_URL = "https://eprashala.pythonanywhere.com";
+
+async function fetchGeminiChat(payloadObject) {
+    const userKey = localStorage.getItem('user_ai_api_key') || '';
+
+    // TIER 1: User has their own key -> Direct browser connection to Google
+    if (userKey && userKey.trim().length > 10) {
+        try {
+            const primaryUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${userKey.trim()}`;
+            const response = await fetch(primaryUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payloadObject)
+            });
+            if (!response.ok) throw new Error(`Primary error status: ${response.status}`);
+            return response;
+        } catch (error) {
+            // Automatic structural fallback to gemini-2.5-flash-lite if primary is busy
+            const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${userKey.trim()}`;
+            return await fetch(fallbackUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payloadObject)
+            });
+        }
+    } 
+    // TIER 2: No key provided -> Route to your centralized Mumbai server
+    else {
+        return await fetch(`${PROXY_BASE_URL}/api/chat`, {
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payloadObject)
+        });
+    }
+}
+	
+	
+
+
     let currentSelectedBook = "";
     let activeChatTtsBtn = null;
     let rawAIResponse = "";
@@ -423,9 +463,9 @@
         const bookFocus = rawBookString.split('(')[1].replace(')','').replace('Focus: ','').trim();
         const selectedLanguageName = document.getElementById('langToggle').options[document.getElementById('langToggle').selectedIndex].text;
 
-        try {
+		try {
             statusText.innerText = "Connecting to astronomical backend...";
-            const calcResponse = await fetch('https://eprashala.pythonanywhere.com/calculate', {
+            const calcResponse = await fetch(`${PROXY_BASE_URL}/calculate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ date: bDate, time: bTime, lat: bLat, lon: bLon })
@@ -476,13 +516,8 @@
             5. Provide a realistic, grounded interpretation. Do NOT invent vague fortunes; tie every claim to the provided mathematical placements (Nakshatra, Rashi, Retrograde status).
             6. Output the reading entirely in ${selectedLanguageName}. Use markdown headers and bullet points for scannability. Do NOT output raw calculations.`;
 
-            const userKey = localStorage.getItem('user_ai_api_key') || '';
-            const aiResponse = await fetch('https://eprashala.pythonanywhere.com/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Custom-Api-Key': userKey },
-                body: JSON.stringify({ contents: [{ parts: [{ text: promptHeader + promptContent }] }] })
-            });
-
+			const payloadObject = { contents: [{ parts: [{ text: promptHeader + promptContent }] }] };
+            const aiResponse = await fetchGeminiChat(payloadObject);
             if (!aiResponse.ok) throw new Error(`AI Engine HTTP Error ${aiResponse.status}`);
             const aiData = await aiResponse.json();
             
@@ -527,12 +562,8 @@
             const reinforcement = `(Consultation Rule: Answer this follow-up query regarding karmic roots, past life debts, or precautions strictly applying the principles of ${currentSelectedBook}. Refer back to the exact Nakshatras and Rashis calculated previously. Provide the answer entirely in ${selectedLanguageName}):\n`;
             const newApiMsg = { role: "user", parts: [{ text: reinforcement + userMsg }] };
             
-            const userKey = localStorage.getItem('user_ai_api_key') || '';
-            const response = await fetch('https://eprashala.pythonanywhere.com/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Custom-Api-Key': userKey },
-                body: JSON.stringify({ contents: [...chatHistoryForAPI, newApiMsg] })
-            });
+			const payloadObject = { contents: [...chatHistoryForAPI, newApiMsg] };
+            const response = await fetchGeminiChat(payloadObject);
 
             if (!response.ok) throw new Error("API Error");
             const data = await response.json();

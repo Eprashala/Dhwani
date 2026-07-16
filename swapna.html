@@ -263,6 +263,49 @@
     let fullShareText = ""; 
     let currentSelectedBook = "";
     let activeChatTtsBtn = null;
+	
+	// Central Proxy URL Base
+    const PROXY_BASE_URL = "https://eprashala.pythonanywhere.com";
+
+    async function fetchGeminiChat(payloadObject) {
+        const userKey = localStorage.getItem('user_ai_api_key') || '';
+
+        // TIER 1: User has their own key -> Talk directly to Google servers
+        if (userKey && userKey.trim().length > 10) {
+            try {
+                console.log("Direct Route Active: Targeting gemini-flash-latest...");
+                const primaryUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${userKey.trim()}`;
+                const response = await fetch(primaryUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payloadObject)
+                });
+                
+                if (!response.ok) throw new Error(`Primary model status: ${response.status}`);
+                return response;
+
+            } catch (error) {
+                console.warn("Primary channel busy/unavailable. Re-routing to gemini-2.5-flash-lite fallback...", error);
+                const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${userKey.trim()}`;
+                return await fetch(fallbackUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payloadObject)
+                });
+            }
+        } 
+        
+        // TIER 2: No personal key provided -> Route to your centralized proxy gateway
+        else {
+            console.log("Proxy Route Active: Routing through centralized server infrastructure...");
+            return await fetch(`${PROXY_BASE_URL}/api/chat`, {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payloadObject)
+            });
+        }
+    }
+	
 
     // --- API Settings Logic ---
     function configureAPIKey() {
@@ -401,13 +444,10 @@
             5. If the dream is negative, provide remedies, precautions, or rituals (Shanti) aligned with ${bookName}. If it is the Mandukya Upanishad, provide philosophical reflection instead of rituals.
             6. CRITICAL REQUIREMENT: You must provide your ENTIRE response in ${selectedLanguageName}. Do not use English unless explicitly requested. Use markdown styling for headers and emphasis.`;
 
-            const userKey = localStorage.getItem('user_ai_api_key') || '';
-            const aiResponse = await fetch('https://eprashala.pythonanywhere.com/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Custom-Api-Key': userKey },
-                body: JSON.stringify({ contents: [{ parts: [{ text: promptHeader + promptContent }] }] })
-            });
-
+			const payloadObject = { contents: [{ parts: [{ text: promptHeader + promptContent }] }] };
+            const aiResponse = await fetchGeminiChat(payloadObject);
+			
+			
             if (!aiResponse.ok) { throw new Error(`AI Engine HTTP Error ${aiResponse.status}`); }
 
             const aiData = await aiResponse.json();
@@ -467,12 +507,8 @@
             const reinforcement = `(Consultation Rule: Answer this follow-up question strictly applying the dream interpretation principles of ${currentSelectedBook}. Provide the answer entirely in ${selectedLanguageName}):\n`;
             const newApiMsg = { role: "user", parts: [{ text: reinforcement + userMsg }] };
             
-            const userKey = localStorage.getItem('user_ai_api_key') || '';
-            const response = await fetch('https://eprashala.pythonanywhere.com/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Custom-Api-Key': userKey },
-                body: JSON.stringify({ contents: [...chatHistoryForAPI, newApiMsg] })
-            });
+			const payloadObject = { contents: [...chatHistoryForAPI, newApiMsg] };
+            const response = await fetchGeminiChat(payloadObject);
 
             if (!response.ok) throw new Error("API Error");
             const data = await response.json();

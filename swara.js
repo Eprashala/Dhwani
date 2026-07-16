@@ -8,6 +8,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 // --- 2. Application Logic & Config ---
+const PROXY_BASE_URL = "https://eprashala.pythonanywhere.com";
 const langMap = { "English": "en-IN", "Hindi": "hi-IN", "Bengali": "bn-IN", "Telugu": "te-IN", "Marathi": "mr-IN", "Tamil": "ta-IN", "Gujarati": "gu-IN" };
 
 // State Variables
@@ -285,12 +286,13 @@ function removeClip(index) {
 
 // --- Deep Forensic & Lie Detection Analysis (Multi-Engine Client-Side Router) ---
 analyzeBtn.addEventListener('click', async () => {
-    const activeKey = localStorage.getItem('user_api_key');
+    const activeKey = localStorage.getItem('user_api_key') || '';
     const selectedEngine = document.getElementById('engineSelect').value;
     const selectedModel = document.getElementById('modelSelect').value;
 
-    if (!activeKey) {
-        alert("Please configure your API Key in Settings first.");
+    // Only block execution if they are missing a key AND trying to use a non-Google engine
+    if (!activeKey && selectedEngine !== "Google DeepMind") {
+        alert("Please configure your API Key in Settings first to use " + selectedEngine + ".");
         toggleModal(true);
         return;
     }
@@ -361,30 +363,60 @@ analyzeBtn.addEventListener('click', async () => {
     let extractedHTML = "";
 
     try {
-	// ==========================================
-			// ROUTE 1: GOOGLE DEEPMIND (Native Audio Support)
-			// ==========================================
-			if (selectedEngine === "Google DeepMind") {
-				// Convert the dropdown text "Gemini 2.5 Pro" into the API format "gemini-2.5-pro"
-				let formattedModelName = selectedModel.toLowerCase().replace(/ /g, '-');
-				
-				API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${formattedModelName}:generateContent?key=${activeKey}`;
+// ==========================================
+        // ROUTE 1: GOOGLE DEEPMIND (Native Audio Support & Dual-Routing)
+        // ==========================================
+        if (selectedEngine === "Google DeepMind") {
+            let formattedModelName = selectedModel.toLowerCase().replace(/ /g, '-');
+            
+            payload = {
+                contents: [{ parts: [ { text: systemPrompt }, { inlineData: { mimeType: mimeType, data: base64Audio } } ] }]
+            };
 
-				payload = {
-					contents: [{ parts: [ { text: systemPrompt }, { inlineData: { mimeType: mimeType, data: base64Audio } } ] }]
-				};
-				fetchOptions.body = JSON.stringify(payload);
+            // TIER 1: User has their own key -> Direct browser handoff to Google
+            if (activeKey && activeKey.trim().length > 10) {
+                try {
+                    console.log(`Direct Route Active: Targeting ${formattedModelName}...`);
+                    const primaryUrl = `https://generativelanguage.googleapis.com/v1beta/models/${formattedModelName}:generateContent?key=${activeKey.trim()}`;
+                    const response = await fetch(primaryUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (!response.ok) throw new Error(`Primary model status: ${response.status}`);
+                    const data = await response.json();
+                    extractedHTML = data.candidates[0].content.parts[0].text;
 
-				const response = await fetch(API_URL, fetchOptions);
-				
-				if (!response.ok) {
-					const errData = await response.json();
-					throw new Error(`Google API Error: ${errData.error?.message || response.statusText}`);
-				}
-				
-				const data = await response.json();
-				extractedHTML = data.candidates[0].content.parts[0].text;
-			}
+                } catch (error) {
+                    console.warn("Primary channel busy/unavailable. Re-routing to fallback...", error);
+                    const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${activeKey.trim()}`;
+                    const response = await fetch(fallbackUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (!response.ok) throw new Error(`Fallback model status: ${response.status}`);
+                    const data = await response.json();
+                    extractedHTML = data.candidates[0].content.parts[0].text;
+                }
+            } 
+            
+            // TIER 2: No personal key provided -> Route to centralized Mumbai proxy
+            else {
+                console.log("Proxy Route Active: Routing through centralized server...");
+                const response = await fetch(`${PROXY_BASE_URL}/api/chat`, {
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) throw new Error(`Proxy status: ${response.status}`);
+                const data = await response.json();
+                extractedHTML = data.candidates[0].content.parts[0].text;
+            }
+        }
         
         // ==========================================
         // ROUTE 2: ANTHROPIC CLAUDE

@@ -44,7 +44,46 @@ function enforceFullscreen() {
 });
 
 // --- 1. DATA STRUCTURES & CONFIG ---
-const PROXY_URL = "https://eprashala.pythonanywhere.com/api/chat"; 
+const PROXY_BASE_URL = "https://eprashala.pythonanywhere.com";
+
+async function fetchGeminiChat(payloadObject) {
+    const userKey = document.getElementById('custom-api-key-input').value.trim() || '';
+
+    // TIER 1: User has their own key -> Direct browser handoff to Google
+    if (userKey && userKey.length > 10) {
+        try {
+            console.log("Direct Route Active: Targeting gemini-flash-latest...");
+            const primaryUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${userKey}`;
+            const response = await fetch(primaryUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payloadObject)
+            });
+            
+            if (!response.ok) throw new Error(`Primary model status: ${response.status}`);
+            return response;
+
+        } catch (error) {
+            console.warn("Primary channel busy/unavailable. Re-routing to fallback...", error);
+            const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${userKey}`;
+            return await fetch(fallbackUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payloadObject)
+            });
+        }
+    } 
+    
+    // TIER 2: No personal key provided -> Route to your centralized Mumbai server
+    else {
+        console.log("Proxy Route Active: Routing through centralized server...");
+        return await fetch(`${PROXY_BASE_URL}/api/chat`, {
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payloadObject)
+        });
+    }
+}
 
 const MAHA_BOARD_SUBJECTS = {
     std1to2: ["Marathi (मराठी)", "English", "Mathematics (गणित)"],
@@ -924,20 +963,15 @@ async function getAIResponse(history) {
            IMG_SEARCH: relevant_topic_keywords`; 
     }
 
-    const payload = { 
-        model: "gemini-3.1-flash", 
+const payload = { 
         contents: history.slice(-10), 
         systemInstruction: { parts: [{ text: prompt }] } 
     };
 
     currentAborter = new AbortController();
 
-    const response = await fetch(PROXY_URL, { 
-        method: 'POST', 
-        headers: headers, 
-        body: JSON.stringify(payload),
-        signal: currentAborter.signal
-    });
+    const response = await fetchGeminiChat(payload);
+    
     if (!response.ok) throw new Error('API Error');
     const data = await response.json();
     return data.candidates[0].content.parts[0].text;

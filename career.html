@@ -321,6 +321,48 @@
     let currentSelectedBook = "";
     let activeChatTtsBtn = null;
     let rawAIResponse = "";
+	
+	// Central Proxy URL Base
+    const PROXY_BASE_URL = "https://eprashala.pythonanywhere.com";
+
+    async function fetchGeminiChat(payloadObject) {
+        const userKey = localStorage.getItem('user_ai_api_key') || '';
+
+        // TIER 1: User has their own key -> Direct browser handoff to Google
+        if (userKey && userKey.trim().length > 10) {
+            try {
+                console.log("Direct Route Active: Targeting gemini-flash-latest...");
+                const primaryUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${userKey.trim()}`;
+                const response = await fetch(primaryUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payloadObject)
+                });
+                
+                if (!response.ok) throw new Error(`Primary model status: ${response.status}`);
+                return response;
+
+            } catch (error) {
+                console.warn("Primary channel busy/unavailable. Re-routing to gemini-2.5-flash-lite fallback...", error);
+                const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${userKey.trim()}`;
+                return await fetch(fallbackUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payloadObject)
+                });
+            }
+        } 
+        
+        // TIER 2: No personal key provided -> Route to your centralized proxy gateway
+        else {
+            console.log("Proxy Route Active: Routing through centralized server infrastructure...");
+            return await fetch(`${PROXY_BASE_URL}/api/chat`, {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payloadObject)
+            });
+        }
+    }
 
     // --- API Settings ---
     function configureAPIKey() {
@@ -465,10 +507,10 @@
         const selectedLanguageName = langDropdown.options[langDropdown.selectedIndex].text;
 
         try {
-            statusText.innerText = "Connecting to astronomical backend...";
+			statusText.innerText = "Connecting to astronomical backend...";
             
             const chartPayload = { date: bDate, time: bTime, lat: bLat, lon: bLon };
-            const calcResponse = await fetch('https://eprashala.pythonanywhere.com/calculate', {
+            const calcResponse = await fetch(`${PROXY_BASE_URL}/calculate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(chartPayload)
@@ -510,12 +552,8 @@
             6. Apply gender-specific classical interpretations suitable for a ${uSex} native if mandated by ${bookName}, but adapt it constructively for the modern world.
             7. CRITICAL REQUIREMENT: Do NOT output the raw math. Provide the final, profound astrological consultation in ${selectedLanguageName}. Use markdown styling for headers and emphasis.`;
 
-            const userKey = localStorage.getItem('user_ai_api_key') || '';
-            const aiResponse = await fetch('https://eprashala.pythonanywhere.com/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Custom-Api-Key': userKey },
-                body: JSON.stringify({ contents: [{ parts: [{ text: promptHeader + promptContent }] }] })
-            });
+			const payloadObject = { contents: [{ parts: [{ text: promptHeader + promptContent }] }] };
+            const aiResponse = await fetchGeminiChat(payloadObject);
 
             if (!aiResponse.ok) { throw new Error(`AI Engine HTTP Error ${aiResponse.status}`); }
 
@@ -570,12 +608,8 @@
             const reinforcement = `(Consultation Rule: Answer this follow-up career question strictly applying the vocational astrology principles of ${currentSelectedBook}. Provide the answer entirely in ${selectedLanguageName}):\n`;
             const newApiMsg = { role: "user", parts: [{ text: reinforcement + userMsg }] };
             
-            const userKey = localStorage.getItem('user_ai_api_key') || '';
-            const response = await fetch('https://eprashala.pythonanywhere.com/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Custom-Api-Key': userKey },
-                body: JSON.stringify({ contents: [...chatHistoryForAPI, newApiMsg] })
-            });
+			const payloadObject = { contents: [...chatHistoryForAPI, newApiMsg] };
+            const response = await fetchGeminiChat(payloadObject);
 
             if (!response.ok) throw new Error("API Error");
             const data = await response.json();

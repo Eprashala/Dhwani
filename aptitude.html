@@ -210,6 +210,48 @@
 </div>
 
 <script>
+    // --- CENTRAL PROXY ROUTER ---
+    const PROXY_BASE_URL = "https://eprashala.pythonanywhere.com";
+
+    async function fetchGeminiChat(payloadObject) {
+        const userKey = document.getElementById('apiKey').value.trim() || '';
+
+        // TIER 1: User has their own key -> Direct browser handoff to Google
+        if (userKey && userKey.length > 10) {
+            try {
+                console.log("Direct Route Active: Targeting gemini-2.5-flash...");
+                const primaryUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${userKey}`;
+                const response = await fetch(primaryUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payloadObject)
+                });
+                
+                if (!response.ok) throw new Error(`Primary model status: ${response.status}`);
+                return response;
+
+            } catch (error) {
+                console.warn("Primary channel busy/unavailable. Re-routing to fallback...", error);
+                const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${userKey}`;
+                return await fetch(fallbackUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payloadObject)
+                });
+            }
+        } 
+        
+        // TIER 2: No personal key provided -> Route to your centralized Mumbai server
+        else {
+            console.log("Proxy Route Active: Routing through centralized server...");
+            return await fetch(`${PROXY_BASE_URL}/api/chat`, {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payloadObject)
+            });
+        }
+    }
+
     let childData = { name: "", age: 0, city: "", lang: "en-IN", langName: "English" };
     let apiKey = "";
     
@@ -392,15 +434,29 @@
         silentUtterance.volume = 0;
         window.speechSynthesis.speak(silentUtterance);
     }
+// --- TTS DEEP SANITIZATION ENGINE ---
+    function cleanTextForTTS(text) {
+        if (!text) return "";
+        // Deep target replacement for: * < > # - ; : [ ] { } ( )
+        // Replaces them with a space so words don't merge, then collapses extra spaces
+        return text.replace(/[\*<>\#\-;:\[\]{}\(\)]/g, ' ')
+                   .replace(/\s+/g, ' ')
+                   .trim();
+    }
+	
 
-    function speakDhwaniResponse(text, onCompleteCallback = null) {
+
+	function speakDhwaniResponse(text, onCompleteCallback = null) {
         if (!('speechSynthesis' in window)) {
             if (onCompleteCallback) setTimeout(onCompleteCallback, text.length * 50);
             return;
         }
         
         window.speechSynthesis.cancel(); 
-        currentSpeechUtterance = new SpeechSynthesisUtterance(text);
+        
+        // Apply deep sanitization before speaking
+        const safeText = cleanTextForTTS(text);
+        currentSpeechUtterance = new SpeechSynthesisUtterance(safeText);
         
         let voices = window.speechSynthesis.getVoices();
         let targetVoice = voices.find(v => v.lang === childData.lang) || 
@@ -678,24 +734,10 @@
         TRANSCRIPT TO ANALYZE:
         ${fullTranscript}`;
 
-        const payload = { contents: [{ role: "user", parts: [{ text: reportPrompt }] }] };
+		const payload = { contents: [{ role: "user", parts: [{ text: reportPrompt }] }] };
         
-        let fetchUrl = "";
-        let fetchHeaders = { 'Content-Type': 'application/json' };
-        
-        if (apiKey) {
-            fetchUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-        } else {
-            fetchUrl = "https://eprashala.pythonanywhere.com/api/chat";
-            fetchHeaders['X-Custom-Api-Key'] = ''; 
-        }
-
         try {
-            const response = await fetch(fetchUrl, {
-                method: 'POST',
-                headers: fetchHeaders,
-                body: JSON.stringify(payload)
-            });
+            const response = await fetchGeminiChat(payload);
 
             const data = await response.json();
             if (!response.ok) throw new Error(data.error?.message || "Failed");
@@ -788,7 +830,7 @@
         setTimeout(playNextReportChunk, 50); 
     }
 
-    function playNextReportChunk() {
+	function playNextReportChunk() {
         if (!isPlayingReport || currentChunkIndex >= reportChunks.length) {
             isPlayingReport = false;
             updateTTSUI(true);
@@ -804,17 +846,9 @@
         const targetScroll = (container.scrollHeight - container.clientHeight) * percent;
         container.scrollTo({ top: targetScroll, behavior: 'smooth' });
 
-        reportUtterance = new SpeechSynthesisUtterance(reportChunks[currentChunkIndex]);
-        
-        let voices = window.speechSynthesis.getVoices();
-        let targetVoice = voices.find(v => v.lang === childData.lang) || 
-                          voices.find(v => v.lang.includes(childData.lang.split('-')[0])) || 
-                          voices.find(v => v.lang.includes('hi-IN'));
-        
-        if (targetVoice) reportUtterance.voice = targetVoice;
-        reportUtterance.rate = 0.85; 
-
-        reportUtterance.onend = () => { currentChunkIndex++; playNextReportChunk(); };
+        // Apply deep sanitization to the chunk before speaking
+        const safeChunkText = cleanTextForTTS(reportChunks[currentChunkIndex]);
+        reportUtterance = new SpeechSynthesisUtterance(safeChunkText);
         reportUtterance.onerror = () => { currentChunkIndex++; playNextReportChunk(); };
 
         window.speechSynthesis.speak(reportUtterance);
@@ -843,28 +877,13 @@
         Based on their test transcript:\n${fullTranscript}\n
         Give practical, realistic advice. Reply in plain text. NO MARKDOWN.`;
 
-        const payload = { 
+	const payload = { 
             system_instruction: { parts: [{ text: systemPrompt }] }, 
             contents: consultHistory 
         };
 
-        const customApiKey = document.getElementById('apiKey').value.trim();
-        let fetchUrl = "";
-        let fetchHeaders = { 'Content-Type': 'application/json' };
-
-        if (customApiKey) {
-            fetchUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${customApiKey}`;
-        } else {
-            fetchUrl = "https://eprashala.pythonanywhere.com/api/chat";
-            fetchHeaders['X-Custom-Api-Key'] = '';
-        }
-
         try {
-            const response = await fetch(fetchUrl, {
-                method: 'POST',
-                headers: fetchHeaders,
-                body: JSON.stringify(payload)
-            });
+            const response = await fetchGeminiChat(payload);
             const data = await response.json();
             if (!response.ok) throw new Error("API Error");
             

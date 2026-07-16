@@ -1574,7 +1574,46 @@ async function requestAppPermissions() {
             state.chatHistory = [];
         }
 
-        // --- 6. SMART ROUTING & FETCH API ---
+// --- 6. SMART ROUTING & FETCH API ---
+        const PROXY_BASE_URL = "https://eprashala.pythonanywhere.com";
+
+        async function fetchGeminiChat(payloadObject, userKey, selectedModel = 'gemini-flash-latest') {
+            // TIER 1: User has their own key -> Direct browser handoff to Google
+            if (userKey && userKey.trim().length > 10) {
+                try {
+                    console.log(`Direct Route Active: Targeting ${selectedModel}...`);
+                    const primaryUrl = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${userKey.trim()}`;
+                    const response = await fetch(primaryUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payloadObject)
+                    });
+                    
+                    if (!response.ok) throw new Error(`Primary model status: ${response.status}`);
+                    return response;
+
+                } catch (error) {
+                    console.warn("Primary channel busy/unavailable. Re-routing to fallback...", error);
+                    const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${userKey.trim()}`;
+                    return await fetch(fallbackUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payloadObject)
+                    });
+                }
+            } 
+            
+            // TIER 2: No personal key provided -> Route to your centralized Mumbai server
+            else {
+                console.log("Proxy Route Active: Routing through centralized server...");
+                return await fetch(`${PROXY_BASE_URL}/api/chat`, {
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payloadObject)
+                });
+            }
+        }
+
         function getGeminiSmartModel(userText, fileData) {
             const isComplex = /explain|analyze|decode|reason|elaborate|solve|understand|summarize|detail/i.test(userText);
             if (fileData && isComplex) return "gemini-3.1-pro"; 
@@ -1591,9 +1630,9 @@ async function requestAppPermissions() {
                     const url = prov === 'openai' ? 'https://api.openai.com/v1/chat/completions' : 'https://api.groq.com/openai/v1/chat/completions';
                     const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` }, body: JSON.stringify({ model: state.settings.model, messages: [{role:"user", content: prompt}] }) });
                     title = (await res.json()).choices[0].message.content;
-                } else if (prov === 'gemini') {
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${key}`;
-                    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{role:"user", parts:[{text:prompt}]}] }) });
+				} else if (prov === 'gemini') {
+                    const payload = { contents: [{role:"user", parts:[{text:prompt}]}] };
+                    const res = await fetchGeminiChat(payload, key, 'gemini-3.5-flash');
                     title = (await res.json()).candidates[0].content.parts[0].text;
                 } else if (prov === 'claude') {
                     const res = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerously-allow-browser': 'true' }, body: JSON.stringify({ model: state.settings.model, max_tokens: 20, messages: [{role:"user", content: prompt}] }) });
@@ -1608,9 +1647,12 @@ async function requestAppPermissions() {
         }
 
         async function processInput(text) {
-            if (state.isProcessing || (!text.trim() && !state.currentBase64File)) return;
+		if (state.isProcessing || (!text.trim() && !state.currentBase64File)) return;
             const prov = state.settings.provider;
-            if (!state.apiKeys[prov]) return alert(`Enter API Key for ${prov} in Models Settings.`);
+            
+            // Only block execution for non-Gemini providers if the key is missing
+            if (!state.apiKeys[prov] && prov !== 'gemini') return alert(`Enter API Key for ${prov} in Models Settings.`);
+            
             const userText = text.trim(); const fileData = state.currentBase64File; const fileType = state.currentFileType;
             DOM.textIn.value = ''; DOM.textIn.style.height = 'auto'; document.getElementById('btn-remove-image').click();
             
@@ -1677,12 +1719,8 @@ CRITICAL INSTRUCTIONS:
                 const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` }, body: JSON.stringify({ model: mod, messages: msgs }) });
                 if(!res.ok) throw new Error("API Limit or Error"); return (await res.json()).choices[0].message.content;
             
-            } else if (state.settings.provider === 'gemini') {
-                const geminiFallbacks = ["gemini-3.5-flash", "gemini-3.1-flash", "gemini-2.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-2.5-flash-lite"];
+			} else if (state.settings.provider === 'gemini') {
                 let targetModel = getGeminiSmartModel(userText, fileData);
-                let modelsToTry = [targetModel];
-                if (!modelsToTry.includes(mod)) modelsToTry.push(mod);
-                geminiFallbacks.forEach(m => { if (!modelsToTry.includes(m)) modelsToTry.push(m); });
 
                 let contents = state.chatHistory.slice(-6, -1).map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
                 let parts = [{ text: userText || "Analyze file." }];
@@ -1690,17 +1728,19 @@ CRITICAL INSTRUCTIONS:
                 if (p.refFileBase64) contents.push({ role: 'user', parts: [{ text: "Persona Reference File attached." }, { inline_data: { mime_type: p.refFileBase64.match(/[^:]\w+\/[\w-+\d.]+(?=;|,)/)[0], data: p.refFileBase64.split(',')[1] } }]});
                 contents.push({ role: 'user', parts });
 
-                for (let model of modelsToTry) {
-                    try {
-                        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-                        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ systemInstruction: { parts: [{text: prompt}] }, contents: contents, generationConfig: { temperature: 0.85 } }) });
-                        if (!res.ok) throw new Error(`Status ${res.status}`);
-                        const data = await res.json();
-                        if (data.candidates && data.candidates.length > 0) return data.candidates[0].content.parts[0].text;
-                        throw new Error(`Empty response`);
-                    } catch (e) { console.warn(`Model ${model} failed, trying fallback.`); }
-                }
-                throw new Error("All Gemini models failed. Please check your API key.");
+                const payloadStructure = { 
+                    systemInstruction: { parts: [{text: prompt}] }, 
+                    contents: contents, 
+                    generationConfig: { temperature: 0.85 } 
+                };
+
+                const res = await fetchGeminiChat(payloadStructure, key, targetModel);
+                if (!res.ok) throw new Error(`Status ${res.status}`);
+                
+                const data = await res.json();
+                if (data.candidates && data.candidates.length > 0) return data.candidates[0].content.parts[0].text;
+                
+                throw new Error(`Empty response. Please check your API key or proxy status.`);
 
             } else if (state.settings.provider === 'claude') {
                 let parts = [];

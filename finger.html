@@ -228,9 +228,48 @@
 </div>
 
 <script>
-    // System Constants
-    const OPENCV_API_URL = 'https://eprashala.pythonanywhere.com/api/analyze_fingerprint';
-    const GEMINI_API_URL = 'https://eprashala.pythonanywhere.com/api/chat';
+// --- CENTRAL PROXY ROUTER ---
+    const PROXY_BASE_URL = "https://eprashala.pythonanywhere.com";
+    const OPENCV_API_URL = `${PROXY_BASE_URL}/api/analyze_fingerprint`;
+
+    async function fetchGeminiChat(payloadObject) {
+        const userKey = localStorage.getItem('marrvish_gemini_key') || '';
+
+        // TIER 1: User has their own key -> Direct browser handoff to Google
+        if (userKey && userKey.trim().length > 10) {
+            try {
+                console.log("Direct Route Active: Targeting gemini-flash-latest...");
+                const primaryUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${userKey.trim()}`;
+                const response = await fetch(primaryUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payloadObject)
+                });
+                
+                if (!response.ok) throw new Error(`Primary model status: ${response.status}`);
+                return response;
+
+            } catch (error) {
+                console.warn("Primary channel busy/unavailable. Re-routing to fallback...", error);
+                const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${userKey.trim()}`;
+                return await fetch(fallbackUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payloadObject)
+                });
+            }
+        } 
+        
+        // TIER 2: No personal key provided -> Route to your centralized Mumbai server
+        else {
+            console.log("Proxy Route Active: Routing through centralized server...");
+            return await fetch(`${PROXY_BASE_URL}/api/chat`, {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payloadObject)
+            });
+        }
+    }
     
     let videoStream = null;
     let isSpeaking = false;
@@ -526,12 +565,8 @@
             "generationConfig": { "temperature": 0.1 } 
         };
 
-        try {
-            const response = await fetch(GEMINI_API_URL, {
-                method: 'POST',
-                headers: getAuthHeaders(),
-                body: JSON.stringify(payload)
-            });
+		try {
+            const response = await fetchGeminiChat(payload);
 
             if (!response.ok) throw new Error(`HTTP ${response.status}: Marrvish AI Core unavailable.`);
             
@@ -584,11 +619,9 @@
 
         const prompt = `Translate this HTML into ${targetLang}. Preserve ALL tags EXACTLY. Do NOT wrap in markdown. \n\n ${userData.finalReportHTML}`;
 
-        try {
-            const response = await fetch(GEMINI_API_URL, {
-                method: 'POST', headers: getAuthHeaders(),
-                body: JSON.stringify({ "contents": [{ "parts": [{ "text": prompt }] }], "generationConfig": { "temperature": 0.1 } })
-            });
+		try {
+            const payloadObject = { "contents": [{ "parts": [{ "text": prompt }] }], "generationConfig": { "temperature": 0.1 } };
+            const response = await fetchGeminiChat(payloadObject);
             const data = await response.json();
             
             if (data.candidates && data.candidates[0].content) {

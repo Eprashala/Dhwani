@@ -418,7 +418,46 @@
     <canvas id="captureCanvas"></canvas>
 
     <script>
-        const PROXY_API_ENDPOINT = "https://eprashala.pythonanywhere.com/api/chat";
+const PROXY_BASE_URL = "https://eprashala.pythonanywhere.com";
+
+        async function fetchGeminiChat(payloadObject) {
+            const userKey = localStorage.getItem('hastarekha_api_key') || '';
+
+            // TIER 1: User has their own key -> Direct browser handoff to Google
+            if (userKey && userKey.trim().length > 10) {
+                try {
+                    console.log("Direct Route Active: Targeting gemini-flash-latest...");
+                    const primaryUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${userKey.trim()}`;
+                    const response = await fetch(primaryUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payloadObject)
+                    });
+                    
+                    if (!response.ok) throw new Error(`Primary model status: ${response.status}`);
+                    return response;
+
+                } catch (error) {
+                    console.warn("Primary channel busy/unavailable. Re-routing to fallback...", error);
+                    const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${userKey.trim()}`;
+                    return await fetch(fallbackUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payloadObject)
+                    });
+                }
+            } 
+            
+            // TIER 2: No personal key provided -> Route to your centralized Mumbai server
+            else {
+                console.log("Proxy Route Active: Routing through centralized server...");
+                return await fetch(`${PROXY_BASE_URL}/api/chat`, {
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payloadObject)
+                });
+            }
+        }
         
         let customApiKey = localStorage.getItem('hastarekha_api_key') || "";
         let savedReadings = JSON.parse(localStorage.getItem('hastarekha_archive') || '[]');
@@ -613,14 +652,13 @@
               "remedies": string (Authentic remedies in ${userLang.value})
             }`;
 
-            try {
-                const response = await fetch(getActiveEndpoint(), {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ "contents": [{ "parts": [ { "text": prompt }, { "inline_data": { "mime_type": "image/jpeg", "data": base64Image } } ] }] })
-                });
+		try {
+                const payloadObject = { "contents": [{ "parts": [ { "text": prompt }, { "inline_data": { "mime_type": "image/jpeg", "data": base64Image } } ] }] };
+                const response = await fetchGeminiChat(payloadObject);
 
                 if(response.status === 504) throw new Error("Gateway Timeout - Matrix overwhelmed. Try again.");
+
+ 
                 const data = await response.json();
                 if (data.error) throw new Error(data.error.message);
 
@@ -726,8 +764,9 @@
 
             const prompt = `Act as a Vedic Palmist. Based on this full reading context: ${fullReadingContext}\nUser asks: "${q}"\nAnswer precisely in ${userLang.value}.`;
 
-            try {
-                const res = await fetch(getActiveEndpoint(), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ "contents": [{ "parts": [{ "text": prompt }] }] }) });
+		try {
+                const payloadObject = { "contents": [{ "parts": [{ "text": prompt }] }] };
+                const res = await fetchGeminiChat(payloadObject);
                 const data = await res.json();
                 if(data.error) throw new Error(data.error.message);
                 

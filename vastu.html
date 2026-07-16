@@ -146,11 +146,53 @@
         fabric.Object.prototype.cornerColor = '#e1b12c';
         fabric.Object.prototype.borderColor = '#00a8ff';
 
-        let canvas;
+		let canvas;
         let vastuCompassGroup;
         let speechSynth = window.speechSynthesis;
         let currentUtterance = null;
         let isSpeakingPaused = false;
+
+        // --- CENTRAL PROXY ROUTER ---
+        const PROXY_BASE_URL = "https://eprashala.pythonanywhere.com";
+
+        async function fetchGeminiChat(payloadObject) {
+            const userKey = document.getElementById('api-key').value.trim() || '';
+
+            // TIER 1: User has their own key -> Direct browser handoff to Google
+            if (userKey && userKey.length > 10) {
+                try {
+                    console.log("Direct Route Active: Targeting gemini-flash-latest...");
+                    const primaryUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${userKey}`;
+                    const response = await fetch(primaryUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payloadObject)
+                    });
+                    
+                    if (!response.ok) throw new Error(`Primary model status: ${response.status}`);
+                    return response;
+
+                } catch (error) {
+                    console.warn("Primary channel busy/unavailable. Re-routing to fallback...", error);
+                    const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${userKey}`;
+                    return await fetch(fallbackUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payloadObject)
+                    });
+                }
+            } 
+            
+            // TIER 2: No personal key provided -> Route to your centralized Mumbai server
+            else {
+                console.log("Proxy Route Active: Routing through centralized server...");
+                return await fetch(`${PROXY_BASE_URL}/api/chat`, {
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payloadObject)
+                });
+            }
+        }
 
         function toggleUtilitiesAccordion() {
             const container = document.getElementById('utilities-container');
@@ -621,13 +663,8 @@
                 outputReportView.scrollIntoView({ behavior: "smooth", block: "start" });
             }
 
-            try {
-                // To utilize the latest Gemini 3.1 architecture, ensure your backend script at this URL is routing to "gemini-3.1-pro" or "gemini-3.1-flash".
-                const response = await fetch('https://eprashala.pythonanywhere.com/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-Custom-Api-Key': apiKey },
-                    body: JSON.stringify(payloadStructure)
-                });
+			try {
+                const response = await fetchGeminiChat(payloadStructure);
 
                 const data = await response.json();
                 visualLoader.style.display = "none";

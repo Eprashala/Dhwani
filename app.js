@@ -18,8 +18,48 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// --- 2. Application Logic ---
-const PROXY_SERVER_URL = "https://eprashala.pythonanywhere.com/api/chat";
+// --- 2. Application Logic & Central Routing ---
+const PROXY_BASE_URL = "https://eprashala.pythonanywhere.com";
+
+async function fetchGeminiChat(payloadObject) {
+    const userKey = localStorage.getItem('user_api_key') || '';
+
+    // TIER 1: User has their own key -> Direct browser handoff to Google
+    if (userKey && userKey.trim().length > 10) {
+        try {
+            console.log("Direct Route Active: Targeting gemini-flash-latest...");
+            const primaryUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${userKey.trim()}`;
+            const response = await fetch(primaryUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payloadObject)
+            });
+            
+            if (!response.ok) throw new Error(`Primary model status: ${response.status}`);
+            return response;
+
+        } catch (error) {
+            console.warn("Primary channel busy/unavailable. Re-routing to fallback...", error);
+            const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${userKey.trim()}`;
+            return await fetch(fallbackUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payloadObject)
+            });
+        }
+    } 
+    
+    // TIER 2: No personal key provided -> Route to your centralized Mumbai server
+    else {
+        console.log("Proxy Route Active: Routing through centralized server...");
+        return await fetch(`${PROXY_BASE_URL}/api/chat`, {
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payloadObject)
+        });
+    }
+}
+
 const langMap = { "English": "en-IN", "Hindi": "hi-IN", "Bengali": "bn-IN", "Telugu": "te-IN", "Marathi": "mr-IN", "Tamil": "ta-IN", "Gujarati": "gu-IN", "Kannada": "kn-IN", "Malayalam": "ml-IN", "Odia": "or-IN", "Punjabi": "pa-IN" };
 
 let currentStream = null;
@@ -465,14 +505,9 @@ CRITICAL INSTRUCTION: Write your ENTIRE response exclusively in the ${targetLang
         contents: [{ parts: [ { text: systemPrompt }, { inlineData: { mimeType: "image/jpeg", data: rawBase64 } } ] }]
     };
 
-    const userKey = localStorage.getItem('user_api_key') || '';
-
-    try {
-        const response = await fetch(PROXY_SERVER_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Custom-Api-Key': userKey },
-            body: JSON.stringify(payload)
-        });
+	try {
+        // Hand the payload directly to the automated router
+        const response = await fetchGeminiChat(payload);
         
         if (!response.ok) { throw new Error(`Server returned status: ${response.status}`); }
 
