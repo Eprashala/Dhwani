@@ -52,6 +52,10 @@ function toggleFormMode(mode) {
     const mName = document.getElementById('motherName');
     const mAge = document.getElementById('motherAge');
     const lmp = document.getElementById('wifeLMP');
+    const medicalNotes = document.getElementById('userMedicalNotes');
+
+    // Automatically set the default text in the text box for both modes
+    medicalNotes.value = "want a intelligent and healthy baby and safe delivery for mother and child.";
 
     if (mode === 'conception') {
         document.getElementById('dateLabel').innerText = "Target Month (For calculating transits):";
@@ -64,7 +68,8 @@ function toggleFormMode(mode) {
         mName.required = false; mAge.required = false;
     } else {
         document.getElementById('dateLabel').innerText = "Doctor's Prescribed C-Section Date Range:";
-        document.getElementById('notesLabel').innerText = "Provide exact dates the doctor has offered:";
+        // Updated label for delivery mode
+        document.getElementById('notesLabel').innerText = "Medical Notes/ Questions for Delivery";
         document.getElementById('submitBtn').innerText = "Calculate Janma Kundli Timings";
         coupleSection.style.display = 'none';
         motherSection.style.display = 'block';
@@ -230,7 +235,7 @@ document.getElementById('santanForm').addEventListener('submit', async function(
     
     const targetDate = document.getElementById('targetDate').value;
     const medicalNotes = document.getElementById('userMedicalNotes').value;
-    const langDropdown = document.getElementById('langToggle');
+	const langDropdown = document.getElementById('langToggle');
     const selectedLanguageName = langDropdown.options[langDropdown.selectedIndex].text;
 
     const todayObj = new Date();
@@ -247,78 +252,117 @@ document.getElementById('santanForm').addEventListener('submit', async function(
     }
 
     try {
-        statusText.innerText = "Connecting to astronomical backend for transits...";
-        const chartPayload = { date: targetDate, time: "12:00:00", lat: bLat, lon: bLon };
-        const calcResponse = await fetch('https://eprashala.pythonanywhere.com/calculate', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(chartPayload)
-        });
+		statusText.innerText = "Connecting to backend for full window ephemeris calendar...";
         
-        const chartData = await calcResponse.json();
-        if (chartData.status !== 'success') throw new Error(chartData.message); 
-
-        statusText.innerText = `Calculating Math & Synastry via AI...`;
-
-        let flatBodies = [];
-        if (chartData.houses) { chartData.houses.forEach(h => h.forEach(b => { if (b.name !== 'Earth') flatBodies.push(b); })); }
+        // 1. Determine Date Window Based on Current Mode
+        let daysBefore = currentMode === "conception" ? 15 : 3;
+        let daysAfter = currentMode === "conception" ? 15 : 3;
         
-        // --- UPGRADED: EXACT PANCHANG MATH ENGINE ---
-        let sun = flatBodies.find(g => g.name === 'Sun' || g.name === 'Surya' || g.name === 'Ravi');
-        let moon = flatBodies.find(g => g.name === 'Moon' || g.name === 'Chandra');
+        let dateArray = [];
+        let baseDateObj = new Date(targetDate);
         
-        let exactVedicData = "";
-        if (sun && moon) {
-            let sunDeg = parseFloat(sun.abs_deg);
-            let moonDeg = parseFloat(moon.abs_deg);
-
-            // Exact Tithi Math ((Moon - Sun) / 12)
-            let diff = moonDeg - sunDeg;
-            if (diff < 0) diff += 360;
-            let tithiIndex = Math.floor(diff / 12);
-            let paksha = tithiIndex < 15 ? 'Shukla Paksha' : 'Krishna Paksha';
-            let tithiName = VEDIC_TITHIS[tithiIndex];
-
-            // Exact Nakshatra Math
-            let nakIndex = Math.floor(moonDeg / (360/27));
-            let nakName = VEDIC_NAKSHATRAS[nakIndex];
-            
-            // EXACT RASHI MATH (Bypassing the buggy .sign property)
-            let moonSignName = VEDIC_RASHIS[Math.floor(moonDeg / 30)];
-            let sunSignName = VEDIC_RASHIS[Math.floor(sunDeg / 30)];
-
-            exactVedicData = `
-### EXACT VEDIC EPHEMERIS FOR TARGET DATE (ABSOLUTE TRUTH):
-- Tithi: ${paksha} ${tithiName} (Phase Index: ${tithiIndex + 1}/30)
-- Moon Nakshatra: ${nakName}
-- Moon Sign (Rashi): ${moonSignName}
-- Sun Sign (Rashi): ${sunSignName}
-`;
+        // Loop from -daysBefore to +daysAfter
+        for(let i = -daysBefore; i <= daysAfter; i++) {
+            let nextDate = new Date(baseDateObj);
+            nextDate.setDate(baseDateObj.getDate() + i);
+            dateArray.push(nextDate.toISOString().split('T')[0]);
         }
+
+        // 2. Fetch astronomical data sequentially to prevent backend overload
+        let results = [];
+        for (let dateStr of dateArray) {
+            try {
+                let res = await fetch('https://eprashala.pythonanywhere.com/calculate', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ date: dateStr, time: "12:00:00", lat: bLat, lon: bLon })
+                });
+                let data = await res.json();
+                results.push(data);
+            } catch (err) {
+                console.error(`Calculation failed for date: ${dateStr}`, err);
+                results.push({ status: 'error', date: dateStr });
+            }
+        }
+
+        // 3. Build the Absolute Truth Ephemeris Table for the AI
+        statusText.innerText = `Calculating Math & Synastry via AI...`;
+        
+        let exactVedicData = `### ABSOLUTE TRUTH VEDIC EPHEMERIS CALENDAR (${dateArray.length} DAYS):\n`;
+        exactVedicData += `⚠️ SYSTEM OVERRIDE: You MUST ONLY select dates explicitly listed in the table below. Do NOT hallucinate, guess, or invent any dates, Tithis, or Nakshatras. If a date is not in this table, it does not exist.\n\n`;
+
+        // Create a variable outside the loop to hold the target date's planets
+        let targetDateFlatBodies = [];
+
+        results.forEach((chartData, index) => {
+            if (chartData.status === 'success' && chartData.houses) {
+                // This flatBodies is temporary for this specific day in the loop
+                let flatBodies = [];
+                chartData.houses.forEach(h => h.forEach(b => { if (b.name !== 'Earth') flatBodies.push(b); }));
+                
+                // If this day matches the user's requested Target Date, save the planetary positions
+                if (dateArray[index] === targetDate) {
+                    targetDateFlatBodies = flatBodies;
+                }
+                
+                let sun = flatBodies.find(g => g.name === 'Sun' || g.name === 'Surya' || g.name === 'Ravi');
+                let moon = flatBodies.find(g => g.name === 'Moon' || g.name === 'Chandra');
+                
+                if (sun && moon) {
+                    let sunDeg = parseFloat(sun.abs_deg);
+                    let moonDeg = parseFloat(moon.abs_deg);
+
+                    // Exact Tithi Math
+                    let diff = moonDeg - sunDeg;
+                    if (diff < 0) diff += 360;
+                    let tithiIndex = Math.floor(diff / 12);
+                    let paksha = tithiIndex < 15 ? 'Shukla Paksha' : 'Krishna Paksha';
+                    let tithiName = VEDIC_TITHIS[tithiIndex];
+
+                    // Exact Nakshatra Math
+                    let nakIndex = Math.floor(moonDeg / (360/27));
+                    let nakName = VEDIC_NAKSHATRAS[nakIndex];
+                    
+                    let moonSignName = VEDIC_RASHIS[Math.floor(moonDeg / 30)];
+
+                    exactVedicData += `- DATE: ${dateArray[index]} | TITHI: ${paksha} ${tithiName} | NAKSHATRA: ${nakName} | MOON RASHI: ${moonSignName}\n`;
+                }
+            }
+        });
 
         let promptHeader = `SYSTEM PROTOCOL: INCOGNITO MODE. Act as a highly compassionate expert in BPHS (Vedic Astrology), Charaka Samhita (Ayurveda), and modern Obstetrics/Biology.\n\n`;
         let promptContent = `System Current Date: ${todayStr}\nUser Context/Natal Data:\n${userContextStr}\nHospital/Location: Lat ${bLat}, Lon ${bLon}\nTarget/Due Date: ${targetDate}\nMedical Notes: "${medicalNotes}"\n\n`;
         
         // Feed foolproof math directly to AI
-        promptContent += exactVedicData + `\n### TRANSITING PLANETARY POSITIONS:\n`;
-        flatBodies.forEach(b => { promptContent += `- ${b.name}: Sign ${b.sign} (Degree: ${safeDeg(b.abs_deg)})\n`; });
+        promptContent += exactVedicData + `\n### TRANSITING PLANETARY POSITIONS (ON TARGET DATE):\n`;
+        
+        // Safely map the target date's bodies
+        if (targetDateFlatBodies.length > 0) {
+            targetDateFlatBodies.forEach(b => { promptContent += `- ${b.name}: Sign ${b.sign} (Degree: ${safeDeg(b.abs_deg)})\n`; });
+        } else {
+            promptContent += `- Data unavailable for the specific target date.\n`;
+        }
 
+ 
         if (currentMode === "conception") {
             promptContent += `\nINSTRUCTIONS FOR GARBHADHANA ANALYSIS:
             1. STRICT FUTURE TIMING: Provide dates strictly in the future compared to System Current Date (${todayStr}).
             2. COUPLE'S AGE ANALYSIS: Deeply evaluate the provided ages and adjust biological advice.
-            3. VEDIC FILTERING (CRITICAL): You MUST use the "EXACT VEDIC EPHEMERIS" block provided above to evaluate the starting date. Filter fertile days using strict BPHS rules (Favorable Tithis: 2,3,5,7,10,11,12,13, Purnima. Avoid Amavasya/Chaturthi). Do NOT attempt to calculate the Tithi yourself; rely ONLY on the provided Ephemeris block.
-            4. ECLIPSE (GRAHAN) CHECK: If Sun, Moon, and Rahu/Ketu are within 15 degrees, warn against conception.
-            5. SCIENTIFIC REASONING: Explain biological relevance for EVERY chosen date.
-            6. MANDATORY PROTOCOL SECTION: You MUST include a section at the beginning of your response titled "🕉️ Universal Garbhadhana Protocol (BPHS & Charaka Samhita)". Translate this section perfectly into the requested language and include these exact points:
+            3. ECLIPSE (GRAHAN) CHECK: Identify if any partial or complete solar or lunar eclipse occurs between the System Current Date (${todayStr}) and the target date + 15 days. If an eclipse falls within this window, provide a fierce warning. You MUST explicitly list the precautions required during the eclipse as per ancient Vedic texts (e.g., placing Kusha/Darbha grass, Tulsi  in food/water, fasting during the Grahan period, staying indoors to avoid negative rays, metal and sharp objects, avoid fermented food and drinks completely during this phase, chanting protective mantras, and taking a purifying bath after Moksha/release).
+			3. VEDIC FILTERING (CRITICAL): You MUST strictly rely on the "ABSOLUTE TRUTH VEDIC EPHEMERIS CALENDAR". Cross-reference the biological fertile window (based on LMP) with the dates provided. 
+               - Select ONLY dates where the Tithi is favorable (2,3,5,7,10,11,12,13, Purnima). 
+               - Select ONLY dates where the Nakshatra is highly favorable for conception (Rohini, Mrigashira, Uttara Phalguni, Hasta, Swati, Anuradha, Uttara Ashadha, Shravana, Dhanishta, Shatabhisha, Uttara Bhadrapada). 
+               - Provide the exact Date, Tithi, and Nakshatra from the table in your final options.            5. ECLIPSE (GRAHAN) CHECK: If Sun, Moon, and Rahu/Ketu are within 15 degrees, warn against conception.
+            6. SCIENTIFIC REASONING: Explain biological relevance for EVERY chosen date.
+            7. MANDATORY PROTOCOL SECTION: You MUST include a section at the beginning of your response titled "🕉️ Universal Garbhadhana Protocol (BPHS & Charaka Samhita)". Translate this section perfectly into the requested language and include these exact points:
                - Advanced Sphuta Calculation: Explain that this tool utilizes mathematical Beeja and Kshetra Sphuta formulas to determine biological compatibility.
-               - Brahmacharya (Celibacy): Strict physical and mental celibacy for at least 3-4 days prior. Scientific reason: Builds Ojas, reduces psychological stress, improves sperm count/motility.
+               - Brahmacharya (Celibacy): Strict physical and mental celibacy for at least 8 days prior. Women to go to her parents place for a week if possible, Scientific reason: Builds Ojas, reduces psychological stress, improves sperm count/motility.
                - Diet (Ritucharya): Sattvic diet. Husband: warm milk with Ashwagandha/Saffron. Wife: milk with Shatavari/Ghee. Scientific reason: Optimizes hormonal balance and creates an alkaline uterine environment.
                - Mantra Jaap: Husband chants "Om Namo Bhagavate Vasudevaya" (108 times). Wife chants Santan Gopal Mantra: "Om Devaki Sudha Govinda Vasudeva Jagatpathe Dehime Tanayam Krishna Twamaham Sharanam Gata" (108 times).`;
 		} else {
             promptContent += `\nINSTRUCTIONS FOR C-SECTION (JANMA MUHURTA) ANALYSIS:
             1. STRICT FUTURE TIMING: Provide dates strictly in the future.
             2. MOTHER'S AGE ANALYSIS: Prioritize safety and recovery.
-            3. MUHURTA SELECTION: Based on the Doctor's date range and the "EXACT VEDIC EPHEMERIS", find the absolute best Lagna window. Place benefics (Jupiter, Venus) in Kendras/Trikonas. 
-            4. ECLIPSE CHECK: Warn fiercely if an eclipse is near the delivery date.
+			3. MUHURTA SELECTION: You MUST strictly rely on the "ABSOLUTE TRUTH VEDIC EPHEMERIS CALENDAR" provided. Review the exact Tithis and Nakshatras for the 7-day window. Select the most mathematically stable date(s) from this list, prioritizing auspicious Nakshatras (like Pushya, Anuradha, Rohini, Revati) and avoiding Rikta Tithis (4, 9, 14). Provide the exact Date, Tithi, and Nakshatra from the table in your final options. Place benefics (Jupiter, Venus) in Kendras/Trikonas for the selected Lagna.            4. ECLIPSE (GRAHAN) CHECK: Identify if any partial or complete solar or lunar eclipse occurs between the System Current Date (${todayStr}) and the delivery date + 15 days. If an eclipse falls within this window, provide a fierce warning. You MUST explicitly list the precautions required for the pregnant mother during the eclipse as per ancient Vedic texts (e.g., staying indoors away from eclipse rays, avoiding cutting tools or sleeping during the eclipse, placing Kusha/ tulsi grass in food/water, fasting, chanting the Santana Gopala or Maha Mrityunjaya mantra, and bathing post-eclipse).
             5. SCIENTIFIC GROUNDING: Follow every time-frame suggested with a Medical/Scientific reason.
             6. AYURVEDIC LABOR MANIPULATION (Charaka & Sushruta Samhita): Include a section titled "🌿 Ayurvedic Guidance for Natural Timing". Explain how to subtly adjust the timing of natural labor by manipulating 'Apana Vata':
                - To PREPONE (Accelerate/Induce): Advise stimulating Apana Vata. Suggest consuming warm milk with a spoon of Castor Oil (Eranda Taila), eating warm/spicy foods, walking, squatting, and remaining physically active.
