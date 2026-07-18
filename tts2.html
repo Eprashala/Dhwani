@@ -170,6 +170,9 @@
         let lastHighlightedSpan = null;
         
         const currentAudio = new Audio(); 
+        
+        // NEW FIX: Global assignment to prevent Windows Chrome garbage collection of the utterance
+        let currentNativeUtterance = null; 
 
         const UI = {
             textIn: document.getElementById('text-input'),
@@ -215,8 +218,10 @@
             
             UI.speedSlider.addEventListener('input', (e) => {
                 UI.speedVal.innerText = `${parseFloat(e.target.value).toFixed(1)}x`;
-                if (ttsStatus === 'PLAYING' && UI.engineSelect.value === 'cloud') {
-                    currentAudio.playbackRate = parseFloat(e.target.value);
+                if (ttsStatus === 'PLAYING') {
+                    if (UI.engineSelect.value === 'cloud') {
+                        currentAudio.playbackRate = parseFloat(e.target.value);
+                    }
                 }
             });
 
@@ -379,6 +384,27 @@
             applyNodeHighlightStyling(globalWordIndex);
         }
 
+        // --- COMMON UTILITY FOR CHUNKING TEXT ---
+        function chunkText(text, maxLength = 180) {
+            const regex = /[^.?!।,\n]+[.?!।,\n]*/g;
+            let chunks = [];
+            let currentChunk = "";
+            let match;
+            
+            while ((match = regex.exec(text)) !== null) {
+                let sentence = match[0];
+                if (currentChunk.length + sentence.length > maxLength) {
+                    if (currentChunk) chunks.push(currentChunk.trim());
+                    currentChunk = sentence;
+                } else {
+                    currentChunk += sentence;
+                }
+            }
+            if (currentChunk) chunks.push(currentChunk.trim());
+            if (chunks.length === 0 && text.trim().length > 0) chunks.push(text.trim());
+            return chunks;
+        }
+
         // --- CURSOR SEEK CONTROL (Deep Jump) ---
         function jumpToWordAndPlay(index) {
             globalWordIndex = index;
@@ -416,9 +442,8 @@
             }
         }
 
-// --- MASTER STATE SYSTEM ---
+        // --- MASTER STATE SYSTEM ---
         function togglePlaybackState() {
-            // 1. Check the actual text box first, not the compiled array
             const rawText = UI.textIn.value.trim();
             
             if (!rawText) {
@@ -431,7 +456,6 @@
                 isManuallyPaused = false;
                 globalWordIndex = 0;
                 
-                // 2. Force the text to compile into interactive spans instantly
                 compileTextToSpans();
                 
                 if (UI.panelRead.classList.contains('hidden')) toggleTabPanel('read');
@@ -453,6 +477,7 @@
                 if (UI.engineSelect.value === 'cloud') {
                     currentAudio.pause();
                 } else {
+                    window.speechSynthesis.pause(); 
                     window.speechSynthesis.cancel(); 
                 }
                 if (highlightTimer) clearTimeout(highlightTimer);
@@ -466,7 +491,6 @@
                 const assignedLang = detectTextLanguage(remainingTextWords);
                 
                 if (UI.engineSelect.value === 'cloud') {
-                    // Re-chunk remaining text and continue
                     executeCloudTTSPipeline(remainingTextWords, assignedLang);
                 } else {
                     window.speechSynthesis.cancel();
@@ -481,58 +505,58 @@
             }
         }
 
-        // --- NATIVE OS TTS ---
+        // --- NATIVE OS TTS (UPDATED FIX) ---
         function executeNativeTTSPipeline(text, langCode) {
             if (!text.trim() || ttsStatus !== 'PLAYING') return;
 
-            const utteranceInstance = new SpeechSynthesisUtterance(text);
-            utteranceInstance.lang = langCode;
-            utteranceInstance.rate = parseFloat(UI.speedSlider.value);
-            utteranceInstance.pitch = parseFloat(UI.pitchSlider.value);
+            // FIX: We now chunk the native text just like the cloud text. 
+            // This prevents Android and Windows native limits from crashing the API.
+            const nativeAudioChunks = chunkText(text, 200);
+            let nativeChunkIndex = 0;
 
-            utteranceInstance.onstart = () => {
-                if (!highlightTimer) initiateDynamicHighlighterTracking();
-            };
-
-            utteranceInstance.onend = () => {
-                if (isManuallyPaused) return; // Prevent Android API overrides[cite: 1]
-                setTimeout(() => {
-                    if (isManuallyPaused) return;
-                    if (globalWordIndex >= wordsArray.length - 1) {
-                        resetCurrentTTS();
+            function speakNextNativeChunk() {
+                if (nativeChunkIndex >= nativeAudioChunks.length || ttsStatus !== 'PLAYING') {
+                    if (nativeChunkIndex >= nativeAudioChunks.length && !isManuallyPaused) {
+                        // Let the highlighting finish up
+                        setTimeout(() => resetCurrentTTS(), 200);
                     }
-                }, 100);
-            };
+                    return;
+                }
 
-            utteranceInstance.onerror = (e) => {
-                if (isManuallyPaused) return;
-                if (!['canceled', 'interrupted'].includes(e.error)) resetCurrentTTS();
-            };
+                // FIX: Store the utterance globally so Windows Chrome Garbage Collector doesn't delete it mid-sentence.
+                currentNativeUtterance = new SpeechSynthesisUtterance(nativeAudioChunks[nativeChunkIndex]);
+                currentNativeUtterance.lang = langCode;
+                currentNativeUtterance.rate = parseFloat(UI.speedSlider.value);
+                currentNativeUtterance.pitch = parseFloat(UI.pitchSlider.value);
 
-            window.speechSynthesis.speak(utteranceInstance);
+                currentNativeUtterance.onstart = () => {
+                    // Only start the dynamic highlighter once the very first chunk begins
+                    if (nativeChunkIndex === 0 && !highlightTimer) initiateDynamicHighlighterTracking();
+                };
+
+                currentNativeUtterance.onend = () => {
+                    if (isManuallyPaused) return; // Prevent Android API overrides[cite: 1]
+                    nativeChunkIndex++;
+                    speakNextNativeChunk();
+                };
+
+                currentNativeUtterance.onerror = (e) => {
+                    if (isManuallyPaused) return;
+                    if (!['canceled', 'interrupted'].includes(e.error)) {
+                        console.warn("Native TTS Error:", e);
+                        // Skip problematic chunk and move to the next to prevent stalling
+                        nativeChunkIndex++;
+                        speakNextNativeChunk();
+                    }
+                };
+
+                window.speechSynthesis.speak(currentNativeUtterance);
+            }
+
+            speakNextNativeChunk();
         }
 
         // --- GOOGLE CLOUD TTS ---
-        function chunkText(text, maxLength = 180) {
-            const regex = /[^.?!।,\n]+[.?!।,\n]*/g;
-            let chunks = [];
-            let currentChunk = "";
-            let match;
-            
-            while ((match = regex.exec(text)) !== null) {
-                let sentence = match[0];
-                if (currentChunk.length + sentence.length > maxLength) {
-                    if (currentChunk) chunks.push(currentChunk.trim());
-                    currentChunk = sentence;
-                } else {
-                    currentChunk += sentence;
-                }
-            }
-            if (currentChunk) chunks.push(currentChunk.trim());
-            if (chunks.length === 0 && text.trim().length > 0) chunks.push(text.trim());
-            return chunks;
-        }
-
         function executeCloudTTSPipeline(text, langCode) {
             const foundationalLang = langCode.split('-')[0];
             audioChunks = chunkText(text, 180); 
@@ -640,6 +664,9 @@
             currentAudio.pause();
             currentAudio.src = "";
             window.speechSynthesis.cancel();
+            
+            // Release memory to avoid leaks
+            currentNativeUtterance = null; 
 
             clearActiveHighlightStyling();
 
