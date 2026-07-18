@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Massive Missive Reader & AI Optimizer</title>
+    <title>TTS Reader & AI Optimizer</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <style>
         ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -171,8 +171,14 @@
         
         const currentAudio = new Audio(); 
         
-        // NEW FIX: Global assignment to prevent Windows Chrome garbage collection of the utterance
+        // Global assignment to prevent Windows Chrome garbage collection of the utterance
         let currentNativeUtterance = null; 
+
+        // Pre-warm Android voices so they don't return an empty array on the first click
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.getVoices();
+            window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
+        }
 
         const UI = {
             textIn: document.getElementById('text-input'),
@@ -419,18 +425,17 @@
                 }
                 if (highlightTimer) clearTimeout(highlightTimer);
                 
-                // Allow engine buffers to clear before aggressively restarting
-                setTimeout(() => {
-                    isManuallyPaused = false;
-                    const documentContent = wordsArray.slice(globalWordIndex).join(" ");
-                    const assignedLang = detectTextLanguage(documentContent);
-                    
-                    if (UI.engineSelect.value === 'cloud') {
-                        executeCloudTTSPipeline(documentContent, assignedLang);
-                    } else {
-                        executeNativeTTSPipeline(documentContent, assignedLang);
-                    }
-                }, 150);
+                // SYNCHRONOUS EXECUTION: Mobile browsers will block the audio play event 
+                // if it happens inside a setTimeout. We execute it immediately.
+                isManuallyPaused = false;
+                const documentContent = wordsArray.slice(globalWordIndex).join(" ");
+                const assignedLang = detectTextLanguage(documentContent);
+                
+                if (UI.engineSelect.value === 'cloud') {
+                    executeCloudTTSPipeline(documentContent, assignedLang);
+                } else {
+                    executeNativeTTSPipeline(documentContent, assignedLang);
+                }
             } else {
                 // If stopped/paused, just update the visual cursor so they know it moved
                 applyNodeHighlightStyling(globalWordIndex);
@@ -463,6 +468,7 @@
 
                 const documentContent = wordsArray.join(" ");
                 const assignedLang = detectTextLanguage(documentContent);
+                
                 if (UI.engineSelect.value === 'cloud') {
                     executeCloudTTSPipeline(documentContent, assignedLang);
                 } else {
@@ -493,49 +499,55 @@
                 if (UI.engineSelect.value === 'cloud') {
                     executeCloudTTSPipeline(remainingTextWords, assignedLang);
                 } else {
-                    window.speechSynthesis.cancel();
-                    setTimeout(() => {
-                        if (remainingTextWords.trim()) {
-                            executeNativeTTSPipeline(remainingTextWords, assignedLang);
-                        } else {
-                            resetCurrentTTS();
-                        }
-                    }, 60);
+                    // NOTE: Do NOT call window.speechSynthesis.cancel() here before speaking.
+                    // Doing so on Android in the same execution tick blocks the immediate following .speak() request.
+                    if (remainingTextWords.trim()) {
+                        executeNativeTTSPipeline(remainingTextWords, assignedLang);
+                    } else {
+                        resetCurrentTTS();
+                    }
                 }
             }
         }
 
-        // --- NATIVE OS TTS (UPDATED FIX) ---
+        // --- NATIVE OS TTS ---
         function executeNativeTTSPipeline(text, langCode) {
             if (!text.trim() || ttsStatus !== 'PLAYING') return;
 
-            // FIX: We now chunk the native text just like the cloud text. 
-            // This prevents Android and Windows native limits from crashing the API.
             const nativeAudioChunks = chunkText(text, 200);
             let nativeChunkIndex = 0;
 
             function speakNextNativeChunk() {
                 if (nativeChunkIndex >= nativeAudioChunks.length || ttsStatus !== 'PLAYING') {
                     if (nativeChunkIndex >= nativeAudioChunks.length && !isManuallyPaused) {
-                        // Let the highlighting finish up
                         setTimeout(() => resetCurrentTTS(), 200);
                     }
                     return;
                 }
 
-                // FIX: Store the utterance globally so Windows Chrome Garbage Collector doesn't delete it mid-sentence.
                 currentNativeUtterance = new SpeechSynthesisUtterance(nativeAudioChunks[nativeChunkIndex]);
                 currentNativeUtterance.lang = langCode;
                 currentNativeUtterance.rate = parseFloat(UI.speedSlider.value);
                 currentNativeUtterance.pitch = parseFloat(UI.pitchSlider.value);
 
+                // EXPLICIT VOICE BINDING: Android Chrome often fails if a hardware voice is not explicitly tied to the utterance.
+                const voices = window.speechSynthesis.getVoices();
+                if (voices.length > 0) {
+                    const exactMatch = voices.find(v => v.lang === langCode || v.lang.replace('_', '-') === langCode);
+                    const broadMatch = voices.find(v => v.lang.startsWith(langCode.split('-')[0]));
+                    if (exactMatch) {
+                        currentNativeUtterance.voice = exactMatch;
+                    } else if (broadMatch) {
+                        currentNativeUtterance.voice = broadMatch;
+                    }
+                }
+
                 currentNativeUtterance.onstart = () => {
-                    // Only start the dynamic highlighter once the very first chunk begins
                     if (nativeChunkIndex === 0 && !highlightTimer) initiateDynamicHighlighterTracking();
                 };
 
                 currentNativeUtterance.onend = () => {
-                    if (isManuallyPaused) return; // Prevent Android API overrides[cite: 1]
+                    if (isManuallyPaused) return; 
                     nativeChunkIndex++;
                     speakNextNativeChunk();
                 };
@@ -544,7 +556,6 @@
                     if (isManuallyPaused) return;
                     if (!['canceled', 'interrupted'].includes(e.error)) {
                         console.warn("Native TTS Error:", e);
-                        // Skip problematic chunk and move to the next to prevent stalling
                         nativeChunkIndex++;
                         speakNextNativeChunk();
                     }
@@ -586,6 +597,7 @@
             currentAudio.play().then(() => {
                 if (currentChunkIndex === 0 && !highlightTimer) initiateDynamicHighlighterTracking();
             }).catch(err => {
+                // If it still fails, it's typically network or audio context suspension
                 setTimeout(() => {
                     currentChunkIndex++;
                     processCloudAudioQueues(langKey);
