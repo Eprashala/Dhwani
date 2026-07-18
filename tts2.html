@@ -32,7 +32,7 @@
     <header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-40 px-6 py-4 flex items-center justify-between shadow-sm">
         <div class="flex items-center gap-3">
             <div class="h-3 w-3 rounded-full bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.5)]"></div>
-            <h1 class="text-lg font-bold tracking-wide text-slate-200 uppercase text-xs">Massive Missive Reader <span class="text-yellow-500 ml-2">⚡ AI Powered</span></h1>
+            <h1 class="text-lg font-bold tracking-wide text-slate-200 uppercase text-xs">TTS Reader <span class="text-yellow-500 ml-2">⚡ AI Powered</span></h1>
         </div>
         <div class="flex items-center gap-2 bg-slate-950/60 border border-slate-800 rounded-lg px-3 py-1 text-xs text-slate-400">
             <span id="status-indicator" class="h-2 w-2 rounded-full bg-slate-500"></span>
@@ -168,6 +168,7 @@
         let currentChunkIndex = 0;
         let highlightTimer = null;
         let lastHighlightedSpan = null;
+		let wakeLock = null;
         
         const currentAudio = new Audio(); 
         
@@ -217,7 +218,30 @@
             syncEngineUIState();
         });
 
-        function setupEventListeners() {
+        // --- SCREEN WAKE LOCK MANAGER ---
+async function requestWakeLock() {
+    try {
+        if ('wakeLock' in navigator) {
+            wakeLock = await navigator.wakeLock.request('screen');
+            wakeLock.addEventListener('release', () => {
+                console.log('Screen Wake Lock released');
+            });
+        }
+    } catch (err) {
+        console.warn(`Wake Lock error: ${err.name}, ${err.message}`);
+    }
+}
+
+function releaseWakeLock() {
+    if (wakeLock !== null) {
+        wakeLock.release().then(() => {
+            wakeLock = null;
+        });
+    }
+}
+		
+		
+		function setupEventListeners() {
             UI.btnPlay.addEventListener('click', togglePlaybackState);
             UI.btnStop.addEventListener('click', resetCurrentTTS);
             UI.btnClear.addEventListener('click', () => { resetCurrentTTS(); UI.textIn.value = ''; compileTextToSpans(); });
@@ -251,7 +275,14 @@
                     jumpToWordAndPlay(newIndex);
                 }
             });
+			
+			
+        document.addEventListener('visibilitychange', async () => {
+        if (document.visibilityState === 'visible' && ttsStatus === 'PLAYING') {
+            await requestWakeLock();
         }
+    });
+}
 
         function toggleTabPanel(target) {
             if (target === 'edit') {
@@ -679,6 +710,7 @@
             
             // Release memory to avoid leaks
             currentNativeUtterance = null; 
+			releaseWakeLock();
 
             clearActiveHighlightStyling();
 
