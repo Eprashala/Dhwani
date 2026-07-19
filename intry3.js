@@ -1340,13 +1340,12 @@ async function getAIResponse(history, config) {
 
     let fetchUrl;
 
-    // --- NEW ROUTING LOGIC ---
-    if (customKey) {
+		if (customKey) {
         // Direct to Google AI Studio endpoint
         fetchUrl = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModelInfo.id}:generateContent?key=${customKey}`;
     } else {
         // Route through your Cloud Run proxy
-        fetchUrl = PROXY_URL;
+        fetchUrl = `${PROXY_URL}/api/chat`; // <-- FIX: Added the endpoint
         // The proxy likely expects the model name in the body payload
         payload.model = selectedModelInfo.id;
     }
