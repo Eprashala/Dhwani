@@ -6,71 +6,60 @@ document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'i' || e.key === 'I' || e.key === 'c' || e.key === 'C')) e.preventDefault();
 });
 
-// --- 2. Application Logic & Central Routing ---
-const PROXY_BASE_URL = "https://eprashala-proxy-511804777001.asia-south1.run.app";
-
+// --- 2. Central Routing ---
+const PROXY_BASE_URL = "https://eprashala.pythonanywhere.com";
 async function fetchGeminiChat(payloadObject) {
     const userKey = localStorage.getItem('user_api_key') || '';
-
     if (userKey && userKey.trim().length > 10) {
         try {
-            console.log("Direct Route Active: Targeting gemini-flash-latest...");
-            const primaryUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${userKey.trim()}`;
-            const response = await fetch(primaryUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payloadObject)
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${userKey.trim()}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payloadObject)
             });
             if (!response.ok) throw new Error(`Primary model status: ${response.status}`);
             return response;
         } catch (error) {
-            console.warn("Primary channel busy. Re-routing to fallback...", error);
-            const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${userKey.trim()}`;
-            return await fetch(fallbackUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payloadObject)
+            return await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${userKey.trim()}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payloadObject)
             });
         }
     } else {
-        console.log("Proxy Route Active: Routing through centralized server...");
-        return await fetch(`${PROXY_BASE_URL}/api/chat`, {
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payloadObject)
-        });
+        return await fetch(`${PROXY_BASE_URL}/api/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payloadObject) });
     }
 }
 
-// --- 3. Global State & DOM Element Holders ---
+// --- 3. Global State ---
 const langMap = { "English": "en-IN", "Hindi": "hi-IN", "Bengali": "bn-IN", "Telugu": "te-IN", "Marathi": "mr-IN", "Tamil": "ta-IN", "Gujarati": "gu-IN", "Kannada": "kn-IN", "Malayalam": "ml-IN", "Odia": "or-IN", "Punjabi": "pa-IN" };
 let currentStream = null, activeImage = null, wakeLock = null;
-let zoom = 1, offsetX = 0, offsetY = 0, isDragging = false, startX, startY;
-let currentSynthUtterance = null, rawReportText = "";
+let zoom = 1, rotation = 0, offsetX = 0, offsetY = 0, isDragging = false, startX, startY;
+let currentSynthUtterance = null, rawReportText = "", rawQaText = "";
+let faceLandmarker = null, faceModelsLoaded = false;
+let canvas, ctx, zoomSlider, rotateSlider, guideWidthSlider, faceGuideSvg, viewport, scannerLine, analyzeBtn, audioBtn, qaAudioBtn;
+let biometricDataDisplay, biometricMetrics, customQuestionInput, askQuestionBtn, qaLoader, qaTarget;
 
-// MediaPipe State Variables
-let faceLandmarker = null;
-let faceModelsLoaded = false;
-
-// DOM Element Holders
-let setupSection, mainWorkspace, userAgeSelect, video, canvas, ctx, zoomSlider, viewport, scannerLine, analyzeBtn, audioBtn, shareBtn;
-
-// --- 4. Safe Application & MediaPipe Initialization ---
+// --- 4. Initialization ---
 function initApp() {
-    setupSection = document.getElementById('setupSection');
-    mainWorkspace = document.getElementById('mainWorkspace');
-    userAgeSelect = document.getElementById('userAge');
-    video = document.getElementById('video');
     canvas = document.getElementById('canvas');
     if (canvas) ctx = canvas.getContext('2d');
-    zoomSlider = document.getElementById('zoomSlider');
     viewport = document.getElementById('viewport');
+    zoomSlider = document.getElementById('zoomSlider');
+    rotateSlider = document.getElementById('rotateSlider');
+    guideWidthSlider = document.getElementById('guideWidthSlider');
+    faceGuideSvg = document.getElementById('faceGuideSvg');
     scannerLine = document.getElementById('scannerLine');
     analyzeBtn = document.getElementById('analyzeBtn');
     audioBtn = document.getElementById('audioBtn');
-    shareBtn = document.getElementById('shareBtn');
+    qaAudioBtn = document.getElementById('qaAudioBtn');
+    
+    biometricDataDisplay = document.getElementById('biometricDataDisplay');
+    biometricMetrics = document.getElementById('biometricMetrics');
+    customQuestionInput = document.getElementById('customQuestionInput');
+    askQuestionBtn = document.getElementById('askQuestionBtn');
+    qaLoader = document.getElementById('qaLoader');
+    qaTarget = document.getElementById('qaTarget');
+    
+    setupInteractionListeners();
 
-    // Populate Age Dropdown safely
+    const userAgeSelect = document.getElementById('userAge');
     if (userAgeSelect && userAgeSelect.children.length === 0) {
         for (let i = 1; i <= 100; i++) {
             let option = document.createElement('option');
@@ -80,409 +69,339 @@ function initApp() {
         }
     }
     
-    if (localStorage.getItem('user_api_key')) {
-        const apiKeyInput = document.getElementById('apiKeyInput');
-        if (apiKeyInput) apiKeyInput.value = localStorage.getItem('user_api_key');
-    }
-    
-    setupInteractionListeners();
+    if (localStorage.getItem('user_api_key')) document.getElementById('apiKeyInput').value = localStorage.getItem('user_api_key');
 
-    // Event Listeners for UI
+    document.getElementById('initBtn').addEventListener('click', async () => {
+        if (!document.getElementById('userName').value || !document.getElementById('userSex').value) return alert("Enter Name and Sex.");
+        requestFullScreen(); await requestWakeLock(); 
+        document.getElementById('setupSection').style.display = 'none';
+        document.getElementById('mainWorkspace').style.display = 'flex';
+        initCanvasDimensions(); 
+        startCamera('user'); // Default to front camera
+    });
+
+    if(askQuestionBtn) askQuestionBtn.addEventListener('click', handleCustomQuestion);
+    if(customQuestionInput) customQuestionInput.addEventListener('keypress', (e) => { if(e.key==='Enter') handleCustomQuestion(); });
+    if(audioBtn) audioBtn.addEventListener('click', toggleSpeech);
+    if(qaAudioBtn) qaAudioBtn.addEventListener('click', toggleQaSpeech);
+    if(document.getElementById('sharePdfBtn')) document.getElementById('sharePdfBtn').addEventListener('click', () => window.print());
+
     const pasteBtn = document.getElementById('pasteBtn');
     if (pasteBtn) {
         pasteBtn.addEventListener('click', async () => {
-            try {
-                const text = await navigator.clipboard.readText();
-                document.getElementById('apiKeyInput').value = text;
-            } catch (err) { alert("Clipboard permission denied or unavailable. Please paste manually."); }
+            try { document.getElementById('apiKeyInput').value = await navigator.clipboard.readText(); } 
+            catch (err) { alert("Clipboard permission denied or unavailable."); }
         });
     }
 
-    const initBtn = document.getElementById('initBtn');
-    if (initBtn) {
-        initBtn.addEventListener('click', async () => {
-            const name = document.getElementById('userName').value.trim();
-            const sex = document.getElementById('userSex').value;
-            if (!name || !sex) { alert("Please enter the subject's Name and Sex to proceed."); return; }
-            requestFullScreen(); 
-            await requestWakeLock(); 
-            setupSection.style.display = 'none';
-            mainWorkspace.style.display = 'flex';
-            initCanvasDimensions();
-            startCamera('user');
-        });
-    }
-
-    if (audioBtn) audioBtn.addEventListener('click', toggleSpeech);
-    
-    if (shareBtn) {
-        shareBtn.addEventListener('click', async () => {
-            const name = document.getElementById('userName').value || 'Subject';
-            const reportDiv = document.getElementById('reportTarget');
-            const cleanText = `Vedic Face Reading Report for ${name}\n\n${reportDiv.innerText}`;
-            if (navigator.share) {
-                try { await navigator.share({ title: `Vedic Face Reading - ${name}`, text: cleanText }); } 
-                catch (err) { if (err.name !== 'AbortError') fallbackCopy(cleanText); }
-            } else { fallbackCopy(cleanText); }
-        });
-    }
-
-    const sharePdfBtn = document.getElementById('sharePdfBtn');
-    if (sharePdfBtn) sharePdfBtn.addEventListener('click', () => window.print());
-
-    // Init MediaPipe
     initMediaPipe();
 }
 
 async function initMediaPipe() {
     try {
-        const visionPkg = window.vision || window;
-        const { FaceLandmarker, FilesetResolver } = visionPkg;
-        if (!FilesetResolver || !FaceLandmarker) {
-            console.warn("MediaPipe Vision package not detected on window scope.");
-            return;
-        }
-        const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
-        faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
-            baseOptions: {
-                modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
-                delegate: "GPU"
-            },
-            outputFaceBlendshapes: false,
-            runningMode: "IMAGE",
-            numFaces: 1
+        const vision = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3");
+        const { FaceLandmarker, FilesetResolver } = vision;
+        const fileset = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
+        faceLandmarker = await FaceLandmarker.createFromOptions(fileset, {
+            baseOptions: { modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`, delegate: "GPU" },
+            outputFaceBlendshapes: false, runningMode: "IMAGE", numFaces: 1
         });
         faceModelsLoaded = true;
-        console.log("Client-side facial mesh calibrated and active.");
-    } catch (err) { console.warn("Mesh calibration failed.", err); }
+    } catch (err) { console.warn("HUD Matrix Engine failed to load.", err); }
 }
 
-if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initApp); } 
-else { initApp(); }
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initApp); else initApp();
 
-// --- 5. On-Device Samudrika Math Engine ---
-function getEuclideanDistance(p1, p2) {
-    return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
-}
+// --- 5. UI CONTROLS & CAMERA HANDLING ---
+async function requestWakeLock() { try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {} }
+function requestFullScreen() { const d = document.documentElement; if (!document.fullscreenElement) { if (d.requestFullscreen) d.requestFullscreen().catch(e=>e); else if (d.webkitRequestFullscreen) d.webkitRequestFullscreen().catch(e=>e); } }
+document.addEventListener('visibilitychange', async () => { if (wakeLock !== null && document.visibilityState === 'visible') await requestWakeLock(); });
 
-function calculateSamudrikaMetrics(landmarks) {
-    const p = (idx) => landmarks[idx];
-    const IDX = { hairline: 10, glabella: 9, subnasale: 2, menton: 152, leftEyeOuter: 33, leftEyeInner: 133, rightEyeInner: 362, rightEyeOuter: 263, noseBridge: 6, noseTip: 1, noseLeft: 129, noseRight: 358, lipTop: 0, lipBottom: 17, cheekLeft: 234, cheekRight: 454 };
+function initCanvasDimensions() { canvas.width = viewport.clientWidth * window.devicePixelRatio; canvas.height = viewport.clientHeight * window.devicePixelRatio; ctx.scale(window.devicePixelRatio, window.devicePixelRatio); }
 
-    const faceHeight = getEuclideanDistance(p(IDX.hairline), p(IDX.menton));
-    const faceWidth = getEuclideanDistance(p(IDX.cheekLeft), p(IDX.cheekRight));
-    
-    const upperZone = getEuclideanDistance(p(IDX.hairline), p(IDX.glabella)) / faceHeight;
-    const middleZone = getEuclideanDistance(p(IDX.glabella), p(IDX.subnasale)) / faceHeight;
-    const lowerZone = getEuclideanDistance(p(IDX.subnasale), p(IDX.menton)) / faceHeight;
-
-    const leftEyeW = getEuclideanDistance(p(IDX.leftEyeOuter), p(IDX.leftEyeInner));
-    const rightEyeW = getEuclideanDistance(p(IDX.rightEyeOuter), p(IDX.rightEyeInner));
-    const intercanthal = getEuclideanDistance(p(IDX.leftEyeInner), p(IDX.rightEyeInner));
-    const eyeSpacingRatio = intercanthal / ((leftEyeW + rightEyeW) / 2);
-
-    const noseRatio = getEuclideanDistance(p(IDX.noseBridge), p(IDX.noseTip)) / getEuclideanDistance(p(IDX.noseLeft), p(IDX.noseRight));
-    const widthToHeightRatio = faceWidth / faceHeight;
-
-    return {
-        triBhaga: `Upper: ${(upperZone*100).toFixed(1)}%, Middle: ${(middleZone*100).toFixed(1)}%, Lower: ${(lowerZone*100).toFixed(1)}%`,
-        eyeSpacing: `Ratio ${eyeSpacingRatio.toFixed(2)} (${eyeSpacingRatio > 1.15 ? 'Wide/Sattvic' : eyeSpacingRatio < 0.85 ? 'Close/Rajasic' : 'Balanced'})`,
-        noseStructure: `Ratio ${noseRatio.toFixed(2)} (${noseRatio > 1.4 ? 'Elongated/Idealistic' : 'Broad/Grounded'})`,
-        dosha: widthToHeightRatio > 0.85 ? "Kapha Base" : widthToHeightRatio < 0.72 ? "Vata Base" : "Pitta Base"
-    };
-}
-
-// --- 6. Core Camera, UI, and File Upload Functions ---
-async function requestWakeLock() {
-    try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } 
-    catch (err) { console.warn(`Wake Lock Error: ${err.message}`); }
-}
-
-function requestFullScreen() {
-    const docEl = document.documentElement;
-    if (!document.fullscreenElement) {
-        if (docEl.requestFullscreen) { docEl.requestFullscreen().catch(e => console.warn(e)); } 
-        else if (docEl.webkitRequestFullscreen) { docEl.webkitRequestFullscreen().catch(e => console.warn(e)); }
-    }
-}
-
-document.addEventListener('visibilitychange', async () => {
-    if (wakeLock !== null && document.visibilityState === 'visible') await requestWakeLock();
-});
-
-function initCanvasDimensions() {
-    canvas.width = viewport.clientWidth * window.devicePixelRatio;
-    canvas.height = viewport.clientHeight * window.devicePixelRatio;
-    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-}
-
+// The Restored Camera Function (Front & Rear Support)
 async function startCamera(mode) {
-    if (currentStream) { currentStream.getTracks().forEach(track => track.stop()); }
-    activeImage = null;
-    ctx.clearRect(0, 0, canvas.width, canvas.height); 
-    video.style.display = 'block';
-    zoomSlider.disabled = true;
-
-    try {
-        const constraints = { video: { facingMode: mode, width: { ideal: 1080 }, height: { ideal: 1350 } } };
-        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
-        video.srcObject = currentStream;
+    if (currentStream) currentStream.getTracks().forEach(t => t.stop()); activeImage = null; ctx.clearRect(0, 0, canvas.width, canvas.height); 
+    document.getElementById('video').style.display = 'block'; 
+    if (zoomSlider) zoomSlider.disabled = true; 
+    if (rotateSlider) rotateSlider.disabled = true;
+    try { 
+        currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode, width: { ideal: 1080 }, height: { ideal: 1350 } } }); 
+        document.getElementById('video').srcObject = currentStream; 
     } catch (err) { console.warn("Camera init failed:", err.message); }
 }
 
 function handleFileUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    if (currentStream) { currentStream.getTracks().forEach(track => track.stop()); video.srcObject = null; }
-    video.style.display = 'none';
-
+    const file = event.target.files[0]; if (!file) return;
+    if (currentStream) { currentStream.getTracks().forEach(t => t.stop()); document.getElementById('video').srcObject = null; }
+    document.getElementById('video').style.display = 'none';
     const reader = new FileReader();
     reader.onload = function(e) {
         activeImage = new Image();
         activeImage.onload = function() {
-            zoom = 1; offsetX = 0; offsetY = 0;
-            zoomSlider.value = 1; zoomSlider.disabled = false;
+            zoom = 1; rotation = 0; offsetX = 0; offsetY = 0; 
+            if(zoomSlider) { zoomSlider.value = 1; zoomSlider.disabled = false; }
+            if(rotateSlider) { rotateSlider.value = 0; rotateSlider.disabled = false; }
             renderCanvasTransformations();
-        }
-        activeImage.src = e.target.result;
-    }
-    reader.readAsDataURL(file);
-    event.target.value = '';
+        }; activeImage.src = e.target.result;
+    }; reader.readAsDataURL(file); event.target.value = '';
 }
 
 function setupInteractionListeners() {
     if(!zoomSlider || !viewport) return;
     zoomSlider.addEventListener('input', (e) => { zoom = parseFloat(e.target.value); renderCanvasTransformations(); });
-    viewport.addEventListener('mousedown', (e) => {
-        if (!activeImage) return;
-        isDragging = true; startX = e.clientX - offsetX; startY = e.clientY - offsetY;
-    });
-    window.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        offsetX = e.clientX - startX; offsetY = e.clientY - startY; renderCanvasTransformations();
-    });
+    if(rotateSlider) rotateSlider.addEventListener('input', (e) => { rotation = parseFloat(e.target.value); renderCanvasTransformations(); });
+    if(guideWidthSlider && faceGuideSvg) guideWidthSlider.addEventListener('input', (e) => { faceGuideSvg.style.width = e.target.value + '%'; });
+    
+    viewport.addEventListener('mousedown', (e) => { if (!activeImage) return; isDragging = true; startX = e.clientX - offsetX; startY = e.clientY - offsetY; });
+    window.addEventListener('mousemove', (e) => { if (!isDragging) return; offsetX = e.clientX - startX; offsetY = e.clientY - startY; renderCanvasTransformations(); });
     window.addEventListener('mouseup', () => isDragging = false);
-
-    viewport.addEventListener('touchstart', (e) => {
-        if (!activeImage || e.touches.length !== 1) return;
-        isDragging = true; startX = e.touches[0].clientX - offsetX; startY = e.touches[0].clientY - offsetY;
-    });
-    viewport.addEventListener('touchmove', (e) => {
-        if (!isDragging || e.touches.length !== 1) return;
-        offsetX = e.touches[0].clientX - startX; offsetY = e.touches[0].clientY - startY; renderCanvasTransformations();
-    });
+    
+    viewport.addEventListener('touchstart', (e) => { if (!activeImage || e.touches.length !== 1) return; isDragging = true; startX = e.touches[0].clientX - offsetX; startY = e.touches[0].clientY - offsetY; });
+    viewport.addEventListener('touchmove', (e) => { if (!isDragging || e.touches.length !== 1) return; offsetX = e.touches[0].clientX - startX; offsetY = e.touches[0].clientY - startY; renderCanvasTransformations(); });
     viewport.addEventListener('touchend', () => isDragging = false);
 }
 
 function renderCanvasTransformations() {
     if (!activeImage) return;
-    const viewW = canvas.width / window.devicePixelRatio;
-    const viewH = canvas.height / window.devicePixelRatio;
-    ctx.clearRect(0, 0, viewW, viewH);
-    ctx.save();
+    const viewW = canvas.width / window.devicePixelRatio, viewH = canvas.height / window.devicePixelRatio;
+    ctx.clearRect(0, 0, viewW, viewH); ctx.save();
+    
     ctx.translate(viewW / 2 + offsetX, viewH / 2 + offsetY);
+    ctx.rotate(rotation * Math.PI / 180);
     ctx.scale(zoom, zoom);
-    const imgRatio = activeImage.width / activeImage.height;
-    const viewRatio = viewW / viewH;
+    
+    const imgRatio = activeImage.width / activeImage.height, viewRatio = viewW / viewH;
     let drawW, drawH;
-    if (imgRatio > viewRatio) { drawH = viewH; drawW = viewH * imgRatio; } 
-    else { drawW = viewW; drawH = viewW / imgRatio; }
-    ctx.drawImage(activeImage, -drawW / 2, -drawH / 2, drawW, drawH);
-    ctx.restore();
-}
-
-function toggleModal(show) { document.getElementById('settingsModal').classList.toggle('active', show); }
-function saveSettings() {
-    const key = document.getElementById('apiKeyInput').value.trim();
-    localStorage.setItem('user_api_key', key);
-    toggleModal(false);
+    if (imgRatio > viewRatio) { drawH = viewH; drawW = viewH * imgRatio; } else { drawW = viewW; drawH = viewW / imgRatio; }
+    ctx.drawImage(activeImage, -drawW / 2, -drawH / 2, drawW, drawH); ctx.restore();
 }
 
 function captureFrameData() {
-    const targetW = 600;
-    const targetH = 750;
-    const processCanvas = document.createElement('canvas');
+    const targetW = 600, targetH = 750, processCanvas = document.createElement('canvas');
     processCanvas.width = targetW; processCanvas.height = targetH;
     const pCtx = processCanvas.getContext('2d');
 
     if (activeImage) {
-        const viewW = canvas.width / window.devicePixelRatio;
-        const viewH = canvas.height / window.devicePixelRatio;
-        const exportScale = targetW / viewW;
-        pCtx.imageSmoothingEnabled = true; pCtx.imageSmoothingQuality = 'high';
-        pCtx.save();
-        pCtx.translate((targetW / 2) + (offsetX * exportScale), (targetH / 2) + (offsetY * exportScale));
-        pCtx.scale(zoom * exportScale, zoom * exportScale);
-
-        const imgRatio = activeImage.width / activeImage.height;
-        const viewRatio = viewW / viewH;
-        let drawW, drawH;
-        if (imgRatio > viewRatio) { drawH = viewH; drawW = viewH * imgRatio; } 
-        else { drawW = viewW; drawH = viewW / imgRatio; }
+        const viewW = canvas.width / window.devicePixelRatio, exportScale = targetW / viewW;
+        pCtx.imageSmoothingEnabled = true; pCtx.imageSmoothingQuality = 'high'; pCtx.save();
         
-        pCtx.drawImage(activeImage, -drawW / 2, -drawH / 2, drawW, drawH);
-        pCtx.restore();
-    } else if (currentStream && video.readyState === video.HAVE_ENOUGH_DATA) {
-        const targetRatio = targetW / targetH;
-        const videoRatio = video.videoWidth / video.videoHeight;
-        let sourceX = 0, sourceY = 0, sourceW = video.videoWidth, sourceH = video.videoHeight;
-        if (videoRatio > targetRatio) { sourceW = video.videoHeight * targetRatio; sourceX = (video.videoWidth - sourceW) / 2; } 
-        else { sourceH = video.videoWidth / targetRatio; sourceY = (video.videoHeight - sourceH) / 2; }
-        pCtx.drawImage(video, sourceX, sourceY, sourceW, sourceH, 0, 0, targetW, targetH);
+        pCtx.translate((targetW / 2) + (offsetX * exportScale), (targetH / 2) + (offsetY * exportScale));
+        pCtx.rotate(rotation * Math.PI / 180);
+        pCtx.scale(zoom * exportScale, zoom * exportScale);
+        
+        const imgRatio = activeImage.width / activeImage.height, viewRatio = viewW / (canvas.height / window.devicePixelRatio);
+        let drawW, drawH;
+        if (imgRatio > viewRatio) { drawH = canvas.height / window.devicePixelRatio; drawW = drawH * imgRatio; } else { drawW = viewW; drawH = viewW / imgRatio; }
+        pCtx.drawImage(activeImage, -drawW / 2, -drawH / 2, drawW, drawH); pCtx.restore();
+    } else if (currentStream && document.getElementById('video').readyState === document.getElementById('video').HAVE_ENOUGH_DATA) {
+        const v = document.getElementById('video');
+        const targetRatio = targetW / targetH, videoRatio = v.videoWidth / v.videoHeight;
+        let sourceX = 0, sourceY = 0, sourceW = v.videoWidth, sourceH = v.videoHeight;
+        if (videoRatio > targetRatio) { sourceW = v.videoHeight * targetRatio; sourceX = (v.videoWidth - sourceW) / 2; } 
+        else { sourceH = v.videoWidth / targetRatio; sourceY = (v.videoHeight - sourceH) / 2; }
+        pCtx.drawImage(v, sourceX, sourceY, sourceW, sourceH, 0, 0, targetW, targetH);
     } else { return null; }
-    
-    return processCanvas.toDataURL('image/jpeg', 0.85);
+    return processCanvas.toDataURL('image/jpeg', 0.95);
 }
 
-// --- 7. Scanning & Logic Sequence ---
+// --- 6. Core Scan & HUD Drawing Sequence ---
 async function initiateScanSequence() {
-    const base64Data = captureFrameData();
-    if (!base64Data) { alert("Please ensure the camera is active or an image is uploaded and positioned."); return; }
+    // 1. Capture the pure, unmarked photo for the AI
+    const bareBase64Data = captureFrameData();
+    if (!bareBase64Data) { alert("Ensure camera is active or an image is uploaded."); return; }
 
-    let computedMetrics = null;
+    // 2. Prepare a variable for the marked-up UI image
+    let uiDisplayMatrix = bareBase64Data; 
 
     if (faceModelsLoaded) {
         analyzeBtn.disabled = true; analyzeBtn.innerText = "Extracting Facial Coordinates...";
-        const img = new Image(); img.src = base64Data;
+        const img = new Image(); img.src = bareBase64Data;
         await new Promise(resolve => img.onload = resolve);
         
         const results = faceLandmarker.detect(img);
-        if (!results.faceLandmarks || results.faceLandmarks.length === 0) {
-            analyzeBtn.disabled = false; analyzeBtn.innerText = "Commence Deep Face Scan";
-            alert("Scan Failed: No human face detected. The Samudrika matrix requires a clear facial geometry to proceed.");
-            return;
+        
+        // If a face is found, draw the HUD on the UI version of the image
+        if (results.faceLandmarks && results.faceLandmarks.length > 0) {
+            const landmarks = results.faceLandmarks[0];
+            const drawCanvas = document.createElement('canvas'); 
+            drawCanvas.width = 600; drawCanvas.height = 750;
+            const dCtx = drawCanvas.getContext('2d'); 
+            
+            // Draw original image
+            dCtx.drawImage(img, 0, 0, 600, 750);
+            
+            // Draw dark tint & glowing mesh
+            dCtx.fillStyle = 'rgba(0, 0, 0, 0.4)'; dCtx.fillRect(0, 0, 600, 750);
+            dCtx.fillStyle = '#00ffcc'; dCtx.shadowBlur = 6; dCtx.shadowColor = '#00ffcc';
+            for (let pt of landmarks) { dCtx.beginPath(); dCtx.arc(pt.x * 600, pt.y * 750, 2.5, 0, 2 * Math.PI); dCtx.fill(); }
+
+            // Draw Samudrika Anchors
+            const keyIndices = [10, 9, 2, 152, 33, 133, 362, 263, 6, 1, 129, 358, 0, 17, 234, 454, 162, 389];
+            dCtx.shadowBlur = 12; dCtx.shadowColor = '#ff0000'; dCtx.fillStyle = '#ff0000'; dCtx.strokeStyle = '#ffffff'; dCtx.lineWidth = 2.5;
+            for (let idx of keyIndices) { const x = landmarks[idx].x * 600, y = landmarks[idx].y * 750; dCtx.beginPath(); dCtx.arc(x, y, 6.5, 0, 2 * Math.PI); dCtx.fill(); dCtx.stroke(); }
+
+            // Save the marked-up image to show the user
+            uiDisplayMatrix = drawCanvas.toDataURL('image/jpeg', 0.95);
         }
-        computedMetrics = calculateSamudrikaMetrics(results.faceLandmarks[0]);
     }
 
-    window.speechSynthesis.cancel();
-    if(audioBtn) audioBtn.style.display = 'none';
-    if(shareBtn) shareBtn.style.display = 'none';
-    const sharePdfBtn = document.getElementById('sharePdfBtn');
-    if(sharePdfBtn) sharePdfBtn.style.display = 'none'; 
-
-    analyzeBtn.disabled = true; analyzeBtn.innerText = "Scanning Elements...";
+    // Hide controls during scan
+    window.speechSynthesis.cancel(); 
+    if(audioBtn) audioBtn.style.display = 'none'; 
+    if(document.getElementById('sharePdfBtn')) document.getElementById('sharePdfBtn').style.display = 'none'; 
+    
+    // Animate Scanner
+    analyzeBtn.disabled = true; analyzeBtn.innerText = "Scanning Elements..."; 
     scannerLine.style.display = 'block'; scannerLine.style.animation = 'none';
-    void scannerLine.offsetWidth; 
-    scannerLine.style.animation = 'scanAnimation 1.2s linear 3';
+    void scannerLine.offsetWidth; scannerLine.style.animation = 'scanAnimation 1.2s linear 3';
 
     setTimeout(() => {
-        scannerLine.style.display = 'none';
-        analyzeBtn.innerText = "Commence Deep Face Scan"; analyzeBtn.disabled = false;
-        const capturedDisplay = document.getElementById('capturedDisplay');
-        capturedDisplay.src = base64Data; capturedDisplay.style.display = 'block';
-        runVedicAnalysis(base64Data, computedMetrics);
-    }, 3600); 
+        scannerLine.style.display = 'none'; analyzeBtn.innerText = "Commence Deep Face Scan"; analyzeBtn.disabled = false;
+        
+        // Show the marked-up matrix image in the UI
+        document.getElementById('capturedDisplay').src = uiDisplayMatrix; 
+        document.getElementById('capturedDisplay').style.display = 'block';
+        
+        // Hide the math box as requested (reverting to pure visual AI)
+        if(biometricDataDisplay) biometricDataDisplay.style.display = 'none';
+
+        // FIRE AI: Send the BARE, UNMARKED image to the AI for processing
+        runVedicAnalysis(bareBase64Data);
+    }, 3600);
 }
 
-function toggleSpeech() {
-    const synth = window.speechSynthesis;
-    const targetLang = document.getElementById('userLang').value;
-    
-    if (synth.speaking) {
-        if (synth.paused) { synth.resume(); audioBtn.innerHTML = "⏸️ Pause"; } 
-        else { synth.pause(); audioBtn.innerHTML = "▶️ Resume"; }
-        return;
-    }
-    
-    synth.cancel(); audioBtn.innerHTML = "⏸️ Pause";
-    const plainText = rawReportText.replace(/<[^>]*>?/gm, '').trim(); 
-    currentSynthUtterance = new SpeechSynthesisUtterance(plainText);
-    currentSynthUtterance.lang = langMap[targetLang] || 'en-IN';
-    currentSynthUtterance.onend = () => { audioBtn.innerHTML = "🔊 Listen"; };
-    currentSynthUtterance.onerror = () => { audioBtn.innerHTML = "🔊 Listen"; };
-    synth.speak(currentSynthUtterance);
-}
-
-function fallbackCopy(text) {
-    navigator.clipboard.writeText(text).then(() => { alert("Report copied to your clipboard!"); })
-    .catch(err => { alert("Failed to copy text."); });
-}
-
-// --- 8. AI Routing & Analysis Generation ---
-async function runVedicAnalysis(base64Data, computedMetrics) {
-    const loader = document.getElementById('loader');
-    const statusText = document.getElementById('statusText');
-    const reportCard = document.getElementById('reportCard');
-    const reportTarget = document.getElementById('reportTarget');
+// --- 7. AI Routing & Restored Prompt ---
+async function runVedicAnalysis(bareBase64Data) {
+    document.getElementById('loader').style.display = 'block'; 
+    document.getElementById('statusText').style.display = 'block'; 
+    document.getElementById('statusText').innerText = "Mapping demographic baselines to physical features..."; 
+    document.getElementById('reportCard').classList.remove('active');
     
     const name = document.getElementById('userName').value;
     const age = document.getElementById('userAge').value;
     const sex = document.getElementById('userSex').value;
     const targetLang = document.getElementById('userLang').value;
-    
-    loader.style.display = 'block'; statusText.style.display = 'block';
-    statusText.innerText = "Processing Samudrika matrices via AI router...";
-    reportCard.classList.remove('active');
 
-    const metricString = computedMetrics ? `
-### PRE-COMPUTED BIOMETRIC MATRIX (EXACT 3D MESH DATA)
-- **Tri-Bhaga (Three Zones) Proportions**: ${computedMetrics.triBhaga}
-- **Netra (Eye) Geometry**: ${computedMetrics.eyeSpacing}
-- **Nasika (Nose) Geometry**: ${computedMetrics.noseStructure}
-- **Ayurvedic Facial Dosha Baseline**: ${computedMetrics.dosha}
-` : "BIOMETRIC MATRIX UNAVAILABLE - RELY ON VISUAL ESTIMATION.";
+    // THE RESTORED PROMPT (Exact match from the source)
+    const systemPrompt = `You are a master expert in Vedic Face Reading (Mukha Samudrika Shastra), deep Indian astrological mappings, and high-level physical feature analysis. This is a real, serious diagnostic tool meant to deliver the absolute, unfiltered truth. Do not flatter. Do not sugarcoat. Analyze with 100% honesty.
 
-    const systemPrompt = `You are a master expert in Vedic Face Reading (Mukha Samudrika Shastra).
 The subject is ${name}, a ${age}-year-old ${sex}. 
-Address the report directly to ${name} or in the third person regarding them.
+CRITICAL: Calibrate your karmic and psychological baseline based on the subject's age (${age}) and sex (${sex}). Address the report directly to ${name} or in the third person regarding them.
 
-${metricString}
+Perform a microscopic, exhaustive analysis of the facial geometry, examining every subtle feature according to ancient Samudrika principles. Leave no aspect unaddressed:
 
-CRITICAL INSTRUCTIONS:
-1. Cross-reference the exact geometric proportions provided in the Biometric Matrix against classical Samudrika Shastra rules. Do not hallucinate physical dimensions; use the math provided.
-2. Perform a microscopic, exhaustive analysis of the facial geometry, examining every subtle feature according to ancient principles.
-3. Be brutally honest. Do not flatter.
+1. **Forehead & Hairline (Lalata & Kesha-Rekha):** Width, vertical lines, planetary mounts, and hairline shape. What is their real intellectual capacity, stubbornness, and karmic baggage?
+2. **Eyebrows (Bhru):** Density, arch, thickness, and spacing. Reveal their true temperament, inherent logic, and relationship with anger or control. 
+3. **Eyes & Pupils (Netra & Tara):** Size, depth, dilation, distance, and the state of the sclera. State clearly if they reflect a Sattvic (pure), Rajasic (restless/desirous), or Tamasic (cunning/lethargic) soul. 
+4. **Eyelashes (Pakshma):** Density, direction, and curl. What do they reveal about vital energy and emotional guarding?
+5. **Nose & Nostrils (Nasika & Nasa-Puta):** Ridge stability, apex sharpness, and nostril flare/exposure. Reveal the exact truth about their ego, wealth-retention capacity, and core vitality.
+6. **Ears (Karna):** Structure, lobe attachment, and placement relative to the eyes. What is their true intuition level and capacity to listen?
+7. **Mouth, Lips & Teeth (Ostha, Mukha & Danta):** Thickness, symmetry, and corner inclination. Reveal their speech traits—do they lie, manipulate, or speak harshly? 
+8. **Jaw & Chin (Chibuka & Hanu):** Structural grit, width, and projection. Will they buckle under pressure or possess an unbreakable will?
+9. **Complexion & Skin Texture (Chhavi & Twak):** The underlying luster (Ojas) or dullness. What does this say about empowering their internal health?
+10. **Ayurvedic Prakriti:** Structural Dosha mapping (Vata, Pitta, Kapha).
+11. **Sensuality & Desires (Kama Assessment):** Analyze the eyes, lips, and facial fleshiness to evaluate their sexual drive and sensual regulation (Indriya Nigraha). Do not hide anything. Be brutally honest. Do they possess a high, unregulated sex drive, perverse tendencies, or deviant appetites? Or are their senses controlled?
 
-Analyze:
-1. Forehead & Hairline (Lalata & Kesha-Rekha)
-2. Eyebrows & Eyes (Bhru & Netra)
-3. Nose & Nostrils (Nasika)
-4. Mouth, Lips & Teeth (Ostha & Danta)
-5. Jaw, Chin & Structure (Chibuka & Tridosha)
-6. Sensuality & Desires (Kama & Indriya Nigraha)
+### THE QUANTITATIVE MATRIX (0-100%)
+Based on the above information, provide exact, brutally honest percentage scores for the following traits. Format this beautifully in HTML.
 
-Provide the quantitative matrix (0-100%) for:
-A. The Four Purusharthas (Dharma, Artha, Kama, Moksha)
-B. The Inner Enemies (Kaam, Krodh, Moha, Maya, Matsar)
-C. Emotional Integrity
-D. Mental Resilience
-E. Purpose and Execution
+**A. The Four Purusharthas (Life Pursuits)**
+* Dharma (Righteousness/Duty): %
+* Artha (Wealth/Material Purpose): %
+* Kama (Desires/Passions): %
+* Moksha (Detachment/Spiritual Liberation): %
 
-Write your ENTIRE response exclusively in ${targetLang}. Deliver using cleanly structured HTML sections (using h3 elements, strong bullet lists, and readable spacing). Do not use markdown backticks around the HTML.`;
+**B. The Inner Enemies (Arishadvarga Vulnerabilities)**
+* Kaam (Lust/Unregulated Desire): %
+* Krodh (Anger/Rage): %
+* Moha (Delusion/Attachment): %
+* Maya/Mada (Arrogance/Ego): %
+* Matsar (Jealousy/Envy): %
 
-    const rawBase64 = base64Data.split(',')[1];
-    const payload = {
-        contents: [{ parts: [ { text: systemPrompt }, { inlineData: { mimeType: "image/jpeg", data: rawBase64 } } ] }]
+**C. Emotional and Social Integrity**
+* Empathy (Understanding others): %
+* Humility (Ego suppression): %
+* Accountability (Taking ownership): %
+* Respectfulness (Dignity to others): %
+
+**D. Mental and Behavioral Resilience**
+* Adaptability (Pivoting under stress): %
+* Self-Regulation (Managing impulses): %
+* Patience (Tolerating hardship): %
+
+**E. Purpose and Execution**
+* Consistency (Reliability over time): %
+* Generosity (Selfless sharing): %
+* Discretion (Keeping confidence/secrets): %
+
+CRITICAL INSTRUCTION: Write your ENTIRE response exclusively in the ${targetLang} language. Deliver the response using cleanly structured HTML sections (using h3 elements, strong bullet lists, and readable spacing). Do not use markdown backticks around the HTML inside your payload response.`;
+
+    const payload = { 
+        contents: [{ 
+            parts: [ 
+                { text: systemPrompt }, 
+                // Using the bare, unmarked image payload
+                { inlineData: { mimeType: "image/jpeg", data: bareBase64Data.split(',')[1] } } 
+            ] 
+        }] 
     };
 
     try {
         const response = await fetchGeminiChat(payload);
-        if (!response.ok) { throw new Error(`Server returned status: ${response.status}`); }
-
-        const data = await response.json();
+        if (!response.ok) throw new Error(`Server status: ${response.status}`);
         
+        const data = await response.json();
         if(data.candidates && data.candidates[0].content.parts[0].text) {
-            let resultText = data.candidates[0].content.parts[0].text;
-            resultText = resultText.replace(/```html/g, '').replace(/```/g, '').trim();
-            
-            rawReportText = resultText; 
-            reportTarget.innerHTML = resultText;
-            
+            rawReportText = data.candidates[0].content.parts[0].text.replace(/```html/g, '').replace(/```/g, '').trim(); 
+            document.getElementById('reportTarget').innerHTML = rawReportText;
             if(audioBtn) { audioBtn.style.display = 'flex'; audioBtn.innerHTML = "🔊 Listen"; }
-            const sharePdfBtn = document.getElementById('sharePdfBtn');
-            if(sharePdfBtn) sharePdfBtn.style.display = 'block'; 
-        } else {
-            throw new Error("Invalid payload format received.");
+            if(document.getElementById('sharePdfBtn')) document.getElementById('sharePdfBtn').style.display = 'block'; 
         }
         
-        reportCard.classList.add('active');
-        reportCard.scrollIntoView({ behavior: 'smooth' });
-        
-    } catch (err) {
-        alert("Processing Error: " + err.message + "\nCheck proxy server connectivity.");
-    } finally {
-        loader.style.display = 'none';
-        statusText.style.display = 'none';
-    }
+        document.getElementById('reportCard').classList.add('active'); 
+        document.getElementById('reportCard').scrollIntoView({ behavior: 'smooth' });
+    } catch (err) { alert("Processing Error: " + err.message); } 
+    finally { document.getElementById('loader').style.display = 'none'; document.getElementById('statusText').style.display = 'none'; }
 }
+
+// --- 8. Follow-Up Interrogation Module (Q&A) ---
+async function handleCustomQuestion() {
+    if (!customQuestionInput || !customQuestionInput.value.trim()) return alert("Please type a question.");
+    const question = customQuestionInput.value.trim();
+    askQuestionBtn.disabled = true; askQuestionBtn.innerText = "Thinking..."; qaLoader.style.display = 'block'; qaTarget.style.display = 'none'; if(qaAudioBtn) qaAudioBtn.style.display = 'none';
+
+    const contextPrompt = `You are a Grand Master of Vedic Mukha Samudrika Shastra. Established Reading Matrix for ${document.getElementById('userName').value || "the subject"}:\n"""\n${rawReportText}\n"""\nUser Question: "${question}"\nAnswer strictly based on the established reading. Be direct and uncompromising. Deliver in ${document.getElementById('userLang').value} using clean HTML tags (no markdown backticks).`;
+
+    try {
+        const response = await fetchGeminiChat({ contents: [{ parts: [{ text: contextPrompt }] }] });
+        if (!response.ok) throw new Error(`Server status: ${response.status}`);
+        const data = await response.json();
+        if (data.candidates && data.candidates[0].content.parts[0].text) {
+            rawQaText = data.candidates[0].content.parts[0].text.replace(/```html/g, '').replace(/```/g, '').trim(); 
+            qaTarget.innerHTML = `<strong style="color: var(--accent);">Question: ${question}</strong><br><br>${rawQaText}`;
+            qaTarget.style.display = 'block';
+            if(qaAudioBtn) { qaAudioBtn.style.display = 'flex'; qaAudioBtn.innerHTML = "🔊 Listen to Answer"; }
+            customQuestionInput.value = ''; 
+        }
+    } catch (err) { alert("Interrogation Error: " + err.message); } 
+    finally { askQuestionBtn.disabled = false; askQuestionBtn.innerText = "Answer"; qaLoader.style.display = 'none'; }
+}
+
+// --- 9. Speech Synthesis ---
+function toggleSpeech() {
+    const synth = window.speechSynthesis, tl = document.getElementById('userLang').value;
+    if (synth.speaking) { if (synth.paused) { synth.resume(); audioBtn.innerHTML = "⏸️ Pause"; } else { synth.pause(); audioBtn.innerHTML = "▶️ Resume"; } return; }
+    synth.cancel(); audioBtn.innerHTML = "⏸️ Pause";
+    currentSynthUtterance = new SpeechSynthesisUtterance(rawReportText.replace(/<[^>]*>?/gm, '').trim()); currentSynthUtterance.lang = langMap[tl] || 'en-IN';
+    currentSynthUtterance.onend = () => { audioBtn.innerHTML = "🔊 Listen"; }; currentSynthUtterance.onerror = () => { audioBtn.innerHTML = "🔊 Listen"; }; synth.speak(currentSynthUtterance);
+}
+function toggleQaSpeech() {
+    const synth = window.speechSynthesis, tl = document.getElementById('userLang').value;
+    if (synth.speaking) { if (synth.paused) { synth.resume(); qaAudioBtn.innerHTML = "⏸️ Pause"; } else { synth.pause(); qaAudioBtn.innerHTML = "▶️ Resume"; } return; }
+    synth.cancel(); qaAudioBtn.innerHTML = "⏸️ Pause";
+    currentSynthUtterance = new SpeechSynthesisUtterance(rawQaText.replace(/<[^>]*>?/gm, '').trim()); currentSynthUtterance.lang = langMap[tl] || 'en-IN';
+    currentSynthUtterance.onend = () => { qaAudioBtn.innerHTML = "🔊 Listen to Answer"; }; currentSynthUtterance.onerror = () => { qaAudioBtn.innerHTML = "🔊 Listen to Answer"; }; synth.speak(currentSynthUtterance);
+}
+function toggleModal(s) { document.getElementById('settingsModal').classList.toggle('active', s); }
+function saveSettings() { localStorage.setItem('user_api_key', document.getElementById('apiKeyInput').value.trim()); toggleModal(false); }
