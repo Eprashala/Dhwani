@@ -307,9 +307,17 @@ body {
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div class="card p-4 rounded-xl text-center">
-                    <h3 class="text-orange-600 font-bold mb-2 border-b border-orange-100 pb-1 title-font">सूर्य व चंद्र काळ</h3>
+			<!-- Detailed Panchang Elements Section -->
+			<div id="detailed-panchang-container" class="hidden card p-6 rounded-xl bg-orange-50 border-t-4 border-orange-500 mb-6 shadow-lg">
+				<h3 class="text-2xl text-orange-900 font-bold mb-4 title-font text-center border-b border-orange-200 pb-2">पंचांग अंगांचे सविस्तर वर्णन (पराशर होरा शास्त्र)</h3>
+				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="detailed-panchang-grid">
+					<!-- Dynamic Content -->
+				</div>
+			</div>
+
+			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+				<div class="card p-4 rounded-xl text-center">
+					<h3 class="text-orange-600 font-bold mb-2 border-b border-orange-100 pb-1 title-font">सूर्य व चंद्र काळ</h3>																			
                     <p class="text-sm mb-2">सूर्योदय: <span id="r-sunrise" class="font-bold text-gray-900 text-base"></span></p>
                     <p class="text-sm mb-2">सूर्यास्त: <span id="r-sunset" class="font-bold text-gray-900 text-base"></span></p>
                     <p class="text-sm text-blue-800 mb-2">चंद्रोदय: <span id="r-moonrise" class="font-bold text-base"></span></p>
@@ -578,6 +586,13 @@ body {
                 setTimeout(() => translatePage(langCode), 500);
             }
         }
+		
+		
+		let bphsDetails = null;
+fetch('panchang_details.json')
+    .then(response => response.json())
+    .then(data => bphsDetails = data)
+    .catch(error => console.error("Error loading BPHS details:", error));
         // ------------------------------
 	
         const TITHIS = ["प्रतिपदा", "द्वितीया", "तृतीया", "चतुर्थी", "पंचमी", "षष्ठी", "सप्तमी", "अष्टमी", "नवमी", "दशमी", "एकादशी", "द्वादशी", "त्रयोदशी", "चतुर्दशी", "पौर्णिमा", "प्रतिपदा", "द्वितीया", "तृतीया", "चतुर्थी", "पंचमी", "षष्ठी", "सप्तमी", "अष्टमी", "नवमी", "दशमी", "एकादशी", "द्वादशी", "त्रयोदशी", "चतुर्दशी", "अमावास्या"];
@@ -1528,6 +1543,31 @@ body {
                 }
                 document.getElementById('r-karana1').innerText = vedic.karana1;
                 document.getElementById('r-karana2').innerText = vedic.karana2;
+				
+				                // --- Detailed BPHS Panchang Info ---
+                if (bphsDetails) {
+                    const renderCard = (title, name, data, icon) => {
+                        if (!data) return '';
+                        return `
+                            <div class="bg-white rounded-lg p-4 border border-orange-200 shadow-sm transition-all hover:shadow-md">
+                                <h4 class="text-lg font-bold text-orange-900 mb-2 border-b border-orange-100 pb-1">${icon} ${title}: <span class="text-indigo-700">${name}</span></h4>
+                                <p class="text-sm mb-1 text-gray-800"><strong>स्वामी/देवता:</strong> ${data.lord}</p>
+                                <p class="text-sm mb-1 text-gray-800"><strong>स्वभाव/तत्त्व:</strong> ${data.nature}</p>
+                                <p class="text-sm text-gray-800"><strong>फळ (Good For):</strong> ${data.goodFor}</p>
+                            </div>
+                        `;
+                    };
+
+                    let detailsHtml = "";
+                    detailsHtml += renderCard("तिथी", vedic.tithi, bphsDetails.tithi[vedic.tithi], "🌙");
+                    detailsHtml += renderCard("वार", vedic.vaar, bphsDetails.vaar[vedic.vaar], "📅");
+                    detailsHtml += renderCard("नक्षत्र", vedic.nakshatra, bphsDetails.nakshatra[vedic.nakshatra], "✨");
+                    detailsHtml += renderCard("योग", vedic.yoga, bphsDetails.yoga[vedic.yoga], "🧘");
+                    detailsHtml += renderCard("करण (सध्याचे)", vedic.karana1, bphsDetails.karana[vedic.karana1], "⚙️");
+
+                    document.getElementById('detailed-panchang-grid').innerHTML = detailsHtml;
+                    document.getElementById('detailed-panchang-container').classList.remove('hidden');
+                }
 
              // --- 4. Ritu ---
                 // ऋतू नेहमी 'सायना' (Tropical) सूर्यावर अवलंबून असतात.
