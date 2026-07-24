@@ -43,62 +43,40 @@ function enforceFullscreen() {
     document.addEventListener(eventType, enforceFullscreen, { capture: true, passive: true });
 });
 
+
 // --- 1. DATA STRUCTURES & CONFIG ---
-const PROXY_BASE_URL = "https://eprashala.pythonanywhere.com";
+const PROXY_BASE_URL = "https://eprashala-proxy-511804777001.asia-south1.run.app";
 
-async function fetchGeminiChat(payloadObject) {
+async function fetchGeminiChat(payloadObject, abortSignal, modelId) {
     const userKey = document.getElementById('custom-api-key-input').value.trim() || '';
+    
+    const fetchOptions = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payloadObject)
+    };
+    if (abortSignal) fetchOptions.signal = abortSignal;
 
-    // TIER 1: User has their own key -> Direct browser handoff to Google
     if (userKey && userKey.length > 10) {
         try {
-            console.log("Direct Route Active: Targeting gemini-flash-latest...");
-            const primaryUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${userKey}`;
-            const response = await fetch(primaryUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payloadObject)
-            });
-            
+            // Dynamically inject the chosen model ID
+            const primaryUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${userKey}`;
+            const response = await fetch(primaryUrl, fetchOptions);
             if (!response.ok) throw new Error(`Primary model status: ${response.status}`);
             return response;
-
         } catch (error) {
-            console.warn("Primary channel busy/unavailable. Re-routing to fallback...", error);
-            const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${userKey}`;
-            return await fetch(fallbackUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payloadObject)
-            });
+            if (error.name === 'AbortError') throw error; 
+            const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash:generateContent?key=${userKey}`;
+            return await fetch(fallbackUrl, fetchOptions);
         }
-    } 
-    
-    // TIER 2: No personal key provided -> Route to your centralized Mumbai server
-    else {
-        console.log("Proxy Route Active: Routing through centralized server...");
-        return await fetch(`${PROXY_BASE_URL}/api/chat`, {
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payloadObject)
-        });
+    } else {
+        // If passing to your proxy, you need to send the model ID so the backend knows which to hit
+        payloadObject.model = modelId; 
+        return await fetch(`${PROXY_BASE_URL}/api/chat`, fetchOptions);
     }
 }
 
-const MAHA_BOARD_SUBJECTS = {
-    std1to2: ["Marathi (मराठी)", "English", "Mathematics (गणित)"],
-    std3: ["Marathi (मराठी)", "English", "Mathematics (गणित)", "Environmental Studies (परिसर अभ्यास)"],
-    std4to5: ["Marathi (मराठी)", "English", "Hindi (हिंदी)", "Mathematics (गणित)", "EVS Part 1 (परिसर अभ्यास १)", "EVS Part 2 (परिसर अभ्यास २ - शिवछत्रपती)"],
-    std6to8: ["Marathi (मराठी)", "English", "Hindi (हिंदी)", "Mathematics (गणित)", "General Science (सामान्य विज्ञान)", "History & Civics (इतिहास व नागरिकशास्त्र)", "Geography (भूगोल)"],
-    std9to10: ["Marathi (मराठी)", "English", "Hindi (हिंदी)", "Sanskrit (संस्कृत)", "Mathematics Part-I (Algebra / बीजगणित)", "Mathematics Part-II (Geometry / भूमिती)", "Science & Technology Part-1", "Science & Technology Part-2", "History & Political Science", "Geography (भूगोल)"],
-    std11to12: [
-        "English", "Marathi (मराठी)", "Hindi (हिंदी)", "Physics", "Chemistry", "Biology", 
-        "Mathematics & Statistics", "Information Technology (IT)", "Economics (अर्थशास्त्र)", 
-        "Book Keeping & Accountancy", "Organization of Commerce & Management (OCM)", 
-        "Secretarial Practice (SP)", "History (इतिहास)", "Geography (भूगोल)", 
-        "Political Science (राज्यशास्त्र)", "Sociology (समाजशास्त्र)", "Psychology (मानसशास्त्र)"
-    ]
-};
+
 
 // --- 2. DOM & STATE ---
 const UI = {
@@ -117,6 +95,10 @@ const UI = {
     btnSharePdf: document.getElementById('btn-share-pdf'),
     iconVol: document.getElementById('icon-vol'),
     iconMute: document.getElementById('icon-mute'),
+	ratioSlider: document.getElementById('ratio-slider'),
+    modelSlider: document.getElementById('model-slider'),
+    ratioVal: document.getElementById('ratio-val'),
+    modelVal: document.getElementById('model-val'),
     
     // Multimodal & Crop Additions
     btnQuizManual: document.getElementById('btn-quiz-manual'), 
@@ -181,6 +163,7 @@ let cropper = null;
 let state = { isProcessing: false, isMuted: false, lastAIMessage: "" };
 let inningsScore = 0; 
 let currentAborter = null;
+let syllabusIndex = {};
 
 // History Vault State
 let allSessions = []; 
@@ -210,6 +193,7 @@ function updateEditPencil() {
         allUserBtns[allUserBtns.length - 1].classList.remove('hidden');
     }
 }
+
 
 window.triggerEditLastInput = (e) => {
     if(e) e.stopPropagation();
@@ -250,8 +234,35 @@ window.triggerEditLastInput = (e) => {
     updateEditPencil();
 };
 
+function getModelInfo(val) {
+    val = parseInt(val);
+    if(val === 20) return { name: "Gemini Flash-Lite", id: "gemini-3.1-flash-lite-preview" };
+    if(val === 40) return { name: "Gemini 3 Flash", id: "gemini-3-flash-preview" };
+    if(val === 60) return { name: "Gemini Thinking", id: "gemini-3.5-flash-preview" }; 
+    if(val === 80) return { name: "Gemini 3.1 Pro Preview", id: "gemini-3.1-pro-preview" }; 
+    return { name: "Gemini 3.1 Pro Preview", id: "gemini-3.1-pro-preview" }; // Fallback default
+}
+
+function updateRightSliderLabels() {
+    if (!UI.ratioSlider || !UI.modelSlider) return;
+    const rVal = UI.ratioSlider.value;
+    UI.ratioVal.innerText = `${rVal}% Book / ${100 - rVal}% AI`;
+    const mVal = UI.modelSlider.value;
+    UI.modelVal.innerText = `${getModelInfo(mVal).name}`;
+}
 // --- 3. INITIALIZATION ---
-window.onload = () => {
+window.onload = async () => {
+    try {
+        // Fetch the external JSON index
+        const response = await fetch('./syllabus.json');
+        if (!response.ok) throw new Error("Failed to load syllabus index.");
+        syllabusIndex = await response.json();
+    } catch (error) {
+        console.error("Error loading syllabus data:", error);
+        alert("Failed to load curriculum data. Please refresh.");
+    }
+
+    // Proceed with existing initialization
     loadData();
     initSpeechRecognition(); 
     
@@ -281,23 +292,81 @@ UI.overlay.addEventListener('click', () => {
 });
 
 function updateSubjectsList() {
-    const std = parseInt(UI.selStd.value);
-    let subjects = [];
+    const medium = UI.selMedium.value;
+    const std = UI.selStd.value;
     
-    if (std >= 1 && std <= 2) subjects = MAHA_BOARD_SUBJECTS.std1to2;
-    else if (std === 3) subjects = MAHA_BOARD_SUBJECTS.std3;
-    else if (std >= 4 && std <= 5) subjects = MAHA_BOARD_SUBJECTS.std4to5;
-    else if (std >= 6 && std <= 8) subjects = MAHA_BOARD_SUBJECTS.std6to8;
-    else if (std >= 9 && std <= 10) subjects = MAHA_BOARD_SUBJECTS.std9to10;
-    else if (std >= 11 && std <= 12) subjects = MAHA_BOARD_SUBJECTS.std11to12;
-
+    // Clear the current dropdown
     UI.selSub.innerHTML = '';
-    subjects.forEach(sub => {
+    
+    // Check if the data exists for the selected medium and standard
+    if (syllabusIndex[medium] && syllabusIndex[medium][std]) {
+        const subjectsObj = syllabusIndex[medium][std];
+        const subjects = Object.keys(subjectsObj); // Extract keys for subjects
+        
+        subjects.forEach(sub => {
+            const opt = document.createElement('option');
+            opt.value = sub;
+            opt.text = sub;
+            UI.selSub.appendChild(opt);
+        });
+
+        // Trigger chapter display for the first loaded subject
+        if (subjects.length > 0) {
+            displayChapterList(medium, std, subjects[0]);
+        }
+    } else {
+        // Fallback if no subjects are found
         const opt = document.createElement('option');
-        opt.value = sub;
-        opt.text = sub;
+        opt.value = "";
+        opt.text = "No subjects available";
         UI.selSub.appendChild(opt);
+    }
+}
+
+function displayChapterList(medium, std, subject) {
+    if (!subject) return;
+    const chapters = syllabusIndex[medium][std][subject];
+    
+    if (!chapters || chapters.length === 0) return;
+
+    let html = `<div class="text-sky-300 text-sm mb-3 font-bold">Select a chapter below or type its name to start:</div>`;
+    html += `<div class="flex flex-wrap gap-2">`;
+    
+    chapters.forEach((chap, index) => {
+        // Escape quotes to prevent HTML breakage
+        const chapterText = chap.replace(/"/g, '&quot;');
+        html += `<button class="chapter-btn inline-flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-sky-600 text-sky-400 hover:text-white rounded-lg transition-colors text-xs font-bold border border-sky-500/30 shadow-sm" data-chapter="${chapterText}">Chapter ${index + 1}: ${chapterText}</button>`;
     });
+    
+    html += `</div>`;
+    
+    renderSystemMessage("Curriculum System", html);
+}
+
+function renderSystemMessage(sender, htmlContent) {
+    const msgId = 'msg-' + Date.now();
+    const div = document.createElement('div');
+    
+    // Using your app's existing model message styling
+    div.className = `msg-container p-4 rounded-2xl bg-[#0f172a]/90 border border-slate-700/50 shadow-lg ml-2 mr-8 mb-4`;
+    div.innerHTML = `
+        <div class="text-[10px] uppercase font-bold tracking-wider text-sky-400 cinzel mb-2">${sender}</div>
+        <div class="text-sm leading-relaxed text-gray-100">${htmlContent}</div>
+    `;
+    
+    UI.log.appendChild(div);
+    
+    // Attach click listeners to all chapter buttons to auto-start the chat
+    div.querySelectorAll('.chapter-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const chapterName = e.target.getAttribute('data-chapter');
+            // Populate the input and simulate sending
+            UI.textIn.value = `I want to study ${chapterName}. Please teach me.`;
+            processInput(UI.textIn.value);
+        });
+    });
+    
+    setTimeout(() => { UI.log.scrollTop = UI.log.scrollHeight; }, 50);
 }
 
 function updateLeftSliderLabels() {
@@ -322,7 +391,12 @@ function loadData() {
     UI.name.value = localStorage.getItem('edu_name') || "";
     UI.age.value = localStorage.getItem('edu_age') || "";
     UI.keyIn.value = localStorage.getItem('edu_api_key') || "";
-    
+    if (UI.ratioSlider) {
+    UI.ratioSlider.value = localStorage.getItem('edu_ratio') || "80";
+    UI.modelSlider.value = localStorage.getItem('edu_model') || "80"; // Defaulting to 80 (Pro Preview)
+    updateRightSliderLabels();
+	}
+	
     if (UI.ttsEngine && localStorage.getItem('edu_tts_engine')) {
         UI.ttsEngine.value = localStorage.getItem('edu_tts_engine');
     }
@@ -386,6 +460,10 @@ function saveData() {
     localStorage.setItem('edu_remember', UI.remember.checked);
 	localStorage.setItem('edu_score', inningsScore);
     
+	if (UI.ratioSlider) {
+    localStorage.setItem('edu_ratio', UI.ratioSlider.value);
+    localStorage.setItem('edu_model', UI.modelSlider.value);
+	}
     if (UI.ttsEngine) localStorage.setItem('edu_tts_engine', UI.ttsEngine.value);
     
     localStorage.setItem('edu_font_size', UI.fontSizeSlider.value);
@@ -621,9 +699,19 @@ function updateStopButtonVisibility() {
 
 // --- 6. EVENT LISTENERS ---
 function setupEventListeners() {
-    UI.selMedium.addEventListener('change', saveData);
-    UI.selStd.addEventListener('change', () => { updateSubjectsList(); saveData(); });
-    UI.selSub.addEventListener('change', saveData);
+	UI.selMedium.addEventListener('change', () => { updateSubjectsList(); saveData(); });
+	UI.selStd.addEventListener('change', () => { updateSubjectsList(); saveData(); });
+	UI.selSub.addEventListener('change', () => {
+		saveData();
+		displayChapterList(UI.selMedium.value, UI.selStd.value, UI.selSub.value);
+	});
+	if (UI.ratioSlider) {
+    UI.ratioSlider.addEventListener('input', () => { updateRightSliderLabels(); saveData(); });
+	}
+	if (UI.modelSlider) {
+		UI.modelSlider.addEventListener('input', () => { updateRightSliderLabels(); saveData(); });
+	}
+	
     if (UI.ttsEngine) UI.ttsEngine.addEventListener('change', saveData);
 
     // Right Modal Events
@@ -918,6 +1006,11 @@ async function getAIResponse(history) {
     const sub = UI.selSub.value;
     const customKey = (UI.keyIn.value.trim().length > 10) ? UI.keyIn.value.trim() : null;
     const headers = { 'Content-Type': 'application/json' };
+	const bookRatio = UI.ratioSlider ? parseInt(UI.ratioSlider.value) : 80;
+    const aiRatio = 100 - bookRatio;
+    const selectedModelInfo = UI.modelSlider ? getModelInfo(UI.modelSlider.value) : { id: "gemini-3.1-pro-preview" };
+	const ratioInstruction = `\nCRITICAL ACCURACY RATIO: Your answer must be exactly ${bookRatio}% strict, factual data retrieved exclusively from the official Maharashtra Balbharati textbook, and ${aiRatio}% gentle contextualization for the user. Do not hallucinate syllabus content.`;
+	
     if (customKey) headers['X-Custom-Api-Key'] = customKey;
 
     let prompt = "";
@@ -969,8 +1062,8 @@ const payload = {
     };
 
     currentAborter = new AbortController();
+const response = await fetchGeminiChat(payload, currentAborter.signal, selectedModelInfo.id);
 
-    const response = await fetchGeminiChat(payload);
     
     if (!response.ok) throw new Error('API Error');
     const data = await response.json();
@@ -1050,25 +1143,64 @@ function updatePlayBtnUI(btn, isPlaying) {
     if (!btn) return;
     const playIcon = btn.querySelector('.play-icon');
     const pauseIcon = btn.querySelector('.pause-icon');
-    
+    const textSpan = btn.querySelector('.play-text');
+
+    // Tailwind classes to force the button to float above the UI
+    const floatClasses = ['fixed', 'bottom-[120px]', 'right-6', 'z-[100]', 'scale-110', 'shadow-2xl', 'border-green-400', 'bg-slate-900'];
+
     if (isPlaying) {
         if (playIcon) playIcon.classList.add('hidden');
         if (pauseIcon) pauseIcon.classList.remove('hidden');
-        btn.classList.add('text-green-400');
+        if (textSpan) textSpan.innerText = "Pause";
+        
+        // Add floating classes and turn indicator green
+        btn.classList.add('text-green-400', 'is-floating', ...floatClasses);
         btn.classList.remove('text-sky-400');
+        
+        // Suppress any competing floating indicators
+        document.querySelectorAll('.msg-play-btn.is-floating').forEach(el => {
+            if (el !== btn) {
+                el.classList.remove('is-floating', ...floatClasses);
+                el.classList.remove('text-green-400');
+                el.classList.add('text-sky-400');
+                const tSpan = el.querySelector('.play-text');
+                if (tSpan) tSpan.innerText = "Play";
+            }
+        });
+        
     } else {
         if (playIcon) playIcon.classList.remove('hidden');
         if (pauseIcon) pauseIcon.classList.add('hidden');
+        if (textSpan) textSpan.innerText = "Resume";
+        
         btn.classList.remove('text-green-400');
         btn.classList.add('text-sky-400');
+        // Note: We intentionally leave the 'is-floating' positioning active while PAUSED 
+        // so the user does not have to scroll to find the resume button.
     }
 }
 
 function resetCurrentTTS() {
+    const floatClasses = ['fixed', 'bottom-[120px]', 'right-6', 'z-[100]', 'scale-110', 'shadow-2xl', 'border-green-400', 'bg-slate-900'];
+
     if (currentActiveBtn) {
         updatePlayBtnUI(currentActiveBtn, false);
+        const textSpan = currentActiveBtn.querySelector('.play-text');
+        if (textSpan) textSpan.innerText = "Play";
+        
+        // Snap the button back to its original place in the chat log
+        currentActiveBtn.classList.remove('is-floating', ...floatClasses);
         currentActiveBtn = null;
     }
+    
+    // Fallback array sweep to maintain clean alignment bounds
+    document.querySelectorAll('.msg-play-btn.is-floating').forEach(el => {
+        el.classList.remove('is-floating', ...floatClasses);
+        el.classList.remove('text-green-400');
+        el.classList.add('text-sky-400');
+        const tSpan = el.querySelector('.play-text');
+        if (tSpan) tSpan.innerText = "Play";
+    });
     
     if (currentAudio) {
         currentAudio.pause();
@@ -1488,9 +1620,10 @@ function renderMessage(sender, text, isModel) {
                 <button class="msg-copy-btn p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-full text-slate-400 hover:text-green-400 transition-colors shadow-sm focus:outline-none" onclick="window.copySingleMessage(this)" data-msg-id="${msgId}" title="Copy Answer">
                     <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                 </button>
-                <button id="play-btn-${msgId}" class="msg-play-btn p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-full text-sky-400 transition-colors shadow-sm focus:outline-none" onclick="window.toggleSingleMessagePlay(this)" data-msg-id="${msgId}" title="Play/Pause Audio">
+				<button id="play-btn-${msgId}" class="msg-play-btn flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-full text-sky-400 transition-colors shadow-sm focus:outline-none" onclick="window.toggleSingleMessagePlay(this)" data-msg-id="${msgId}" title="Play/Pause Audio">
                     <svg class="play-icon w-4 h-4 pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                     <svg class="pause-icon w-4 h-4 hidden pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                    <span class="play-text text-[10px] font-bold uppercase tracking-wider pointer-events-none">Play</span>
                 </button>
             </div>`;
     }
@@ -1498,17 +1631,18 @@ function renderMessage(sender, text, isModel) {
     div.innerHTML = htmlContent;
     UI.log.appendChild(div);
 
-    if (isModel) {
+if (isModel) {
         const mdBody = div.querySelector('.markdown-body');
         
-        // Strip tags completely so the TTS engine doesn't read them out loud
+        // Deep sanitization: Strip tags, brackets, and markdown symbols so the TTS reads cleanly
         const cleanTextForTTS = text
             .replace(/YT_SEARCH:.*$/gm, '')
             .replace(/IMG_SEARCH:.*$/gm, '')
             .replace(/\[SCORE:\d+\]/g, '')
-            .replace(/[*_#`~]/g, '')
-            .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-            .replace(/<[^>]+>/g, '')
+            .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Extract text from markdown links
+            .replace(/<[^>]+>/g, ' ')               // Strip HTML tags and replace with space
+            .replace(/[\*<>\#\-;:\[\]{}\(\)`~_]/g, ' ') // Target deep symbols and punctuation
+            .replace(/\s+/g, ' ')                   // Collapse any double spaces created by removal
             .trim();
             
         const speechText = prepareTextForTTSAndHighlighting(mdBody, msgId);
