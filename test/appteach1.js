@@ -49,30 +49,56 @@ const PROXY_BASE_URL = "https://eprashala-proxy-511804777001.asia-south1.run.app
 
 async function fetchGeminiChat(payloadObject, abortSignal, modelId) {
     const userKey = document.getElementById('custom-api-key-input').value.trim() || '';
-    
-    const fetchOptions = {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payloadObject)
-    };
-    if (abortSignal) fetchOptions.signal = abortSignal;
 
+    // TIER 1: User Direct Route (Personal API Key)
     if (userKey && userKey.length > 10) {
+        
+        // 🚨 STRICT REQUIREMENT: Remove 'model' from the JSON body or Google will reject it.
+        delete payloadObject.model;
+
+        const fetchOptions = {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payloadObject)
+        };
+        if (abortSignal) fetchOptions.signal = abortSignal;
+
         try {
-            // Dynamically inject the chosen model ID
+            console.log(`Direct Route Active: Targeting ${modelId}...`);
             const primaryUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${userKey}`;
             const response = await fetch(primaryUrl, fetchOptions);
+            
             if (!response.ok) throw new Error(`Primary model status: ${response.status}`);
             return response;
+
         } catch (error) {
             if (error.name === 'AbortError') throw error; 
-            const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash:generateContent?key=${userKey}`;
-            return await fetch(fallbackUrl, fetchOptions);
+            console.warn("Primary channel unavailable. Falling back to Flash...", error);
+            
+            // 🚨 UPDATED FALLBACK: Pointing to a valid active model from your list
+            const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${userKey}`;
+            
+            const fallbackResponse = await fetch(fallbackUrl, fetchOptions);
+            if (!fallbackResponse.ok) throw new Error(`Fallback model status: ${fallbackResponse.status}`);
+            return fallbackResponse;
         }
-    } else {
-        // If passing to your proxy, you need to send the model ID so the backend knows which to hit
-        payloadObject.model = modelId; 
-        return await fetch(`${PROXY_BASE_URL}/api/chat`, fetchOptions);
+    } 
+    
+    // TIER 2: Proxy Gateway (No Personal Key - Uses Server Key)
+    else {
+        console.log(`Proxy Route Active: Forwarding request for ${modelId} to Central Gateway...`);
+        
+        // ONLY inject the model name here, because your Python proxy expects it.
+        payloadObject.model = modelId;
+        
+        const proxyOptions = {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payloadObject)
+        };
+        if (abortSignal) proxyOptions.signal = abortSignal;
+
+        return await fetch(`${PROXY_BASE_URL}/api/chat`, proxyOptions);
     }
 }
 
@@ -236,9 +262,9 @@ window.triggerEditLastInput = (e) => {
 
 function getModelInfo(val) {
     val = parseInt(val);
-    if(val === 20) return { name: "Gemini Flash-Lite", id: "gemini-3.1-flash-lite-preview" };
-    if(val === 40) return { name: "Gemini 3 Flash", id: "gemini-3-flash-preview" };
-    if(val === 60) return { name: "Gemini Thinking", id: "gemini-3.5-flash-preview" }; 
+    if(val === 20) return { name: "Gemini 3.1 Flash-Lite", id: "gemini-3.1-flash-lite" };
+    if(val === 40) return { name: "Gemini 3.5 Flash", id: "gemini-3.5-flash" };
+    if(val === 60) return { name: "Gemini Live Preview", id: "gemini-3.1-flash-live-preview" }; 
     if(val === 80) return { name: "Gemini 3.1 Pro Preview", id: "gemini-3.1-pro-preview" }; 
     return { name: "Gemini 3.1 Pro Preview", id: "gemini-3.1-pro-preview" }; // Fallback default
 }
