@@ -45,41 +45,60 @@ function enforceFullscreen() {
 
 
 // --- 1. DATA STRUCTURES & CONFIG ---
-const PROXY_BASE_URL = "https://eprashala.pythonanywhere.com";
+const PROXY_BASE_URL = "https://eprashala-proxy-511804777001.asia-south1.run.app";
 
-async function fetchGeminiChat(payloadObject, abortSignal) {
+async function fetchGeminiChat(payloadObject, abortSignal, modelId) {
     const userKey = document.getElementById('custom-api-key-input').value.trim() || '';
-    
-    // Package request options and bind the AbortController signal if active
-    const fetchOptions = {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payloadObject)
-    };
-    if (abortSignal) fetchOptions.signal = abortSignal;
 
-    // TIER 1: User has their own key -> Direct browser handoff to Google
+    // TIER 1: User Direct Route (Personal API Key)
     if (userKey && userKey.length > 10) {
+        
+        // 🚨 STRICT REQUIREMENT: Remove 'model' from the JSON body or Google will reject it.
+        delete payloadObject.model;
+
+        const fetchOptions = {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payloadObject)
+        };
+        if (abortSignal) fetchOptions.signal = abortSignal;
+
         try {
-            console.log("Direct Route Active: Targeting gemini-flash-latest...");
-            const primaryUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${userKey}`;
+            console.log(`Direct Route Active: Targeting ${modelId}...`);
+            const primaryUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${userKey}`;
             const response = await fetch(primaryUrl, fetchOptions);
             
             if (!response.ok) throw new Error(`Primary model status: ${response.status}`);
             return response;
 
         } catch (error) {
-            if (error.name === 'AbortError') throw error; // Halt immediately if user triggered cancellation
-            console.warn("Primary channel busy/unavailable. Re-routing to fallback...", error);
-            const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${userKey}`;
-            return await fetch(fallbackUrl, fetchOptions);
+            if (error.name === 'AbortError') throw error; 
+            console.warn("Primary channel unavailable. Falling back to Flash...", error);
+            
+            // 🚨 UPDATED FALLBACK: Pointing to a valid active model from your list
+            const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${userKey}`;
+            
+            const fallbackResponse = await fetch(fallbackUrl, fetchOptions);
+            if (!fallbackResponse.ok) throw new Error(`Fallback model status: ${fallbackResponse.status}`);
+            return fallbackResponse;
         }
     } 
     
-    // TIER 2: No personal key provided -> Route to your centralized Mumbai proxy server
+    // TIER 2: Proxy Gateway (No Personal Key - Uses Server Key)
     else {
-        console.log("Proxy Route Active: Routing through centralized gateway...");
-        return await fetch(`${PROXY_BASE_URL}/api/chat`, fetchOptions);
+        console.log(`Proxy Route Active: Forwarding request for ${modelId} to Central Gateway...`);
+        
+        // ONLY inject the model name here, because your Python proxy expects it.
+        payloadObject.model = modelId;
+        
+        const proxyOptions = {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payloadObject)
+        };
+        if (abortSignal) proxyOptions.signal = abortSignal;
+
+        return await fetch(`${PROXY_BASE_URL}/api/chat`, proxyOptions);
     }
 }
 
@@ -102,6 +121,10 @@ const UI = {
     btnSharePdf: document.getElementById('btn-share-pdf'),
     iconVol: document.getElementById('icon-vol'),
     iconMute: document.getElementById('icon-mute'),
+	ratioSlider: document.getElementById('ratio-slider'),
+    modelSlider: document.getElementById('model-slider'),
+    ratioVal: document.getElementById('ratio-val'),
+    modelVal: document.getElementById('model-val'),
     
     // Multimodal & Crop Additions
     btnQuizManual: document.getElementById('btn-quiz-manual'), 
@@ -197,6 +220,7 @@ function updateEditPencil() {
     }
 }
 
+
 window.triggerEditLastInput = (e) => {
     if(e) e.stopPropagation();
 
@@ -236,6 +260,22 @@ window.triggerEditLastInput = (e) => {
     updateEditPencil();
 };
 
+function getModelInfo(val) {
+    val = parseInt(val);
+    if(val === 20) return { name: "Gemini 3.1 Flash-Lite", id: "gemini-3.1-flash-lite" };
+    if(val === 40) return { name: "Gemini 3.5 Flash", id: "gemini-3.5-flash" };
+    if(val === 60) return { name: "Gemini Live Preview", id: "gemini-3.1-flash-live-preview" }; 
+    if(val === 80) return { name: "Gemini 3.1 Pro Preview", id: "gemini-3.1-pro-preview" }; 
+    return { name: "Gemini 3.1 Pro Preview", id: "gemini-3.1-pro-preview" }; // Fallback default
+}
+
+function updateRightSliderLabels() {
+    if (!UI.ratioSlider || !UI.modelSlider) return;
+    const rVal = UI.ratioSlider.value;
+    UI.ratioVal.innerText = `${rVal}% Book / ${100 - rVal}% AI`;
+    const mVal = UI.modelSlider.value;
+    UI.modelVal.innerText = `${getModelInfo(mVal).name}`;
+}
 // --- 3. INITIALIZATION ---
 window.onload = async () => {
     try {
@@ -286,7 +326,8 @@ function updateSubjectsList() {
     
     // Check if the data exists for the selected medium and standard
     if (syllabusIndex[medium] && syllabusIndex[medium][std]) {
-        const subjects = syllabusIndex[medium][std];
+        const subjectsObj = syllabusIndex[medium][std];
+        const subjects = Object.keys(subjectsObj); // Extract keys for subjects
         
         subjects.forEach(sub => {
             const opt = document.createElement('option');
@@ -294,13 +335,64 @@ function updateSubjectsList() {
             opt.text = sub;
             UI.selSub.appendChild(opt);
         });
+
+        // Trigger chapter display for the first loaded subject
+        if (subjects.length > 0) {
+            displayChapterList(medium, std, subjects[0]);
+        }
     } else {
-        // Fallback if no subjects are found for that specific index
+        // Fallback if no subjects are found
         const opt = document.createElement('option');
         opt.value = "";
         opt.text = "No subjects available";
         UI.selSub.appendChild(opt);
     }
+}
+
+function displayChapterList(medium, std, subject) {
+    if (!subject) return;
+    const chapters = syllabusIndex[medium][std][subject];
+    
+    if (!chapters || chapters.length === 0) return;
+
+    let html = `<div class="text-sky-300 text-sm mb-3 font-bold">Select a chapter below or type its name to start:</div>`;
+    html += `<div class="flex flex-wrap gap-2">`;
+    
+    chapters.forEach((chap, index) => {
+        // Escape quotes to prevent HTML breakage
+        const chapterText = chap.replace(/"/g, '&quot;');
+        html += `<button class="chapter-btn inline-flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-sky-600 text-sky-400 hover:text-white rounded-lg transition-colors text-xs font-bold border border-sky-500/30 shadow-sm" data-chapter="${chapterText}">Chapter ${index + 1}: ${chapterText}</button>`;
+    });
+    
+    html += `</div>`;
+    
+    renderSystemMessage("Curriculum System", html);
+}
+
+function renderSystemMessage(sender, htmlContent) {
+    const msgId = 'msg-' + Date.now();
+    const div = document.createElement('div');
+    
+    // Using your app's existing model message styling
+    div.className = `msg-container p-4 rounded-2xl bg-[#0f172a]/90 border border-slate-700/50 shadow-lg ml-2 mr-8 mb-4`;
+    div.innerHTML = `
+        <div class="text-[10px] uppercase font-bold tracking-wider text-sky-400 cinzel mb-2">${sender}</div>
+        <div class="text-sm leading-relaxed text-gray-100">${htmlContent}</div>
+    `;
+    
+    UI.log.appendChild(div);
+    
+    // Attach click listeners to all chapter buttons to auto-start the chat
+    div.querySelectorAll('.chapter-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const chapterName = e.target.getAttribute('data-chapter');
+            // Populate the input and simulate sending
+            UI.textIn.value = `I want to study ${chapterName}. Please teach me.`;
+            processInput(UI.textIn.value);
+        });
+    });
+    
+    setTimeout(() => { UI.log.scrollTop = UI.log.scrollHeight; }, 50);
 }
 
 function updateLeftSliderLabels() {
@@ -325,7 +417,12 @@ function loadData() {
     UI.name.value = localStorage.getItem('edu_name') || "";
     UI.age.value = localStorage.getItem('edu_age') || "";
     UI.keyIn.value = localStorage.getItem('edu_api_key') || "";
-    
+    if (UI.ratioSlider) {
+    UI.ratioSlider.value = localStorage.getItem('edu_ratio') || "80";
+    UI.modelSlider.value = localStorage.getItem('edu_model') || "80"; // Defaulting to 80 (Pro Preview)
+    updateRightSliderLabels();
+	}
+	
     if (UI.ttsEngine && localStorage.getItem('edu_tts_engine')) {
         UI.ttsEngine.value = localStorage.getItem('edu_tts_engine');
     }
@@ -389,6 +486,10 @@ function saveData() {
     localStorage.setItem('edu_remember', UI.remember.checked);
 	localStorage.setItem('edu_score', inningsScore);
     
+	if (UI.ratioSlider) {
+    localStorage.setItem('edu_ratio', UI.ratioSlider.value);
+    localStorage.setItem('edu_model', UI.modelSlider.value);
+	}
     if (UI.ttsEngine) localStorage.setItem('edu_tts_engine', UI.ttsEngine.value);
     
     localStorage.setItem('edu_font_size', UI.fontSizeSlider.value);
@@ -624,9 +725,19 @@ function updateStopButtonVisibility() {
 
 // --- 6. EVENT LISTENERS ---
 function setupEventListeners() {
-	UI.selMedium.addEventListener('change', () => { updateSubjectsList();  saveData(); });
-    UI.selStd.addEventListener('change', () => { updateSubjectsList(); saveData(); });
-    UI.selSub.addEventListener('change', saveData);
+	UI.selMedium.addEventListener('change', () => { updateSubjectsList(); saveData(); });
+	UI.selStd.addEventListener('change', () => { updateSubjectsList(); saveData(); });
+	UI.selSub.addEventListener('change', () => {
+		saveData();
+		displayChapterList(UI.selMedium.value, UI.selStd.value, UI.selSub.value);
+	});
+	if (UI.ratioSlider) {
+    UI.ratioSlider.addEventListener('input', () => { updateRightSliderLabels(); saveData(); });
+	}
+	if (UI.modelSlider) {
+		UI.modelSlider.addEventListener('input', () => { updateRightSliderLabels(); saveData(); });
+	}
+	
     if (UI.ttsEngine) UI.ttsEngine.addEventListener('change', saveData);
 
     // Right Modal Events
@@ -921,6 +1032,11 @@ async function getAIResponse(history) {
     const sub = UI.selSub.value;
     const customKey = (UI.keyIn.value.trim().length > 10) ? UI.keyIn.value.trim() : null;
     const headers = { 'Content-Type': 'application/json' };
+	const bookRatio = UI.ratioSlider ? parseInt(UI.ratioSlider.value) : 80;
+    const aiRatio = 100 - bookRatio;
+    const selectedModelInfo = UI.modelSlider ? getModelInfo(UI.modelSlider.value) : { id: "gemini-3.1-pro-preview" };
+	const ratioInstruction = `\nCRITICAL ACCURACY RATIO: Your answer must be exactly ${bookRatio}% strict, factual data retrieved exclusively from the official Maharashtra Balbharati textbook, and ${aiRatio}% gentle contextualization for the user. Do not hallucinate syllabus content.`;
+	
     if (customKey) headers['X-Custom-Api-Key'] = customKey;
 
     let prompt = "";
@@ -972,9 +1088,8 @@ const payload = {
     };
 
     currentAborter = new AbortController();
+const response = await fetchGeminiChat(payload, currentAborter.signal, selectedModelInfo.id);
 
-    // Pass both the payload and the operational abort signal into the router
-    const response = await fetchGeminiChat(payload, currentAborter.signal);
     
     if (!response.ok) throw new Error('API Error');
     const data = await response.json();
