@@ -18,7 +18,7 @@ async function fetchGeminiChat(payloadObject) {
             if (!response.ok) throw new Error(`Primary model status: ${response.status}`);
             return response;
         } catch (error) {
-            return await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${userKey.trim()}`, {
+            return await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${userKey.trim()}`, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payloadObject)
             });
         }
