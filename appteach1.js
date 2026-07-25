@@ -396,16 +396,17 @@ function renderSystemMessage(sender, htmlContent) {
     UI.log.appendChild(div);
     
     // Attach click listeners to all chapter buttons to auto-start the chat
-    div.querySelectorAll('.chapter-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            // FIX: Changed e.target to e.currentTarget
-            const chapterName = e.currentTarget.getAttribute('data-chapter');
-            
-            // Populate the input and simulate sending
-            UI.textIn.value = `I want to study ${chapterName}. Please teach me.`;
-            processInput(UI.textIn.value);
-        });
-    });
+		div.querySelectorAll('.chapter-btn').forEach(btn => {
+			btn.addEventListener('click', (e) => {
+				const chapterName = e.currentTarget.getAttribute('data-chapter');
+				const std = UI.selStd.value;
+				const sub = UI.selSub.value;
+				
+				// Explicit prompt emphasizing the exact updated chapter
+				UI.textIn.value = `I want to study Chapter "${chapterName}" for Standard ${std} (${sub}). Please start teaching me this exact updated chapter topic.`;
+				processInput(UI.textIn.value);
+			});
+		});
     
     setTimeout(() => { UI.log.scrollTop = UI.log.scrollHeight; }, 50);
 }
@@ -1048,27 +1049,37 @@ async function getAIResponse(history) {
     const sub = UI.selSub.value;
     const customKey = (UI.keyIn.value.trim().length > 10) ? UI.keyIn.value.trim() : null;
     const headers = { 'Content-Type': 'application/json' };
-	const bookRatio = UI.ratioSlider ? parseInt(UI.ratioSlider.value) : 80;
+    const bookRatio = UI.ratioSlider ? parseInt(UI.ratioSlider.value) : 80;
     const aiRatio = 100 - bookRatio;
     const selectedModelInfo = UI.modelSlider ? getModelInfo(UI.modelSlider.value) : { id: "gemini-3.1-pro-preview" };
-	const ratioInstruction = `\nCRITICAL ACCURACY RATIO: Your answer must be exactly ${bookRatio}% strict, factual data retrieved exclusively from the official Maharashtra Balbharati textbook, and ${aiRatio}% gentle contextualization for the user. Do not hallucinate syllabus content.`;
-	
+    
     if (customKey) headers['X-Custom-Api-Key'] = customKey;
 
     let prompt = "";
+
+    // GROUND TRUTH DIRECTIVE FOR RECENT SYLLABUS REVISIONS
+    const syllabusAuthorityNotice = `
+    CRITICAL SYLLABUS DIRECTIVE:
+    The Maharashtra State Board (Balbharati) textbook curriculum has undergone major updates. 
+    You MUST treat the exact chapter title specified in the user request as the absolute ground-truth topic from the latest official textbook. 
+    Do NOT attempt to correct, rename, or substitute chapter titles based on older textbook editions, legacy syllabus mappings, or historical memory. Teach strictly according to the chapter name provided.`;
 
     if (role === 'Teacher') {
         const teacherName = UI.name.value ? ` as ${UI.name.value}` : "";
         prompt = `You are an expert educational assistant helping a fellow teacher${teacherName}.
         Context: Maharashtra State Board (Balbharati), Standard ${std}, Subject: "${sub}", Medium: ${med}.
+        
+        ${syllabusAuthorityNotice}
+
         CRITICAL RULES:
-        1. Strictly adhere to the syllabus.
+        1. Strictly adhere to the updated syllabus topic requested.
         2. Tone: Professional, helpful, collaborative.
         3. Language: Primary language is ${med}.
-        4. FORMATTING: Use Markdown to format your response neatly (use **bold** for emphasis, bullet points for lists, and short paragraphs). Do NOT use complex LaTeX.
-        5. MEDIA LINKS: At the very end of your response, provide EXACTLY two lines formatted like this for further visual exploration. The keywords must accurately reflect the specific topic, subject (${sub}), and standard (${std}) in the ${med} medium:
-           YT_SEARCH: relevant_topic_keywords
-           IMG_SEARCH: relevant_topic_keywords`;
+        4. ACCURACY RATIO: Maintain ${bookRatio}% factual alignment with the requested chapter and ${aiRatio}% gentle contextual teaching.
+        5. FORMATTING: Use Markdown to format your response neatly (use **bold** for emphasis, bullet points for lists, and short paragraphs). Do NOT use complex LaTeX.
+        6. MEDIA LINKS: At the very end of your response, provide EXACTLY two lines formatted like this:
+           YT_SEARCH: Standard ${std} ${sub} ${med} medium relevant_topic_keywords
+           IMG_SEARCH: Standard ${std} ${sub} ${med} medium relevant_topic_keywords`;
     } else {
         const studentName = UI.name.value || "Child";
         const estimatedAge = parseInt(std) + 5;
@@ -1079,34 +1090,37 @@ async function getAIResponse(history) {
             "Use EXTREMELY simple words. Keep answers SHORT, highly nurturing. Talk to them like a loving primary school teacher." : 
             "Use clear, encouraging explanations appropriate for a teenager.";
 
-		prompt = `You are a highly polite, caring, and expert teacher.
+        prompt = `You are a highly polite, caring, and expert teacher.
         Context: You are teaching a student named ${studentName} (Age: ~${finalAge}), in Standard ${std}, Subject: "${sub}", Medium: ${med} (Maharashtra State Board).
+        
+        ${syllabusAuthorityNotice}
+
         CRITICAL RULES:
         1. PERSONA: Answer in a gender-neutral, deeply caring way. Address them affectionately with respect.
-        2. EXPERTISE: Draw explanations strictly from the textbook for this grade.
+        2. EXPERTISE: Draw explanations strictly from the textbook topic requested by the student.
         3. COMPLEXITY & LENGTH: ${toneInstruction}
         4. Language: Primary language is ${med}.
-        5. FORMATTING: Use Markdown to format your response neatly (use **bold** for emphasis, bullet points for lists, and short paragraphs). Do NOT use complex LaTeX.
-        6. GAMIFICATION (CRICKET THEME): Act as an automated umpire to score the student's progress. Append a hidden tag exactly like [SCORE:X] at the very end of your response if they hit a milestone.
+        5. ACCURACY RATIO: Maintain ${bookRatio}% strict factual accuracy with the latest textbook and ${aiRatio}% engaging guidance.
+        6. FORMATTING: Use Markdown to format your response neatly (use **bold** for emphasis, bullet points for lists, and short paragraphs). Do NOT use complex LaTeX.
+        7. GAMIFICATION (CRICKET THEME): Act as an automated umpire to score the student's progress. Append a hidden tag exactly like [SCORE:X] at the very end of your response if they hit a milestone.
            - [SCORE:4] if they grasp a major topic (Boundary).
            - [SCORE:6] if they answer a quiz question perfectly (Sixer).
            - [SCORE:50] if they show 50% mastery of the current lesson (Fifty).
            - [SCORE:100] if they fully complete and master the chapter (Century).
            IMPORTANT: Do NOT explain the score or mention the tag to the user, just output the tag silently.
-        7. MEDIA LINKS: At the very end of your response, provide EXACTLY two lines formatted like this for further visual exploration. The keywords must accurately reflect the specific topic, subject (${sub}), and standard (${std}) in the ${med} medium:
-           YT_SEARCH: relevant_topic_keywords
-           IMG_SEARCH: relevant_topic_keywords`; 
+        8. MEDIA LINKS: At the very end of your response, provide EXACTLY two lines formatted like this:
+           YT_SEARCH: Standard ${std} ${sub} ${med} medium relevant_topic_keywords
+           IMG_SEARCH: Standard ${std} ${sub} ${med} medium relevant_topic_keywords`; 
     }
 
-const payload = { 
+    const payload = { 
         contents: history.slice(-10), 
         systemInstruction: { parts: [{ text: prompt }] } 
     };
 
     currentAborter = new AbortController();
-const response = await fetchGeminiChat(payload, currentAborter.signal, selectedModelInfo.id);
+    const response = await fetchGeminiChat(payload, currentAborter.signal, selectedModelInfo.id);
 
-    
     if (!response.ok) throw new Error('API Error');
     const data = await response.json();
     return data.candidates[0].content.parts[0].text;
@@ -1117,11 +1131,12 @@ const response = await fetchGeminiChat(payload, currentAborter.signal, selectedM
 function prepareTextForTTSAndHighlighting(container, msgId) {
     const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
         acceptNode: function(node) {
-            // Do not highlight or process text inside the video/image buttons
+            // Do not highlight or process text inside external link buttons
             if (node.parentNode && node.parentNode.closest('.external-link-btn')) return NodeFilter.FILTER_REJECT;
             return NodeFilter.FILTER_ACCEPT;
         }
     }, false);
+    
     const textNodes = [];
     let node;
     
@@ -1131,6 +1146,7 @@ function prepareTextForTTSAndHighlighting(container, msgId) {
 
     let wordCounter = 0;
     let finalSpeechText = [];
+    let insideBracket = false; // Tracks if we are currently reading inside () [] or {}
 
     textNodes.forEach(textNode => {
         const parts = textNode.nodeValue.split(/(\s+)/); 
@@ -1139,12 +1155,38 @@ function prepareTextForTTSAndHighlighting(container, msgId) {
         parts.forEach(part => {
             if (part.trim().length > 0) {
                 const span = document.createElement('span');
-                span.id = `tts-${msgId}-${wordCounter}`;
                 span.className = 'transition-all duration-150'; 
                 span.textContent = part;
+                
+                let skipThisWord = false;
+                
+                // If the word contains an opening bracket, enter 'skip mode'
+                if (/[\(\[\{]/.test(part)) {
+                    insideBracket = true;
+                }
+                
+                if (insideBracket) {
+                    skipThisWord = true;
+                }
+                
+                // If the word contains a closing bracket, exit 'skip mode' for the next word
+                if (/[\)\]\}]/.test(part)) {
+                    insideBracket = false;
+                }
+
+                // Only add the word to the TTS engine if we aren't inside brackets
+                if (!skipThisWord) {
+                    // Assign the ID so the visual highlighter finds it
+                    span.id = `tts-${msgId}-${wordCounter}`;
+                    
+                    // Replace : and ; with a full stop so the TTS engine takes a breath
+                    let spokenWord = part.replace(/[:;]/g, '.');
+                    
+                    finalSpeechText.push(spokenWord);
+                    wordCounter++;
+                }
+                
                 fragment.appendChild(span);
-                finalSpeechText.push(part);
-                wordCounter++;
             } else {
                 fragment.appendChild(document.createTextNode(part));
             }
@@ -1676,19 +1718,13 @@ function renderMessage(sender, text, isModel) {
 if (isModel) {
         const mdBody = div.querySelector('.markdown-body');
         
-        // Deep sanitization: Strip tags, brackets, and markdown symbols so the TTS reads cleanly
-        const cleanTextForTTS = text
-            .replace(/YT_SEARCH:.*$/gm, '')
-            .replace(/IMG_SEARCH:.*$/gm, '')
-            .replace(/\[SCORE:\d+\]/g, '')
-            .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Extract text from markdown links
-            .replace(/<[^>]+>/g, ' ')               // Strip HTML tags and replace with space
-            .replace(/[\*<>\#\-;:\[\]{}\(\)`~_]/g, ' ') // Target deep symbols and punctuation
-            .replace(/\s+/g, ' ')                   // Collapse any double spaces created by removal
-            .trim();
-            
+        // Use the newly engineered preparation function to generate 
+        // the audio text. It handles bracket skipping, colon pausing, 
+        // and synchronizes the highlighter perfectly!
         const speechText = prepareTextForTTSAndHighlighting(mdBody, msgId);
-        speechDataMap[msgId] = cleanTextForTTS;
+        
+        // Save the cleaned speech text to the audio map
+        speechDataMap[msgId] = speechText;
     }
     
     updateEditPencil();
