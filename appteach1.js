@@ -327,8 +327,16 @@ function updateSubjectsList() {
     // Check if the data exists for the selected medium and standard
     if (syllabusIndex[medium] && syllabusIndex[medium][std]) {
         const subjectsObj = syllabusIndex[medium][std];
-        const subjects = Object.keys(subjectsObj); // Extract keys for subjects
+        const subjects = Object.keys(subjectsObj); 
         
+        // Add a disabled default option so the user MUST actively select a subject
+        const defaultOpt = document.createElement('option');
+        defaultOpt.value = "";
+        defaultOpt.text = "-- Select a Subject --";
+        defaultOpt.disabled = true;
+        defaultOpt.selected = true;
+        UI.selSub.appendChild(defaultOpt);
+
         subjects.forEach(sub => {
             const opt = document.createElement('option');
             opt.value = sub;
@@ -336,10 +344,8 @@ function updateSubjectsList() {
             UI.selSub.appendChild(opt);
         });
 
-        // Trigger chapter display for the first loaded subject
-        if (subjects.length > 0) {
-            displayChapterList(medium, std, subjects[0]);
-        }
+        // REMOVED: displayChapterList(...) is no longer auto-triggered here.
+        
     } else {
         // Fallback if no subjects are found
         const opt = document.createElement('option');
@@ -356,12 +362,19 @@ function displayChapterList(medium, std, subject) {
     if (!chapters || chapters.length === 0) return;
 
     let html = `<div class="text-sky-300 text-sm mb-3 font-bold">Select a chapter below or type its name to start:</div>`;
-    html += `<div class="flex flex-wrap gap-2">`;
+    
+    // Changed to 'flex-col' for a vertical index layout
+    html += `<div class="flex flex-col gap-2 w-full">`;
     
     chapters.forEach((chap, index) => {
         // Escape quotes to prevent HTML breakage
         const chapterText = chap.replace(/"/g, '&quot;');
-        html += `<button class="chapter-btn inline-flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-sky-600 text-sky-400 hover:text-white rounded-lg transition-colors text-xs font-bold border border-sky-500/30 shadow-sm" data-chapter="${chapterText}">Chapter ${index + 1}: ${chapterText}</button>`;
+        
+        // Styled as full-width list items
+        html += `<button class="chapter-btn flex items-center justify-start w-full gap-3 px-4 py-3 bg-slate-800 hover:bg-sky-600 text-sky-400 hover:text-white rounded-lg transition-colors text-sm font-bold border border-sky-500/30 shadow-sm text-left" data-chapter="${chapterText}">
+            <span class="text-sky-500/70 whitespace-nowrap">Chapter ${index + 1}:</span> 
+            <span>${chapterText}</span>
+        </button>`;
     });
     
     html += `</div>`;
@@ -385,7 +398,9 @@ function renderSystemMessage(sender, htmlContent) {
     // Attach click listeners to all chapter buttons to auto-start the chat
     div.querySelectorAll('.chapter-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            const chapterName = e.target.getAttribute('data-chapter');
+            // FIX: Changed e.target to e.currentTarget
+            const chapterName = e.currentTarget.getAttribute('data-chapter');
+            
             // Populate the input and simulate sending
             UI.textIn.value = `I want to study ${chapterName}. Please teach me.`;
             processInput(UI.textIn.value);
@@ -728,6 +743,7 @@ function setupEventListeners() {
 	UI.selMedium.addEventListener('change', () => { updateSubjectsList(); saveData(); });
 	UI.selStd.addEventListener('change', () => { updateSubjectsList(); saveData(); });
 	UI.selSub.addEventListener('change', () => {
+		clearData(); 
 		saveData();
 		displayChapterList(UI.selMedium.value, UI.selStd.value, UI.selSub.value);
 	});
