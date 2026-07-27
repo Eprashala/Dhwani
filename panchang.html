@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>संपूर्ण वैदिक पंचांग आणि विज्ञान - गुरुजी</title>
+	<meta name="theme-color" content="#ea580c">
+    <link rel="manifest" href="/panchang_manifest.json">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.8.0/suncalc.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -189,6 +191,24 @@ body {
         </a>
 
     </header>
+	
+	<!-- Install App Banner (Hidden by default) -->
+    <div id="install-banner" class="hidden container mx-auto px-4 max-w-6xl mt-4">
+        <div class="bg-white border-l-4 border-orange-500 shadow-md p-4 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-orange-100 p-2 rounded-full">
+                    <i class="fas fa-download text-xl text-orange-600"></i>
+                </div>
+                <div>
+                    <h4 class="font-bold text-gray-800 text-lg">पंचांग ॲप इंस्टॉल करा</h4>
+                    <p class="text-sm text-gray-600">ऑफलाईन वापरासाठी हे ॲप तुमच्या मोबाईलवर घ्या.</p>
+                </div>
+            </div>
+            <button id="install-btn" class="w-full sm:w-auto bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:-translate-y-1">
+                इंस्टॉल करा (Install)
+            </button>
+        </div>
+    </div>
 
     <div class="container mx-auto px-4 max-w-6xl">
 
@@ -2188,8 +2208,67 @@ function showYamardhaList() {
             modal.classList.remove('hidden');
             modal.classList.add('flex');
         }
+// --- PWA INSTALLATION LOGIC ---
+        let deferredPrompt;
+        const installBanner = document.getElementById('install-banner');
+        const installBtn = document.getElementById('install-btn');
+
+        // Catch the default browser install prompt
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // Prevent the browser from showing its default mini-infobar
+            e.preventDefault();
+            
+            // Stash the event so it can be triggered later when the user clicks our button
+            deferredPrompt = e;
+            
+            // Unhide our custom install banner
+            installBanner.classList.remove('hidden');
+        });
+
+        // Trigger installation when the custom button is clicked
+        installBtn.addEventListener('click', async () => {
+            // Hide our banner
+            installBanner.classList.add('hidden');
+            
+            if (deferredPrompt) {
+                // Show the native install prompt to the user
+                deferredPrompt.prompt();
+                
+                // Wait for the user's choice
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    console.log('User accepted the PWA installation');
+                } else {
+                    console.log('User dismissed the PWA installation');
+                    // Optional: Show the banner again if they canceled, or leave it hidden
+                    installBanner.classList.remove('hidden');
+                }
+                
+                // The prompt() can only be used once, so clear it out
+                deferredPrompt = null;
+            }
+        });
+
+        // Listen for successful installation (from our button or browser menu)
+        window.addEventListener('appinstalled', () => {
+            // Ensure the banner is hidden forever once installed
+            installBanner.classList.add('hidden');
+            deferredPrompt = null;
+            console.log('Panchang PWA was successfully installed');
+        });
+
 
         window.onload = init;
+    </script>
+<script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          // Note the explicit scope linking to this specific HTML file
+          navigator.serviceWorker.register('/panchang_sw.js', { scope: '/panchang.html' })
+            .then(reg => console.log('Panchang Service Worker registered!'))
+            .catch(err => console.log('Service Worker registration failed:', err));
+        });
+      }
     </script>
 </body>
 </html>
