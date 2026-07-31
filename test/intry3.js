@@ -287,11 +287,22 @@ function enforceFullScreen() {
     }
 }
 
+const safeFullScreen = (e) => {
+    // Do not trigger fullscreen if the user is interacting with an input box
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) {
+        return;
+    }
+    enforceFullScreen();
+};
+
+document.addEventListener('click', safeFullScreen, { capture: true });
+document.addEventListener('touchstart', safeFullScreen, { capture: true, passive: true });
+
 document.addEventListener('click', enforceFullScreen, { capture: true });
 document.addEventListener('touchstart', enforceFullScreen, { capture: true, passive: true });
 
 // --- 2. THE ANCIENT LIBRARY CONFIGURATION ---
-const PROXY_URL = "https://eprashala.pythonanywhere.com/api/chat";
+const PROXY_URL = "https://eprashala.pythonanywhere.com";
 
 let LIBRARY_CONFIG = {};
 async function loadLibraryConfig() {
@@ -500,7 +511,7 @@ function getSelectedItemName() {
 function getModelInfo(val) {
     val = parseInt(val);
     if(val === 20) return { name: "Flash-Lite", id: "gemini-3.1-flash-lite" };
-    if(val === 40) return { name: "Flash", id: "gemini-2.5-flash" };
+    if(val === 40) return { name: "Flash", id: "gemini-3-flash-preview" };
     if(val === 60) return { name: "Thinking", id: "gemini-3.5-flash" }; 
     if(val === 80) return { name: "Pro", id: "gemini-3.1-pro" };
     return { name: "Flash", id: "gemini-3.1-flash" };
@@ -971,6 +982,11 @@ function setupEventListeners() {
     UI.btnSend.onclick = (e) => { e.stopPropagation(); processInput(UI.textIn.value); };
     UI.textIn.onkeypress = (e) => { e.stopPropagation(); if(e.key === 'Enter') processInput(UI.textIn.value); };
 
+UI.textIn.addEventListener('focus', () => {
+    setTimeout(() => {
+        UI.textIn.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }, 300);
+});
 	UI.btnMic.addEventListener('click', (e) => {
         e.stopPropagation();
         if (state.isProcessing) return;
@@ -983,6 +999,85 @@ function setupEventListeners() {
         if (isListening) { recognition.stop(); } 
         else { recognition.lang = UI.lang.value; try { recognition.start(); } catch(err) {} }
     });
+	
+	// --- SMART BOOK SUGGESTIONS LOGIC ---
+    // Map everyday keywords to specific groups and books from your library
+    const keywordMap = {
+        "health": { group: "Ayurveda", item: "Charaka Samhita", label: "Health (Charaka)" },
+        "medicine": { group: "Ayurveda", item: "Sushruta Samhita", label: "Medicine (Sushruta)" },
+        "surgery": { group: "Ayurveda", item: "Sushruta Samhita", label: "Surgery (Sushruta)" },
+        "relationship": { group: "Shastra", item: "Kama Shastra", label: "Relationships" },
+        "love": { group: "Shastra", item: "Kama Shastra", label: "Love & Aesthetics" },
+        "science": { group: "Vedic Sciences", item: "Vedic Quantum Physics", label: "Quantum Science" },
+        "physics": { group: "Vedic Sciences", item: "Vedic Quantum Physics", label: "Vedic Physics" },
+        "astronomy": { group: "Jyotish", item: "Surya Siddhanta", label: "Astronomy" },
+        "stars": { group: "Jyotish", item: "Brihat Parashara", label: "Astrology" },
+        "math": { group: "Ancient Scientists & Mathematicians", item: "Aryabhata", label: "Mathematics" },
+        "law": { group: "Dharma Shastra", item: "Manusmriti", label: "Ancient Law" },
+        "sports": { group: "Ancient Sports and Martial Arts", item: "Ancient Sports and Martial Arts", label: "Ancient Sports" },
+        "cricket": { group: "Sports Science & Mindset", item: "Sachin Tendulkar", label: "Cricket Mindset" }
+    };
+
+    const suggestionsContainer = document.getElementById('book-suggestions');
+
+    UI.textIn.addEventListener('input', (e) => {
+        if (!suggestionsContainer) return;
+        
+        const text = e.target.value.toLowerCase();
+        let matchedBooks = [];
+        let matchedKeys = new Set(); // Prevent duplicate tabs if multiple keywords map to the same book
+
+        // Check if any keyword matches the user's input
+        for (const [key, data] of Object.entries(keywordMap)) {
+            if (text.includes(key)) {
+                const uniqueId = data.group + "|" + data.item;
+                if (!matchedKeys.has(uniqueId)) {
+                    matchedKeys.add(uniqueId);
+                    matchedBooks.push(data);
+                }
+            }
+        }
+
+        // Display the tabs if matches are found
+        if (matchedBooks.length > 0) {
+            suggestionsContainer.classList.remove('hidden');
+            suggestionsContainer.innerHTML = matchedBooks.map(book => 
+                `<button type="button" 
+                    onclick="window.selectSuggestedBook('${book.group}', '${book.item}')" 
+                    class="whitespace-nowrap px-4 py-1.5 bg-cyan-900/60 hover:bg-cyan-700 text-cyan-200 border border-cyan-600/50 rounded-full text-xs font-bold transition-all shadow-md focus:outline-none">
+                    Select: ${book.label}
+                </button>`
+            ).join('');
+        } else {
+            // Hide the tabs if no keywords are matched or text is cleared
+            suggestionsContainer.classList.add('hidden');
+            suggestionsContainer.innerHTML = '';
+        }
+    });
+
+    // Global function to handle tab clicks
+    window.selectSuggestedBook = (group, item) => {
+        selectedLibraryItem = `${group}|${item}`;
+        if (UI.ddText) UI.ddText.innerText = item;
+        
+        // Flash effect to show it was selected
+        const container = document.getElementById('dropdown-btn');
+        if (container) {
+            container.classList.add('bg-cyan-900/50', 'border-cyan-400');
+            setTimeout(() => {
+                container.classList.remove('bg-cyan-900/50', 'border-cyan-400');
+            }, 500);
+        }
+
+        // Hide suggestions after selection
+        if (suggestionsContainer) {
+            suggestionsContainer.classList.add('hidden');
+            suggestionsContainer.innerHTML = '';
+        }
+    };
+	
+	
+	
 }
 
 function initSpeechRecognition() {
@@ -1324,13 +1419,12 @@ async function getAIResponse(history, config) {
 
     let fetchUrl;
 
-    // --- NEW ROUTING LOGIC ---
-    if (customKey) {
+		if (customKey) {
         // Direct to Google AI Studio endpoint
         fetchUrl = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModelInfo.id}:generateContent?key=${customKey}`;
     } else {
         // Route through your Cloud Run proxy
-        fetchUrl = PROXY_URL;
+        fetchUrl = `${PROXY_URL}/api/chat`; // <-- FIX: Added the endpoint
         // The proxy likely expects the model name in the body payload
         payload.model = selectedModelInfo.id;
     }
@@ -1467,14 +1561,12 @@ function resetCurrentTTS() {
     if (currentActiveBtn) {
         updatePlayBtnUI(currentActiveBtn, false);
         const textSpan = currentActiveBtn.querySelector('.play-text');
-        if (textSpan) textSpan.innerText = "Play"; // Reset text
+        if (textSpan) textSpan.innerText = "Play";
         
-        // Snap the button back to its original place
         currentActiveBtn.classList.remove('is-floating');
         currentActiveBtn = null;
     }
     
-    // Fallback cleanup: remove floating state from ALL play buttons
     document.querySelectorAll('.btn-play-msg.is-floating').forEach(el => el.classList.remove('is-floating'));
     
     if (currentAudio) {
@@ -1486,15 +1578,15 @@ function resetCurrentTTS() {
     }
     if (highlightTimer) {
         clearTimeout(highlightTimer);
-        highlightTimer = null;
+        highlightTimer = null; // Always reset to null
     }
 
     clearTTSHighlight(); 
     ttsStatus = 'STOPPED';
     globalWordIndex = 0;
     window.currentPlayingText = "";
-    
-	isManuallyPaused = false;
+    isManuallyPaused = false;
+
     setTimeout(updateStopButtonVisibility, 50); 
 }
 
@@ -1511,37 +1603,50 @@ window.toggleSingleMessagePlay = (btnElem) => {
     if (currentActiveBtn === btnElem && window.currentPlayingText === plainText) {
         if (ttsStatus === 'PAUSED') {
             ttsStatus = 'PLAYING';
-            isManuallyPaused = false; // Reset the flag
             updatePlayBtnUI(btnElem, true);
             updateStopButtonVisibility(); 
             
             if (activeEngine === 'cloud') {
+                isManuallyPaused = false;
                 if (currentAudio && currentAudio.src) currentAudio.play();
                 startHighlightTimer(msgId);
             } else {
-                // ANDROID NATIVE RESUME: Wait 50ms for engine to clear, then resume remaining text
+                // NATIVE RESUME FIX:
+                // Keep isManuallyPaused = true until cancel() finishes processing
                 window.speechSynthesis.cancel();
+                
                 setTimeout(() => {
+                    isManuallyPaused = false; // Safely unlock after cancel finishes
+                    
+                    if (highlightTimer) {
+                        clearTimeout(highlightTimer);
+                        highlightTimer = null; // Clear timer reference for onstart
+                    }
+
                     const remainingText = wordsArray.slice(globalWordIndex).join(" ");
                     if (remainingText.trim()) {
                         playNativeAudioSegment(remainingText, msgId, UI.lang ? UI.lang.value : 'hi-IN');
                     } else {
                         resetCurrentTTS();
                     }
-                }, 50);
+                }, 100);
             }
             return;
         } else if (ttsStatus === 'PLAYING') {
             ttsStatus = 'PAUSED';
-            isManuallyPaused = true; // Set the flag so onend/onerror ignores this!
+            isManuallyPaused = true; // Protect pause state from triggering reset handlers
             updatePlayBtnUI(btnElem, false);
             
             if (activeEngine === 'cloud') {
                 if (currentAudio) currentAudio.pause();
             } else {
-                window.speechSynthesis.cancel(); // Stop Android instantly
+                window.speechSynthesis.cancel(); // Stop Android Native TTS
             }
-            if (highlightTimer) clearTimeout(highlightTimer);
+
+            if (highlightTimer) {
+                clearTimeout(highlightTimer);
+                highlightTimer = null; // Reset reference to allow restart on resume
+            }
             return;
         }
     }
@@ -1550,7 +1655,7 @@ window.toggleSingleMessagePlay = (btnElem) => {
     currentActiveBtn = btnElem;
     window.currentPlayingText = plainText;
     ttsStatus = 'PLAYING';
-    isManuallyPaused = false; // Ensure flag is clean on new playback
+    isManuallyPaused = false; 
     updatePlayBtnUI(btnElem, true);
     updateStopButtonVisibility(); 
 
