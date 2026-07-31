@@ -626,7 +626,7 @@ async function loadData() {
             UI.ttsPitchSlider.value = localStorage.getItem('darshan_tts_pitch') || "1.0";
             
             const savedHighlight = localStorage.getItem('darshan_highlight');
-            UI.highlightCheckbox.checked = savedHighlight !== 'false'; 
+            UI.highlightCheckbox.checked = savedHighlight === 'true'; 
             updateLeftSliderLabels();
         }
         
