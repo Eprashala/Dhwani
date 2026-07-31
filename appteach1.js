@@ -439,9 +439,12 @@ function calculateAutoSpeed() {
         finalAge = parseInt(stdStr) + 5; // Standard + 5 estimation
     }
 
-    if (finalAge >= 1 && finalAge <= 4) return "0.8";
-    if (finalAge >= 5 && finalAge <= 7) return "0.9";
-    return "1.0"; // 8 and above
+    // New Speed Rules
+    if (finalAge >= 1 && finalAge <= 3) return "0.7";
+    if (finalAge >= 4 && finalAge <= 8) return "0.8";
+    if (finalAge >= 9 && finalAge <= 13) return "0.9";
+    
+    return "1.0"; // Age 14 and above
 }
 
 // --- 4. DATA MANAGEMENT & VAULT ---
