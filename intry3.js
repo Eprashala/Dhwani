@@ -1561,14 +1561,12 @@ function resetCurrentTTS() {
     if (currentActiveBtn) {
         updatePlayBtnUI(currentActiveBtn, false);
         const textSpan = currentActiveBtn.querySelector('.play-text');
-        if (textSpan) textSpan.innerText = "Play"; // Reset text
+        if (textSpan) textSpan.innerText = "Play";
         
-        // Snap the button back to its original place
         currentActiveBtn.classList.remove('is-floating');
         currentActiveBtn = null;
     }
     
-    // Fallback cleanup: remove floating state from ALL play buttons
     document.querySelectorAll('.btn-play-msg.is-floating').forEach(el => el.classList.remove('is-floating'));
     
     if (currentAudio) {
@@ -1580,15 +1578,15 @@ function resetCurrentTTS() {
     }
     if (highlightTimer) {
         clearTimeout(highlightTimer);
-        highlightTimer = null;
+        highlightTimer = null; // Always reset to null
     }
 
     clearTTSHighlight(); 
     ttsStatus = 'STOPPED';
     globalWordIndex = 0;
     window.currentPlayingText = "";
-    
-	isManuallyPaused = false;
+    isManuallyPaused = false;
+
     setTimeout(updateStopButtonVisibility, 50); 
 }
 
@@ -1605,37 +1603,50 @@ window.toggleSingleMessagePlay = (btnElem) => {
     if (currentActiveBtn === btnElem && window.currentPlayingText === plainText) {
         if (ttsStatus === 'PAUSED') {
             ttsStatus = 'PLAYING';
-            isManuallyPaused = false; // Reset the flag
             updatePlayBtnUI(btnElem, true);
             updateStopButtonVisibility(); 
             
             if (activeEngine === 'cloud') {
+                isManuallyPaused = false;
                 if (currentAudio && currentAudio.src) currentAudio.play();
                 startHighlightTimer(msgId);
             } else {
-                // ANDROID NATIVE RESUME: Wait 50ms for engine to clear, then resume remaining text
+                // NATIVE RESUME FIX:
+                // Keep isManuallyPaused = true until cancel() finishes processing
                 window.speechSynthesis.cancel();
+                
                 setTimeout(() => {
+                    isManuallyPaused = false; // Safely unlock after cancel finishes
+                    
+                    if (highlightTimer) {
+                        clearTimeout(highlightTimer);
+                        highlightTimer = null; // Clear timer reference for onstart
+                    }
+
                     const remainingText = wordsArray.slice(globalWordIndex).join(" ");
                     if (remainingText.trim()) {
                         playNativeAudioSegment(remainingText, msgId, UI.lang ? UI.lang.value : 'hi-IN');
                     } else {
                         resetCurrentTTS();
                     }
-                }, 50);
+                }, 100);
             }
             return;
         } else if (ttsStatus === 'PLAYING') {
             ttsStatus = 'PAUSED';
-            isManuallyPaused = true; // Set the flag so onend/onerror ignores this!
+            isManuallyPaused = true; // Protect pause state from triggering reset handlers
             updatePlayBtnUI(btnElem, false);
             
             if (activeEngine === 'cloud') {
                 if (currentAudio) currentAudio.pause();
             } else {
-                window.speechSynthesis.cancel(); // Stop Android instantly
+                window.speechSynthesis.cancel(); // Stop Android Native TTS
             }
-            if (highlightTimer) clearTimeout(highlightTimer);
+
+            if (highlightTimer) {
+                clearTimeout(highlightTimer);
+                highlightTimer = null; // Reset reference to allow restart on resume
+            }
             return;
         }
     }
@@ -1644,7 +1655,7 @@ window.toggleSingleMessagePlay = (btnElem) => {
     currentActiveBtn = btnElem;
     window.currentPlayingText = plainText;
     ttsStatus = 'PLAYING';
-    isManuallyPaused = false; // Ensure flag is clean on new playback
+    isManuallyPaused = false; 
     updatePlayBtnUI(btnElem, true);
     updateStopButtonVisibility(); 
 
