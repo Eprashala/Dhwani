@@ -492,6 +492,7 @@ function loadData() {
 				}
 				
 				const savedHighlight = localStorage.getItem('edu_highlight');	
+		}
 				
     if (UI.remember.checked) {
         const savedHist = localStorage.getItem('edu_all_history');
