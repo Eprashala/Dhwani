@@ -997,7 +997,7 @@ UI.textIn.addEventListener('focus', () => {
     const handleMicDown = (e) => {
         e.preventDefault(); 
         e.stopPropagation(); 
-        enforceFullscreen();
+        enforceFullScreen(); // FIXED: Capital 'S' to match the function in this file
         
         if (state.isProcessing || !recognition) {
             if (!recognition) alert("Speech recognition is not supported in this browser.");
@@ -1019,7 +1019,8 @@ UI.textIn.addEventListener('focus', () => {
         finalMicTranscript = '';
         UI.textIn.value = '';
         
-        recognition.lang = UI.selMedium.value === 'Marathi' ? 'mr-IN' : 'en-IN'; 
+        // FIXED: Using UI.lang.value which is the correct dropdown for intry3.js
+        recognition.lang = UI.lang.value; 
         try { recognition.start(); } catch(err) { console.error(err); }
     };
 
