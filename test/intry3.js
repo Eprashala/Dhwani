@@ -1057,7 +1057,7 @@ UI.textIn.addEventListener('focus', () => {
     UI.btnMic.addEventListener('touchend', handleMicUp);
     
     UI.btnMic.addEventListener('mouseleave', handleMicLeave);
-}
+
 	
 	// --- SMART BOOK SUGGESTIONS LOGIC ---
     // Map everyday keywords to specific groups and books from your library
