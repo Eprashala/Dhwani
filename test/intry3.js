@@ -6,13 +6,13 @@ let isListening = false;
 let isManuallyPaused = false;
 let selectedLibraryItem = "Bhagavad Gita|Bhagavad Gita";
 let state = { isProcessing: false, isMuted: false, lastAIMessage: "", sessionActive: false };
+let isMicButtonHeld = false;
+let finalMicTranscript = '';
 
 let ttsStatus = 'STOPPED';
 let currentActiveBtn = null;
 let currentAudio = new Audio(); // Cloud audio singleton
 let audioChunks = [];
-let isMicButtonHeld = false;
-let currentTranscript = ""; // To hold text until release
 let currentChunkIndex = 0;
 let globalWordIndex = 0;
 let highlightTimer = null;
@@ -989,45 +989,47 @@ UI.textIn.addEventListener('focus', () => {
         UI.textIn.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }, 300);
 });
-// --- PUSH TO TALK LOGIC ---
-    const startMic = (e) => {
-        e.preventDefault();
+
+// INSERT THIS PUSH-TO-TALK LOGIC
+    const startMicRecording = (e) => {
+        e.preventDefault(); // Prevents long-press text selection on mobile
         e.stopPropagation();
-        if (state.isProcessing || isMicButtonHeld) return;
+        if (state.isProcessing) return;
         
         if (!recognition) {
             alert("⚠️ Speech Recognition is not supported by this browser.");
             return;
         }
 
-        isMicButtonHeld = true;
-        currentTranscript = ""; // Reset transcript
+        if (isMicButtonHeld) return; // Prevent double firing
         
-        recognition.lang = UI.lang.value; 
+        isMicButtonHeld = true;
+        finalMicTranscript = '';
+        UI.textIn.value = '';
+        
+        recognition.lang = UI.lang.value;
         try { recognition.start(); } catch(err) {}
     };
 
-    const stopMic = (e) => {
+    const stopMicRecording = (e) => {
         e.preventDefault();
         e.stopPropagation();
         if (!isMicButtonHeld) return;
         
         isMicButtonHeld = false;
         
-        // Stop the microphone when the user releases the button
-        if (recognition) {
-            recognition.stop();
+        if (recognition && isListening) {
+            recognition.stop(); // This triggers onend, which then processes the input
         }
     };
 
-    // Attach Start Events (Mouse Click & Touch)
-    UI.btnMic.addEventListener('mousedown', startMic);
-    UI.btnMic.addEventListener('touchstart', startMic);
-    
-    // Attach Stop Events (Mouse Release, Touch Release, or Dragging Off the Button)
-    UI.btnMic.addEventListener('mouseup', stopMic);
-    UI.btnMic.addEventListener('mouseleave', stopMic);
-    UI.btnMic.addEventListener('touchend', stopMic);
+    // Attach all necessary events for desktop and mobile
+    UI.btnMic.addEventListener('mousedown', startMicRecording);
+    UI.btnMic.addEventListener('touchstart', startMicRecording, { passive: false });
+    UI.btnMic.addEventListener('mouseup', stopMicRecording);
+    UI.btnMic.addEventListener('mouseleave', stopMicRecording);
+    UI.btnMic.addEventListener('touchend', stopMicRecording);
+
 	
 	// --- SMART BOOK SUGGESTIONS LOGIC ---
     // Map everyday keywords to specific groups and books from your library
@@ -1109,77 +1111,71 @@ UI.textIn.addEventListener('focus', () => {
 	
 }
 
-function initSpeechRecognition() {
-    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRec) return; 
-    
-    recognition = new SpeechRec();
-    
-    // Set to true so it keeps listening for the entire duration the button is held
-    recognition.continuous = true; 
-    recognition.interimResults = true; // Allows us to see text as we speak
-    
-    recognition.onstart = () => {
-        isListening = true;
-        updateStopButtonVisibility(); 
-        UI.btnMic.classList.add('mic-pulse');
-        UI.status.style.backgroundColor = '#ef4444'; 
-        UI.textIn.value = '';
-        UI.textIn.placeholder = "Listening... Release to send.";
-    };
-    
-    recognition.onresult = (e) => {
-        let interimTranscript = '';
-        let finalText = '';
-
-        for (let i = e.resultIndex; i < e.results.length; ++i) {
-            if (e.results[i].isFinal) {
-                finalText += e.results[i][0].transcript;
-            } else {
-                interimTranscript += e.results[i][0].transcript;
-            }
-        }
-        
-        // Combine previously finalized text with new text
-        currentTranscript = (currentTranscript + " " + finalText).trim();
-        
-        // Show the user what is being heard in real-time
-        UI.textIn.value = currentTranscript + " " + interimTranscript;
-    };
-    
-    recognition.onend = () => {
-        isListening = false;
-        
-        // If the API drops early but the user is still holding the button, restart it!
-        if (isMicButtonHeld) {
-            try { recognition.start(); } catch(err) {}
-            return;
-        }
-
-        // The user released the button. Send the message!
-        if (!state.isProcessing) {
-            resetMicUI();
-            const finalMessage = UI.textIn.value.trim();
-            if (finalMessage) {
-                processInput(finalMessage);
-            } else {
-                UI.textIn.placeholder = "Type your message...";
-            }
-        }
-        
-        setTimeout(updateStopButtonVisibility, 50);
-    };
-    
-    recognition.onerror = (e) => {
-        console.error("Mic Error:", e.error);
-        if (e.error !== 'no-speech') {
-            isListening = false; 
-            isMicButtonHeld = false; // Reset state on error
-            resetMicUI(); 
-            setTimeout(updateStopButtonVisibility, 50); 
-        }
-    };
-}
+			function initSpeechRecognition() {
+				const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+				if (!SpeechRec) return; 
+				
+				recognition = new SpeechRec();
+				recognition.continuous = false; // Keep false for Android reliability
+				recognition.interimResults = true; // Changed to true to show text as user speaks
+				
+				recognition.onstart = () => {
+					isListening = true;
+					updateStopButtonVisibility(); 
+					UI.btnMic.classList.add('mic-pulse');
+					UI.status.style.backgroundColor = '#ef4444'; 
+					UI.textIn.placeholder = "Listening... Speak now.";
+				};
+				
+				recognition.onresult = (e) => {
+					let interimText = '';
+					for (let i = e.resultIndex; i < e.results.length; ++i) {
+						if (e.results[i].isFinal) {
+							finalMicTranscript += e.results[i][0].transcript + " ";
+						} else {
+							interimText += e.results[i][0].transcript;
+						}
+					}
+					// Update the input box live with both final and interim text
+					UI.textIn.value = (finalMicTranscript + interimText).trim();
+				};
+				
+				recognition.onend = () => {
+					isListening = false;
+					
+					if (isMicButtonHeld) {
+						// User is still holding the button, restart recognition seamlessly
+						try { recognition.start(); } catch(err) {}
+					} else {
+						// Button released, finalize and process the text
+						if (!state.isProcessing) resetMicUI();
+						setTimeout(updateStopButtonVisibility, 50);
+						
+						const fullText = UI.textIn.value.trim();
+						if (fullText) {
+							processInput(fullText);
+						}
+						finalMicTranscript = ''; // Reset for the next recording
+					}
+				};
+				
+				recognition.onerror = (e) => {
+					console.error("Mic Error:", e.error);
+					isListening = false; 
+					resetMicUI(); 
+					setTimeout(updateStopButtonVisibility, 50); 
+					
+					if (e.error === 'no-speech') {
+						return; 
+					} else if (e.error === 'network') {
+						alert("⚠️ Network Error: Android's Google App cannot reach the speech servers.");
+					} else if (e.error === 'not-allowed' || e.error === 'audio-capture') {
+						alert("⚠️ Mic Blocked: Please ensure BOTH Google Chrome and the 'Google' app have microphone permissions in phone settings.");
+					} else {
+						alert("⚠️ Speech Engine Error: " + e.error);
+					}
+				};
+			}
 function resetMicUI() {
     UI.btnMic.classList.remove('mic-pulse');
     UI.status.style.backgroundColor = '#4b5563'; 
