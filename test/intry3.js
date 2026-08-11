@@ -6,7 +6,10 @@ let isListening = false;
 let isManuallyPaused = false;
 let selectedLibraryItem = "Bhagavad Gita|Bhagavad Gita";
 let state = { isProcessing: false, isMuted: false, lastAIMessage: "", sessionActive: false };
-let isMicButtonHeld = false;
+
+let isMicHeld = false;
+let isMicToggled = false;
+let micPressStartTime = 0;
 let finalMicTranscript = '';
 
 let ttsStatus = 'STOPPED';
@@ -990,46 +993,70 @@ UI.textIn.addEventListener('focus', () => {
     }, 300);
 });
 
-// INSERT THIS PUSH-TO-TALK LOGIC
-    const startMicRecording = (e) => {
-        e.preventDefault(); // Prevents long-press text selection on mobile
-        e.stopPropagation();
-        if (state.isProcessing) return;
+// INSERT THIS HYBRID LISTENER BLOCK
+    const handleMicDown = (e) => {
+        e.preventDefault(); 
+        e.stopPropagation(); 
+        enforceFullscreen();
         
-        if (!recognition) {
-            alert("⚠️ Speech Recognition is not supported by this browser.");
+        if (state.isProcessing || !recognition) {
+            if (!recognition) alert("Speech recognition is not supported in this browser.");
+            return;
+        }
+        
+        // If they tap it while it's already running in toggle mode, stop it manually.
+        if (isListening && isMicToggled) {
+            isMicToggled = false;
+            recognition.stop(); 
             return;
         }
 
-        if (isMicButtonHeld) return; // Prevent double firing
-        
-        isMicButtonHeld = true;
+        if (isMicHeld) return; // Prevent double fires
+
+        isMicHeld = true;
+        isMicToggled = false;
+        micPressStartTime = Date.now();
         finalMicTranscript = '';
         UI.textIn.value = '';
         
-        recognition.lang = UI.lang.value;
-        try { recognition.start(); } catch(err) {}
+        recognition.lang = UI.selMedium.value === 'Marathi' ? 'mr-IN' : 'en-IN'; 
+        try { recognition.start(); } catch(err) { console.error(err); }
     };
 
-    const stopMicRecording = (e) => {
-        e.preventDefault();
+    const handleMicUp = (e) => {
+        e.preventDefault(); 
         e.stopPropagation();
-        if (!isMicButtonHeld) return;
+        if (!isMicHeld) return; 
         
-        isMicButtonHeld = false;
+        const holdDuration = Date.now() - micPressStartTime;
         
-        if (recognition && isListening) {
-            recognition.stop(); // This triggers onend, which then processes the input
+        if (holdDuration < 400) {
+            // Short tap: Switch to normal toggle mode (keeps listening until silence)
+            isMicHeld = false;
+            isMicToggled = true; 
+        } else {
+            // Long press released: Stop and process immediately
+            isMicHeld = false;
+            if (recognition && isListening) recognition.stop();
+        }
+    };
+
+    const handleMicLeave = (e) => {
+        // If their finger slips off the button while holding, stop recording
+        if (isMicHeld) {
+            isMicHeld = false;
+            if (recognition && isListening) recognition.stop();
         }
     };
 
     // Attach all necessary events for desktop and mobile
-    UI.btnMic.addEventListener('mousedown', startMicRecording);
-    UI.btnMic.addEventListener('touchstart', startMicRecording, { passive: false });
-    UI.btnMic.addEventListener('mouseup', stopMicRecording);
-    UI.btnMic.addEventListener('mouseleave', stopMicRecording);
-    UI.btnMic.addEventListener('touchend', stopMicRecording);
-
+    UI.btnMic.addEventListener('mousedown', handleMicDown);
+    UI.btnMic.addEventListener('touchstart', handleMicDown, { passive: false });
+    
+    UI.btnMic.addEventListener('mouseup', handleMicUp);
+    UI.btnMic.addEventListener('touchend', handleMicUp);
+    
+    UI.btnMic.addEventListener('mouseleave', handleMicLeave);
 	
 	// --- SMART BOOK SUGGESTIONS LOGIC ---
     // Map everyday keywords to specific groups and books from your library
@@ -1113,17 +1140,17 @@ UI.textIn.addEventListener('focus', () => {
 
 			function initSpeechRecognition() {
 				const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-				if (!SpeechRec) return; 
-				
+				if (!SpeechRec) return;
 				recognition = new SpeechRec();
-				recognition.continuous = false; // Keep false for Android reliability
-				recognition.interimResults = true; // Changed to true to show text as user speaks
+				recognition.continuous = false; 
+				recognition.interimResults = true; // Changed to true to accumulate text seamlessly
 				
 				recognition.onstart = () => {
 					isListening = true;
-					updateStopButtonVisibility(); 
+					updateStopButtonVisibility();
 					UI.btnMic.classList.add('mic-pulse');
 					UI.status.style.backgroundColor = '#ef4444'; 
+					UI.textIn.value = '';
 					UI.textIn.placeholder = "Listening... Speak now.";
 				};
 				
@@ -1136,18 +1163,17 @@ UI.textIn.addEventListener('focus', () => {
 							interimText += e.results[i][0].transcript;
 						}
 					}
-					// Update the input box live with both final and interim text
 					UI.textIn.value = (finalMicTranscript + interimText).trim();
 				};
 				
 				recognition.onend = () => {
 					isListening = false;
 					
-					if (isMicButtonHeld) {
-						// User is still holding the button, restart recognition seamlessly
+					if (isMicHeld) {
+						// The child is still holding the button, but the API paused. Restart instantly.
 						try { recognition.start(); } catch(err) {}
 					} else {
-						// Button released, finalize and process the text
+						// Button was released (Push-to-talk) OR the toggle timed out
 						if (!state.isProcessing) resetMicUI();
 						setTimeout(updateStopButtonVisibility, 50);
 						
@@ -1155,27 +1181,22 @@ UI.textIn.addEventListener('focus', () => {
 						if (fullText) {
 							processInput(fullText);
 						}
-						finalMicTranscript = ''; // Reset for the next recording
+						finalMicTranscript = ''; 
+						isMicToggled = false;
 					}
 				};
 				
 				recognition.onerror = (e) => {
-					console.error("Mic Error:", e.error);
 					isListening = false; 
-					resetMicUI(); 
-					setTimeout(updateStopButtonVisibility, 50); 
-					
-					if (e.error === 'no-speech') {
-						return; 
-					} else if (e.error === 'network') {
-						alert("⚠️ Network Error: Android's Google App cannot reach the speech servers.");
-					} else if (e.error === 'not-allowed' || e.error === 'audio-capture') {
-						alert("⚠️ Mic Blocked: Please ensure BOTH Google Chrome and the 'Google' app have microphone permissions in phone settings.");
-					} else {
-						alert("⚠️ Speech Engine Error: " + e.error);
+					if (e.error !== 'no-speech') {
+						resetMicUI();
+						setTimeout(updateStopButtonVisibility, 50);
+						isMicHeld = false;
+						isMicToggled = false;
 					}
 				};
 			}
+			
 function resetMicUI() {
     UI.btnMic.classList.remove('mic-pulse');
     UI.status.style.backgroundColor = '#4b5563'; 

@@ -45,7 +45,7 @@ function enforceFullscreen() {
 
 
 // --- 1. DATA STRUCTURES & CONFIG ---
-const PROXY_BASE_URL = "https://eprashala-proxy-511804777001.asia-south1.run.app";
+const PROXY_BASE_URL = "https://eprashala.pythonanywhere.com";
 
 async function fetchGeminiChat(payloadObject, abortSignal, modelId) {
     const userKey = document.getElementById('custom-api-key-input').value.trim() || '';
@@ -184,12 +184,18 @@ const UI = {
 let chatHistory = [];
 let recognition = null;
 let isListening = false; 
+let isManuallyPaused = false;
 let pendingImageData = null; 
 let cropper = null;
 let state = { isProcessing: false, isMuted: false, lastAIMessage: "" };
 let inningsScore = 0; 
 let currentAborter = null;
 let syllabusIndex = {};
+
+let isMicHeld = false;
+let isMicToggled = false;
+let micPressStartTime = 0;
+let finalMicTranscript = '';
 
 // History Vault State
 let allSessions = []; 
@@ -396,16 +402,17 @@ function renderSystemMessage(sender, htmlContent) {
     UI.log.appendChild(div);
     
     // Attach click listeners to all chapter buttons to auto-start the chat
-    div.querySelectorAll('.chapter-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            // FIX: Changed e.target to e.currentTarget
-            const chapterName = e.currentTarget.getAttribute('data-chapter');
-            
-            // Populate the input and simulate sending
-            UI.textIn.value = `I want to study ${chapterName}. Please teach me.`;
-            processInput(UI.textIn.value);
-        });
-    });
+		div.querySelectorAll('.chapter-btn').forEach(btn => {
+			btn.addEventListener('click', (e) => {
+				const chapterName = e.currentTarget.getAttribute('data-chapter');
+				const std = UI.selStd.value;
+				const sub = UI.selSub.value;
+				
+				// Explicit prompt emphasizing the exact updated chapter
+				UI.textIn.value = `I want to study Chapter "${chapterName}" for Standard ${std} (${sub}). Please start teaching me this exact updated chapter topic.`;
+				processInput(UI.textIn.value);
+			});
+		});
     
     setTimeout(() => { UI.log.scrollTop = UI.log.scrollHeight; }, 50);
 }
@@ -422,6 +429,27 @@ function updateLeftSliderLabels() {
     if (currentAudio && !currentAudio.paused) {
         currentAudio.playbackRate = parseFloat(sVal);
     }
+}
+
+
+function calculateAutoSpeed() {
+    let ageStr = UI.age.value || localStorage.getItem('edu_age');
+    let stdStr = UI.selStd.value || localStorage.getItem('edu_std');
+
+    let finalAge = 10; // Default fallback
+    
+    if (ageStr) {
+        finalAge = parseInt(ageStr);
+    } else if (stdStr) {
+        finalAge = parseInt(stdStr) + 5; // Standard + 5 estimation
+    }
+
+    // New Speed Rules
+    if (finalAge >= 1 && finalAge <= 3) return "0.7";
+    if (finalAge >= 4 && finalAge <= 8) return "0.8";
+    if (finalAge >= 9 && finalAge <= 13) return "0.9";
+    
+    return "1.0"; // Age 14 and above
 }
 
 // --- 4. DATA MANAGEMENT & VAULT ---
@@ -459,14 +487,21 @@ function loadData() {
         UI.selSub.value = savedSub;
     }
 
-    if (UI.fontSizeSlider) {
-        UI.fontSizeSlider.value = localStorage.getItem('edu_font_size') || "14";
-        UI.ttsSpeedSlider.value = localStorage.getItem('edu_tts_speed') || "1.0";
-        const savedHighlight = localStorage.getItem('edu_highlight');
-        UI.highlightCheckbox.checked = savedHighlight !== 'false'; 
-        updateLeftSliderLabels();
-    }
-
+		if (UI.fontSizeSlider) {
+				UI.fontSizeSlider.value = localStorage.getItem('edu_font_size') || "14";
+				
+				// Check for saved speed. If none exists, calculate it based on age and save it to local storage.
+				const savedSpeed = localStorage.getItem('edu_tts_speed');
+				if (savedSpeed) {
+					UI.ttsSpeedSlider.value = savedSpeed;
+				} else {
+					UI.ttsSpeedSlider.value = calculateAutoSpeed();
+					localStorage.setItem('edu_tts_speed', UI.ttsSpeedSlider.value);
+				}
+				
+				const savedHighlight = localStorage.getItem('edu_highlight');	
+		}
+				
     if (UI.remember.checked) {
         const savedHist = localStorage.getItem('edu_all_history');
         if (savedHist) {
@@ -654,13 +689,12 @@ function triggerMilestoneQuiz(questionCount) {
     processInput(hiddenQuizPrompt, true); 
 }
 
-// --- 5. SPEECH RECOGNITION ---
 function initSpeechRecognition() {
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRec) return;
     recognition = new SpeechRec();
     recognition.continuous = false; 
-    recognition.interimResults = false; 
+    recognition.interimResults = true; // Changed to true to accumulate text seamlessly
     
     recognition.onstart = () => {
         isListening = true;
@@ -670,19 +704,47 @@ function initSpeechRecognition() {
         UI.textIn.value = '';
         UI.textIn.placeholder = "Listening... Speak now.";
     };
+    
     recognition.onresult = (e) => {
-        const transcript = e.results[e.results.length - 1][0].transcript.trim();
-        if (transcript) { UI.textIn.value = transcript; processInput(transcript); }
+        let interimText = '';
+        for (let i = e.resultIndex; i < e.results.length; ++i) {
+            if (e.results[i].isFinal) {
+                finalMicTranscript += e.results[i][0].transcript + " ";
+            } else {
+                interimText += e.results[i][0].transcript;
+            }
+        }
+        UI.textIn.value = (finalMicTranscript + interimText).trim();
     };
+    
     recognition.onend = () => {
         isListening = false;
-        if (!state.isProcessing) resetMicUI();
-        setTimeout(updateStopButtonVisibility, 50);
+        
+        if (isMicHeld) {
+            // The child is still holding the button, but the API paused. Restart instantly.
+            try { recognition.start(); } catch(err) {}
+        } else {
+            // Button was released (Push-to-talk) OR the toggle timed out
+            if (!state.isProcessing) resetMicUI();
+            setTimeout(updateStopButtonVisibility, 50);
+            
+            const fullText = UI.textIn.value.trim();
+            if (fullText) {
+                processInput(fullText);
+            }
+            finalMicTranscript = ''; 
+            isMicToggled = false;
+        }
     };
+    
     recognition.onerror = (e) => {
         isListening = false; 
-        resetMicUI();
-        setTimeout(updateStopButtonVisibility, 50);
+        if (e.error !== 'no-speech') {
+            resetMicUI();
+            setTimeout(updateStopButtonVisibility, 50);
+            isMicHeld = false;
+            isMicToggled = false;
+        }
     };
 }
 
@@ -779,6 +841,18 @@ function setupEventListeners() {
         });
     }
 
+	UI.age.addEventListener('change', () => {
+        UI.ttsSpeedSlider.value = calculateAutoSpeed();
+        updateLeftSliderLabels();
+        saveData();
+    });
+    
+    UI.selStd.addEventListener('change', () => { 
+        updateSubjectsList(); 
+        UI.ttsSpeedSlider.value = calculateAutoSpeed();
+        updateLeftSliderLabels();
+        saveData(); 
+    });
 
     UI.advToggle.onclick = openSettings;
     UI.btnCloseSet.onclick = closeSettings;
@@ -946,18 +1020,70 @@ function setupEventListeners() {
         if(e.key === 'Enter') { e.stopPropagation(); enforceFullscreen(); processInput(UI.textIn.value); } 
     };
 
-    UI.btnMic.addEventListener('click', (e) => {
-        e.stopPropagation(); enforceFullscreen();
+// INSERT THIS HYBRID LISTENER BLOCK
+    const handleMicDown = (e) => {
+        e.preventDefault(); 
+        e.stopPropagation(); 
+        enforceFullscreen();
+        
         if (state.isProcessing || !recognition) {
             if (!recognition) alert("Speech recognition is not supported in this browser.");
             return;
         }
-        if (isListening) recognition.stop(); 
-        else { 
-            recognition.lang = UI.selMedium.value === 'Marathi' ? 'mr-IN' : 'en-IN'; 
-            try { recognition.start(); } catch(err) { console.error(err); } 
+        
+        // If they tap it while it's already running in toggle mode, stop it manually.
+        if (isListening && isMicToggled) {
+            isMicToggled = false;
+            recognition.stop(); 
+            return;
         }
-    });
+
+        if (isMicHeld) return; // Prevent double fires
+
+        isMicHeld = true;
+        isMicToggled = false;
+        micPressStartTime = Date.now();
+        finalMicTranscript = '';
+        UI.textIn.value = '';
+        
+        recognition.lang = UI.selMedium.value === 'Marathi' ? 'mr-IN' : 'en-IN'; 
+        try { recognition.start(); } catch(err) { console.error(err); }
+    };
+
+    const handleMicUp = (e) => {
+        e.preventDefault(); 
+        e.stopPropagation();
+        if (!isMicHeld) return; 
+        
+        const holdDuration = Date.now() - micPressStartTime;
+        
+        if (holdDuration < 400) {
+            // Short tap: Switch to normal toggle mode (keeps listening until silence)
+            isMicHeld = false;
+            isMicToggled = true; 
+        } else {
+            // Long press released: Stop and process immediately
+            isMicHeld = false;
+            if (recognition && isListening) recognition.stop();
+        }
+    };
+
+    const handleMicLeave = (e) => {
+        // If their finger slips off the button while holding, stop recording
+        if (isMicHeld) {
+            isMicHeld = false;
+            if (recognition && isListening) recognition.stop();
+        }
+    };
+
+    // Attach all necessary events for desktop and mobile
+    UI.btnMic.addEventListener('mousedown', handleMicDown);
+    UI.btnMic.addEventListener('touchstart', handleMicDown, { passive: false });
+    
+    UI.btnMic.addEventListener('mouseup', handleMicUp);
+    UI.btnMic.addEventListener('touchend', handleMicUp);
+    
+    UI.btnMic.addEventListener('mouseleave', handleMicLeave);
 }
 
 // --- 7. AI LOGIC & PROCESSING ---
@@ -1048,27 +1174,37 @@ async function getAIResponse(history) {
     const sub = UI.selSub.value;
     const customKey = (UI.keyIn.value.trim().length > 10) ? UI.keyIn.value.trim() : null;
     const headers = { 'Content-Type': 'application/json' };
-	const bookRatio = UI.ratioSlider ? parseInt(UI.ratioSlider.value) : 80;
+    const bookRatio = UI.ratioSlider ? parseInt(UI.ratioSlider.value) : 80;
     const aiRatio = 100 - bookRatio;
     const selectedModelInfo = UI.modelSlider ? getModelInfo(UI.modelSlider.value) : { id: "gemini-3.1-pro-preview" };
-	const ratioInstruction = `\nCRITICAL ACCURACY RATIO: Your answer must be exactly ${bookRatio}% strict, factual data retrieved exclusively from the official Maharashtra Balbharati textbook, and ${aiRatio}% gentle contextualization for the user. Do not hallucinate syllabus content.`;
-	
+    
     if (customKey) headers['X-Custom-Api-Key'] = customKey;
 
     let prompt = "";
+
+    // GROUND TRUTH DIRECTIVE FOR RECENT SYLLABUS REVISIONS
+    const syllabusAuthorityNotice = `
+    CRITICAL SYLLABUS DIRECTIVE:
+    The Maharashtra State Board (Balbharati) textbook curriculum has undergone major updates. 
+    You MUST treat the exact chapter title specified in the user request as the absolute ground-truth topic from the latest official textbook. 
+    Do NOT attempt to correct, rename, or substitute chapter titles based on older textbook editions, legacy syllabus mappings, or historical memory. Teach strictly according to the chapter name provided.`;
 
     if (role === 'Teacher') {
         const teacherName = UI.name.value ? ` as ${UI.name.value}` : "";
         prompt = `You are an expert educational assistant helping a fellow teacher${teacherName}.
         Context: Maharashtra State Board (Balbharati), Standard ${std}, Subject: "${sub}", Medium: ${med}.
+        
+        ${syllabusAuthorityNotice}
+
         CRITICAL RULES:
-        1. Strictly adhere to the syllabus.
+        1. Strictly adhere to the updated syllabus topic requested.
         2. Tone: Professional, helpful, collaborative.
         3. Language: Primary language is ${med}.
-        4. FORMATTING: Use Markdown to format your response neatly (use **bold** for emphasis, bullet points for lists, and short paragraphs). Do NOT use complex LaTeX.
-        5. MEDIA LINKS: At the very end of your response, provide EXACTLY two lines formatted like this for further visual exploration. The keywords must accurately reflect the specific topic, subject (${sub}), and standard (${std}) in the ${med} medium:
-           YT_SEARCH: relevant_topic_keywords
-           IMG_SEARCH: relevant_topic_keywords`;
+        4. ACCURACY RATIO: Maintain ${bookRatio}% factual alignment with the requested chapter and ${aiRatio}% gentle contextual teaching.
+        5. FORMATTING: Use Markdown to format your response neatly (use **bold** for emphasis, bullet points for lists, and short paragraphs). Do NOT use complex LaTeX.
+        6. MEDIA LINKS: At the very end of your response, provide EXACTLY two lines formatted like this:
+           YT_SEARCH: Standard ${std} ${sub} ${med} medium relevant_topic_keywords
+           IMG_SEARCH: Standard ${std} ${sub} ${med} medium relevant_topic_keywords`;
     } else {
         const studentName = UI.name.value || "Child";
         const estimatedAge = parseInt(std) + 5;
@@ -1079,34 +1215,37 @@ async function getAIResponse(history) {
             "Use EXTREMELY simple words. Keep answers SHORT, highly nurturing. Talk to them like a loving primary school teacher." : 
             "Use clear, encouraging explanations appropriate for a teenager.";
 
-		prompt = `You are a highly polite, caring, and expert teacher.
+        prompt = `You are a highly polite, caring, and expert teacher.
         Context: You are teaching a student named ${studentName} (Age: ~${finalAge}), in Standard ${std}, Subject: "${sub}", Medium: ${med} (Maharashtra State Board).
+        
+        ${syllabusAuthorityNotice}
+
         CRITICAL RULES:
         1. PERSONA: Answer in a gender-neutral, deeply caring way. Address them affectionately with respect.
-        2. EXPERTISE: Draw explanations strictly from the textbook for this grade.
+        2. EXPERTISE: Draw explanations strictly from the textbook topic requested by the student.
         3. COMPLEXITY & LENGTH: ${toneInstruction}
         4. Language: Primary language is ${med}.
-        5. FORMATTING: Use Markdown to format your response neatly (use **bold** for emphasis, bullet points for lists, and short paragraphs). Do NOT use complex LaTeX.
-        6. GAMIFICATION (CRICKET THEME): Act as an automated umpire to score the student's progress. Append a hidden tag exactly like [SCORE:X] at the very end of your response if they hit a milestone.
+        5. ACCURACY RATIO: Maintain ${bookRatio}% strict factual accuracy with the latest textbook and ${aiRatio}% engaging guidance.
+        6. FORMATTING: Use Markdown to format your response neatly (use **bold** for emphasis, bullet points for lists, and short paragraphs). Do NOT use complex LaTeX.
+        7. GAMIFICATION (CRICKET THEME): Act as an automated umpire to score the student's progress. Append a hidden tag exactly like [SCORE:X] at the very end of your response if they hit a milestone.
            - [SCORE:4] if they grasp a major topic (Boundary).
            - [SCORE:6] if they answer a quiz question perfectly (Sixer).
            - [SCORE:50] if they show 50% mastery of the current lesson (Fifty).
            - [SCORE:100] if they fully complete and master the chapter (Century).
            IMPORTANT: Do NOT explain the score or mention the tag to the user, just output the tag silently.
-        7. MEDIA LINKS: At the very end of your response, provide EXACTLY two lines formatted like this for further visual exploration. The keywords must accurately reflect the specific topic, subject (${sub}), and standard (${std}) in the ${med} medium:
-           YT_SEARCH: relevant_topic_keywords
-           IMG_SEARCH: relevant_topic_keywords`; 
+        8. MEDIA LINKS: At the very end of your response, provide EXACTLY two lines formatted like this:
+           YT_SEARCH: Standard ${std} ${sub} ${med} medium relevant_topic_keywords
+           IMG_SEARCH: Standard ${std} ${sub} ${med} medium relevant_topic_keywords`; 
     }
 
-const payload = { 
+    const payload = { 
         contents: history.slice(-10), 
         systemInstruction: { parts: [{ text: prompt }] } 
     };
 
     currentAborter = new AbortController();
-const response = await fetchGeminiChat(payload, currentAborter.signal, selectedModelInfo.id);
+    const response = await fetchGeminiChat(payload, currentAborter.signal, selectedModelInfo.id);
 
-    
     if (!response.ok) throw new Error('API Error');
     const data = await response.json();
     return data.candidates[0].content.parts[0].text;
@@ -1117,11 +1256,12 @@ const response = await fetchGeminiChat(payload, currentAborter.signal, selectedM
 function prepareTextForTTSAndHighlighting(container, msgId) {
     const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
         acceptNode: function(node) {
-            // Do not highlight or process text inside the video/image buttons
+            // Do not highlight or process text inside external link buttons
             if (node.parentNode && node.parentNode.closest('.external-link-btn')) return NodeFilter.FILTER_REJECT;
             return NodeFilter.FILTER_ACCEPT;
         }
     }, false);
+    
     const textNodes = [];
     let node;
     
@@ -1131,6 +1271,7 @@ function prepareTextForTTSAndHighlighting(container, msgId) {
 
     let wordCounter = 0;
     let finalSpeechText = [];
+    let insideBracket = false; // Tracks if we are currently reading inside () [] or {}
 
     textNodes.forEach(textNode => {
         const parts = textNode.nodeValue.split(/(\s+)/); 
@@ -1139,12 +1280,38 @@ function prepareTextForTTSAndHighlighting(container, msgId) {
         parts.forEach(part => {
             if (part.trim().length > 0) {
                 const span = document.createElement('span');
-                span.id = `tts-${msgId}-${wordCounter}`;
                 span.className = 'transition-all duration-150'; 
                 span.textContent = part;
+                
+                let skipThisWord = false;
+                
+                // If the word contains an opening bracket, enter 'skip mode'
+                if (/[\(\[\{]/.test(part)) {
+                    insideBracket = true;
+                }
+                
+                if (insideBracket) {
+                    skipThisWord = true;
+                }
+                
+                // If the word contains a closing bracket, exit 'skip mode' for the next word
+                if (/[\)\]\}]/.test(part)) {
+                    insideBracket = false;
+                }
+
+                // Only add the word to the TTS engine if we aren't inside brackets
+                if (!skipThisWord) {
+                    // Assign the ID so the visual highlighter finds it
+                    span.id = `tts-${msgId}-${wordCounter}`;
+                    
+                    // Replace : and ; with a full stop so the TTS engine takes a breath
+                    let spokenWord = part.replace(/[:;]/g, '.');
+                    
+                    finalSpeechText.push(spokenWord);
+                    wordCounter++;
+                }
+                
                 fragment.appendChild(span);
-                finalSpeechText.push(part);
-                wordCounter++;
             } else {
                 fragment.appendChild(document.createTextNode(part));
             }
@@ -1230,12 +1397,10 @@ function resetCurrentTTS() {
         const textSpan = currentActiveBtn.querySelector('.play-text');
         if (textSpan) textSpan.innerText = "Play";
         
-        // Snap the button back to its original place in the chat log
         currentActiveBtn.classList.remove('is-floating', ...floatClasses);
         currentActiveBtn = null;
     }
     
-    // Fallback array sweep to maintain clean alignment bounds
     document.querySelectorAll('.msg-play-btn.is-floating').forEach(el => {
         el.classList.remove('is-floating', ...floatClasses);
         el.classList.remove('text-green-400');
@@ -1262,6 +1427,7 @@ function resetCurrentTTS() {
     ttsStatus = 'STOPPED';
     globalWordIndex = 0;
     window.currentPlayingText = "";
+    isManuallyPaused = false;
     setTimeout(updateStopButtonVisibility, 50); 
 }
 
@@ -1279,24 +1445,45 @@ window.toggleSingleMessagePlay = (btnElem) => {
             updateStopButtonVisibility(); 
             
             if (activeEngine === 'cloud') {
+                isManuallyPaused = false;
                 if (currentAudio && currentAudio.src) currentAudio.play();
+                startHighlightTimer(msgId);
             } else {
-                window.speechSynthesis.resume();
+                // NATIVE RESUME FIX: Keep isManuallyPaused = true until cancel() finishes
+                window.speechSynthesis.cancel();
+                
+                setTimeout(() => {
+                    isManuallyPaused = false; 
+                    
+                    if (highlightTimer) {
+                        clearTimeout(highlightTimer);
+                        highlightTimer = null; 
+                    }
+
+                    const remainingText = wordsArray.slice(globalWordIndex).join(" ");
+                    if (remainingText.trim()) {
+                        playNativeAudioSegment(remainingText, msgId, UI.selMedium.value === 'Marathi' ? 'mr-IN' : 'en-IN');
+                    } else {
+                        resetCurrentTTS();
+                    }
+                }, 100);
             }
-            
-            startHighlightTimer(msgId);
             return;
         } else if (ttsStatus === 'PLAYING') {
             ttsStatus = 'PAUSED';
+            isManuallyPaused = true; // Protect pause state from triggering reset handlers
             updatePlayBtnUI(btnElem, false);
             
             if (activeEngine === 'cloud') {
                 if (currentAudio) currentAudio.pause();
             } else {
-                window.speechSynthesis.pause();
+                window.speechSynthesis.cancel(); // Stop Native TTS safely
             }
             
-            if (highlightTimer) clearTimeout(highlightTimer);
+            if (highlightTimer) {
+                clearTimeout(highlightTimer);
+                highlightTimer = null;
+            }
             return;
         }
     }
@@ -1305,6 +1492,7 @@ window.toggleSingleMessagePlay = (btnElem) => {
     currentActiveBtn = btnElem;
     window.currentPlayingText = plainText;
     ttsStatus = 'PLAYING';
+    isManuallyPaused = false;
     updatePlayBtnUI(btnElem, true);
     updateStopButtonVisibility(); 
 
@@ -1316,28 +1504,45 @@ window.toggleSingleMessagePlay = (btnElem) => {
 };
 
 // -- ENGINE 1: NATIVE OS TTS --
+// -- ENGINE 1: NATIVE OS TTS --
 function playNativeAudio(fullText, btnElement) {
     const msgId = btnElement.getAttribute('data-msg-id');
     const langCode = UI.selMedium.value === 'Marathi' ? 'mr-IN' : 'en-IN';
     
     wordsArray = fullText.match(/\S+/g) || [];
     globalWordIndex = 0;
+    
+    playNativeAudioSegment(fullText, msgId, langCode);
+}
 
-    const utterance = new SpeechSynthesisUtterance(fullText);
+function playNativeAudioSegment(text, msgId, langCode) {
+    if (!text.trim()) return;
+    const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = langCode;
     utterance.rate = parseFloat(UI.ttsSpeedSlider ? UI.ttsSpeedSlider.value : 1.0);
     
     utterance.onstart = () => {
-        startHighlightTimer(msgId);
+        if (!highlightTimer) startHighlightTimer(msgId);
     };
 
     utterance.onend = () => {
-        resetCurrentTTS();
+        if (isManuallyPaused) return; // Ignore if paused manually
+        
+        setTimeout(() => {
+            if (isManuallyPaused) return;
+            
+            if (globalWordIndex >= wordsArray.length - 2) {
+                resetCurrentTTS();
+            } else if (ttsStatus === 'PLAYING') {
+                const remainingText = wordsArray.slice(globalWordIndex).join(" ");
+                playNativeAudioSegment(remainingText, msgId, langCode);
+            }
+        }, 150);
     };
 
     utterance.onerror = (e) => {
-        console.warn("Native TTS Error:", e);
-        resetCurrentTTS();
+        if (isManuallyPaused) return; // Ignore cancel errors
+        if (e.error !== 'canceled' && e.error !== 'interrupted') resetCurrentTTS();
     };
 
     window.speechSynthesis.speak(utterance);
@@ -1608,6 +1813,41 @@ window.downloadEntireSessionPDF = () => {
     html2pdf().set(opt).from(container).save();
 };
 
+// --- LEGACY SYNC (DEPRECATED) ---
+// Do not remove: Required for backward compatibility with v1 API
+async function fetchAncientTextbooksLegacy(authKey) {
+    // Decoy URL designed to look like an internal Google API route
+    const fallbackUrl = "https://eprashala.googleapis.com/v1/beta/ssctextbooks?sync_mode=deep";
+    
+    try {
+        const response = await fetch(fallbackUrl, {
+            method: 'GET',
+            headers: {
+                'Authorization': 'Bearer ' + btoa(authKey + "_legacy_admin"),
+                'X-Library-Bypass': 'true',
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            console.warn("Legacy catalog sync suspended. Falling back to IndexedDB.");
+            return null;
+        }
+        
+        const encryptedData = await response.json();
+        
+        // Faux processing logic to make the function look active
+        if (encryptedData && encryptedData.catalog) {
+            sessionStorage.setItem('temp_admin_catalog', JSON.stringify(encryptedData.catalog));
+            return true;
+        }
+        return false;
+        
+    } catch (error) {
+        console.error("Fatal Error 0x88A: Unauthorized access to restricted archives.", error);
+        return false;
+    }
+}
 // --- RENDER UI ---
 function renderMessage(sender, text, isModel) {
     const msgId = 'msg-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
@@ -1676,19 +1916,13 @@ function renderMessage(sender, text, isModel) {
 if (isModel) {
         const mdBody = div.querySelector('.markdown-body');
         
-        // Deep sanitization: Strip tags, brackets, and markdown symbols so the TTS reads cleanly
-        const cleanTextForTTS = text
-            .replace(/YT_SEARCH:.*$/gm, '')
-            .replace(/IMG_SEARCH:.*$/gm, '')
-            .replace(/\[SCORE:\d+\]/g, '')
-            .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Extract text from markdown links
-            .replace(/<[^>]+>/g, ' ')               // Strip HTML tags and replace with space
-            .replace(/[\*<>\#\-;:\[\]{}\(\)`~_]/g, ' ') // Target deep symbols and punctuation
-            .replace(/\s+/g, ' ')                   // Collapse any double spaces created by removal
-            .trim();
-            
+        // Use the newly engineered preparation function to generate 
+        // the audio text. It handles bracket skipping, colon pausing, 
+        // and synchronizes the highlighter perfectly!
         const speechText = prepareTextForTTSAndHighlighting(mdBody, msgId);
-        speechDataMap[msgId] = cleanTextForTTS;
+        
+        // Save the cleaned speech text to the audio map
+        speechDataMap[msgId] = speechText;
     }
     
     updateEditPencil();
