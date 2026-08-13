@@ -7,6 +7,11 @@ let isManuallyPaused = false;
 let selectedLibraryItem = "Bhagavad Gita|Bhagavad Gita";
 let state = { isProcessing: false, isMuted: false, lastAIMessage: "", sessionActive: false };
 
+let isMicHeld = false;
+let isMicToggled = false;
+let micPressStartTime = 0;
+let finalMicTranscript = '';
+
 let ttsStatus = 'STOPPED';
 let currentActiveBtn = null;
 let currentAudio = new Audio(); // Cloud audio singleton
@@ -987,18 +992,73 @@ UI.textIn.addEventListener('focus', () => {
         UI.textIn.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }, 300);
 });
-	UI.btnMic.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (state.isProcessing) return;
+
+// INSERT THIS HYBRID LISTENER BLOCK
+    const handleMicDown = (e) => {
+        e.preventDefault(); 
+        e.stopPropagation(); 
+        enforceFullScreen(); // FIXED: Capital 'S' to match the function in this file
         
-        if (!recognition) {
-            alert("⚠️ Speech Recognition is not supported by this browser.");
+        if (state.isProcessing || !recognition) {
+            if (!recognition) alert("Speech recognition is not supported in this browser.");
+            return;
+        }
+        
+        // If they tap it while it's already running in toggle mode, stop it manually.
+        if (isListening && isMicToggled) {
+            isMicToggled = false;
+            recognition.stop(); 
             return;
         }
 
-        if (isListening) { recognition.stop(); } 
-        else { recognition.lang = UI.lang.value; try { recognition.start(); } catch(err) {} }
-    });
+        if (isMicHeld) return; // Prevent double fires
+
+        isMicHeld = true;
+        isMicToggled = false;
+        micPressStartTime = Date.now();
+        finalMicTranscript = '';
+        UI.textIn.value = '';
+        
+        // FIXED: Using UI.lang.value which is the correct dropdown for intry3.js
+        recognition.lang = UI.lang.value; 
+        try { recognition.start(); } catch(err) { console.error(err); }
+    };
+
+    const handleMicUp = (e) => {
+        e.preventDefault(); 
+        e.stopPropagation();
+        if (!isMicHeld) return; 
+        
+        const holdDuration = Date.now() - micPressStartTime;
+        
+        if (holdDuration < 400) {
+            // Short tap: Switch to normal toggle mode (keeps listening until silence)
+            isMicHeld = false;
+            isMicToggled = true; 
+        } else {
+            // Long press released: Stop and process immediately
+            isMicHeld = false;
+            if (recognition && isListening) recognition.stop();
+        }
+    };
+
+    const handleMicLeave = (e) => {
+        // If their finger slips off the button while holding, stop recording
+        if (isMicHeld) {
+            isMicHeld = false;
+            if (recognition && isListening) recognition.stop();
+        }
+    };
+
+    // Attach all necessary events for desktop and mobile
+    UI.btnMic.addEventListener('mousedown', handleMicDown);
+    UI.btnMic.addEventListener('touchstart', handleMicDown, { passive: false });
+    
+    UI.btnMic.addEventListener('mouseup', handleMicUp);
+    UI.btnMic.addEventListener('touchend', handleMicUp);
+    
+    UI.btnMic.addEventListener('mouseleave', handleMicLeave);
+
 	
 	// --- SMART BOOK SUGGESTIONS LOGIC ---
     // Map everyday keywords to specific groups and books from your library
@@ -1080,51 +1140,65 @@ UI.textIn.addEventListener('focus', () => {
 	
 }
 
-function initSpeechRecognition() {
-    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRec) return; 
-    
-    recognition = new SpeechRec();
-    recognition.continuous = false; 
-    recognition.interimResults = false; 
-    
-    recognition.onstart = () => {
-        isListening = true;
-        updateStopButtonVisibility(); 
-        UI.btnMic.classList.add('mic-pulse');
-        UI.status.style.backgroundColor = '#ef4444'; 
-        UI.textIn.value = '';
-        UI.textIn.placeholder = "Listening... Speak now.";
-    };
-    
-    recognition.onresult = (e) => {
-        const transcript = e.results[e.results.length - 1][0].transcript.trim();
-        if (transcript) { UI.textIn.value = transcript; processInput(transcript); }
-    };
-    
-    recognition.onend = () => {
-        isListening = false;
-        if (!state.isProcessing) resetMicUI();
-        setTimeout(updateStopButtonVisibility, 50);
-    };
-    
-    recognition.onerror = (e) => {
-        console.error("Mic Error:", e.error);
-        isListening = false; 
-        resetMicUI(); 
-        setTimeout(updateStopButtonVisibility, 50); 
-        
-        if (e.error === 'no-speech') {
-            return; 
-        } else if (e.error === 'network') {
-            alert("⚠️ Network Error: Android's Google App cannot reach the speech servers.");
-        } else if (e.error === 'not-allowed' || e.error === 'audio-capture') {
-            alert("⚠️ Mic Blocked: Please ensure BOTH Google Chrome and the 'Google' app have microphone permissions in phone settings.");
-        } else {
-            alert("⚠️ Speech Engine Error: " + e.error);
-        }
-    };
-}
+			function initSpeechRecognition() {
+				const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+				if (!SpeechRec) return;
+				recognition = new SpeechRec();
+				recognition.continuous = false; 
+				recognition.interimResults = true; // Changed to true to accumulate text seamlessly
+				
+				recognition.onstart = () => {
+					isListening = true;
+					updateStopButtonVisibility();
+					UI.btnMic.classList.add('mic-pulse');
+					UI.status.style.backgroundColor = '#ef4444'; 
+					UI.textIn.value = '';
+					UI.textIn.placeholder = "Listening... Speak now.";
+				};
+				
+				recognition.onresult = (e) => {
+					let interimText = '';
+					for (let i = e.resultIndex; i < e.results.length; ++i) {
+						if (e.results[i].isFinal) {
+							finalMicTranscript += e.results[i][0].transcript + " ";
+						} else {
+							interimText += e.results[i][0].transcript;
+						}
+					}
+					UI.textIn.value = (finalMicTranscript + interimText).trim();
+				};
+				
+				recognition.onend = () => {
+					isListening = false;
+					
+					if (isMicHeld) {
+						// The child is still holding the button, but the API paused. Restart instantly.
+						try { recognition.start(); } catch(err) {}
+					} else {
+						// Button was released (Push-to-talk) OR the toggle timed out
+						if (!state.isProcessing) resetMicUI();
+						setTimeout(updateStopButtonVisibility, 50);
+						
+						const fullText = UI.textIn.value.trim();
+						if (fullText) {
+							processInput(fullText);
+						}
+						finalMicTranscript = ''; 
+						isMicToggled = false;
+					}
+				};
+				
+				recognition.onerror = (e) => {
+					isListening = false; 
+					if (e.error !== 'no-speech') {
+						resetMicUI();
+						setTimeout(updateStopButtonVisibility, 50);
+						isMicHeld = false;
+						isMicToggled = false;
+					}
+				};
+			}
+			
 function resetMicUI() {
     UI.btnMic.classList.remove('mic-pulse');
     UI.status.style.backgroundColor = '#4b5563'; 
@@ -2109,3 +2183,50 @@ function renderMessage(sender, text, isModel) {
     return msgId;
 }
 
+document.addEventListener('DOMContentLoaded', () => {
+    const btnUpdateApp = document.getElementById('btn-update-app');
+
+    if (btnUpdateApp) {
+        btnUpdateApp.addEventListener('click', async () => {
+            // Optional: Change button text/icon to show loading state
+            const originalText = btnUpdateApp.innerHTML;
+            btnUpdateApp.innerHTML = `<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Syncing...`;
+            btnUpdateApp.disabled = true;
+
+            try {
+                // 1. Force the Service Worker to check for updates
+                if ('serviceWorker' in navigator) {
+                    const registration = await navigator.serviceWorker.ready;
+                    await registration.update();
+                }
+
+                // 2. Clear all existing caches (this forces the browser to fetch fresh assets)
+                if ('caches' in window) {
+                    const cacheKeys = await caches.keys();
+                    await Promise.all(
+                        cacheKeys.map(key => caches.delete(key))
+                    );
+                }
+
+                // 3. Unregister the service worker to ensure a clean slate upon reload
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (let registration of registrations) {
+                        await registration.unregister();
+                    }
+                }
+
+                // 4. Force a hard reload bypassing the browser cache
+                window.location.reload(true);
+
+            } catch (error) {
+                console.error('Failed to sync updates:', error);
+                alert('Could not sync updates. Please check your internet connection.');
+                
+                // Restore button state if it fails
+                btnUpdateApp.innerHTML = originalText;
+                btnUpdateApp.disabled = false;
+            }
+        });
+    }
+});
