@@ -2230,3 +2230,73 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+document.addEventListener('DOMContentLoaded', () => {
+    const btnUpdateApp = document.getElementById('btn-update-app');
+
+    if (btnUpdateApp) {
+        btnUpdateApp.addEventListener('click', async () => {
+            const originalText = btnUpdateApp.innerHTML;
+            btnUpdateApp.innerHTML = `
+                <svg class="w-4 h-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg> Syncing Latest Files...`;
+            btnUpdateApp.disabled = true;
+
+            try {
+                let syncSuccessful = false;
+
+                // 1. Send direct SYNC_NOW message to active Service Worker
+                if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                    const messageChannel = new MessageChannel();
+                    
+                    const messagePromise = new Promise((resolve) => {
+                        // 6-second safety timeout in case network is extremely slow
+                        const timeout = setTimeout(() => resolve(false), 6000);
+
+                        messageChannel.port1.onmessage = (event) => {
+                            clearTimeout(timeout);
+                            if (event.data && event.data.status === 'SUCCESS') {
+                                resolve(true);
+                            } else {
+                                resolve(false);
+                            }
+                        };
+                    });
+
+                    navigator.serviceWorker.controller.postMessage(
+                        { action: 'SYNC_NOW' },
+                        [messageChannel.port2]
+                    );
+
+                    syncSuccessful = await messagePromise;
+                }
+
+                // 2. Fallback execution: Purge caches directly if SW isn't controlling page yet
+                if (!syncSuccessful) {
+                    console.warn('SW Message channel unavailable/timed out. Executing direct purge fallback...');
+                    if ('caches' in window) {
+                        const keys = await caches.keys();
+                        await Promise.all(keys.map(key => caches.delete(key)));
+                    }
+                    if ('serviceWorker' in navigator) {
+                        const registrations = await navigator.serviceWorker.getRegistrations();
+                        for (let reg of registrations) {
+                            await reg.unregister();
+                        }
+                    }
+                }
+
+                // 3. Force hard reload with timestamp query to ensure full fresh render
+                window.location.href = window.location.pathname + '?reload=' + Date.now();
+
+            } catch (error) {
+                console.error('Update App Error:', error);
+                alert('Could not complete update. Please check your internet connection.');
+                btnUpdateApp.innerHTML = originalText;
+                btnUpdateApp.disabled = false;
+            }
+        });
+    }
+});
