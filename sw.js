@@ -1,4 +1,4 @@
-const CACHE_NAME = 'eprashala-library-v4.6'; 
+const CACHE_NAME = 'eprashala-library-v4.7'; 
 
 const ASSETS_TO_CACHE = [
     '/',
