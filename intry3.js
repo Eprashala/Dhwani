@@ -2183,54 +2183,7 @@ function renderMessage(sender, text, isModel) {
     return msgId;
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    const btnUpdateApp = document.getElementById('btn-update-app');
-
-    if (btnUpdateApp) {
-        btnUpdateApp.addEventListener('click', async () => {
-            // Optional: Change button text/icon to show loading state
-            const originalText = btnUpdateApp.innerHTML;
-            btnUpdateApp.innerHTML = `<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Syncing...`;
-            btnUpdateApp.disabled = true;
-
-            try {
-                // 1. Force the Service Worker to check for updates
-                if ('serviceWorker' in navigator) {
-                    const registration = await navigator.serviceWorker.ready;
-                    await registration.update();
-                }
-
-                // 2. Clear all existing caches (this forces the browser to fetch fresh assets)
-                if ('caches' in window) {
-                    const cacheKeys = await caches.keys();
-                    await Promise.all(
-                        cacheKeys.map(key => caches.delete(key))
-                    );
-                }
-
-                // 3. Unregister the service worker to ensure a clean slate upon reload
-                if ('serviceWorker' in navigator) {
-                    const registrations = await navigator.serviceWorker.getRegistrations();
-                    for (let registration of registrations) {
-                        await registration.unregister();
-                    }
-                }
-
-                // 4. Force a hard reload bypassing the browser cache
-                window.location.reload(true);
-
-            } catch (error) {
-                console.error('Failed to sync updates:', error);
-                alert('Could not sync updates. Please check your internet connection.');
-                
-                // Restore button state if it fails
-                btnUpdateApp.innerHTML = originalText;
-                btnUpdateApp.disabled = false;
-            }
-        });
-    }
-});
-
+// --- APP UPDATE SYNC LOGIC ---
 document.addEventListener('DOMContentLoaded', () => {
     const btnUpdateApp = document.getElementById('btn-update-app');
 
@@ -2252,8 +2205,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const messageChannel = new MessageChannel();
                     
                     const messagePromise = new Promise((resolve) => {
-                        // 6-second safety timeout in case network is extremely slow
-                        const timeout = setTimeout(() => resolve(false), 6000);
+                        // 8-second safety timeout for slower mobile networks
+                        const timeout = setTimeout(() => resolve(false), 8000);
 
                         messageChannel.port1.onmessage = (event) => {
                             clearTimeout(timeout);
