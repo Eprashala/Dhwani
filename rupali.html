@@ -154,10 +154,8 @@
     </div>
 
     <script>
-        // --- UTILITY: PREVENT RIGHT CLICK ---
         document.addEventListener('contextmenu', event => event.preventDefault());
 
-        // --- UTILITY: FULLSCREEN MODE ---
         function enterFullScreen() {
             const elem = document.documentElement;
             if (elem.requestFullscreen) { elem.requestFullscreen(); } 
@@ -165,7 +163,6 @@
             else if (elem.msRequestFullscreen) { elem.msRequestFullscreen(); }
         }
 
-        // --- DOM ELEMENTS ---
         const talkButton = document.getElementById('talk-button');
         const statusIndicator = document.getElementById('status-indicator');
         const conversationLog = document.getElementById('conversation-log');
@@ -179,7 +176,6 @@
         const endChatButton = document.getElementById('end-chat-button');
         const restartChatButton = document.getElementById('restart-chat-button');
         
-        // Advance Settings
         const advanceToggleBtn = document.getElementById('advance-toggle-btn');
         const advanceContainer = document.getElementById('advance-container');
         const useCustomKeyCheckbox = document.getElementById('use-custom-key-checkbox');
@@ -187,11 +183,11 @@
         const pasteKeyBtn = document.getElementById('paste-key-btn');
 
         // --- CONFIGURATION ---
-        const DEFAULT_API_KEY = "AIzaSyB41xzsLyqQizurma_sHuBPd18wpJvoJro"; 
-        const SILENCE_TIMEOUT = 4000; // 4000 milliseconds = 4 Seconds
-	    let appState = 'IDLE'; 
+        const PROXY_URL = "https://eprashala.pythonanywhere.com/api/chat";
+        const SILENCE_TIMEOUT = 4000;
+        let appState = 'IDLE'; 
         let userName = '';
-        let userAge = 18; // Default age for this module
+        let userAge = 18; 
         let chatHistory = [];
         let systemInstruction = '';
         let recognition;
@@ -201,14 +197,12 @@
         let voices = [];
         let wakeLock = null;
 
-        // --- INITIALIZATION ---
         window.onload = () => {
             if (synth.speaking) synth.cancel();
             loadUserData(); 
             loadVoices();   
         };
 
-        // --- UI LOGIC ---
         advanceToggleBtn.addEventListener('click', () => {
             advanceContainer.classList.toggle('hidden');
             advanceContainer.classList.toggle('flex');
@@ -237,14 +231,13 @@
             } catch (err) { alert('Could not paste. Type manually.'); }
         });
 
-        function getEffectiveApiKey() {
+        function getEffectiveCustomKey() {
             if (useCustomKeyCheckbox.checked && customApiKeyInput.value.trim().length > 10) {
                 return customApiKeyInput.value.trim();
             }
-            return DEFAULT_API_KEY;
+            return null;
         }
 
-        // --- MEMORY LOGIC ---
         function loadUserData() {
             try {
                 const savedName = localStorage.getItem('rupali_userName');
@@ -304,8 +297,6 @@
         manualNameInput.addEventListener('input', () => { if(rememberMeCheckbox.checked) saveUserData(); });
         manualAgeInput.addEventListener('input', () => { if(rememberMeCheckbox.checked) saveUserData(); });
 
-
-        // --- SPEECH RECOGNITION ---
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         
         if (!SpeechRecognition) {
@@ -336,7 +327,6 @@
             try { recognition.start(); } catch (e) {}
         }
 
-        // --- MAIN INTERACTION FLOW ---
         talkButton.addEventListener('click', toggleListening);
         pauseResumeButton.addEventListener('click', togglePauseResume);
         stopSpeechButton.addEventListener('click', stopSpeech);
@@ -367,7 +357,6 @@
                         saveUserData(); 
                         buildSystemPrompt(); 
 
-                        // CHECK HISTORY
                         const previousHistory = loadChatContext(userName);
                         
                         if (previousHistory.length > 0) {
@@ -464,7 +453,6 @@
 
             try {
                 switch (currentState) {
-                    // WAKE WORD: Check for Rupali / Tai
                     case 'LISTENING_FOR_WAKEWORD':
                         const t = transcript.toLowerCase();
                         if (t.includes('rupali') || t.includes('tai') || t.includes('रुपाली') || t.includes('ताई')) {
@@ -540,7 +528,6 @@
             }
         }
 
-        // --- THE BRAIN: RUPALI'S LOGIC ---
         function buildSystemPrompt() {
             let ageTone = "";
             if (userAge <= 18) {
@@ -549,7 +536,6 @@
                 ageTone = "User is an ADULT. Tone: Professional Expert Beautician & Dermatologist. Explain causes (pitta dosha, stress). Suggest complex masks (lepas) and anti-aging/glow remedies.";
             }
 
-            // THE BEAUTY CURRICULUM
             const curriculum = `
             MODULES TO TEACH (Beauty & Dermatology):
             1. Tridosha Analysis: Identify if problem is Vata (dry), Pitta (sensitive/red), or Kapha (oily) related.
@@ -590,13 +576,16 @@
             restartChatButton.disabled = false;
         }
 
-        // --- API CALLS ---
+        // --- API CALLS (ROUTED VIA PYTHONANYWHERE PROXY) ---
         async function getAIResponse(historyData) {
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${getEffectiveApiKey()}`;
+            const customKey = getEffectiveCustomKey();
+            const headers = { 'Content-Type': 'application/json' };
+            if (customKey) headers['X-Custom-Api-Key'] = customKey;
+
             try {
-                const response = await fetch(apiUrl, {
+                const response = await fetch(PROXY_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: headers,
                     body: JSON.stringify({
                         contents: historyData,
                         systemInstruction: { parts: [{ text: systemInstruction }] }
@@ -604,17 +593,20 @@
                 });
                 const result = await response.json();
                 return result.candidates[0].content.parts[0].text.trim();
-            } catch (error) { return "Network Error. Please try again."; }
+            } catch (error) { return "नेटवर्क त्रुटी. कृपया पुन्हा प्रयत्न करा."; }
         }
 
         async function generateTextResponseFromChat() { return await getAIResponse(chatHistory); }
 
         async function extractNameFromTranscript(transcript) {
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${getEffectiveApiKey()}`;
+            const customKey = getEffectiveCustomKey();
+            const headers = { 'Content-Type': 'application/json' };
+            if (customKey) headers['X-Custom-Api-Key'] = customKey;
+
             try {
-                const response = await fetch(apiUrl, {
+                const response = await fetch(PROXY_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: headers,
                     body: JSON.stringify({ contents: [{ parts: [{ text: `Extract First Name from Marathi audio: "${transcript}". If unclear return "सखी".` }] }] })
                 });
                 const result = await response.json();
@@ -624,11 +616,14 @@
         }
 
         async function extractAgeFromTranscript(transcript) {
-             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${getEffectiveApiKey()}`;
-             try {
-                const response = await fetch(apiUrl, {
+            const customKey = getEffectiveCustomKey();
+            const headers = { 'Content-Type': 'application/json' };
+            if (customKey) headers['X-Custom-Api-Key'] = customKey;
+
+            try {
+                const response = await fetch(PROXY_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: headers,
                     body: JSON.stringify({ contents: [{ parts: [{ text: `Extract age number from: "${transcript}". Return ONLY digits. Default 18.` }] }] })
                 });
                 const result = await response.json();
@@ -642,7 +637,6 @@
             return cleaned.replace(/[\*#`]/g, ' ').replace(/\s+/g, ' ').trim();
         }
 
-        // --- SPEECH SYNTHESIS ---
         function loadVoices() {
             voices = synth.getVoices();
             if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = () => { voices = synth.getVoices(); };
@@ -695,8 +689,6 @@
                 let marathiVoice = voices.find(voice => voice.lang === 'mr-IN') || voices.find(voice => voice.lang === 'hi-IN');
                 if (marathiVoice) utterance.voice = marathiVoice;
                 utterance.lang = 'mr-IN';
-                
-                // Gentle pace for beauty expert persona
                 utterance.rate = 0.9; 
                 
                 synth.speak(utterance);
@@ -735,7 +727,6 @@
             catch (err) { try { await navigator.clipboard.writeText(chatText); logMessage('Info', 'Copied'); } catch (e) {} }
         }
 
-        // --- WAKE LOCK ---
         async function acquireWakeLock() {
             if ('wakeLock' in navigator) { 
                 try { 
