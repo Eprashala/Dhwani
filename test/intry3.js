@@ -1079,21 +1079,99 @@ const handleMicDown = async (e) => {
 
 	
 	// --- SMART BOOK SUGGESTIONS LOGIC ---
+// --- SMART BOOK SUGGESTIONS LOGIC ---
     // Map everyday keywords to specific groups and books from your library
     const keywordMap = {
+        // 1. Core Health & Wellness
         "health": { group: "Ayurveda", item: "Charaka Samhita", label: "Health (Charaka)" },
         "medicine": { group: "Ayurveda", item: "Sushruta Samhita", label: "Medicine (Sushruta)" },
         "surgery": { group: "Ayurveda", item: "Sushruta Samhita", label: "Surgery (Sushruta)" },
+        "pregnancy": { group: "Ayurveda", item: "Garbha Sanskar", label: "Garbha Sanskar" },
+        "women": { group: "Prominent Personalities", item: "Dr. Pihu Gynecology & Women's Health", label: "Women's Health" },
+        "beauty": { group: "Prominent Personalities", item: "Dr. Rupali - Ayurvedic Cosmetology", label: "Beauty & Skin" },
+        "addiction": { group: "Ayurveda", item: "Vedic & Ayurvedic De-Addiction Science", label: "De-Addiction" },
+        "drugs": { group: "Ayurveda", item: "Vedic & Ayurvedic De-Addiction Science", label: "Mind Recovery" },
+        
+        // 2. Relationships & Mind
         "relationship": { group: "Shastra", item: "Kama Shastra", label: "Relationships" },
         "love": { group: "Shastra", item: "Kama Shastra", label: "Love & Aesthetics" },
+        "mind": { group: "Philosophical Sutras", item: "Patanjali Yoga Sutras", label: "Yoga & Mind" },
+        "yoga": { group: "Philosophical Sutras", item: "Patanjali Yoga Sutras", label: "Patanjali Yoga" },
+        "meditation": { group: "Modern Spiritual", item: "Paramahansa Yogananda", label: "Kriya Yoga" },
+        
+        // 3. Ancient Sciences, Math & Engineering
         "science": { group: "Vedic Sciences", item: "Vedic Quantum Physics", label: "Quantum Science" },
         "physics": { group: "Vedic Sciences", item: "Vedic Quantum Physics", label: "Vedic Physics" },
         "astronomy": { group: "Jyotish", item: "Surya Siddhanta", label: "Astronomy" },
         "stars": { group: "Jyotish", item: "Brihat Parashara", label: "Astrology" },
         "math": { group: "Ancient Scientists & Mathematicians", item: "Aryabhata", label: "Mathematics" },
-        "law": { group: "Dharma Shastra", item: "Manusmriti", label: "Ancient Law" },
+        "water": { group: "Shastra", item: "Jala Samrakshana & Engineering", label: "Water Conservation" },
+        "aviation": { group: "Shastra", item: "Vaimanika Shastra", label: "Ancient Aviation" },
+        "gems": { group: "Ratna Pariksha (Ancient Gemology)", item: "Ratnapariksha", label: "Gemology" },
+        "diamond": { group: "Ratna Pariksha (Ancient Gemology)", item: "Ratnapariksha", label: "Gem Testing" },
+        "animals": { group: "Shastra", item: "Pashu Ayurveda", label: "Veterinary Science" },
+        "architecture": { group: "Shastra", item: "Vastu Shastra", label: "Vastu Shastra" },
+        "vastu": { group: "Shastra", item: "Vastu Shastra", label: "Vastu" },
+        "engineering": { group: "Shastra", item: "Shilpa Shastra", label: "Shilpa Shastra" },
+
+        // 4. Modern Law, Governance & Tax
+        "law": { group: "Laws In India", item: "Constitution", label: "Constitution of India" },
+        "ancient law": { group: "Dharma Shastra", item: "Manusmriti", label: "Ancient Law" },
+        "crime": { group: "Laws In India", item: "Substantive Criminal Law", label: "Criminal Law" },
+        "police": { group: "Laws In India", item: "Central Police Framework", label: "Police Framework" },
+        "tax": { group: "Laws In India", item: "Direct Taxes", label: "Taxation Laws" },
+        "driving": { group: "Laws In India", item: "Road Safety & Violations", label: "Traffic Laws" },
+        "politics": { group: "Dharma Shastra", item: "Arthashastra", label: "Chanakya's Politics" },
+
+        // 5. Tech & Modern Influencers
+        "computer": { group: "Real Influencers", item: "Linus Torvalds", label: "Linux & Computing" },
+        "tech": { group: "Real Influencers", item: "Steve Jobs", label: "Tech Innovation" },
+        "apple": { group: "Real Influencers", item: "Steve Jobs", label: "Apple History" },
+        "iphone": { group: "Real Influencers", item: "Steve Jobs", label: "Apple History" },
+        "google": { group: "Real Influencers", item: "Sundar Pichai", label: "Google Tech" },
+        "ai": { group: "Real Influencers", item: "Sam Altman", label: "Artificial Intelligence" },
+        "tesla": { group: "Real Influencers", item: "Elon Musk", label: "SpaceX & Tesla" },
+
+        // 6. Business & Economy
+        "business": { group: "Business Tycoons of India", item: "Ratan Naval Tata", label: "Tata Legacy" },
+        "startup": { group: "Business Tycoons of India", item: "Sachin Bansal", label: "Startups (Flipkart)" },
+        "invest": { group: "Business Tycoons of India", item: "Radhakishan Damani", label: "Investing (DMart)" },
+        "stocks": { group: "Business Tycoons of India", item: "Nithin Kamath", label: "Retail Broking" },
+        "reliance": { group: "Business Tycoons of India", item: "Dhirubhai Ambani", label: "Reliance Legacy" },
+
+        // 7. Government Schemes & Agriculture
+        "scheme": { group: "PMO schemes", item: "PMJAY", label: "Govt Health Schemes" },
+        "farming": { group: "Prominent Personalities", item: "Baliraja - Agricultural Science", label: "Farming Science" },
+        "agriculture": { group: "Prominent Personalities", item: "Baliraja - Agricultural Science", label: "Agricultural Wisdom" },
+        "kisan": { group: "PMO schemes", item: "PM-KISAN", label: "PM-KISAN" },
+
+        // 8. Sports Science
         "sports": { group: "Ancient Sports and Martial Arts", item: "Ancient Sports and Martial Arts", label: "Ancient Sports" },
-        "cricket": { group: "Sports Science & Mindset", item: "Sachin Tendulkar", label: "Cricket Mindset" }
+        "cricket": { group: "Sports Science & Mindset", item: "Sachin Tendulkar", label: "Cricket Mindset" },
+        "chess": { group: "Sports Science & Mindset", item: "Viswanathan Anand", label: "Chess Mastery" },
+        "olympics": { group: "Sports Science & Mindset", item: "Abhinav Bindra", label: "Olympic Focus" },
+        "boxing": { group: "Sports Science & Mindset", item: "Mary Kom", label: "Boxing Champion" },
+
+        // 9. Arts, Music & Culture
+        "music": { group: "Arts & Applied Sciences", item: "Sangita Ratnakara", label: "Classical Music" },
+        "dance": { group: "Classical Literature", item: "Natyashastra", label: "Natyashastra" },
+        "singing": { group: "Visionaries & Cultural Icons", item: "Lata Mangeshkar", label: "Indian Playback" },
+
+        // 10. History, Heroes & Freedom
+        "shivaji": { group: "Maratha Empire", item: "Chhatrapati Shivaji Maharaj", label: "Shivaji Maharaj" },
+        "maratha": { group: "Maratha Empire", item: "Chhatrapati Sambhaji Maharaj", label: "Sambhaji Maharaj" },
+        "freedom": { group: "Indian Freedom Fighters", item: "Mahatma Gandhi", label: "Freedom Struggle" },
+        "revolution": { group: "Indian Freedom Fighters", item: "Bhagat Singh", label: "Bhagat Singh" },
+        "space": { group: "Visionaries & Cultural Icons", item: "A.P.J. Abdul Kalam", label: "Space & Missiles" },
+        
+        // 11. Deep Spiritual & Epics
+        "gita": { group: "Bhagavad Gita", item: "Bhagavad Gita", label: "Bhagavad Gita" },
+        "ram": { group: "Gods", item: "Rama", label: "Lord Rama" },
+        "ramayana": { group: "Epics", item: "Ramayana", label: "Ramayana Epic" },
+        "krishna": { group: "Gods", item: "Krishna", label: "Lord Krishna" },
+        "mahabharata": { group: "Epics", item: "Mahabharata", label: "Mahabharata" },
+        "shiv": { group: "Gods", item: "Shiv", label: "Lord Shiva" },
+        "buddha": { group: "Gods", item: "Gautam Buddha", label: "Lord Buddha" }
     };
 
     const suggestionsContainer = document.getElementById('book-suggestions');
