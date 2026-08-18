@@ -1076,7 +1076,52 @@ const handleMicDown = async (e) => {
     UI.btnMic.addEventListener('touchend', handleMicUp);
     
     UI.btnMic.addEventListener('mouseleave', handleMicLeave);
+	// --- HEADSET BUTTON (ANSWER CALL / PLAY-PAUSE) INTERCEPTOR ---
+    const toggleMicFromHeadset = () => {
+        if (state.isProcessing || !recognition) return;
 
+        if (isListening) {
+            // If already listening, stop it (mimics tapping to stop)
+            isMicToggled = false;
+            if (recognition) recognition.stop();
+        } else {
+            // If not listening, start it in "Toggle" mode
+            // We create a dummy event to bypass preventDefault/stopPropagation errors
+            const dummyEvent = { preventDefault: () => {}, stopPropagation: () => {} };
+            
+            // 1. Trigger the down action
+            handleMicDown(dummyEvent);
+            
+            // 2. Trigger the up action immediately (100ms) to force it into "short tap" toggle mode
+            setTimeout(() => {
+                handleMicUp(dummyEvent);
+            }, 100); 
+        }
+    };
+
+    // 1. Media Session API (Captures Bluetooth & most modern wired headsets)
+    if ('mediaSession' in navigator) {
+        // Hijack the OS media controls so the headset button routes to our PWA
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: 'Dhwani AI',
+            artist: 'Active Session',
+        });
+
+        navigator.mediaSession.setActionHandler('play', toggleMicFromHeadset);
+        navigator.mediaSession.setActionHandler('pause', toggleMicFromHeadset);
+        navigator.mediaSession.setActionHandler('stop', () => {
+            if (isListening && recognition) recognition.stop();
+        });
+    }
+
+    // 2. Keyboard Fallback (Captures older wired headsets that send raw keycodes)
+    document.addEventListener('keydown', (e) => {
+        // 'MediaPlayPause' is the standard web keycode for the headset hook/call button
+        if (e.key === 'MediaPlayPause' || e.key === 'Call') {
+            e.preventDefault();
+            toggleMicFromHeadset();
+        }
+    });
 	
 	// --- SMART BOOK SUGGESTIONS LOGIC ---
 // --- SMART BOOK SUGGESTIONS LOGIC ---
