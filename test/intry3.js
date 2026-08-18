@@ -994,35 +994,53 @@ UI.textIn.addEventListener('focus', () => {
 });
 
 // INSERT THIS HYBRID LISTENER BLOCK
-    const handleMicDown = (e) => {
-        e.preventDefault(); 
-        e.stopPropagation(); 
-        enforceFullScreen(); // FIXED: Capital 'S' to match the function in this file
-        
-        if (state.isProcessing || !recognition) {
-            if (!recognition) alert("Speech recognition is not supported in this browser.");
-            return;
-        }
-        
-        // If they tap it while it's already running in toggle mode, stop it manually.
-        if (isListening && isMicToggled) {
-            isMicToggled = false;
-            recognition.stop(); 
-            return;
-        }
-
-        if (isMicHeld) return; // Prevent double fires
-
-        isMicHeld = true;
+// Change to async arrow function
+const handleMicDown = async (e) => {
+    e.preventDefault(); 
+    e.stopPropagation(); 
+    enforceFullScreen(); 
+    
+    if (state.isProcessing || !recognition) {
+        if (!recognition) alert("Speech recognition is not supported in this browser.");
+        return;
+    }
+    
+    if (isListening && isMicToggled) {
         isMicToggled = false;
-        micPressStartTime = Date.now();
-        finalMicTranscript = '';
-        UI.textIn.value = '';
+        recognition.stop(); 
+        return;
+    }
+
+    if (isMicHeld) return; 
+
+    isMicHeld = true;
+    isMicToggled = false;
+    micPressStartTime = Date.now();
+    finalMicTranscript = '';
+    UI.textIn.value = '';
+    
+    recognition.lang = UI.lang.value; 
+
+    // --- AUDIO ROUTING FIX START ---
+    try {
+        // Force the OS to switch to the Bluetooth/Wired headset profile
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: { echoCancellation: true, noiseSuppression: true } 
+            });
+            // Immediately stop the tracks so the Web Speech API can take control of the mic
+            stream.getTracks().forEach(track => track.stop());
+        }
         
-        // FIXED: Using UI.lang.value which is the correct dropdown for intry3.js
-        recognition.lang = UI.lang.value; 
-        try { recognition.start(); } catch(err) { console.error(err); }
-    };
+        // Now start the recognition engine
+        recognition.start(); 
+    } catch(err) { 
+        console.error("Hardware routing failed:", err);
+        // Fallback: Attempt to start anyway if permission was denied or stream failed
+        try { recognition.start(); } catch(fallbackErr) { console.error(fallbackErr); }
+    }
+    // --- AUDIO ROUTING FIX END ---
+};
 
     const handleMicUp = (e) => {
         e.preventDefault(); 
@@ -2183,3 +2201,73 @@ function renderMessage(sender, text, isModel) {
     return msgId;
 }
 
+// --- APP UPDATE SYNC LOGIC ---
+document.addEventListener('DOMContentLoaded', () => {
+    const btnUpdateApp = document.getElementById('btn-update-app');
+
+    if (btnUpdateApp) {
+        btnUpdateApp.addEventListener('click', async () => {
+            const originalText = btnUpdateApp.innerHTML;
+            btnUpdateApp.innerHTML = `
+                <svg class="w-4 h-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg> Syncing Latest Files...`;
+            btnUpdateApp.disabled = true;
+
+            try {
+                let syncSuccessful = false;
+
+                // 1. Send direct SYNC_NOW message to active Service Worker
+                if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                    const messageChannel = new MessageChannel();
+                    
+                    const messagePromise = new Promise((resolve) => {
+                        // 8-second safety timeout for slower mobile networks
+                        const timeout = setTimeout(() => resolve(false), 8000);
+
+                        messageChannel.port1.onmessage = (event) => {
+                            clearTimeout(timeout);
+                            if (event.data && event.data.status === 'SUCCESS') {
+                                resolve(true);
+                            } else {
+                                resolve(false);
+                            }
+                        };
+                    });
+
+                    navigator.serviceWorker.controller.postMessage(
+                        { action: 'SYNC_NOW' },
+                        [messageChannel.port2]
+                    );
+
+                    syncSuccessful = await messagePromise;
+                }
+
+                // 2. Fallback execution: Purge caches directly if SW isn't controlling page yet
+                if (!syncSuccessful) {
+                    console.warn('SW Message channel unavailable/timed out. Executing direct purge fallback...');
+                    if ('caches' in window) {
+                        const keys = await caches.keys();
+                        await Promise.all(keys.map(key => caches.delete(key)));
+                    }
+                    if ('serviceWorker' in navigator) {
+                        const registrations = await navigator.serviceWorker.getRegistrations();
+                        for (let reg of registrations) {
+                            await reg.unregister();
+                        }
+                    }
+                }
+
+                // 3. Force hard reload with timestamp query to ensure full fresh render
+                window.location.href = window.location.pathname + '?reload=' + Date.now();
+
+            } catch (error) {
+                console.error('Update App Error:', error);
+                alert('Could not complete update. Please check your internet connection.');
+                btnUpdateApp.innerHTML = originalText;
+                btnUpdateApp.disabled = false;
+            }
+        });
+    }
+});
