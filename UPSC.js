@@ -4,6 +4,16 @@
 
 // --- 0. SECURITY, WAKE LOCK, VISIBILITY & FULLSCREEN ---
 document.addEventListener('contextmenu', event => event.preventDefault());
+// --- DYNAMIC VIEWPORT FIX FOR ANDROID ---
+function updateViewportHeight() {
+    // Calculates 1% of the true visible window height
+    let vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty('--vh', `${vh}px`);
+    document.body.style.height = `calc(var(--vh, 1vh) * 100)`;
+}
+window.addEventListener('resize', updateViewportHeight);
+window.addEventListener('orientationchange', updateViewportHeight);
+updateViewportHeight(); // Run immediately on load
 
 let wakeLock = null;
 async function requestWakeLock() {
@@ -1019,17 +1029,19 @@ window.downloadEntireSessionPDF = () => {
 // --- EVENT HANDLERS ---
 function setupEventListeners() {
     UI.btnExportPdf.onclick = window.downloadEntireSessionPDF;
-	UI.btnStart.onclick = () => {
+// Aggressively trigger fullscreen by listening to the entire overlay
+    UI.overlay.addEventListener('click', () => {
         enforceFullscreen();
         requestWakeLock();
         UI.overlay.style.display = 'none';
-        // Prime audio for mobile web
+        
+        // Prime audio for mobile web securely
         if ('speechSynthesis' in window) {
             const silent = new SpeechSynthesisUtterance('');
             silent.volume = 0;
             window.speechSynthesis.speak(silent);
         }
-    };
+    });
 
     UI.langSelector.onchange = () => {
         savePreferences();
