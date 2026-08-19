@@ -104,6 +104,7 @@ const UI = {
 	
 	// Inside const UI = { ... }
     rememberCheckbox: document.getElementById('remember-checkbox'),
+	highlightCheckbox: document.getElementById('highlight-checkbox'),
     mainView: document.getElementById('settings-main-view'),
     historyView: document.getElementById('settings-history-view'),
     btnViewHistory: document.getElementById('btn-view-history'),
@@ -126,6 +127,11 @@ let ttsStatus = 'STOPPED';
 let currentActiveBtn = null;
 let currentMsgId = null;
 const rawTextMap = {};
+let wordsArray = [];
+let globalWordIndex = 0;
+let highlightTimer = null;
+let lastHighlightedSpan = null;
+const speechDataMap = {};
 let activeExamSeconds = 0;
 let examTimerInterval = null;
 let allSessions = []; 
@@ -140,7 +146,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     loadPreferences();
     await initIndexedDB();
     await loadAllSessionsFromDB();
-    await loadPaperDatabase();
+    populateYearDropdown(); // Populate dropdown immediately without waiting for a download
     initSpeechEngine();
     setupEventListeners();
 });
@@ -153,6 +159,28 @@ function loadPreferences() {
         UI.langSelector.value = localStorage.getItem('upsc_lang');
     }
     UI.rememberCheckbox.checked = localStorage.getItem('upsc_remember') !== 'false';
+	UI.highlightCheckbox.checked = localStorage.getItem('upsc_highlight') === 'true';
+}
+
+function savePreferences() {
+    localStorage.setItem('upsc_user_name', UI.cfgUserName.value.trim());
+    localStorage.setItem('upsc_api_key', UI.cfgCustomKey.value.trim());
+    localStorage.setItem('upsc_tts_speed', UI.cfgTtsSpeed.value);
+    localStorage.setItem('upsc_lang', UI.langSelector.value);
+    localStorage.setItem('upsc_remember', UI.rememberCheckbox.checked);
+	localStorage.setItem('upsc_highlight', UI.highlightCheckbox.checked);
+}
+
+// --- UI SETUP ---
+function populateYearDropdown() {
+    UI.yearSelector.innerHTML = '';
+    // Populate from 2026 down to 2000
+    for (let y = 2026; y >= 2000; y--) {
+        const option = document.createElement('option');
+        option.value = y;
+        option.textContent = `UPSC Year - ${y}`;
+        UI.yearSelector.appendChild(option);
+    }
 }
 
 function savePreferences() {
@@ -409,19 +437,45 @@ function populateYearDropdown() {
     }
 }
 
-function loadPaperQuestions() {
+// --- DYNAMIC LAZY-LOADING ENGINE ---
+async function loadPaperQuestions() {
     const selectedYear = UI.yearSelector.value;
     const selectedPaper = UI.paperTypeSelector.value;
     activePaperKey = `${selectedYear}_${selectedPaper}`; // e.g., "2026_GS1"
 
-    if (!papersDatabase[activePaperKey]) {
-        UI.qStatement.innerHTML = `<span class="text-orange-400 font-bold">The ${selectedYear} ${selectedPaper} paper is not available yet in the database.</span>`;
+    // 1. Check if we already downloaded this year's file to save RAM & Internet Data
+    if (!papersDatabase[selectedYear]) {
+        UI.qStatement.innerHTML = `<span class="text-sky-400 font-bold animate-pulse">Downloading ${selectedYear} papers securely...</span>`;
+        UI.optionsContainer.innerHTML = '';
+        
+        try {
+            // Dynamically fetch the specific year's file
+            const response = await fetch(`./${selectedYear}_upsc_papers.json`);
+            if (!response.ok) throw new Error("File not found on server");
+            
+            // Cache the downloaded year into memory
+            papersDatabase[selectedYear] = await response.json();
+        } catch (e) {
+            console.warn(`Missing file: ${selectedYear}_upsc_papers.json`);
+            UI.qStatement.innerHTML = `<span class="text-orange-400 font-bold">The ${selectedYear} papers are not available yet on the server.</span>`;
+            return;
+        }
+    }
+
+    // 2. Extract the data from the cached year
+    const yearData = papersDatabase[selectedYear];
+    
+    // This allows the JSON keys inside the file to be either "2026_GS1" OR just "GS1"
+    const paperData = yearData[activePaperKey] || yearData[selectedPaper];
+
+    if (!paperData || !paperData.questions || paperData.questions.length === 0) {
+        UI.qStatement.innerHTML = `<span class="text-orange-400 font-bold">The ${selectedPaper} for ${selectedYear} is not currently available.</span>`;
         UI.optionsContainer.innerHTML = '';
         return;
     }
     
-    // Deep clone the questions so our shuffles don't alter the master database
-    currentQuestionList = JSON.parse(JSON.stringify(papersDatabase[activePaperKey].questions || []));
+    // 3. Deep clone the questions so our shuffles don't alter the master cache
+    currentQuestionList = JSON.parse(JSON.stringify(paperData.questions));
     
     if (UI.randomCheckbox.checked) {
         shuffleQuestionsAndOptions(currentQuestionList);
@@ -430,8 +484,8 @@ function loadPaperQuestions() {
     currentQuestionIndex = 0;
     userScore = 0;
     updateScoreUI();
-	resetExamTimer();
-	currentSessionId = Date.now(); // Generate new unique ID for the vault
+    resetExamTimer();
+    currentSessionId = Date.now(); // Generate new unique ID for the vault
     chatHistory = [];
     renderCurrentQuestion();
 }
@@ -594,12 +648,17 @@ INSTRUCTIONS:
 
     try {
         const aiMessage = await queryGeminiDirectOrProxy([{ text: "Evaluate question" }], systemPrompt);
-		const msgId = 'msg-' + Date.now();
+        const msgId = 'msg-' + Date.now();
         rawTextMap[msgId] = aiMessage;
         
         UI.dhwaniExplanation.innerHTML = marked.parse(aiMessage) + generateActionBar(msgId);
+        
+        // Wrap the text in highlight tracking spans
+        const speechText = prepareTextForTTSAndHighlighting(UI.dhwaniExplanation, msgId);
+        speechDataMap[msgId] = speechText;
+
         chatHistory.push({ role: 'model', text: aiMessage });
-		saveSessionToDB();
+        saveSessionToDB();
 
         // Auto trigger the floating TTS
         setTimeout(() => { window.toggleSingleMessagePlay(msgId); }, 100);
@@ -754,7 +813,12 @@ function appendChatMessage(role, text, isRestoring = false) {
         
         div.className = 'glass-card p-3.5 rounded-xl bg-slate-900/90 mr-8 border-slate-700 text-xs text-slate-200 markdown-body';
         div.innerHTML = marked.parse(text) + generateActionBar(msgId);
-// Auto trigger floating TTS only for live exams, not history loads
+        
+        // Wrap the text in highlight tracking spans
+        const speechText = prepareTextForTTSAndHighlighting(div, msgId);
+        speechDataMap[msgId] = speechText;
+
+        // Auto trigger floating TTS only for live exams, not history loads
         if (!isRestoring) {
             setTimeout(() => { window.toggleSingleMessagePlay(msgId); }, 100);
         }
@@ -804,10 +868,118 @@ function initSpeechEngine() {
     };
 }
 
-// --- TTS ENGINE & FLOATING UI ---
+// --- WORD HIGHLIGHTING ENGINE ---
+function prepareTextForTTSAndHighlighting(container, msgId) {
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+        acceptNode: function(node) {
+            if (node.parentNode && node.parentNode.closest('.msg-action-bar')) return NodeFilter.FILTER_REJECT;
+            return NodeFilter.FILTER_ACCEPT;
+        }
+    }, false);
+    
+    const textNodes = [];
+    let node;
+    
+    while (node = walker.nextNode()) {
+        if (node.nodeValue.trim() !== '') textNodes.push(node);
+    }
+
+    let wordCounter = 0;
+    let finalSpeechText = [];
+    let insideBracket = false;
+
+    textNodes.forEach(textNode => {
+        const parts = textNode.nodeValue.split(/(\s+)/); 
+        const fragment = document.createDocumentFragment();
+        
+        parts.forEach(part => {
+            if (part.trim().length > 0) {
+                const span = document.createElement('span');
+                span.className = 'transition-all duration-150'; 
+                span.textContent = part;
+                
+                let skipThisWord = false;
+                if (/[\(\[\{]/.test(part)) insideBracket = true;
+                if (insideBracket) skipThisWord = true;
+                if (/[\)\]\}]/.test(part)) insideBracket = false;
+
+                if (!skipThisWord) {
+                    span.id = `tts-${msgId}-${wordCounter}`;
+                    let spokenWord = part.replace(/[:;]/g, '.');
+                    finalSpeechText.push(spokenWord);
+                    wordCounter++;
+                }
+                fragment.appendChild(span);
+            } else {
+                fragment.appendChild(document.createTextNode(part));
+            }
+        });
+        textNode.parentNode.replaceChild(fragment, textNode);
+    });
+
+    return finalSpeechText.join(' ');
+}
+
+function highlightTTSWord(msgId, wordIndex) {
+    clearTTSHighlight(); 
+    const span = document.getElementById(`tts-${msgId}-${wordIndex}`);
+    
+    if (span) {
+        // ONLY apply visual orange highlights if the user checked the setting
+        if (UI.highlightCheckbox.checked) {
+            span.classList.add('bg-orange-500/30', 'text-orange-300', 'font-bold', 'rounded-[3px]', 'px-[2px]', 'shadow-[0_0_8px_rgba(249,115,22,0.4)]');
+            lastHighlightedSpan = span;
+        }
+
+        // ALWAYS auto-scroll to keep the reading position in view
+        const logContainer = document.getElementById('main-scroll-area');
+        const spanRect = span.getBoundingClientRect();
+        const logRect = logContainer.getBoundingClientRect();
+        
+        if (spanRect.bottom > logRect.bottom - 40 || spanRect.top < logRect.top + 40) {
+            span.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+}
+
+function clearTTSHighlight() {
+    if (lastHighlightedSpan) {
+        lastHighlightedSpan.classList.remove('bg-orange-500/30', 'text-orange-300', 'font-bold', 'rounded-[3px]', 'px-[2px]', 'shadow-[0_0_8px_rgba(249,115,22,0.4)]');
+        lastHighlightedSpan = null;
+    }
+}
+
+function startHighlightTimer(msgId) {
+    if (highlightTimer) clearTimeout(highlightTimer);
+
+    const BASE_DELAY = 150;  
+    const CHAR_DELAY = 55;   
+    const MAX_DELAY = 800;   
+
+    const highlightNextWord = () => {
+        if (ttsStatus !== 'PLAYING' || globalWordIndex >= wordsArray.length) return;
+
+        highlightTTSWord(msgId, globalWordIndex);
+
+        const currentWord = wordsArray[globalWordIndex] || "";
+        const charCount = currentWord.length;
+        const dynamicSpeechRate = parseFloat(UI.cfgTtsSpeed.value || "1.0");
+
+        let wordDuration = (BASE_DELAY + (charCount * CHAR_DELAY)) / dynamicSpeechRate; 
+        if (wordDuration > (MAX_DELAY / dynamicSpeechRate)) wordDuration = (MAX_DELAY / dynamicSpeechRate);
+
+        globalWordIndex++;
+        highlightTimer = setTimeout(highlightNextWord, wordDuration);
+    };
+
+    highlightNextWord();
+}
+
 window.toggleSingleMessagePlay = (msgId) => {
     const btnElem = document.getElementById(`play-btn-${msgId}`);
-    const plainText = cleanTextForSpeech(rawTextMap[msgId] || "");
+    
+    // Pull the bracket-cleaned text generated by the highlighter
+    const plainText = speechDataMap[msgId] || "";
     if (!plainText) return;
 
     if (currentMsgId === msgId) {
@@ -815,10 +987,12 @@ window.toggleSingleMessagePlay = (msgId) => {
             window.speechSynthesis.pause();
             ttsStatus = 'PAUSED';
             updatePlayBtnUI(btnElem, false);
+            if (highlightTimer) clearTimeout(highlightTimer);
         } else if (ttsStatus === 'PAUSED') {
             window.speechSynthesis.resume();
             ttsStatus = 'PLAYING';
             updatePlayBtnUI(btnElem, true);
+            startHighlightTimer(msgId);
         }
         return;
     }
@@ -827,6 +1001,10 @@ window.toggleSingleMessagePlay = (msgId) => {
     stopTTS();
     currentMsgId = msgId;
     currentActiveBtn = btnElem;
+    
+    // Reset Highlighter Words Array
+    wordsArray = plainText.match(/\S+/g) || [];
+    globalWordIndex = 0;
     
     const langCode = UI.langSelector.value === 'hi' ? 'hi-IN' : 'en-IN';
     const rate = parseFloat(UI.cfgTtsSpeed.value || "1.0");
@@ -838,10 +1016,10 @@ window.toggleSingleMessagePlay = (msgId) => {
     utterance.onstart = () => {
         ttsStatus = 'PLAYING';
         updatePlayBtnUI(btnElem, true);
+        startHighlightTimer(msgId); // Ignite the highlighter loop
     };
     
     utterance.onend = () => {
-        // Prevent clearing state if manually paused
         if (ttsStatus !== 'PAUSED') stopTTS();
     };
     
@@ -857,31 +1035,48 @@ function updatePlayBtnUI(btn, isPlaying) {
     const playIcon = btn.querySelector('.play-icon');
     const pauseIcon = btn.querySelector('.pause-icon');
     const textSpan = btn.querySelector('.play-text');
-    const floatClasses = ['fixed', 'bottom-[120px]', 'right-6', 'z-[100]', 'scale-110', 'shadow-2xl', 'border-green-400', 'bg-slate-900'];
+    
+    // Upgraded float classes
+    const floatClasses = ['fixed', 'bottom-[150px]', 'right-5', 'z-[9999]', 'scale-110', 'shadow-[0_0_20px_rgba(0,0,0,0.8)]', 'border-2', 'border-orange-500', 'bg-slate-900'];
 
     if (isPlaying) {
         if (playIcon) playIcon.classList.add('hidden');
         if (pauseIcon) pauseIcon.classList.remove('hidden');
         if (textSpan) textSpan.innerText = "Pause";
         
-        btn.classList.add('text-green-400', 'is-floating', ...floatClasses);
-        btn.classList.remove('text-sky-400');
+        // 🚀 THE FIX: Move button to body to escape the backdrop-filter containment
+        document.body.appendChild(btn);
         
-        // Suppress other floating buttons
+        // Pin to screen
+        btn.classList.add('text-orange-400', 'is-floating', ...floatClasses);
+        btn.classList.remove('text-sky-400', 'border-slate-600');
+        
+        // Suppress any competing floating buttons
         document.querySelectorAll('.msg-play-btn.is-floating').forEach(el => {
             if (el !== btn) {
-                el.classList.remove('is-floating', ...floatClasses, 'text-green-400');
-                el.classList.add('text-sky-400');
+                el.classList.remove('is-floating', ...floatClasses, 'text-orange-400', 'text-green-400');
+                el.classList.add('text-sky-400', 'border-slate-600');
                 const tSpan = el.querySelector('.play-text');
                 if (tSpan) tSpan.innerText = "Play";
+                
+                // 🚀 Move suppressed buttons back to their original action bars
+                const elMsgId = el.id.replace('play-btn-', '');
+                const siblingCopy = document.getElementById(`copy-btn-${elMsgId}`);
+                if (siblingCopy && siblingCopy.parentElement) {
+                    siblingCopy.parentElement.appendChild(el);
+                } else {
+                    el.remove();
+                }
             }
         });
     } else {
+        // WHEN PAUSED: Change text/icons, but EXPLICITLY KEEP it floating in the body
         if (playIcon) playIcon.classList.remove('hidden');
         if (pauseIcon) pauseIcon.classList.add('hidden');
         if (textSpan) textSpan.innerText = "Resume";
-        btn.classList.remove('text-green-400');
-        btn.classList.add('text-sky-400');
+        
+        btn.classList.add('text-green-400', 'border-green-500'); // Turn green to indicate ready-to-resume
+        btn.classList.remove('text-orange-400', 'border-orange-500');
     }
 }
 
@@ -889,10 +1084,15 @@ function stopTTS() {
     if (window.speechSynthesis) window.speechSynthesis.cancel();
     ttsStatus = 'STOPPED';
     
+    if (highlightTimer) clearTimeout(highlightTimer);
+    clearTTSHighlight();
+    
     if (currentActiveBtn) {
-        const floatClasses = ['fixed', 'bottom-[120px]', 'right-6', 'z-[100]', 'scale-110', 'shadow-2xl', 'border-green-400', 'bg-slate-900'];
-        currentActiveBtn.classList.remove('is-floating', ...floatClasses, 'text-green-400');
-        currentActiveBtn.classList.add('text-sky-400');
+        // Classes to remove (including the green paused border)
+        const floatClasses = ['fixed', 'bottom-[150px]', 'right-5', 'z-[9999]', 'scale-110', 'shadow-[0_0_20px_rgba(0,0,0,0.8)]', 'border-2', 'border-orange-500', 'border-green-500', 'bg-slate-900'];
+        
+        currentActiveBtn.classList.remove('is-floating', ...floatClasses, 'text-orange-400', 'text-green-400');
+        currentActiveBtn.classList.add('text-sky-400', 'border-slate-600');
         
         const playIcon = currentActiveBtn.querySelector('.play-icon');
         const pauseIcon = currentActiveBtn.querySelector('.pause-icon');
@@ -901,6 +1101,18 @@ function stopTTS() {
         if (playIcon) playIcon.classList.remove('hidden');
         if (pauseIcon) pauseIcon.classList.add('hidden');
         if (textSpan) textSpan.innerText = "Play";
+        
+        // 🚀 THE FIX: Put the button back into its original chat box
+        if (currentMsgId) {
+            // Find the action bar by looking for the neighboring copy button
+            const siblingCopy = document.getElementById(`copy-btn-${currentMsgId}`);
+            if (siblingCopy && siblingCopy.parentElement) {
+                siblingCopy.parentElement.appendChild(currentActiveBtn);
+            } else {
+                currentActiveBtn.remove(); // Failsafe if chat was cleared
+            }
+        }
+        
         currentActiveBtn = null;
     }
     currentMsgId = null;
@@ -1055,9 +1267,16 @@ function setupEventListeners() {
             : 'Proceed to Next Question →';
     };
 	
-	// Hook up the new Start Exam Button
-    UI.btnStartExam.onclick = () => {
-        loadPaperQuestions();
+	// Hook up the new Dynamic Start Exam Button
+    UI.btnStartExam.onclick = async () => {
+        const originalText = UI.btnStartExam.innerHTML;
+        UI.btnStartExam.innerHTML = "LOADING...";
+        UI.btnStartExam.disabled = true;
+        
+        await loadPaperQuestions(); // Waits for the JSON file to download
+        
+        UI.btnStartExam.innerHTML = originalText;
+        UI.btnStartExam.disabled = false;
     };
 
     UI.btnNextQuestion.onclick = () => {
