@@ -541,6 +541,9 @@ function renderCurrentQuestion() {
     UI.chatStream.innerHTML = '';
     chatHistory = [];
 
+	const banner = document.getElementById('archive-notice-banner');
+    if (banner) banner.remove();
+	
     const total = currentQuestionList.length;
     if (total === 0) {
         UI.qStatement.textContent = "No questions found in this paper set.";
@@ -1273,16 +1276,23 @@ function setupEventListeners() {
         }
     });
 
+// Inside setupEventListeners()...
+
+    UI.yearSelector.addEventListener('change', clearExamScreen);
+    UI.paperTypeSelector.addEventListener('change', clearExamScreen);
+
     UI.langSelector.onchange = () => {
         savePreferences();
         populateYearDropdown();
         UI.lblRandom.textContent = UI.langSelector.value === 'hi' ? 'अनियमित क्रम' : 'Random Order';
-		UI.lblUnderstandingPrompt.textContent = UI.langSelector.value === 'hi' 
+        UI.lblUnderstandingPrompt.textContent = UI.langSelector.value === 'hi' 
         ? 'कोई संदेह है? ध्वनि एआई से पूछें' 
         : 'Have a Doubt? Ask Dhwani AI Teacher';
         UI.btnNextQuestion.textContent = UI.langSelector.value === 'hi' 
             ? 'अगले प्रश्न पर चलें →' 
             : 'Proceed to Next Question →';
+            
+        clearExamScreen(); // Instantly clear the board when language changes
     };
 	
 	// Hook up the new Dynamic Start Exam Button
@@ -1526,3 +1536,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// --- UTILITY: CLEAR SCREEN ---
+function clearExamScreen() {
+    stopTTS();
+    UI.chatStream.innerHTML = '';
+    UI.optionsContainer.innerHTML = '';
+    
+    const currentLang = UI.langSelector.value;
+    UI.qStatement.innerHTML = currentLang === 'hi' 
+        ? '<span class="text-slate-400 italic">कृपया शुरू करने के लिए "Start Exam" पर क्लिक करें...</span>' 
+        : '<span class="text-slate-400 italic">Please click "Start Exam" to begin...</span>';
+        
+    UI.qIndexBadge.textContent = 'Standby';
+    UI.qSubjectBadge.textContent = 'Pending';
+    UI.dhwaniMentorBox.classList.add('hidden');
+    
+    chatHistory = [];
+    currentQuestionList = [];
+    userScore = 0;
+    updateScoreUI();
+    resetExamTimer();
+    
+    // Remove the Archive Banner if it exists from a previous history load
+    const banner = document.getElementById('archive-notice-banner');
+    if (banner) banner.remove();
+}
