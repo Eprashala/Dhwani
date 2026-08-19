@@ -40,7 +40,7 @@ function enforceFullscreen() {
 });
 
 const CONFIG = {
-    PROXY_URL: "https://eprashala-proxy-511804777001.asia-south1.run.app/api/chat", // Added the required endpoint path
+    PROXY_URL: "https://eprashala.pythonanywhere.com/api/chat", // Added the required endpoint path
 };
 
 // --- DOM REFERENCES ---
