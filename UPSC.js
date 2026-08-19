@@ -1036,18 +1036,24 @@ function updatePlayBtnUI(btn, isPlaying) {
     const pauseIcon = btn.querySelector('.pause-icon');
     const textSpan = btn.querySelector('.play-text');
     
-    // Upgraded float classes
-    const floatClasses = ['fixed', 'bottom-[150px]', 'right-5', 'z-[9999]', 'scale-110', 'shadow-[0_0_20px_rgba(0,0,0,0.8)]', 'border-2', 'border-orange-500', 'bg-slate-900'];
+    // Use only standard Tailwind classes. No arbitrary brackets like [150px].
+    const floatClasses = ['fixed', 'scale-110', 'border-2', 'border-orange-500', 'bg-slate-900'];
 
     if (isPlaying) {
         if (playIcon) playIcon.classList.add('hidden');
         if (pauseIcon) pauseIcon.classList.remove('hidden');
         if (textSpan) textSpan.innerText = "Pause";
         
-        // 🚀 THE FIX: Move button to body to escape the backdrop-filter containment
+        // Move button to body to escape CSS containment
         document.body.appendChild(btn);
         
-        // Pin to screen
+        // 🚀 THE FIX: Use native inline styles to guarantee mobile rendering
+        btn.style.bottom = '150px';
+        btn.style.right = '20px';
+        btn.style.zIndex = '9999';
+        btn.style.boxShadow = '0 0 20px rgba(0,0,0,0.8)';
+        
+        // Apply visual classes
         btn.classList.add('text-orange-400', 'is-floating', ...floatClasses);
         btn.classList.remove('text-sky-400', 'border-slate-600');
         
@@ -1056,10 +1062,17 @@ function updatePlayBtnUI(btn, isPlaying) {
             if (el !== btn) {
                 el.classList.remove('is-floating', ...floatClasses, 'text-orange-400', 'text-green-400');
                 el.classList.add('text-sky-400', 'border-slate-600');
+                
+                // Clear inline styles from suppressed buttons
+                el.style.bottom = '';
+                el.style.right = '';
+                el.style.zIndex = '';
+                el.style.boxShadow = '';
+                
                 const tSpan = el.querySelector('.play-text');
                 if (tSpan) tSpan.innerText = "Play";
                 
-                // 🚀 Move suppressed buttons back to their original action bars
+                // Return suppressed buttons to their original container
                 const elMsgId = el.id.replace('play-btn-', '');
                 const siblingCopy = document.getElementById(`copy-btn-${elMsgId}`);
                 if (siblingCopy && siblingCopy.parentElement) {
@@ -1070,12 +1083,12 @@ function updatePlayBtnUI(btn, isPlaying) {
             }
         });
     } else {
-        // WHEN PAUSED: Change text/icons, but EXPLICITLY KEEP it floating in the body
+        // WHEN PAUSED: Change text/icons, but EXPLICITLY KEEP the floating classes and inline styles active
         if (playIcon) playIcon.classList.remove('hidden');
         if (pauseIcon) pauseIcon.classList.add('hidden');
         if (textSpan) textSpan.innerText = "Resume";
         
-        btn.classList.add('text-green-400', 'border-green-500'); // Turn green to indicate ready-to-resume
+        btn.classList.add('text-green-400', 'border-green-500'); 
         btn.classList.remove('text-orange-400', 'border-orange-500');
     }
 }
@@ -1088,11 +1101,17 @@ function stopTTS() {
     clearTTSHighlight();
     
     if (currentActiveBtn) {
-        // Classes to remove (including the green paused border)
-        const floatClasses = ['fixed', 'bottom-[150px]', 'right-5', 'z-[9999]', 'scale-110', 'shadow-[0_0_20px_rgba(0,0,0,0.8)]', 'border-2', 'border-orange-500', 'border-green-500', 'bg-slate-900'];
+        // Standard classes to remove
+        const floatClasses = ['fixed', 'scale-110', 'border-2', 'border-orange-500', 'border-green-500', 'bg-slate-900'];
         
         currentActiveBtn.classList.remove('is-floating', ...floatClasses, 'text-orange-400', 'text-green-400');
         currentActiveBtn.classList.add('text-sky-400', 'border-slate-600');
+        
+        // 🚀 THE FIX: Clear the native inline styles so the button resets perfectly
+        currentActiveBtn.style.bottom = '';
+        currentActiveBtn.style.right = '';
+        currentActiveBtn.style.zIndex = '';
+        currentActiveBtn.style.boxShadow = '';
         
         const playIcon = currentActiveBtn.querySelector('.play-icon');
         const pauseIcon = currentActiveBtn.querySelector('.pause-icon');
@@ -1102,14 +1121,13 @@ function stopTTS() {
         if (pauseIcon) pauseIcon.classList.add('hidden');
         if (textSpan) textSpan.innerText = "Play";
         
-        // 🚀 THE FIX: Put the button back into its original chat box
+        // Put the button back into its original chat box location
         if (currentMsgId) {
-            // Find the action bar by looking for the neighboring copy button
             const siblingCopy = document.getElementById(`copy-btn-${currentMsgId}`);
             if (siblingCopy && siblingCopy.parentElement) {
                 siblingCopy.parentElement.appendChild(currentActiveBtn);
             } else {
-                currentActiveBtn.remove(); // Failsafe if chat was cleared
+                currentActiveBtn.remove();
             }
         }
         
