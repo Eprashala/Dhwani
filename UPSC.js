@@ -40,7 +40,7 @@ function enforceFullscreen() {
 });
 
 const CONFIG = {
-    PROXY_URL: "https://eprashala.pythonanywhere.com/api/chat", // Added the required endpoint path
+    PROXY_URL: "https://eprashala-proxy-511804777001.asia-south1.run.app/api/chat", // Added the required endpoint path
 };
 
 // --- DOM REFERENCES ---
@@ -55,6 +55,12 @@ const UI = {
     scoreCounter: document.getElementById('score-counter'),
 	examTimer: document.getElementById('exam-timer'),
     lblRandom: document.getElementById('lbl-random'),
+	btnCamera: document.getElementById('btn-camera'),
+    cameraInput: document.getElementById('camera-input'),
+    cropModal: document.getElementById('crop-modal'),
+    cropImage: document.getElementById('crop-image'),
+    btnCropRetake: document.getElementById('btn-crop-retake'),
+    btnCropDone: document.getElementById('btn-crop-done'),
     
     // Question Card
     qIndexBadge: document.getElementById('q-index-badge'),
@@ -116,7 +122,8 @@ let allSessions = [];
 const currentDateKey = new Date().toISOString().split('T')[0];
 let currentSessionId = Date.now();
 let upscDB = null;
-
+let pendingImageData = null; 
+let cropper = null;
 
 // --- INITIALIZATION ---
 window.addEventListener('DOMContentLoaded', async () => {
@@ -600,11 +607,11 @@ async function queryGeminiDirectOrProxy(messages, systemInstruction) {
     const userKey = localStorage.getItem('upsc_api_key') || "";
     const modelId = "gemini-flash-lite-latest"; // Main model
     
-    // Construct the base payload
+    // Construct the base payload (Now handling image parts!)
     let payloadObject = {
         contents: messages.map(m => ({
             role: m.role === 'model' ? 'model' : 'user',
-            parts: [{ text: m.text }]
+            parts: m.parts ? m.parts : [{ text: m.text }] // Uses multimodal parts if available
         })),
         systemInstruction: { parts: [{ text: systemInstruction }] }
     };
@@ -667,12 +674,30 @@ async function queryGeminiDirectOrProxy(messages, systemInstruction) {
 }
 
 // --- USER DOUBT SUBMISSION ---
+// --- USER DOUBT SUBMISSION (MULTIMODAL) ---
 async function submitUserDoubt() {
     const text = UI.userDoubtInput.value.trim();
-    if (!text) return;
+    if (!text && !pendingImageData) return; // Stop if completely empty
     
     UI.userDoubtInput.value = '';
-    appendChatMessage('user', text);
+    UI.userDoubtInput.placeholder = "Ask Dhwani AI any doubt regarding this question...";
+    
+    // Create UI Display String
+    const displayMsg = text + (pendingImageData ? " 📷 [Image attached]" : "");
+    appendChatMessage('user', displayMsg);
+
+    // Build the multimodal data array for Gemini
+    let userMessageParts = [];
+    if (text) userMessageParts.push({ text: text });
+    if (!text && pendingImageData) userMessageParts.push({ text: "Please analyze this image in the context of the active UPSC question." });
+    if (pendingImageData) {
+        userMessageParts.push({ inlineData: { mimeType: "image/jpeg", data: pendingImageData } });
+    }
+
+    // Reset UI Camera State immediately
+    pendingImageData = null;
+    UI.btnCamera.classList.remove('text-orange-400');
+    UI.btnCamera.classList.add('text-slate-400');
 
     const currentLang = UI.langSelector.value;
     const qData = currentQuestionList[currentQuestionIndex];
@@ -681,31 +706,31 @@ async function submitUserDoubt() {
     const systemPrompt = `You are Dhwani AI, UPSC mentor at upsc.eprashala.com.
 You are clarifying a doubt for ${candidateName} regarding the active UPSC question (${qData.subject}).
 Language: ${currentLang === 'hi' ? 'Hindi (हिन्दी)' : 'English'}.
-Maintain high conceptual clarity, cite standard sources (NCERT, Laxmikanth, PMFIAS, Economic Survey) where relevant.`;
+Maintain high conceptual clarity, cite standard sources (NCERT, Laxmikanth, PMFIAS, Economic Survey) where relevant. If the user attached an image, integrate its analysis thoroughly.`;
 
-    // SAFELY FORMAT HISTORY: Ensure the first message is always from a 'user'
+    // SAFELY FORMAT HISTORY
     let formattedHistory = [];
     if (chatHistory.length > 0 && chatHistory[0].role === 'model') {
         formattedHistory.push({ role: 'user', text: "Here is my previous test evaluation." });
     }
     
-    // Attach existing history and the new custom text doubt
+    // Attach old history, and append the NEW message containing the image payload
     formattedHistory = formattedHistory.concat(chatHistory.map(m => ({ text: m.text, role: m.role })));
-    formattedHistory.push({ text: text, role: 'user' });
+    formattedHistory.push({ role: 'user', parts: userMessageParts, text: displayMsg });
 
     try {
         const aiResponse = await queryGeminiDirectOrProxy(formattedHistory, systemPrompt);
-        chatHistory.push({ role: 'user', text: text });
+        
+        // Log plain text in DB so we don't bloat local storage with giant image base64s
+        chatHistory.push({ role: 'user', text: displayMsg });
         chatHistory.push({ role: 'model', text: aiResponse });
-		saveSessionToDB();
+        saveSessionToDB();
 
         appendChatMessage('model', aiResponse);
-     
     } catch (e) {
         console.error("Custom Doubt API Error:", e);
         appendChatMessage('system', "⚠️ Network interrupted. Please try again.");
     }
-	
 }
 
 function appendChatMessage(role, text, isRestoring = false) {
@@ -1134,6 +1159,51 @@ function setupEventListeners() {
         UI.historyView.classList.remove('flex');
         UI.mainView.classList.remove('hidden');
     };
+
+	// --- CAMERA & CROPPER LOGIC ---
+    UI.btnCamera.addEventListener('click', (e) => {
+        e.stopPropagation(); enforceFullscreen(); UI.cameraInput.click(); 
+    });
+
+    UI.cameraInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (e) => {
+            UI.cropImage.src = e.target.result;
+            UI.cropModal.classList.remove('hidden');
+            if (cropper) cropper.destroy();
+            cropper = new Cropper(UI.cropImage, {
+                viewMode: 2, dragMode: 'move', autoCropArea: 0.9,
+                restore: false, guides: true, center: true, highlight: false,
+                cropBoxMovable: true, cropBoxResizable: true, toggleDragModeOnDblclick: false,
+            });
+        };
+    });
+
+    UI.btnCropRetake.addEventListener('click', (e) => {
+        e.stopPropagation(); enforceFullscreen();
+        if (cropper) cropper.destroy();
+        UI.cropModal.classList.add('hidden');
+        UI.cameraInput.value = ''; UI.cameraInput.click();
+    });
+
+    UI.btnCropDone.addEventListener('click', (e) => {
+        e.stopPropagation(); enforceFullscreen();
+        if (!cropper) return;
+        // Extract high-quality JPEG and strip the prefix for Google API formatting
+        const canvas = cropper.getCroppedCanvas({ maxWidth: 800, maxHeight: 1200, fillColor: '#fff' });
+        pendingImageData = canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+        
+        cropper.destroy(); cropper = null;
+        UI.cropModal.classList.add('hidden');
+        
+        // Update UI to show successful attachment
+        UI.userDoubtInput.placeholder = "📷 Image attached! Add text or send...";
+        UI.btnCamera.classList.remove('text-slate-400');
+        UI.btnCamera.classList.add('text-orange-400');
+    });
 
 }
 // --- APP UPDATE SYNC LOGIC ---
