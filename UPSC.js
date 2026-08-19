@@ -2,6 +2,43 @@
  * upsc.eprashala.com - AI Teacher & Interactive Exam Engine
  */
 
+// --- 0. SECURITY, WAKE LOCK, VISIBILITY & FULLSCREEN ---
+document.addEventListener('contextmenu', event => event.preventDefault());
+
+let wakeLock = null;
+async function requestWakeLock() {
+    try {
+        if ('wakeLock' in navigator) {
+            wakeLock = await navigator.wakeLock.request('screen');
+        }
+    } catch (err) { }
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        requestWakeLock();
+    }
+});
+
+function enforceFullscreen() {
+    if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
+        const docElm = document.documentElement;
+        if (docElm.requestFullscreen) {
+            docElm.requestFullscreen().catch(() => {});
+        } else if (docElm.webkitRequestFullscreen) { 
+            docElm.webkitRequestFullscreen().catch(() => {});
+        } else if (docElm.msRequestFullscreen) { 
+            docElm.msRequestFullscreen().catch(() => {});
+        }
+    }
+}
+
+// Aggressively capture all interactions to ensure fullscreen stays locked
+['click', 'touchstart', 'touchend', 'keydown'].forEach(eventType => {
+    window.addEventListener(eventType, enforceFullscreen, { capture: true, passive: true });
+    document.addEventListener(eventType, enforceFullscreen, { capture: true, passive: true });
+});
+
 const CONFIG = {
     PROXY_URL: "https://eprashala-proxy-511804777001.asia-south1.run.app/api/chat", // Added the required endpoint path
 };
@@ -958,6 +995,8 @@ window.downloadEntireSessionPDF = () => {
 function setupEventListeners() {
     UI.btnExportPdf.onclick = window.downloadEntireSessionPDF;
 	UI.btnStart.onclick = () => {
+        enforceFullscreen();
+        requestWakeLock();
         UI.overlay.style.display = 'none';
         // Prime audio for mobile web
         if ('speechSynthesis' in window) {
@@ -999,9 +1038,9 @@ function setupEventListeners() {
         }
     };
 
-    UI.btnSendDoubt.onclick = submitUserDoubt;
-    UI.userDoubtInput.onkeydown = (e) => {
-        if (e.key === 'Enter') submitUserDoubt();
+	UI.btnSendDoubt.onclick = () => {
+        enforceFullscreen();
+        submitUserDoubt();
     };
 
     UI.btnVoiceMic.onclick = () => {
