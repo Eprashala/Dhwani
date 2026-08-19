@@ -808,13 +808,15 @@ Maintain high conceptual clarity, cite standard sources (NCERT, Laxmikanth, PMFI
 function appendChatMessage(role, text, isRestoring = false) {
     const div = document.createElement('div');
     if (role === 'user') {
-        div.className = 'glass-card p-3 rounded-xl bg-sky-950/40 text-right ml-8 border-sky-800/40 text-xs text-sky-200';
+        // CHANGED: Replaced text-xs with text-sm
+        div.className = 'glass-card p-3 rounded-xl bg-sky-950/40 text-right ml-8 border-sky-800/40 text-sm text-sky-200';
         div.textContent = text;
 	} else if (role === 'model') {
         const msgId = 'msg-' + Date.now();
         rawTextMap[msgId] = text;
         
-        div.className = 'glass-card p-3.5 rounded-xl bg-slate-900/90 mr-8 border-slate-700 text-xs text-slate-200 markdown-body';
+        // CHANGED: Replaced text-xs with text-sm
+        div.className = 'glass-card p-3.5 rounded-xl bg-slate-900/90 mr-8 border-slate-700 text-sm text-slate-200 markdown-body';
         div.innerHTML = marked.parse(text) + generateActionBar(msgId);
         
         // Wrap the text in highlight tracking spans
@@ -842,8 +844,10 @@ function initSpeechEngine() {
     recognition.continuous = false;
     recognition.interimResults = true;
 
+    // Inside initSpeechEngine() in UPSC.js
     recognition.onstart = () => {
         isRecording = true;
+        stopTTS(); // Ensure the AI stops talking when the mic activates
         UI.btnVoiceMic.classList.add('mic-listening');
         UI.userDoubtInput.placeholder = "Listening to your doubt...";
     };
@@ -1327,7 +1331,18 @@ function setupEventListeners() {
         submitUserDoubt();
     };
 
+// Inside setupEventListeners() in UPSC.js
     UI.btnVoiceMic.onclick = () => {
+        // FIX: Prime the TTS engine during this explicit click gesture.
+        // This bypasses browser autoplay policies that block audio 
+        // when triggered later from the async recognition.onend event.
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel(); // Clear any stuck audio queues
+            const primeAudio = new SpeechSynthesisUtterance('');
+            primeAudio.volume = 0;
+            window.speechSynthesis.speak(primeAudio);
+        }
+
         if (!recognition) return alert("Speech recognition not supported in this browser.");
         if (isRecording) {
             recognition.stop();
