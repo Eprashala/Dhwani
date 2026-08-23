@@ -617,6 +617,8 @@ async function loadData() {
         UI.name.value = localStorage.getItem('darshan_name') || "";
         UI.age.value = localStorage.getItem('darshan_age') || "";
         UI.remember.checked = localStorage.getItem('darshan_remember') === 'true';
+		const savedRemember = localStorage.getItem('darshan_remember');
+        UI.remember.checked = savedRemember !== null ? savedRemember === 'true' : true;
         
         UI.ratioSlider.value = localStorage.getItem('darshan_ratio') || "80";
         UI.modelSlider.value = localStorage.getItem('darshan_model') || "40";
@@ -701,7 +703,9 @@ function renderHistoryList() {
     sorted.forEach(session => {
         const card = document.createElement('div');
         card.className = "w-full text-left text-sm text-slate-300 bg-slate-800/80 hover:bg-slate-700 p-4 rounded-xl transition-colors border border-slate-700 hover:border-cyan-500/50 flex flex-col gap-2 outline-none mb-2 shadow-sm cursor-pointer group";
-        
+		const rawPreview = session.messages.length > 0 ? session.messages[0].parts[0].text : 'Empty session';
+        const safePreview = rawPreview.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+		
         card.innerHTML = `
             <div class="flex justify-between items-center w-full">
                 <div class="flex items-center gap-2 overflow-hidden flex-1">
