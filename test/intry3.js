@@ -1702,15 +1702,10 @@ const [group, itemName] = selectedLibraryItem.split('|');
     }
     
    // Core payload format (without the model ID, which is handled in the URL for direct calls)
+// Core payload format (without the model ID, which is handled in the URL for direct calls)
 	const payload = { 
         contents: history.slice(-10), 
-        systemInstruction: { parts: [{ text: prompt }] },
-        generationConfig: {
-            temperature: 0.2, // Low temperature drastically reduces hallucinations
-            topK: 20,
-            presencePenalty: 0.6, // Encourages the model to talk about new topics
-            frequencyPenalty: 0.6 // Penalizes reusing the exact same verses or phrases
-        }
+        systemInstruction: { parts: [{ text: prompt }] }
     };
 
     let fetchUrl;
