@@ -1639,6 +1639,53 @@ async function processInput(userText) {
     setTimeout(updateStopButtonVisibility, 100); 
 }
 
+// Fetches verified author, publication date, and official synopses from 40M+ modern books
+async function fetchGoogleBooksData(query) {
+    try {
+        const url = `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(query)}&maxResults=1&printType=books`;
+        const res = await fetch(url);
+        if (!res.ok) return null;
+        
+        const data = await res.json();
+        if (!data.items || data.items.length === 0) return null;
+
+        const info = data.items[0].volumeInfo;
+        return {
+            title: info.title || query,
+            authors: info.authors ? info.authors.join(", ") : "Unknown",
+            publishedDate: info.publishedDate || "Unknown",
+            description: info.description ? info.description.substring(0, 1200) : "No official synopsis available."
+        };
+    } catch (e) {
+        console.error("Google Books Fetch Error:", e);
+        return null;
+    }
+}
+
+// Fetches public domain records, historical summaries, and alternate metadata
+async function fetchArchiveOrgData(query) {
+    try {
+        const url = `https://archive.org/advancedsearch.php?q=title:(${encodeURIComponent(query)})&fl[]=identifier,title,creator,description,year&sort[]=downloads+desc&rows=1&output=json`;
+        const res = await fetch(url);
+        const data = await res.json();
+        
+        if (data.response && data.response.docs.length > 0) {
+            const doc = data.response.docs[0];
+            return {
+                title: doc.title || query,
+                authors: doc.creator ? doc.creator.join(", ") : "Unknown",
+                year: doc.year || "Unknown",
+                // Strip raw HTML tags that often appear in Archive.org descriptions
+                description: doc.description ? doc.description.toString().replace(/<[^>]*>?/gm, '').substring(0, 1200) : "No description available."
+            };
+        }
+        return null;
+    } catch (e) {
+        console.error("Archive.org Fetch Error:", e);
+        return null;
+    }
+}
+
 async function getAIResponse(history, config) {
     const customKey = (UI.keyIn.value.length > 10) ? UI.keyIn.value : null;
     const headers = { 'Content-Type': 'application/json' };
@@ -1651,72 +1698,94 @@ async function getAIResponse(history, config) {
     const aiRatio = 100 - bookRatio;
     const selectedModelInfo = getModelInfo(UI.modelSlider.value);
 
-	   
-	       
-	const recentTopics = history.slice(-4)
-        .filter(msg => msg.role === 'model')
-        .map(msg => msg.parts[0].text.substring(0, 50)) // Grabs the start of recent answers
-        .join(" | ");
-
-const [group, itemName] = selectedLibraryItem.split('|');
+    const [group, itemName] = selectedLibraryItem.split('|');
     const isArchive = (group === 'Archive');
 
     let prompt = "";
+    let liveContext = "";
 
-    if (isArchive) {
-        // --- GLOBAL ARCHIVE PROMPT (Modeled after book.html) ---
-        prompt = `Act as 'Dhwani', an expert book and literary explainer. You are accessing the global internet archives to discuss the book/topic: "${config.texts}".
+	if (isArchive) {
+        // Trigger both API fetches simultaneously for speed
+        const [googleData, archiveData] = await Promise.all([
+            fetchGoogleBooksData(itemName),
+            fetchArchiveOrgData(itemName)
+        ]);
+
+        // Construct the verified context block
+        if (googleData || archiveData) {
+            liveContext = `[LIVE VERIFIED METADATA FROM GLOBAL APIS]\n`;
+            if (googleData) {
+                liveContext += `--- GOOGLE BOOKS RECORD ---\nTitle: ${googleData.title}\nAuthor(s): ${googleData.authors}\nPublished: ${googleData.publishedDate}\nSynopsis: ${googleData.description}\n\n`;
+            }
+            if (archiveData) {
+                liveContext += `--- ARCHIVE.ORG RECORD ---\nTitle: ${archiveData.title}\nAuthor(s): ${archiveData.authors}\nYear: ${archiveData.year}\nSummary: ${archiveData.description}\n`;
+            }
+        } else {
+            liveContext = `[LIVE VERIFIED METADATA]\nCRITICAL: No verified records found for "${itemName}" in Google Books or Archive.org.`;
+        }
+
+        // --- GLOBAL ARCHIVE PROMPT ---
+        prompt = `Act as 'Dhwani', an expert book and literary explainer. The user has selected the book/topic: "${itemName}".
+        
+        ${liveContext}
         
         CRITICAL RULES:
         1. PERSONA: Address the user respectfully. Do NOT begin with a greeting.
-        2. GLOBAL ACCESS: You are authorized to draw upon your general training data (the internet archives) to discuss "${config.texts}". This includes modern literature, western philosophy, and global science.
-        3. EXACT QUOTE/EXCERPT: If the user asks for quotes, summaries, or details, provide accurate information from the requested book.
-        4. ZERO HALLUCINATION: If the book "${config.texts}" does not exist, explicitly state that it cannot be found in the global archives. Do not invent plots or quotes.
-        5. EXPLANATION & TONE: Explain the context clearly and deeply, adjusting your tone for a ${UI.age.value || '25'}-year-old. ${contextAddon}
-        6. LANGUAGE: Speak strictly in ${UI.lang.value}.
-        7. FORMATTING: Use Markdown (bolding, bullet points).
-        8. MEDIA LINKS: At the very end of your response, provide EXACTLY two lines formatted like this:
-           YT_SEARCH: relevant_topic_keywords
-           IMG_SEARCH: relevant_topic_keywords`;
+        2. GROUNDING & EXISTENCE:
+           - The metadata above confirms the book's authentic existence, author, and main subject.
+           - If the metadata explicitly says "No verified records found", only then state that you cannot locate this title in the global library.
+           - If the book is verified, you are FULLY AUTHORIZED to answer questions regarding its plot, characters, chapters, themes, and ideas using your knowledge of the work. Do not restrict yourself only to the synopsis sentences.
+        3. QUOTES & CHAPTER ACCURACY:
+           - Provide accurate thematic explanations and describe scenes faithfully.
+           - If you do not have the verbatim page or line memorized, accurately summarize the passage rather than inventing words in quotation marks.
+        4. EXPLANATION & TONE: Deliver clear, comprehensive insights suitable for a ${UI.age.value || '25'}-year-old. ${contextAddon}
+        5. LANGUAGE: Speak strictly in ${UI.lang.value}.
+        6. FORMATTING: Use Markdown (bolding, lists).
+        7. MEDIA LINKS: At the very end of your response, provide EXACTLY two lines:
+           YT_SEARCH: ${itemName} book summary
+           IMG_SEARCH: ${itemName} book cover`;
            
     } else {
-        // --- ANCIENT LIBRARY PROMPT (Your existing strict prompt) ---
-        prompt = `You are Dhwani, an AI female interpreter and guide to ancient Indian texts. You are NOT the author and you are NOT a god. You are currently interpreting the text: "${config.texts}" which is associated with ${config.persona}.
+        // --- ANCIENT LIBRARY PROMPT ---
+        prompt = `You are Dhwani, an AI female interpreter and guide to ancient Indian texts. You are interpreting: "${config.texts}" associated with ${config.persona}.
         
-        CRITICAL AND UNBREAKABLE RULES FOR YOUR RESPONSE:
-        1. PERSONA: Your name is Dhwani. Address the user respectfully and affectionately as "Vatsa" or "Bhakta". Do NOT begin your response with a greeting (e.g., Namaste, Pranam, Hello). Dive straight into the answer.
-        2. STRICT SCOPE & ABSENCE PROTOCOL:
-           - You must determine if the user's question is authentically addressed or mentioned in "${config.texts}".
-           - IF THE INFORMATION IS NOT PRESENT: If "${config.texts}" does not contain teachings, context, or verses regarding the user's question, DO NOT invent verses or hallucinate.
-           - You MUST state clearly in ${UI.lang.value}: "The selected text (${config.texts}) does not contain information about your question. Would you like me to look for this in other texts in the library?"
-           - When delivering this message, skip Rules 3, 4, and 5 entirely.
-           - PERMISSION EXCEPTION: If the user's latest message is agreeing after you asked this question in the preceding message, you are authorized to search and answer using wisdom from other authentic ancient Indian texts.
-        3. EXACT VERSE/QUOTE: Quote a genuine, relevant verse, sutra, or shloka. If you cannot recall the exact verbatim phrasing, paraphrase accurately.
-        4. THE REFERENCE (ANTI-HALLUCINATION GUARDRAIL): State the structural reference ONLY if 100% verified. Never invent chapter/verse digits.
-        5. THE EXPLANATION: Explain the verse in depth. Keep the ratio strictly to ${bookRatio}% classical text analysis and ${aiRatio}% practical contextual guidance. ${contextAddon}
-        6. LANGUAGE: Speak strictly in the language code: ${UI.lang.value}.
-        7. FORMATTING: Use Markdown (bolding, lists) for clean presentation.
-        8. MEDIA LINKS: At the very end of your response, provide EXACTLY two lines:
+        CRITICAL RULES:
+        1. PERSONA: Address the user respectfully and affectionately as "Vatsa" or "Bhakta". Do NOT begin with a greeting (e.g., Namaste, Pranam, Hello). Dive straight into the answer.
+        
+        2. SCOPE & CONCEPTUAL RELEVANCE (DO NOT FALSELY REFUSE):
+           - Ancient scriptures address modern human challenges through timeless philosophical, ethical, physical, and psychological principles (e.g., mental distress as Vishada, self-discipline as Sanyama/Abhyasa, duty as Swadharma, wellbeing as Dincharya/Ayurveda).
+           - IF THE TOPIC RELATES to any underlying human emotion, duty, spiritual principle, health guidance, or philosophical dilemma covered by "${config.texts}", treat it as FULLY PRESENT and explain the text's relevant teachings.
+           - STRICT REFUSAL THRESHOLD: You must ONLY state that the text does not contain information if the question is genuinely and entirely foreign to "${config.texts}" (e.g., asking about modern software coding, airplanes in the Bhagavad Gita, or modern tax law in the Upanishads).
+           - In case of true absence, state in ${UI.lang.value}: "The selected text (${config.texts}) does not contain information about your question. Would you like me to look for this in other texts in the library?"
+           - PERMISSION EXCEPTION: If the user says "yes" or agrees after you offered this, you are authorized to draw wisdom from other ancient Indian texts.
+
+        3. SCRIPTURAL CITATIONS (NO FABRICATION, NO FEAR):
+           - If you recall a relevant authentic shloka, sutra, or passage, quote it.
+           - If you know the teaching but not the exact Sanskrit wording or exact numbering, DO NOT REFUSE. Simply state: "In the teachings of ${config.texts}..." and explain the core principle accurately in your own words.
+           - State specific chapter/verse digits ONLY when certain; otherwise, reference the section conceptually (e.g., "In the dialogue between Krishna and Arjuna during the second chapter...").
+
+        4. EXPLANATION: Balance the explanation: ${bookRatio}% classical text analysis and ${aiRatio}% practical contextual guidance for daily life. ${contextAddon}
+        5. LANGUAGE: Speak strictly in ${UI.lang.value}.
+        6. FORMATTING: Use Markdown (bolding, bullet points) for clear readability.
+        7. MEDIA LINKS: At the very end of your response, provide EXACTLY two lines:
            YT_SEARCH: relevant_topic_keywords
            IMG_SEARCH: relevant_topic_keywords`;
     }
     
-   // Core payload format (without the model ID, which is handled in the URL for direct calls)
-// Core payload format (without the model ID, which is handled in the URL for direct calls)
-	const payload = { 
+    // Core payload format
+    const payload = { 
         contents: history.slice(-10), 
         systemInstruction: { parts: [{ text: prompt }] }
     };
 
     let fetchUrl;
 
-		if (customKey) {
+    if (customKey) {
         // Direct to Google AI Studio endpoint
         fetchUrl = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModelInfo.id}:generateContent?key=${customKey}`;
     } else {
         // Route through your Cloud Run proxy
-        fetchUrl = `${PROXY_URL}/api/chat`; // <-- FIX: Added the endpoint
-        // The proxy likely expects the model name in the body payload
+        fetchUrl = `${PROXY_URL}/api/chat`;
         payload.model = selectedModelInfo.id;
     }
 
@@ -1740,10 +1809,12 @@ const [group, itemName] = selectedLibraryItem.split('|');
         return data.candidates[0].content.parts[0].text;
 
     } catch (err) {
-        // Re-throw to allow processInput() to handle the UI reset
         throw err; 
     }
 }
+
+
+
 
 // --- DUAL TTS ENGINE (CLOUD & NATIVE) ---
 function prepareTextForTTSAndHighlighting(container, msgId) {
