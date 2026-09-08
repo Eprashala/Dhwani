@@ -1651,36 +1651,65 @@ async function getAIResponse(history, config) {
     const aiRatio = 100 - bookRatio;
     const selectedModelInfo = getModelInfo(UI.modelSlider.value);
 
-	   
-	       
-	const recentTopics = history.slice(-4)
-        .filter(msg => msg.role === 'model')
-        .map(msg => msg.parts[0].text.substring(0, 50)) // Grabs the start of recent answers
-        .join(" | ");
-
-const [group, itemName] = selectedLibraryItem.split('|');
+    const [group, itemName] = selectedLibraryItem.split('|');
     const isArchive = (group === 'Archive');
 
     let prompt = "";
+    let fetchedContext = "";
 
+    // --- 1. DYNAMIC ARCHIVE.ORG FETCH ---
     if (isArchive) {
-        // --- GLOBAL ARCHIVE PROMPT (Modeled after book.html) ---
-        prompt = `Act as 'Dhwani', an expert book and literary explainer. You are accessing the global internet archives to discuss the book/topic: "${config.texts}".
+        try {
+            // Query the Internet Archive Advanced Search API directly from the browser
+            const archiveSearchUrl = `https://archive.org/advancedsearch.php?q=title:(${encodeURIComponent(itemName)})&fl[]=identifier,title,creator,description,year&sort[]=downloads+desc&rows=1&page=1&output=json`;
+            const archiveRes = await fetch(archiveSearchUrl);
+            const archiveData = await archiveRes.json();
+            
+            if (archiveData.response && archiveData.response.docs.length > 0) {
+                const doc = archiveData.response.docs[0];
+                
+                // Clean up raw HTML tags from the archive description
+                let cleanDesc = doc.description ? doc.description.toString().replace(/<[^>]*>?/gm, '').substring(0, 1500) : 'No description available.';
+                
+                fetchedContext = `
+                [LIVE INTERNET ARCHIVE METADATA]
+                Title: ${doc.title}
+                Author: ${doc.creator ? doc.creator.join(', ') : 'Unknown'}
+                Year: ${doc.year || 'Unknown'}
+                Archive ID: ${doc.identifier}
+                Summary: ${cleanDesc}
+                `;
+            } else {
+                fetchedContext = `[LIVE INTERNET ARCHIVE METADATA] No direct matches found for "${itemName}" in the digital library.`;
+            }
+        } catch (e) {
+            console.error("Archive.org fetch failed:", e);
+            fetchedContext = `[LIVE INTERNET ARCHIVE METADATA] Connection to Archive.org failed.`;
+        }
+    }
+
+    // --- 2. DYNAMIC PROMPT INJECTION ---
+    if (isArchive) {
+        // --- GLOBAL ARCHIVE PROMPT ---
+        prompt = `Act as 'Dhwani', an expert book and literary explainer. You are discussing the book/topic: "${config.texts}".
+        
+        Here is the live data retrieved from Archive.org:
+        ${fetchedContext}
         
         CRITICAL RULES:
         1. PERSONA: Address the user respectfully. Do NOT begin with a greeting.
-        2. GLOBAL ACCESS: You are authorized to draw upon your general training data (the internet archives) to discuss "${config.texts}". This includes modern literature, western philosophy, and global science.
-        3. EXACT QUOTE/EXCERPT: If the user asks for quotes, summaries, or details, provide accurate information from the requested book.
-        4. ZERO HALLUCINATION: If the book "${config.texts}" does not exist, explicitly state that it cannot be found in the global archives. Do not invent plots or quotes.
+        2. GROUNDING: Use the [LIVE INTERNET ARCHIVE METADATA] above to verify the book exists, validate the author, and ground your summary. You are authorized to supplement this with your general training data (global internet archives).
+        3. EXACT QUOTE/EXCERPT: If the user asks for quotes, summarize based on your knowledge. Do not invent exact quotes if you cannot recall them perfectly.
+        4. ZERO HALLUCINATION: If the book "${config.texts}" does not exist in the metadata or your memory, explicitly state that it cannot be found. Do not invent plots.
         5. EXPLANATION & TONE: Explain the context clearly and deeply, adjusting your tone for a ${UI.age.value || '25'}-year-old. ${contextAddon}
         6. LANGUAGE: Speak strictly in ${UI.lang.value}.
         7. FORMATTING: Use Markdown (bolding, bullet points).
         8. MEDIA LINKS: At the very end of your response, provide EXACTLY two lines formatted like this:
-           YT_SEARCH: relevant_topic_keywords
-           IMG_SEARCH: relevant_topic_keywords`;
+           YT_SEARCH: ${itemName} book analysis
+           IMG_SEARCH: ${itemName} book cover`;
            
     } else {
-        // --- ANCIENT LIBRARY PROMPT (Your existing strict prompt) ---
+        // --- ANCIENT LIBRARY PROMPT (Strict Guardrails) ---
         prompt = `You are Dhwani, an AI female interpreter and guide to ancient Indian texts. You are NOT the author and you are NOT a god. You are currently interpreting the text: "${config.texts}" which is associated with ${config.persona}.
         
         CRITICAL AND UNBREAKABLE RULES FOR YOUR RESPONSE:
@@ -1701,22 +1730,20 @@ const [group, itemName] = selectedLibraryItem.split('|');
            IMG_SEARCH: relevant_topic_keywords`;
     }
     
-   // Core payload format (without the model ID, which is handled in the URL for direct calls)
-// Core payload format (without the model ID, which is handled in the URL for direct calls)
-	const payload = { 
+    // Core payload format
+    const payload = { 
         contents: history.slice(-10), 
         systemInstruction: { parts: [{ text: prompt }] }
     };
 
     let fetchUrl;
 
-		if (customKey) {
+    if (customKey) {
         // Direct to Google AI Studio endpoint
         fetchUrl = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModelInfo.id}:generateContent?key=${customKey}`;
     } else {
         // Route through your Cloud Run proxy
-        fetchUrl = `${PROXY_URL}/api/chat`; // <-- FIX: Added the endpoint
-        // The proxy likely expects the model name in the body payload
+        fetchUrl = `${PROXY_URL}/api/chat`;
         payload.model = selectedModelInfo.id;
     }
 
@@ -1740,7 +1767,6 @@ const [group, itemName] = selectedLibraryItem.split('|');
         return data.candidates[0].content.parts[0].text;
 
     } catch (err) {
-        // Re-throw to allow processInput() to handle the UI reset
         throw err; 
     }
 }
