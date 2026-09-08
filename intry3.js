@@ -502,13 +502,52 @@ function renderDropdownList(filterText = "") {
             UI.ddList.appendChild(groupDiv);
         }
     }
+
+    // --- NEW: GLOBAL INTERNET ARCHIVE FALLBACK ---
+    if (filterText.trim().length > 0) {
+        const archiveDiv = document.createElement('div');
+        archiveDiv.innerHTML = `<div class="text-[10px] uppercase text-orange-500 font-bold px-3 py-1.5 mt-1 bg-slate-900 sticky top-0 z-10 shadow-sm">Global Internet Archives</div>`;
+        
+        const itemDiv = document.createElement('div');
+        itemDiv.className = "px-3 py-2 cursor-pointer hover:bg-slate-700 rounded-lg transition-colors flex flex-col mx-1 my-0.5 border border-orange-500/30 bg-orange-900/20";
+        itemDiv.innerHTML = `
+            <span class="text-sm font-bold text-orange-400 leading-tight">Search for: "${filterText}"</span>
+            <span class="text-[10px] text-slate-400 mt-0.5 leading-tight">Access modern & global books beyond the ancient library.</span>
+        `;
+        
+        itemDiv.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // Prefixing with "Archive|" tells our system how to handle this
+            selectedLibraryItem = `Archive|${filterText.trim()}`;
+            UI.ddText.innerText = `[Archive] ${filterText.trim()}`;
+            
+            UI.ddMenu.style.display = 'none';
+            UI.ddMenu.classList.add('hidden');
+            UI.ddSearch.value = ''; 
+            renderDropdownList();   
+        };
+        
+        archiveDiv.appendChild(itemDiv);
+        UI.ddList.appendChild(archiveDiv);
+    }
 }
 
 function getSelectedConfig() {
     const [group, item] = selectedLibraryItem.split('|');
+    
+    // Intercept Archive requests and generate a temporary virtual config
+    if (group === 'Archive') {
+        return {
+            persona: "Global Archive AI",
+            texts: item,
+            greeting: "Namaste",
+            desc: "Accessing the global internet archives."
+        };
+    }
+    
     return LIBRARY_CONFIG[group][item];
 }
-
 function getSelectedItemName() {
     return selectedLibraryItem.split('|')[1];
 }
@@ -1614,26 +1653,59 @@ async function getAIResponse(history, config) {
 
 	   
 	       
- const prompt = `You are Dhwani, an AI female interpreter and guide to ancient Indian texts. You are NOT the author and you are NOT a god. You are interpreting the text: "${config.texts}" which is associated with ${config.persona}.
-    
-    CRITICAL AND UNBREAKABLE RULES FOR YOUR RESPONSE:
-    1. PERSONA: Your name is Dhwani. Address the user respectfully and affectionately using gender-neutral terms like "Vatsa" (child/seeker) or "Bhakta" (devotee). Do NOT pretend to be ${config.persona}. Act strictly as a humble interpreter sharing their wisdom. IMPORTANT: Do NOT begin your response with a greeting (e.g., Namaste, Pranam, Hello) as the user has already been greeted. Dive straight into the wisdom.
-    2. EXCLUSIVE SOURCE MATERIAL: You MUST derive your entire answer, philosophy, and worldview EXCLUSIVELY from "${config.texts}". Do NOT mix in concepts, verses, or ideas from other texts.
-    3. EXACT VERSE/QUOTE: You MUST select a real, highly relevant verse, sutra, shloka, or phrase from "${config.texts}" that directly addresses the user's query. If you cannot recall the exact verbatim words, paraphrase the concept accurately rather than fabricating a fake verse.
-    4. THE REFERENCE (ANTI-HALLUCINATION GUARDRAIL): State the exact structural reference (e.g., Book, Chapter, Canto, Verse) ONLY if you are 100% certain. If there is even a slight ambiguity across different historical recensions/editions, DO NOT guess or invent numbers. Instead, omit the digits and use a phrase like: "In a celebrated section of the ${config.texts}..." or describe its conceptual placement. Never invent chapter/verse numbers.
-    5. THE RECITATION: Recite the original verse accurately in the requested language.
-    6. THE EXPLANATION: Explain the profound meaning of this specific verse strictly within the context of "${config.texts}" as an interpreter. Apply it directly to the user's question to provide actionable guidance.
-    7. LANGUAGE: Speak strictly in the language code: ${UI.lang.value}.
-    8. FORMATTING: Use rich Markdown formatting (bolding, headers, lists) to make the text beautiful and structured for the user to read.
-    9. TONE & RATIO: Maintain an objective, knowledgeable, yet compassionate tone. Your answer must be exactly ${bookRatio}% strict traditional quotation/interpretation of "${config.texts}" and ${aiRatio}% compassionate contextualization for the modern user. ${contextAddon}
-    10. MEDIA LINKS: At the very end of your response, provide EXACTLY two lines formatted like this for further exploration (translate the descriptive text to ${UI.lang.value}):
-       YT_SEARCH: relevant_topic_keywords
-       IMG_SEARCH: relevant_topic_keywords`;
+	const recentTopics = history.slice(-4)
+        .filter(msg => msg.role === 'model')
+        .map(msg => msg.parts[0].text.substring(0, 50)) // Grabs the start of recent answers
+        .join(" | ");
+
+const [group, itemName] = selectedLibraryItem.split('|');
+    const isArchive = (group === 'Archive');
+
+    let prompt = "";
+
+    if (isArchive) {
+        // --- GLOBAL ARCHIVE PROMPT (Modeled after book.html) ---
+        prompt = `Act as 'Dhwani', an expert book and literary explainer. You are accessing the global internet archives to discuss the book/topic: "${config.texts}".
+        
+        CRITICAL RULES:
+        1. PERSONA: Address the user respectfully. Do NOT begin with a greeting.
+        2. GLOBAL ACCESS: You are authorized to draw upon your general training data (the internet archives) to discuss "${config.texts}". This includes modern literature, western philosophy, and global science.
+        3. EXACT QUOTE/EXCERPT: If the user asks for quotes, summaries, or details, provide accurate information from the requested book.
+        4. ZERO HALLUCINATION: If the book "${config.texts}" does not exist, explicitly state that it cannot be found in the global archives. Do not invent plots or quotes.
+        5. EXPLANATION & TONE: Explain the context clearly and deeply, adjusting your tone for a ${UI.age.value || '25'}-year-old. ${contextAddon}
+        6. LANGUAGE: Speak strictly in ${UI.lang.value}.
+        7. FORMATTING: Use Markdown (bolding, bullet points).
+        8. MEDIA LINKS: At the very end of your response, provide EXACTLY two lines formatted like this:
+           YT_SEARCH: relevant_topic_keywords
+           IMG_SEARCH: relevant_topic_keywords`;
+           
+    } else {
+        // --- ANCIENT LIBRARY PROMPT (Your existing strict prompt) ---
+        prompt = `You are Dhwani, an AI female interpreter and guide to ancient Indian texts. You are NOT the author and you are NOT a god. You are currently interpreting the text: "${config.texts}" which is associated with ${config.persona}.
+        
+        CRITICAL AND UNBREAKABLE RULES FOR YOUR RESPONSE:
+        1. PERSONA: Your name is Dhwani. Address the user respectfully and affectionately as "Vatsa" or "Bhakta". Do NOT begin your response with a greeting (e.g., Namaste, Pranam, Hello). Dive straight into the answer.
+        2. STRICT SCOPE & ABSENCE PROTOCOL:
+           - You must determine if the user's question is authentically addressed or mentioned in "${config.texts}".
+           - IF THE INFORMATION IS NOT PRESENT: If "${config.texts}" does not contain teachings, context, or verses regarding the user's question, DO NOT invent verses or hallucinate.
+           - You MUST state clearly in ${UI.lang.value}: "The selected text (${config.texts}) does not contain information about your question. Would you like me to look for this in other texts in the library?"
+           - When delivering this message, skip Rules 3, 4, and 5 entirely.
+           - PERMISSION EXCEPTION: If the user's latest message is agreeing after you asked this question in the preceding message, you are authorized to search and answer using wisdom from other authentic ancient Indian texts.
+        3. EXACT VERSE/QUOTE: Quote a genuine, relevant verse, sutra, or shloka. If you cannot recall the exact verbatim phrasing, paraphrase accurately.
+        4. THE REFERENCE (ANTI-HALLUCINATION GUARDRAIL): State the structural reference ONLY if 100% verified. Never invent chapter/verse digits.
+        5. THE EXPLANATION: Explain the verse in depth. Keep the ratio strictly to ${bookRatio}% classical text analysis and ${aiRatio}% practical contextual guidance. ${contextAddon}
+        6. LANGUAGE: Speak strictly in the language code: ${UI.lang.value}.
+        7. FORMATTING: Use Markdown (bolding, lists) for clean presentation.
+        8. MEDIA LINKS: At the very end of your response, provide EXACTLY two lines:
+           YT_SEARCH: relevant_topic_keywords
+           IMG_SEARCH: relevant_topic_keywords`;
+    }
     
    // Core payload format (without the model ID, which is handled in the URL for direct calls)
-    const payload = { 
+// Core payload format (without the model ID, which is handled in the URL for direct calls)
+	const payload = { 
         contents: history.slice(-10), 
-        systemInstruction: { parts: [{ text: prompt }] } 
+        systemInstruction: { parts: [{ text: prompt }] }
     };
 
     let fetchUrl;
