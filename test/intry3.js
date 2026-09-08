@@ -1639,6 +1639,53 @@ async function processInput(userText) {
     setTimeout(updateStopButtonVisibility, 100); 
 }
 
+// Fetches verified author, publication date, and official synopses from 40M+ modern books
+async function fetchGoogleBooksData(query) {
+    try {
+        const url = `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(query)}&maxResults=1&printType=books`;
+        const res = await fetch(url);
+        if (!res.ok) return null;
+        
+        const data = await res.json();
+        if (!data.items || data.items.length === 0) return null;
+
+        const info = data.items[0].volumeInfo;
+        return {
+            title: info.title || query,
+            authors: info.authors ? info.authors.join(", ") : "Unknown",
+            publishedDate: info.publishedDate || "Unknown",
+            description: info.description ? info.description.substring(0, 1200) : "No official synopsis available."
+        };
+    } catch (e) {
+        console.error("Google Books Fetch Error:", e);
+        return null;
+    }
+}
+
+// Fetches public domain records, historical summaries, and alternate metadata
+async function fetchArchiveOrgData(query) {
+    try {
+        const url = `https://archive.org/advancedsearch.php?q=title:(${encodeURIComponent(query)})&fl[]=identifier,title,creator,description,year&sort[]=downloads+desc&rows=1&output=json`;
+        const res = await fetch(url);
+        const data = await res.json();
+        
+        if (data.response && data.response.docs.length > 0) {
+            const doc = data.response.docs[0];
+            return {
+                title: doc.title || query,
+                authors: doc.creator ? doc.creator.join(", ") : "Unknown",
+                year: doc.year || "Unknown",
+                // Strip raw HTML tags that often appear in Archive.org descriptions
+                description: doc.description ? doc.description.toString().replace(/<[^>]*>?/gm, '').substring(0, 1200) : "No description available."
+            };
+        }
+        return null;
+    } catch (e) {
+        console.error("Archive.org Fetch Error:", e);
+        return null;
+    }
+}
+
 async function getAIResponse(history, config) {
     const customKey = (UI.keyIn.value.length > 10) ? UI.keyIn.value : null;
     const headers = { 'Content-Type': 'application/json' };
@@ -1655,52 +1702,39 @@ async function getAIResponse(history, config) {
     const isArchive = (group === 'Archive');
 
     let prompt = "";
-    let fetchedContext = "";
+    let liveContext = "";
 
-    // --- 1. DYNAMIC ARCHIVE.ORG FETCH ---
     if (isArchive) {
-        try {
-            // Query the Internet Archive Advanced Search API directly from the browser
-            const archiveSearchUrl = `https://archive.org/advancedsearch.php?q=title:(${encodeURIComponent(itemName)})&fl[]=identifier,title,creator,description,year&sort[]=downloads+desc&rows=1&page=1&output=json`;
-            const archiveRes = await fetch(archiveSearchUrl);
-            const archiveData = await archiveRes.json();
-            
-            if (archiveData.response && archiveData.response.docs.length > 0) {
-                const doc = archiveData.response.docs[0];
-                
-                // Clean up raw HTML tags from the archive description
-                let cleanDesc = doc.description ? doc.description.toString().replace(/<[^>]*>?/gm, '').substring(0, 1500) : 'No description available.';
-                
-                fetchedContext = `
-                [LIVE INTERNET ARCHIVE METADATA]
-                Title: ${doc.title}
-                Author: ${doc.creator ? doc.creator.join(', ') : 'Unknown'}
-                Year: ${doc.year || 'Unknown'}
-                Archive ID: ${doc.identifier}
-                Summary: ${cleanDesc}
-                `;
-            } else {
-                fetchedContext = `[LIVE INTERNET ARCHIVE METADATA] No direct matches found for "${itemName}" in the digital library.`;
+        // Trigger both API fetches simultaneously for speed
+        const [googleData, archiveData] = await Promise.all([
+            fetchGoogleBooksData(itemName),
+            fetchArchiveOrgData(itemName)
+        ]);
+
+        // Construct the verified context block
+        if (googleData || archiveData) {
+            liveContext = `[LIVE VERIFIED METADATA FROM GLOBAL APIS]\n`;
+            if (googleData) {
+                liveContext += `--- GOOGLE BOOKS RECORD ---\nTitle: ${googleData.title}\nAuthor(s): ${googleData.authors}\nPublished: ${googleData.publishedDate}\nSynopsis: ${googleData.description}\n\n`;
             }
-        } catch (e) {
-            console.error("Archive.org fetch failed:", e);
-            fetchedContext = `[LIVE INTERNET ARCHIVE METADATA] Connection to Archive.org failed.`;
+            if (archiveData) {
+                liveContext += `--- ARCHIVE.ORG RECORD ---\nTitle: ${archiveData.title}\nAuthor(s): ${archiveData.authors}\nYear: ${archiveData.year}\nSummary: ${archiveData.description}\n`;
+            }
+        } else {
+            liveContext = `[LIVE VERIFIED METADATA]\nCRITICAL: No verified records found for "${itemName}" in Google Books or Archive.org. The book may not exist or the title is incorrect.`;
         }
-    }
 
-    // --- 2. DYNAMIC PROMPT INJECTION ---
-    if (isArchive) {
-        // --- GLOBAL ARCHIVE PROMPT ---
-        prompt = `Act as 'Dhwani', an expert book and literary explainer. You are discussing the book/topic: "${config.texts}".
+        // --- GLOBAL ARCHIVE PROMPT (Grounded by Dual APIs) ---
+        prompt = `Act as 'Dhwani', an expert book and literary explainer. The user has searched the global internet archives for the topic: "${itemName}".
         
-        Here is the live data retrieved from Archive.org:
-        ${fetchedContext}
+        Here is the live, verified data retrieved from the Google Books and Archive.org databases:
+        ${liveContext}
         
         CRITICAL RULES:
         1. PERSONA: Address the user respectfully. Do NOT begin with a greeting.
-        2. GROUNDING: Use the [LIVE INTERNET ARCHIVE METADATA] above to verify the book exists, validate the author, and ground your summary. You are authorized to supplement this with your general training data (global internet archives).
-        3. EXACT QUOTE/EXCERPT: If the user asks for quotes, summarize based on your knowledge. Do not invent exact quotes if you cannot recall them perfectly.
-        4. ZERO HALLUCINATION: If the book "${config.texts}" does not exist in the metadata or your memory, explicitly state that it cannot be found. Do not invent plots.
+        2. GROUNDING (NO HALLUCINATIONS): You MUST use the [LIVE VERIFIED METADATA] above to verify the book's existence, author, and plot. Do not invent plots, characters, or publication dates that contradict this metadata.
+        3. ABSENCE PROTOCOL: If the [LIVE VERIFIED METADATA] states that no records were found, you MUST inform the user that the book cannot be located in the global archives. Do not attempt to summarize a book that failed the metadata check.
+        4. EXACT QUOTES: If the user asks for an exact quote, and it is not present in the metadata synopsis, state clearly that you do not have the exact verbatim text loaded, but provide a thematic summary based on the synopsis instead. Do not fabricate quotes.
         5. EXPLANATION & TONE: Explain the context clearly and deeply, adjusting your tone for a ${UI.age.value || '25'}-year-old. ${contextAddon}
         6. LANGUAGE: Speak strictly in ${UI.lang.value}.
         7. FORMATTING: Use Markdown (bolding, bullet points).
@@ -1709,7 +1743,7 @@ async function getAIResponse(history, config) {
            IMG_SEARCH: ${itemName} book cover`;
            
     } else {
-        // --- ANCIENT LIBRARY PROMPT (Strict Guardrails) ---
+        // --- ANCIENT LIBRARY PROMPT (Your existing strict prompt for library_config.json) ---
         prompt = `You are Dhwani, an AI female interpreter and guide to ancient Indian texts. You are NOT the author and you are NOT a god. You are currently interpreting the text: "${config.texts}" which is associated with ${config.persona}.
         
         CRITICAL AND UNBREAKABLE RULES FOR YOUR RESPONSE:
@@ -1770,6 +1804,9 @@ async function getAIResponse(history, config) {
         throw err; 
     }
 }
+
+
+
 
 // --- DUAL TTS ENGINE (CLOUD & NATIVE) ---
 function prepareTextForTTSAndHighlighting(container, msgId) {
