@@ -239,12 +239,6 @@
             } catch (err) { alert('Could not paste. Type manually.'); }
         });
 
-        function getEffectiveApiKey() {
-            if (useCustomKeyCheckbox.checked && customApiKeyInput.value.trim().length > 10) {
-                return customApiKeyInput.value.trim();
-            }
-            return DEFAULT_API_KEY;
-        }
 
         // --- MEMORY LOGIC ---
         function loadUserData() {
@@ -349,6 +343,16 @@
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
         async function toggleListening() {
+		try {
+                await navigator.mediaDevices.getUserMedia({ audio: true });
+            } catch (err) {
+                console.warn("Microphone access not granted or hardware unavailable.", err);
+            }
+
+            if (appState === 'IDLE') {
+                try { enterFullScreen(); } catch(e) {}
+            }
+			
             if (appState === 'IDLE') {
                 try { enterFullScreen(); } catch(e) {}
             }
