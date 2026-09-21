@@ -1639,25 +1639,31 @@ async function processInput(userText) {
     setTimeout(updateStopButtonVisibility, 100); 
 }
 
-// Fetches verified author, publication date, and official synopses from 40M+ modern books
-async function fetchGoogleBooksData(query) {
+// Universal metadata fetcher for the background LLM prompt
+async function fetchGlobalBookMetadata(query) {
     try {
-        const url = `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(query)}&maxResults=1&printType=books`;
-        const res = await fetch(url);
-        if (!res.ok) return null;
-        
-        const data = await res.json();
-        if (!data.items || data.items.length === 0) return null;
+        // 1. Try Google Books API (General search, NO strict 'intitle:' filter)
+        const gbResponse = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=1&printType=books`);
+        const gbData = await gbResponse.json();
 
-        const info = data.items[0].volumeInfo;
-        return {
-            title: info.title || query,
-            authors: info.authors ? info.authors.join(", ") : "Unknown",
-            publishedDate: info.publishedDate || "Unknown",
-            description: info.description ? info.description.substring(0, 1200) : "No official synopsis available."
-        };
-    } catch (e) {
-        console.error("Google Books Fetch Error:", e);
+        if (gbResponse.ok && gbData.items && gbData.items.length > 0) {
+            const info = gbData.items[0].volumeInfo;
+            return `--- GOOGLE BOOKS RECORD ---\nTitle: ${info.title || query}\nAuthor(s): ${info.authors ? info.authors.join(", ") : "Unknown"}\nSynopsis: ${info.description ? info.description.substring(0, 1200) : "No official synopsis available."}\n`;
+        }
+        
+        // 2. FALLBACK: Open Library API (Bypasses Google API blocks)
+        const olResponse = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=1`);
+        const olData = await olResponse.json();
+        
+        if (olData.docs && olData.docs.length > 0) {
+            const doc = olData.docs[0];
+            return `--- OPEN LIBRARY RECORD ---\nTitle: ${doc.title || query}\nAuthor(s): ${doc.author_name ? doc.author_name.join(", ") : "Unknown"}\nFirst Published: ${doc.first_publish_year || 'Unknown'}\n`;
+        }
+
+        return null; // Both failed
+
+    } catch (error) {
+        console.error("Global Metadata Fetch Error:", error);
         return null;
     }
 }
@@ -1705,23 +1711,14 @@ async function getAIResponse(history, config) {
     let liveContext = "";
 
 	if (isArchive) {
-        // Trigger both API fetches simultaneously for speed
-        const [googleData, archiveData] = await Promise.all([
-            fetchGoogleBooksData(itemName),
-            fetchArchiveOrgData(itemName)
-        ]);
+        // Wait for the unified metadata fetcher
+        const metadataString = await fetchGlobalBookMetadata(itemName);
 
         // Construct the verified context block
-        if (googleData || archiveData) {
-            liveContext = `[LIVE VERIFIED METADATA FROM GLOBAL APIS]\n`;
-            if (googleData) {
-                liveContext += `--- GOOGLE BOOKS RECORD ---\nTitle: ${googleData.title}\nAuthor(s): ${googleData.authors}\nPublished: ${googleData.publishedDate}\nSynopsis: ${googleData.description}\n\n`;
-            }
-            if (archiveData) {
-                liveContext += `--- ARCHIVE.ORG RECORD ---\nTitle: ${archiveData.title}\nAuthor(s): ${archiveData.authors}\nYear: ${archiveData.year}\nSummary: ${archiveData.description}\n`;
-            }
+        if (metadataString) {
+            liveContext = `[LIVE VERIFIED METADATA FROM GLOBAL APIS]\n${metadataString}\n`;
         } else {
-            liveContext = `[LIVE VERIFIED METADATA]\nCRITICAL: No verified records found for "${itemName}" in Google Books or Archive.org.`;
+            liveContext = `[LIVE VERIFIED METADATA]\nCRITICAL: No verified records found for "${itemName}" in Google Books or Open Library.`;
         }
 
         // --- GLOBAL ARCHIVE PROMPT ---
