@@ -2541,3 +2541,111 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// --- GOOGLE BOOKS GLOBAL SEARCH ENGINE ---
+
+document.addEventListener("DOMContentLoaded", () => {
+    const globalModal = document.getElementById('global-search-modal');
+    const btnOpenGlobal = document.getElementById('btn-open-global-search');
+    const btnCloseGlobal = document.getElementById('btn-close-global-search');
+    const searchInput = document.getElementById('global-search-input');
+    const btnSearch = document.getElementById('btn-trigger-global-search');
+    const resultsContainer = document.getElementById('global-search-results');
+
+    if (!globalModal || !btnOpenGlobal) return;
+
+    // Open/Close Modal
+    btnOpenGlobal.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        globalModal.classList.remove('hidden');
+        searchInput.focus();
+    });
+
+    btnCloseGlobal.addEventListener('click', () => {
+        globalModal.classList.add('hidden');
+    });
+
+// Trigger Search
+    const executeSearch = async () => {
+        const query = searchInput.value.trim();
+        if (!query) return;
+
+        resultsContainer.innerHTML = `<div class="text-center text-orange-400 mt-10 animate-pulse font-bold">Consulting global archives...</div>`;
+
+        try {
+            let booksData = [];
+            
+            // 1. Try Google Books API First (Best for plot descriptions)
+            const gbResponse = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=10&printType=books`);
+            const gbData = await gbResponse.json();
+
+            // If Google Books succeeds and isn't blocking us
+            if (gbResponse.ok && gbData.items && gbData.items.length > 0) {
+                booksData = gbData.items.map(book => ({
+                    title: book.volumeInfo.title || "Unknown Title",
+                    authors: book.volumeInfo.authors ? book.volumeInfo.authors.join(", ") : "Unknown Author",
+                    thumbnail: book.volumeInfo.imageLinks ? book.volumeInfo.imageLinks.thumbnail : 'https://via.placeholder.com/128x192.png?text=No+Cover',
+                    snippet: book.volumeInfo.description ? book.volumeInfo.description.substring(0, 120) + "..." : "No description available."
+                }));
+            } else {
+                // 2. FALLBACK: Open Library API (100% free, ignores IP blocks, no API key needed)
+                const olResponse = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=10`);
+                const olData = await olResponse.json();
+                
+                if (olData.docs && olData.docs.length > 0) {
+                    booksData = olData.docs.map(doc => ({
+                        title: doc.title || "Unknown Title",
+                        authors: doc.author_name ? doc.author_name.join(", ") : "Unknown Author",
+                        thumbnail: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : 'https://via.placeholder.com/128x192.png?text=No+Cover',
+                        snippet: `First published in ${doc.first_publish_year || 'Unknown'}.`
+                    }));
+                }
+            }
+
+            resultsContainer.innerHTML = '';
+
+            // If BOTH databases fail to find it
+            if (booksData.length === 0) {
+                resultsContainer.innerHTML = `<div class="text-center text-red-400 mt-10">No books found for "${query}".</div>`;
+                return;
+            }
+
+            // Render Results
+            booksData.forEach(book => {
+                const card = document.createElement('div');
+                card.className = "flex gap-4 p-3 bg-slate-800/80 hover:bg-slate-700 border border-slate-600 rounded-xl cursor-pointer transition-colors shadow-md";
+                card.innerHTML = `
+                    <img src="${book.thumbnail}" class="w-16 h-24 object-cover rounded shadow-sm flex-shrink-0 bg-slate-900" alt="Cover">
+                    <div class="flex flex-col flex-1 overflow-hidden">
+                        <h3 class="text-sm font-bold text-orange-400 truncate">${book.title}</h3>
+                        <p class="text-xs text-slate-300 font-semibold truncate mb-1">By: ${book.authors}</p>
+                        <p class="text-[10px] text-slate-400 leading-tight">${book.snippet}</p>
+                    </div>
+                `;
+
+                // When user clicks a book, set it as the active entity in Dhwani
+                card.onclick = () => {
+                    selectedLibraryItem = `Archive|${book.title} by ${book.authors}`;
+                    if (UI.ddText) {
+                        UI.ddText.innerText = `[Global] ${book.title}`;
+                    }
+                    globalModal.classList.add('hidden');
+                    if (UI.welcome) UI.welcome.style.display = 'none';
+                    UI.textIn.value = `I want to discuss the book "${book.title}" by ${book.authors}.`;
+                    processInput(UI.textIn.value);
+                };
+
+                resultsContainer.appendChild(card);
+            });
+
+        } catch (error) {
+            console.error("Search Error:", error);
+            resultsContainer.innerHTML = `<div class="text-center text-red-500 mt-10">Network error fetching books.</div>`;
+        }
+    };
+
+    btnSearch.addEventListener('click', executeSearch);
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') executeSearch();
+    });
+});
