@@ -1611,10 +1611,13 @@ async function processInput(userText) {
     saveData();
 
 
-    try {
-        const rawRes = await getAIResponse(chatHistory, config);
-		rawRes = rawRes.replace(/^.*?(global library records|verified digital entry|databases queried|digital lookup).*?(\n\n|\.\s+)/is, '');
-        rawRes = rawRes.replace(/^(Although |Even though |I cannot locate ).*?\n\n/is, '');
+	try {
+        // FIXED: Changed const to let so the filter doesn't crash the browser
+        let rawRes = await getAIResponse(chatHistory, config);
+        
+        // IRONCLAD FILTER: Strips any forced database apologies before they render
+        rawRes = rawRes.replace(/^.*?(global library records|verified digital entry|databases queried|digital lookup|public records).*?(\n\n|\.\s+)/is, '');
+        rawRes = rawRes.replace(/^(Although |Even though |I cannot locate |I am unable |While the ).*?\n\n/is, '');
         rawRes = rawRes.trim();
         
         state.lastAIMessage = rawRes;
@@ -1747,26 +1750,22 @@ YOUR MANDATE:
 
     } else {
         // --- ANCIENT LIBRARY PROMPT ---
-        prompt = `You are Dhwani, an AI female interpreter and guide to ancient Indian texts. You are interpreting: "${config.texts}" associated with ${config.persona}.
+	prompt = `You are Dhwani, an AI female interpreter and guide to ancient Indian texts. You are interpreting: "${config.texts}" associated with ${config.persona}.
         
         CRITICAL RULES:
-        1. PERSONA: Address the user respectfully and affectionately as "Vatsa" or "Bhakta". Do NOT begin with a greeting (e.g., Namaste, Pranam, Hello). Dive straight into the answer.
+        1. PERSONA: Address the user respectfully and affectionately as "Vatsa" or "Bhakta". Do NOT begin with a greeting. Dive straight into the answer.
         
         2. SCOPE & CONCEPTUAL RELEVANCE (DO NOT FALSELY REFUSE):
-           - Ancient scriptures address modern human challenges through timeless philosophical, ethical, physical, and psychological principles (e.g., mental distress as Vishada, self-discipline as Sanyama/Abhyasa, duty as Swadharma, wellbeing as Dincharya/Ayurveda).
-           - IF THE TOPIC RELATES to any underlying human emotion, duty, spiritual principle, health guidance, or philosophical dilemma covered by "${config.texts}", treat it as FULLY PRESENT and explain the text's relevant teachings.
-           - STRICT REFUSAL THRESHOLD: You must ONLY state that the text does not contain information if the question is genuinely and entirely foreign to "${config.texts}" (e.g., asking about modern software coding, airplanes in the Bhagavad Gita, or modern tax law in the Upanishads).
-           - In case of true absence, state in ${UI.lang.value}: "The selected text (${config.texts}) does not contain information about your question. Would you like me to look for this in other texts in the library?"
-           - PERMISSION EXCEPTION: If the user says "yes" or agrees after you offered this, you are authorized to draw wisdom from other ancient Indian texts.
+           - Ancient scriptures address modern human challenges through timeless principles. If the topic relates to emotion, duty, or philosophy, treat it as FULLY PRESENT.
+           - STRICT ANTI-REFUSAL: NEVER apologize. NEVER say you cannot locate a specific modern author, translation, or commentary (e.g., Baba Faqir Chand). If the user asks for a specific modern version you don't know, ignore the author and CONFIDENTLY explain the philosophy of the original ancient text directly.
+           - Only state the text lacks information if it is completely non-spiritual (e.g., modern software coding).
 
-        3. SCRIPTURAL CITATIONS (NO FABRICATION, NO FEAR):
-           - If you recall a relevant authentic shloka, sutra, or passage, quote it.
-           - If you know the teaching but not the exact Sanskrit wording or exact numbering, DO NOT REFUSE. Simply state: "In the teachings of ${config.texts}..." and explain the core principle accurately in your own words.
-           - State specific chapter/verse digits ONLY when certain; otherwise, reference the section conceptually (e.g., "In the dialogue between Krishna and Arjuna during the second chapter...").
+        3. SCRIPTURAL CITATIONS:
+           - Explain the core principle accurately in your own words if you don't have the exact Sanskrit. Do not invent verse numbers.
 
         4. EXPLANATION: Balance the explanation: ${bookRatio}% classical text analysis and ${aiRatio}% practical contextual guidance for daily life. ${contextAddon}
         5. LANGUAGE: Speak strictly in ${UI.lang.value}.
-        6. FORMATTING: Use Markdown (bolding, bullet points) for clear readability.
+        6. FORMATTING: Use Markdown (bolding, bullet points).
         7. MEDIA LINKS: At the very end of your response, provide EXACTLY two lines:
            YT_SEARCH: relevant_topic_keywords
            IMG_SEARCH: relevant_topic_keywords`;
@@ -1774,12 +1773,9 @@ YOUR MANDATE:
     
     // Core payload format
 const payload = { 
-    contents: history.slice(-10), 
-    systemInstruction: { parts: [{ text: prompt }] },
-    tools: [
-        { google_search: {} } // Enables live web retrieval for exact book TOCs
-    ]
-};
+        contents: history.slice(-10), 
+        systemInstruction: { parts: [{ text: prompt }] }
+    };
 
     let fetchUrl;
 
