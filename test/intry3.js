@@ -1613,6 +1613,9 @@ async function processInput(userText) {
 
     try {
         const rawRes = await getAIResponse(chatHistory, config);
+		rawRes = rawRes.replace(/^.*?(global library records|verified digital entry|databases queried|digital lookup).*?(\n\n|\.\s+)/is, '');
+        rawRes = rawRes.replace(/^(Although |Even though |I cannot locate ).*?\n\n/is, '');
+        rawRes = rawRes.trim();
         
         state.lastAIMessage = rawRes;
         chatHistory.push({ role: 'model', parts: [{ text: rawRes }] });
@@ -1719,31 +1722,30 @@ async function getAIResponse(history, config) {
     let prompt = "";
     let liveContext = "";
 
-		if (isArchive) {
-				// Wait for the unified metadata fetcher
-				const metadataString = await fetchGlobalBookMetadata(itemName);
+if (isArchive) {
+        // Use the metadata already loaded by the search UI
+        const bookInfo = window.currentBookContext || { title: itemName, authors: "", snippet: "" };
+        const bookTitle = bookInfo.title || itemName;
+        const bookAuthor = (bookInfo.authors && bookInfo.authors !== "Unknown Author") ? ` by ${bookInfo.authors}` : "";
+        const bookOverview = (bookInfo.snippet && !bookInfo.snippet.includes("No description")) ? `Summary Context: ${bookInfo.snippet}` : "";
 
-				// SILENT CONTEXT: If it fails, give the LLM NO excuse to talk about failures.
-				// We completely remove any mention of timeouts or missing records.
-				liveContext = metadataString ? `[VERIFIED BOOK METADATA]\n${metadataString}\n` : "";
+        // --- GLOBAL MASTER PROFESSOR PROMPT ---
+        prompt = `You are Dhwani, an expert university professor and master tutor. You have complete, encyclopedic mastery of the book "${bookTitle}"${bookAuthor}.
 
-				// --- GLOBAL ARCHIVE PROMPT ---
-				prompt = `Act as 'Dhwani', an expert academic mentor and literary guide. The user has selected the book/topic: "${itemName}".
-				
-				${liveContext}
-				
-				CRITICAL RULES:
-				1. PERSONA: Dive straight into the subject matter. Do NOT begin with a greeting. Do NOT apologize.
-				2. NO META-COMMENTARY: You are STRICTLY FORBIDDEN from using words like "metadata", "global library", "verified records", "databases", or "search". Never mention that you couldn't find a record.
-				3. CONFIDENCE: Act as if you have the book right in front of you. If [VERIFIED BOOK METADATA] is missing, rely entirely on your vast pre-trained knowledge to explain its themes, chapters, and philosophy flawlessly.
-				4. EXPLANATION & TONE: Deliver clear, comprehensive insights suitable for a ${UI.age.value || '25'}-year-old. ${contextAddon}
-				5. LANGUAGE: Speak strictly in ${UI.lang.value}.
-				6. FORMATTING: Use Markdown (bolding, lists).
-				7. MEDIA LINKS: At the very end of your response, provide EXACTLY two lines:
-				   YT_SEARCH: ${itemName}
-				   IMG_SEARCH: ${itemName}`;
-				   
-			} else {
+${bookOverview}
+
+YOUR MANDATE:
+1. Master Authority: You know this book inside and out. Dive immediately into its core curriculum, syllabus, and topics without any introductory pleasantries or background disclaimers.
+2. Structure & Breadth: Immediately outline the primary volumes, units, or major theoretical sections of "${bookTitle}"${bookAuthor}, explaining how the concepts build on each other.
+3. Proactive Engagement: Conclude by asking the student which specific chapter, theorem, formula, or problem they want to work through today.
+4. Tone: Academic, rigorous, encouraging, and clear. Tailored for a ${UI.age.value || '25'}-year-old student. ${contextAddon}
+5. Language: Strictly ${UI.lang.value}.
+6. Formatting: Use clean Markdown with bold topic headers and bullet points.
+7. Media Links: At the very end, provide:
+   YT_SEARCH: ${bookTitle} lectures
+   IMG_SEARCH: ${bookTitle} diagram`;
+
+    } else {
         // --- ANCIENT LIBRARY PROMPT ---
         prompt = `You are Dhwani, an AI female interpreter and guide to ancient Indian texts. You are interpreting: "${config.texts}" associated with ${config.persona}.
         
@@ -2627,7 +2629,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // When user clicks a book, set it as the active entity in Dhwani
                 card.onclick = () => {
-                    // Lock the exact title
+                    // Cache the exact book data from the search result
+                    window.currentBookContext = book;
                     selectedLibraryItem = `Archive|${book.title}`; 
                     
                     if (UI.ddText) {
@@ -2635,13 +2638,17 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                     globalModal.classList.add('hidden');
                     
+                    // 1. CRITICAL: Clear old contaminated chat history so prior apologies do not repeat
+                    chatHistory = [];
+                    UI.log.innerHTML = '';
                     if (UI.welcome) UI.welcome.style.display = 'none';
                     
-                    // Smart prompt: don't say "by Unknown Author" if the API didn't find the author
                     let authorText = (book.authors && book.authors !== "Unknown Author") ? ` by ${book.authors}` : "";
-                    UI.textIn.value = `I want to discuss the book "${book.title}"${authorText}.`;
                     
-                    processInput(UI.textIn.value);
+                    // 2. Direct, constructive initial prompt
+                    const initialQuery = `Please provide an overview of "${book.title}"${authorText} and outline its core chapters or syllabus so we can begin.`;
+                    
+                    processInput(initialQuery);
                 };
 
                 resultsContainer.appendChild(card);
