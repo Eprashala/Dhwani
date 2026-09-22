@@ -1581,9 +1581,18 @@ async function processInput(userText) {
 
     let introMsgId = null;
 
-    // 2. INSTANT GREETING: Catch the user gesture before it expires!
+ 
+// 2. INSTANT GREETING: Catch the user gesture before it expires!
     if (isFirstMessage) {
-        const greetingText = getDhwaniGreeting(UI.lang.value, config.persona, config.texts);
+        let greetingText = "";
+        
+        // Custom greeting if it's a global archive book
+		if (selectedLibraryItem.startsWith('Archive|')) {
+            greetingText = `Hello ${userName}. I am Dhwani, a master professor of the book "${config.texts}". I am ready to break down its chapters, theories, and concepts for you.`;
+        } else {
+            // Standard ancient library greeting
+            greetingText = getDhwaniGreeting(UI.lang.value, config.persona, config.texts);
+        }
         
         chatHistory.push({ role: 'user', parts: [{ text: "Pranam." }] });
         chatHistory.push({ role: 'model', parts: [{ text: greetingText }] });
@@ -1602,8 +1611,14 @@ async function processInput(userText) {
     saveData();
 
 
-    try {
-        const rawRes = await getAIResponse(chatHistory, config);
+	try {
+        // FIXED: Changed const to let so the filter doesn't crash the browser
+        let rawRes = await getAIResponse(chatHistory, config);
+        
+        // IRONCLAD FILTER: Strips any forced database apologies before they render
+        rawRes = rawRes.replace(/^.*?(global library records|verified digital entry|databases queried|digital lookup|public records).*?(\n\n|\.\s+)/is, '');
+        rawRes = rawRes.replace(/^(Although |Even though |I cannot locate |I am unable |While the ).*?\n\n/is, '');
+        rawRes = rawRes.trim();
         
         state.lastAIMessage = rawRes;
         chatHistory.push({ role: 'model', parts: [{ text: rawRes }] });
@@ -1639,25 +1654,31 @@ async function processInput(userText) {
     setTimeout(updateStopButtonVisibility, 100); 
 }
 
-// Fetches verified author, publication date, and official synopses from 40M+ modern books
-async function fetchGoogleBooksData(query) {
+// Universal metadata fetcher for the background LLM prompt
+async function fetchGlobalBookMetadata(query) {
     try {
-        const url = `https://www.googleapis.com/books/v1/volumes?q=intitle:${encodeURIComponent(query)}&maxResults=1&printType=books`;
-        const res = await fetch(url);
-        if (!res.ok) return null;
-        
-        const data = await res.json();
-        if (!data.items || data.items.length === 0) return null;
+        // 1. Try Google Books API (General search, NO strict 'intitle:' filter)
+        const gbResponse = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=1&printType=books`);
+        const gbData = await gbResponse.json();
 
-        const info = data.items[0].volumeInfo;
-        return {
-            title: info.title || query,
-            authors: info.authors ? info.authors.join(", ") : "Unknown",
-            publishedDate: info.publishedDate || "Unknown",
-            description: info.description ? info.description.substring(0, 1200) : "No official synopsis available."
-        };
-    } catch (e) {
-        console.error("Google Books Fetch Error:", e);
+        if (gbResponse.ok && gbData.items && gbData.items.length > 0) {
+            const info = gbData.items[0].volumeInfo;
+            return `--- GOOGLE BOOKS RECORD ---\nTitle: ${info.title || query}\nAuthor(s): ${info.authors ? info.authors.join(", ") : "Unknown"}\nSynopsis: ${info.description ? info.description.substring(0, 1200) : "No official synopsis available."}\n`;
+        }
+        
+        // 2. FALLBACK: Open Library API (Bypasses Google API blocks)
+        const olResponse = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=1`);
+        const olData = await olResponse.json();
+        
+        if (olData.docs && olData.docs.length > 0) {
+            const doc = olData.docs[0];
+            return `--- OPEN LIBRARY RECORD ---\nTitle: ${doc.title || query}\nAuthor(s): ${doc.author_name ? doc.author_name.join(", ") : "Unknown"}\nFirst Published: ${doc.first_publish_year || 'Unknown'}\n`;
+        }
+
+        return null; // Both failed
+
+    } catch (error) {
+        console.error("Global Metadata Fetch Error:", error);
         return null;
     }
 }
@@ -1704,79 +1725,52 @@ async function getAIResponse(history, config) {
     let prompt = "";
     let liveContext = "";
 
-	if (isArchive) {
-        // Trigger both API fetches simultaneously for speed
-        const [googleData, archiveData] = await Promise.all([
-            fetchGoogleBooksData(itemName),
-            fetchArchiveOrgData(itemName)
-        ]);
+if (isArchive) {
+        // Use the metadata already loaded by the search UI
+        const bookInfo = window.currentBookContext || { title: itemName, authors: "", snippet: "" };
+        const bookTitle = bookInfo.title || itemName;
+        const bookAuthor = (bookInfo.authors && bookInfo.authors !== "Unknown Author") ? ` by ${bookInfo.authors}` : "";
+        const bookOverview = (bookInfo.snippet && !bookInfo.snippet.includes("No description")) ? `Summary Context: ${bookInfo.snippet}` : "";
 
-        // Construct the verified context block
-        if (googleData || archiveData) {
-            liveContext = `[LIVE VERIFIED METADATA FROM GLOBAL APIS]\n`;
-            if (googleData) {
-                liveContext += `--- GOOGLE BOOKS RECORD ---\nTitle: ${googleData.title}\nAuthor(s): ${googleData.authors}\nPublished: ${googleData.publishedDate}\nSynopsis: ${googleData.description}\n\n`;
-            }
-            if (archiveData) {
-                liveContext += `--- ARCHIVE.ORG RECORD ---\nTitle: ${archiveData.title}\nAuthor(s): ${archiveData.authors}\nYear: ${archiveData.year}\nSummary: ${archiveData.description}\n`;
-            }
-        } else {
-            liveContext = `[LIVE VERIFIED METADATA]\nCRITICAL: No verified records found for "${itemName}" in Google Books or Archive.org.`;
-        }
+        // --- GLOBAL MASTER PROFESSOR PROMPT ---
+        prompt = `You are Dhwani, an expert university professor and master tutor. You have complete, encyclopedic mastery of the book "${bookTitle}"${bookAuthor}.
 
-        // --- GLOBAL ARCHIVE PROMPT ---
-        prompt = `Act as 'Dhwani', an expert book and literary explainer. The user has selected the book/topic: "${itemName}".
-        
-        ${liveContext}
-        
-        CRITICAL RULES:
-        1. PERSONA: Address the user respectfully. Do NOT begin with a greeting.
-        2. GROUNDING & EXISTENCE:
-           - The metadata above confirms the book's authentic existence, author, and main subject.
-           - If the metadata explicitly says "No verified records found", only then state that you cannot locate this title in the global library.
-           - If the book is verified, you are FULLY AUTHORIZED to answer questions regarding its plot, characters, chapters, themes, and ideas using your knowledge of the work. Do not restrict yourself only to the synopsis sentences.
-        3. QUOTES & CHAPTER ACCURACY:
-           - Provide accurate thematic explanations and describe scenes faithfully.
-           - If you do not have the verbatim page or line memorized, accurately summarize the passage rather than inventing words in quotation marks.
-        4. EXPLANATION & TONE: Deliver clear, comprehensive insights suitable for a ${UI.age.value || '25'}-year-old. ${contextAddon}
-        5. LANGUAGE: Speak strictly in ${UI.lang.value}.
-        6. FORMATTING: Use Markdown (bolding, lists).
-        7. MEDIA LINKS: At the very end of your response, provide EXACTLY two lines:
-           YT_SEARCH: ${itemName} book summary
-           IMG_SEARCH: ${itemName} book cover`;
-           
+${bookOverview}
+
+YOUR MANDATE:
+1. Master Authority: You know this book inside and out. Dive immediately into its core curriculum, syllabus, and topics without any introductory pleasantries or background disclaimers.
+2. Structure & Breadth: Immediately outline the primary volumes, units, or major theoretical sections of "${bookTitle}"${bookAuthor}, explaining how the concepts build on each other.
+3. Proactive Engagement: Conclude by asking the student which specific chapter, theorem, formula, or problem they want to work through today.
+4. Tone: Academic, rigorous, encouraging, and clear. Tailored for a ${UI.age.value || '25'}-year-old student. ${contextAddon}
+5. Language: Strictly ${UI.lang.value}.
+6. Formatting: Use clean Markdown with bold topic headers and bullet points.
+7. Media Links: At the very end, provide:
+   YT_SEARCH: ${bookTitle} lectures
+   IMG_SEARCH: ${bookTitle} diagram`;
+
     } else {
         // --- ANCIENT LIBRARY PROMPT ---
-        prompt = `You are Dhwani, an AI female interpreter and guide to ancient Indian texts. You are interpreting: "${config.texts}" associated with ${config.persona}.
-        
-        CRITICAL RULES:
-        1. PERSONA: Address the user respectfully and affectionately as "Vatsa" or "Bhakta". Do NOT begin with a greeting (e.g., Namaste, Pranam, Hello). Dive straight into the answer.
-        
-        2. SCOPE & CONCEPTUAL RELEVANCE (DO NOT FALSELY REFUSE):
-           - Ancient scriptures address modern human challenges through timeless philosophical, ethical, physical, and psychological principles (e.g., mental distress as Vishada, self-discipline as Sanyama/Abhyasa, duty as Swadharma, wellbeing as Dincharya/Ayurveda).
-           - IF THE TOPIC RELATES to any underlying human emotion, duty, spiritual principle, health guidance, or philosophical dilemma covered by "${config.texts}", treat it as FULLY PRESENT and explain the text's relevant teachings.
-           - STRICT REFUSAL THRESHOLD: You must ONLY state that the text does not contain information if the question is genuinely and entirely foreign to "${config.texts}" (e.g., asking about modern software coding, airplanes in the Bhagavad Gita, or modern tax law in the Upanishads).
-           - In case of true absence, state in ${UI.lang.value}: "The selected text (${config.texts}) does not contain information about your question. Would you like me to look for this in other texts in the library?"
-           - PERMISSION EXCEPTION: If the user says "yes" or agrees after you offered this, you are authorized to draw wisdom from other ancient Indian texts.
+prompt = `You are Dhwani, an expert university professor and master tutor. You have complete, encyclopedic mastery of the book "${bookTitle}"${bookAuthor}.
 
-        3. SCRIPTURAL CITATIONS (NO FABRICATION, NO FEAR):
-           - If you recall a relevant authentic shloka, sutra, or passage, quote it.
-           - If you know the teaching but not the exact Sanskrit wording or exact numbering, DO NOT REFUSE. Simply state: "In the teachings of ${config.texts}..." and explain the core principle accurately in your own words.
-           - State specific chapter/verse digits ONLY when certain; otherwise, reference the section conceptually (e.g., "In the dialogue between Krishna and Arjuna during the second chapter...").
+${bookOverview}
 
-        4. EXPLANATION: Balance the explanation: ${bookRatio}% classical text analysis and ${aiRatio}% practical contextual guidance for daily life. ${contextAddon}
-        5. LANGUAGE: Speak strictly in ${UI.lang.value}.
-        6. FORMATTING: Use Markdown (bolding, bullet points) for clear readability.
-        7. MEDIA LINKS: At the very end of your response, provide EXACTLY two lines:
-           YT_SEARCH: relevant_topic_keywords
-           IMG_SEARCH: relevant_topic_keywords`;
+CRITICAL RULES:
+1. Master Authority: You MUST act as if you are holding the book. NEVER mention "library records", "digital entry", "metadata", or "databases". NEVER apologize.
+2. Structure & Breadth: Immediately outline the primary volumes, units, or major theoretical sections of "${bookTitle}"${bookAuthor}, explaining how the concepts build on each other.
+3. Proactive Engagement: Conclude by asking the student which specific chapter, theorem, formula, or problem they want to work through today.
+4. Tone: Academic, rigorous, encouraging, and clear. Tailored for a ${UI.age.value || '25'}-year-old student. ${contextAddon}
+5. Language: Strictly ${UI.lang.value}.
+6. Formatting: Use clean Markdown with bold topic headers and bullet points.
+7. Media Links: At the very end, provide EXACTLY two lines:
+   YT_SEARCH: ${bookTitle} lectures
+   IMG_SEARCH: ${bookTitle} diagram`;
     }
     
     // Core payload format
-    const payload = { 
-        contents: history.slice(-10), 
-        systemInstruction: { parts: [{ text: prompt }] }
-    };
+const payload = { 
+    contents: history.slice(-10), 
+    systemInstruction: { parts: [{ text: prompt }] }
+};
 
     let fetchUrl;
 
@@ -2540,4 +2534,125 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+});
+
+// --- GOOGLE BOOKS GLOBAL SEARCH ENGINE ---
+
+document.addEventListener("DOMContentLoaded", () => {
+    const globalModal = document.getElementById('global-search-modal');
+    const btnOpenGlobal = document.getElementById('btn-open-global-search');
+    const btnCloseGlobal = document.getElementById('btn-close-global-search');
+    const searchInput = document.getElementById('global-search-input');
+    const btnSearch = document.getElementById('btn-trigger-global-search');
+    const resultsContainer = document.getElementById('global-search-results');
+
+    if (!globalModal || !btnOpenGlobal) return;
+
+    // Open/Close Modal
+    btnOpenGlobal.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        globalModal.classList.remove('hidden');
+        searchInput.focus();
+    });
+
+    btnCloseGlobal.addEventListener('click', () => {
+        globalModal.classList.add('hidden');
+    });
+
+// Trigger Search
+    const executeSearch = async () => {
+        const query = searchInput.value.trim();
+        if (!query) return;
+
+        resultsContainer.innerHTML = `<div class="text-center text-orange-400 mt-10 animate-pulse font-bold">Consulting global archives...</div>`;
+
+        try {
+            let booksData = [];
+            
+            // 1. Try Google Books API First (Best for plot descriptions)
+            const gbResponse = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=10&printType=books`);
+            const gbData = await gbResponse.json();
+
+            // If Google Books succeeds and isn't blocking us
+            if (gbResponse.ok && gbData.items && gbData.items.length > 0) {
+                booksData = gbData.items.map(book => ({
+                    title: book.volumeInfo.title || "Unknown Title",
+                    authors: book.volumeInfo.authors ? book.volumeInfo.authors.join(", ") : "Unknown Author",
+                    thumbnail: book.volumeInfo.imageLinks ? book.volumeInfo.imageLinks.thumbnail : 'https://via.placeholder.com/128x192.png?text=No+Cover',
+                    snippet: book.volumeInfo.description ? book.volumeInfo.description.substring(0, 120) + "..." : "No description available."
+                }));
+            } else {
+                // 2. FALLBACK: Open Library API (100% free, ignores IP blocks, no API key needed)
+                const olResponse = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=10`);
+                const olData = await olResponse.json();
+                
+                if (olData.docs && olData.docs.length > 0) {
+                    booksData = olData.docs.map(doc => ({
+                        title: doc.title || "Unknown Title",
+                        authors: doc.author_name ? doc.author_name.join(", ") : "Unknown Author",
+                        thumbnail: doc.cover_i ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg` : 'https://via.placeholder.com/128x192.png?text=No+Cover',
+                        snippet: `First published in ${doc.first_publish_year || 'Unknown'}.`
+                    }));
+                }
+            }
+
+            resultsContainer.innerHTML = '';
+
+            // If BOTH databases fail to find it
+            if (booksData.length === 0) {
+                resultsContainer.innerHTML = `<div class="text-center text-red-400 mt-10">No books found for "${query}".</div>`;
+                return;
+            }
+
+            // Render Results
+            booksData.forEach(book => {
+                const card = document.createElement('div');
+                card.className = "flex gap-4 p-3 bg-slate-800/80 hover:bg-slate-700 border border-slate-600 rounded-xl cursor-pointer transition-colors shadow-md";
+                card.innerHTML = `
+                    <img src="${book.thumbnail}" class="w-16 h-24 object-cover rounded shadow-sm flex-shrink-0 bg-slate-900" alt="Cover">
+                    <div class="flex flex-col flex-1 overflow-hidden">
+                        <h3 class="text-sm font-bold text-orange-400 truncate">${book.title}</h3>
+                        <p class="text-xs text-slate-300 font-semibold truncate mb-1">By: ${book.authors}</p>
+                        <p class="text-[10px] text-slate-400 leading-tight">${book.snippet}</p>
+                    </div>
+                `;
+
+
+// When user clicks a book, set it as the active entity in Dhwani
+                card.onclick = () => {
+                    // Cache the exact book data from the search result
+                    window.currentBookContext = book;
+                    selectedLibraryItem = `Archive|${book.title}`; 
+                    
+                    if (UI.ddText) {
+                        UI.ddText.innerText = `[Global] ${book.title}`;
+                    }
+                    globalModal.classList.add('hidden');
+                    
+                    // 1. CRITICAL: Clear old contaminated chat history so prior apologies do not repeat
+                    chatHistory = [];
+                    UI.log.innerHTML = '';
+                    if (UI.welcome) UI.welcome.style.display = 'none';
+                    
+                    let authorText = (book.authors && book.authors !== "Unknown Author") ? ` by ${book.authors}` : "";
+                    
+                    // 2. Direct, constructive initial prompt
+                    const initialQuery = `Please provide an overview of "${book.title}"${authorText} and outline its core chapters or syllabus so we can begin.`;
+                    
+                    processInput(initialQuery);
+                };
+
+                resultsContainer.appendChild(card);
+            });
+
+        } catch (error) {
+            console.error("Search Error:", error);
+            resultsContainer.innerHTML = `<div class="text-center text-red-500 mt-10">Network error fetching books.</div>`;
+        }
+    };
+
+    btnSearch.addEventListener('click', executeSearch);
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') executeSearch();
+    });
 });
