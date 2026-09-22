@@ -1719,35 +1719,31 @@ async function getAIResponse(history, config) {
     let prompt = "";
     let liveContext = "";
 
-if (isArchive) {
-        // Wait for the unified metadata fetcher
-        const metadataString = await fetchGlobalBookMetadata(itemName);
+		if (isArchive) {
+				// Wait for the unified metadata fetcher
+				const metadataString = await fetchGlobalBookMetadata(itemName);
 
-        // If the fetch fails or times out, FORCE the AI to use its pre-trained knowledge
-        if (metadataString) {
-            liveContext = `[LIVE VERIFIED METADATA]\n${metadataString}\n`;
-        } else {
-            liveContext = `[PRE-TRAINED KNOWLEDGE MODE]\nThe live metadata fetch timed out. You MUST STILL ANSWER using your pre-trained internal knowledge of the book "${itemName}". NEVER refuse to discuss a known book. NEVER state you cannot locate it.`;
-        }
+				// SILENT CONTEXT: If it fails, give the LLM NO excuse to talk about failures.
+				// We completely remove any mention of timeouts or missing records.
+				liveContext = metadataString ? `[VERIFIED BOOK METADATA]\n${metadataString}\n` : "";
 
-        // --- GLOBAL ARCHIVE PROMPT ---
-       prompt = `Act as 'Dhwani', an expert academic mentor and textbook guide. 
-The user has selected the specific textbook: "${itemName}".
-
-CRITICAL TEXTBOOK RULES:
-1. AUTHOR FIDELITY: Pay strict attention to the author and publisher specified. Different authors arrange topics differently. Adhere to this author's particular terminology, pedagogical progression, and typical chapter organization.
-2. STRUCTURAL AWARENESS: 
-   - If the user asks for a specific chapter number (e.g., "Chapter 3"), refer to the standard Table of Contents for THIS specific author and edition.
-   - If there are minor variations across editions, clarify the topic briefly (e.g., "In most editions of Mehta, Chapter 3 covers Network Theorems. Are we working on Thevenin's or Maximum Power Transfer?").
-3. CONCEPTUAL ACCURACY: Solve problems step-by-step using standard engineering notations and SI units. Break down complex circuit derivations clearly.
-4. PROACTIVE GUIDANCE: If starting fresh, outline the book's 4-6 major units and ask the student which topic they want to master today.
-5. LANGUAGE & TONE: Professional, encouraging, and clear. Language: ${UI.lang.value}.
-6. MEDIA LINKS:
-   YT_SEARCH: ${itemName} engineering lectures
-   IMG_SEARCH: ${itemName} circuit diagrams`;
-        
-             
-    } else {
+				// --- GLOBAL ARCHIVE PROMPT ---
+				prompt = `Act as 'Dhwani', an expert academic mentor and literary guide. The user has selected the book/topic: "${itemName}".
+				
+				${liveContext}
+				
+				CRITICAL RULES:
+				1. PERSONA: Dive straight into the subject matter. Do NOT begin with a greeting. Do NOT apologize.
+				2. NO META-COMMENTARY: You are STRICTLY FORBIDDEN from using words like "metadata", "global library", "verified records", "databases", or "search". Never mention that you couldn't find a record.
+				3. CONFIDENCE: Act as if you have the book right in front of you. If [VERIFIED BOOK METADATA] is missing, rely entirely on your vast pre-trained knowledge to explain its themes, chapters, and philosophy flawlessly.
+				4. EXPLANATION & TONE: Deliver clear, comprehensive insights suitable for a ${UI.age.value || '25'}-year-old. ${contextAddon}
+				5. LANGUAGE: Speak strictly in ${UI.lang.value}.
+				6. FORMATTING: Use Markdown (bolding, lists).
+				7. MEDIA LINKS: At the very end of your response, provide EXACTLY two lines:
+				   YT_SEARCH: ${itemName}
+				   IMG_SEARCH: ${itemName}`;
+				   
+			} else {
         // --- ANCIENT LIBRARY PROMPT ---
         prompt = `You are Dhwani, an AI female interpreter and guide to ancient Indian texts. You are interpreting: "${config.texts}" associated with ${config.persona}.
         
@@ -2630,21 +2626,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 // When user clicks a book, set it as the active entity in Dhwani
-card.onclick = () => {
-    // Retain full bibliographic identity
-    selectedLibraryItem = `Archive|${book.title} [Author: ${book.authors}]`; 
-    
-    if (UI.ddText) {
-        UI.ddText.innerText = `[Book] ${book.title}`;
-    }
-    globalModal.classList.add('hidden');
-    
-    if (UI.welcome) UI.welcome.style.display = 'none';
-    
-    // Explicit first prompt instructs the model to acknowledge author and layout
-    UI.textIn.value = `I am studying "${book.title}" by ${book.authors}. Please provide an overview of its chapter structure and let me know how we can start.`;
-    processInput(UI.textIn.value);
-}
+                card.onclick = () => {
+                    // Lock the exact title
+                    selectedLibraryItem = `Archive|${book.title}`; 
+                    
+                    if (UI.ddText) {
+                        UI.ddText.innerText = `[Global] ${book.title}`;
+                    }
+                    globalModal.classList.add('hidden');
+                    
+                    if (UI.welcome) UI.welcome.style.display = 'none';
+                    
+                    // Smart prompt: don't say "by Unknown Author" if the API didn't find the author
+                    let authorText = (book.authors && book.authors !== "Unknown Author") ? ` by ${book.authors}` : "";
+                    UI.textIn.value = `I want to discuss the book "${book.title}"${authorText}.`;
+                    
+                    processInput(UI.textIn.value);
+                };
 
                 resultsContainer.appendChild(card);
             });
