@@ -1581,9 +1581,18 @@ async function processInput(userText) {
 
     let introMsgId = null;
 
-    // 2. INSTANT GREETING: Catch the user gesture before it expires!
+ 
+// 2. INSTANT GREETING: Catch the user gesture before it expires!
     if (isFirstMessage) {
-        const greetingText = getDhwaniGreeting(UI.lang.value, config.persona, config.texts);
+        let greetingText = "";
+        
+        // Custom greeting if it's a global archive book
+        if (selectedLibraryItem.startsWith('Archive|')) {
+            greetingText = `Hello ${userName}, I am Dhwani. I have accessed the global library archives for "${config.texts}". I am ready to discuss its plot, themes, chapters, or concepts with you.`;
+        } else {
+            // Standard ancient library greeting
+            greetingText = getDhwaniGreeting(UI.lang.value, config.persona, config.texts);
+        }
         
         chatHistory.push({ role: 'user', parts: [{ text: "Pranam." }] });
         chatHistory.push({ role: 'model', parts: [{ text: greetingText }] });
@@ -1710,15 +1719,15 @@ async function getAIResponse(history, config) {
     let prompt = "";
     let liveContext = "";
 
-	if (isArchive) {
+if (isArchive) {
         // Wait for the unified metadata fetcher
         const metadataString = await fetchGlobalBookMetadata(itemName);
 
-        // Construct the verified context block
+        // If the fetch fails or times out, FORCE the AI to use its pre-trained knowledge
         if (metadataString) {
-            liveContext = `[LIVE VERIFIED METADATA FROM GLOBAL APIS]\n${metadataString}\n`;
+            liveContext = `[LIVE VERIFIED METADATA]\n${metadataString}\n`;
         } else {
-            liveContext = `[LIVE VERIFIED METADATA]\nCRITICAL: No verified records found for "${itemName}" in Google Books or Open Library.`;
+            liveContext = `[PRE-TRAINED KNOWLEDGE MODE]\nThe live metadata fetch timed out. You MUST STILL ANSWER using your pre-trained internal knowledge of the book "${itemName}". NEVER refuse to discuss a known book. NEVER state you cannot locate it.`;
         }
 
         // --- GLOBAL ARCHIVE PROMPT ---
@@ -1728,13 +1737,8 @@ async function getAIResponse(history, config) {
         
         CRITICAL RULES:
         1. PERSONA: Address the user respectfully. Do NOT begin with a greeting.
-        2. GROUNDING & EXISTENCE:
-           - The metadata above confirms the book's authentic existence, author, and main subject.
-           - If the metadata explicitly says "No verified records found", only then state that you cannot locate this title in the global library.
-           - If the book is verified, you are FULLY AUTHORIZED to answer questions regarding its plot, characters, chapters, themes, and ideas using your knowledge of the work. Do not restrict yourself only to the synopsis sentences.
-        3. QUOTES & CHAPTER ACCURACY:
-           - Provide accurate thematic explanations and describe scenes faithfully.
-           - If you do not have the verbatim page or line memorized, accurately summarize the passage rather than inventing words in quotation marks.
+        2. EXPERT KNOWLEDGE: You are FULLY AUTHORIZED to answer questions about this book's plot, characters, chapters, themes, and ideas. 
+        3. STRICT ANTI-REFUSAL: NEVER say "I cannot locate this title" or "No verified records found." If the metadata is missing, rely entirely on your vast pre-trained knowledge of literature to answer the user's questions perfectly.
         4. EXPLANATION & TONE: Deliver clear, comprehensive insights suitable for a ${UI.age.value || '25'}-year-old. ${contextAddon}
         5. LANGUAGE: Speak strictly in ${UI.lang.value}.
         6. FORMATTING: Use Markdown (bolding, lists).
@@ -2620,14 +2624,19 @@ document.addEventListener("DOMContentLoaded", () => {
                     </div>
                 `;
 
-                // When user clicks a book, set it as the active entity in Dhwani
+
+// When user clicks a book, set it as the active entity in Dhwani
                 card.onclick = () => {
-                    selectedLibraryItem = `Archive|${book.title} by ${book.authors}`;
+                    // FIX: Save ONLY the title as the internal item name so the background API can find it
+                    selectedLibraryItem = `Archive|${book.title}`; 
+                    
                     if (UI.ddText) {
                         UI.ddText.innerText = `[Global] ${book.title}`;
                     }
                     globalModal.classList.add('hidden');
+                    
                     if (UI.welcome) UI.welcome.style.display = 'none';
+                    // The user's input still includes the author for context
                     UI.textIn.value = `I want to discuss the book "${book.title}" by ${book.authors}.`;
                     processInput(UI.textIn.value);
                 };
