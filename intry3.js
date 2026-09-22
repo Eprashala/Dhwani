@@ -1588,7 +1588,7 @@ async function processInput(userText) {
         
         // Custom greeting if it's a global archive book
 		if (selectedLibraryItem.startsWith('Archive|')) {
-            greetingText = `Hello ${userName}. I am Dhwani, a master professor of the book "${config.texts}". I am ready to break down its chapters, theories, and concepts for you.`;
+            greetingText = `Hello ${userName}. I am Dhwani, a interpreter of the book "${config.texts}". I am ready to break down its chapters, theories, and concepts for you.`;
         } else {
             // Standard ancient library greeting
             greetingText = getDhwaniGreeting(UI.lang.value, config.persona, config.texts);
@@ -1611,23 +1611,25 @@ async function processInput(userText) {
     saveData();
 
 
-	try {
-        // FIXED: Changed const to let so the filter doesn't crash the browser
+try {
         let rawRes = await getAIResponse(chatHistory, config);
         
-        // IRONCLAD FILTER: Strips any forced database apologies before they render
-        rawRes = rawRes.replace(/^.*?(global library records|verified digital entry|databases queried|digital lookup|public records).*?(\n\n|\.\s+)/is, '');
-        rawRes = rawRes.replace(/^(Although |Even though |I cannot locate |I am unable |While the ).*?\n\n/is, '');
+        // 4. FIX: Trim FIRST! If the AI starts with a space/newline, the ^ anchor fails.
+        rawRes = rawRes.trim();
+        
+        // 5. FIX: Expanded the filter to catch "verified records", "global library databases", and "I apologize"
+        rawRes = rawRes.replace(/^.*?(global library records|verified digital entry|databases queried|digital lookup|public records|verified records|global library databases).*?(\n\n|\.\s+)/is, '');
+        rawRes = rawRes.replace(/^(Although |Even though |I cannot locate |I am unable |While the |I apologize).*?\n\n/is, '');
+        
+        // Trim again to clean up any leftover whitespace
         rawRes = rawRes.trim();
         
         state.lastAIMessage = rawRes;
         chatHistory.push({ role: 'model', parts: [{ text: rawRes }] });
         
         if (isFirstMessage && introMsgId) {
-            // Appends to the existing greeting bubble
             appendToExistingMessage(introMsgId, rawRes);
         } else {
-            // Renders standard separate bubble for all subsequent messages
             const newMsgId = renderMessage("Dhwani", rawRes, true); 
             if (!state.isMuted && ttsStatus !== 'PLAYING') {
                 const btn = document.getElementById(`play-btn-${newMsgId}`);
@@ -1723,34 +1725,44 @@ async function getAIResponse(history, config) {
     const isArchive = (group === 'Archive');
 
     let prompt = "";
-    let liveContext = "";
+    
+    // 1. FIX: Declare variables OUTSIDE the if/else blocks to prevent ReferenceErrors
+    let bookTitle = "";
+    let bookAuthor = "";
+    let bookOverview = "";
 
-if (isArchive) {
+    if (isArchive) {
         // Use the metadata already loaded by the search UI
         const bookInfo = window.currentBookContext || { title: itemName, authors: "", snippet: "" };
-        const bookTitle = bookInfo.title || itemName;
-        const bookAuthor = (bookInfo.authors && bookInfo.authors !== "Unknown Author") ? ` by ${bookInfo.authors}` : "";
-        const bookOverview = (bookInfo.snippet && !bookInfo.snippet.includes("No description")) ? `Summary Context: ${bookInfo.snippet}` : "";
+        bookTitle = bookInfo.title || itemName;
+        bookAuthor = (bookInfo.authors && bookInfo.authors !== "Unknown Author") ? ` by ${bookInfo.authors}` : "";
+        bookOverview = (bookInfo.snippet && !bookInfo.snippet.includes("No description")) ? `Summary Context: ${bookInfo.snippet}` : "";
 
         // --- GLOBAL MASTER PROFESSOR PROMPT ---
+        // 2. FIX: Added the CRITICAL RULES (Anti-apology) to the Archive prompt
         prompt = `You are Dhwani, an expert university professor and master tutor. You have complete, encyclopedic mastery of the book "${bookTitle}"${bookAuthor}.
 
 ${bookOverview}
 
-YOUR MANDATE:
-1. Master Authority: You know this book inside and out. Dive immediately into its core curriculum, syllabus, and topics without any introductory pleasantries or background disclaimers.
+CRITICAL RULES:
+1. Master Authority: You MUST act as if you have the book right in front of you. NEVER mention "library records", "verified digital entry", "metadata", "databases", or state that you cannot locate the book. NEVER apologize for lack of records. If the specific edition is obscure, discuss the core themes of the primary text confidently.
 2. Structure & Breadth: Immediately outline the primary volumes, units, or major theoretical sections of "${bookTitle}"${bookAuthor}, explaining how the concepts build on each other.
 3. Proactive Engagement: Conclude by asking the student which specific chapter, theorem, formula, or problem they want to work through today.
 4. Tone: Academic, rigorous, encouraging, and clear. Tailored for a ${UI.age.value || '25'}-year-old student. ${contextAddon}
 5. Language: Strictly ${UI.lang.value}.
 6. Formatting: Use clean Markdown with bold topic headers and bullet points.
-7. Media Links: At the very end, provide:
+7. Media Links: At the very end, provide EXACTLY two lines:
    YT_SEARCH: ${bookTitle} lectures
    IMG_SEARCH: ${bookTitle} diagram`;
 
     } else {
         // --- ANCIENT LIBRARY PROMPT ---
-prompt = `You are Dhwani, an expert university professor and master tutor. You have complete, encyclopedic mastery of the book "${bookTitle}"${bookAuthor}.
+        // 3. FIX: Define the ancient library variables correctly here
+        bookTitle = config.texts || itemName;
+        bookAuthor = config.persona ? ` (Wisdom of ${config.persona})` : "";
+        bookOverview = config.desc ? `Context: ${config.desc}` : "";
+
+        prompt = `You are Dhwani, an expert university professor and master tutor. You have complete, encyclopedic mastery of the book "${bookTitle}"${bookAuthor}.
 
 ${bookOverview}
 
@@ -1766,22 +1778,16 @@ CRITICAL RULES:
    IMG_SEARCH: ${bookTitle} diagram`;
     }
     
-    // Core payload format
-const payload = { 
-    contents: history.slice(-10), 
-    systemInstruction: { parts: [{ text: prompt }] }
-};
+    const payload = { 
+        contents: history.slice(-10), 
+        systemInstruction: { parts: [{ text: prompt }] }
+    };
 
-    let fetchUrl;
+    let fetchUrl = customKey 
+        ? `https://generativelanguage.googleapis.com/v1beta/models/${selectedModelInfo.id}:generateContent?key=${customKey}` 
+        : `${PROXY_URL}/api/chat`;
 
-    if (customKey) {
-        // Direct to Google AI Studio endpoint
-        fetchUrl = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModelInfo.id}:generateContent?key=${customKey}`;
-    } else {
-        // Route through your Cloud Run proxy
-        fetchUrl = `${PROXY_URL}/api/chat`;
-        payload.model = selectedModelInfo.id;
-    }
+    if (!customKey) payload.model = selectedModelInfo.id;
 
     currentAborter = new AbortController();
 
