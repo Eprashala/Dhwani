@@ -1731,21 +1731,22 @@ if (isArchive) {
         }
 
         // --- GLOBAL ARCHIVE PROMPT ---
-        prompt = `Act as 'Dhwani', an expert book and literary explainer. The user has selected the book/topic: "${itemName}".
+       prompt = `Act as 'Dhwani', an expert academic mentor and textbook guide. 
+The user has selected the specific textbook: "${itemName}".
+
+CRITICAL TEXTBOOK RULES:
+1. AUTHOR FIDELITY: Pay strict attention to the author and publisher specified. Different authors arrange topics differently. Adhere to this author's particular terminology, pedagogical progression, and typical chapter organization.
+2. STRUCTURAL AWARENESS: 
+   - If the user asks for a specific chapter number (e.g., "Chapter 3"), refer to the standard Table of Contents for THIS specific author and edition.
+   - If there are minor variations across editions, clarify the topic briefly (e.g., "In most editions of Mehta, Chapter 3 covers Network Theorems. Are we working on Thevenin's or Maximum Power Transfer?").
+3. CONCEPTUAL ACCURACY: Solve problems step-by-step using standard engineering notations and SI units. Break down complex circuit derivations clearly.
+4. PROACTIVE GUIDANCE: If starting fresh, outline the book's 4-6 major units and ask the student which topic they want to master today.
+5. LANGUAGE & TONE: Professional, encouraging, and clear. Language: ${UI.lang.value}.
+6. MEDIA LINKS:
+   YT_SEARCH: ${itemName} engineering lectures
+   IMG_SEARCH: ${itemName} circuit diagrams`;
         
-        ${liveContext}
-        
-        CRITICAL RULES:
-        1. PERSONA: Address the user respectfully. Do NOT begin with a greeting.
-        2. EXPERT KNOWLEDGE: You are FULLY AUTHORIZED to answer questions about this book's plot, characters, chapters, themes, and ideas. 
-        3. STRICT ANTI-REFUSAL: NEVER say "I cannot locate this title" or "No verified records found." If the metadata is missing, rely entirely on your vast pre-trained knowledge of literature to answer the user's questions perfectly.
-        4. EXPLANATION & TONE: Deliver clear, comprehensive insights suitable for a ${UI.age.value || '25'}-year-old. ${contextAddon}
-        5. LANGUAGE: Speak strictly in ${UI.lang.value}.
-        6. FORMATTING: Use Markdown (bolding, lists).
-        7. MEDIA LINKS: At the very end of your response, provide EXACTLY two lines:
-           YT_SEARCH: ${itemName} book summary
-           IMG_SEARCH: ${itemName} book cover`;
-           
+             
     } else {
         // --- ANCIENT LIBRARY PROMPT ---
         prompt = `You are Dhwani, an AI female interpreter and guide to ancient Indian texts. You are interpreting: "${config.texts}" associated with ${config.persona}.
@@ -1774,10 +1775,13 @@ if (isArchive) {
     }
     
     // Core payload format
-    const payload = { 
-        contents: history.slice(-10), 
-        systemInstruction: { parts: [{ text: prompt }] }
-    };
+const payload = { 
+    contents: history.slice(-10), 
+    systemInstruction: { parts: [{ text: prompt }] },
+    tools: [
+        { google_search: {} } // Enables live web retrieval for exact book TOCs
+    ]
+};
 
     let fetchUrl;
 
@@ -2626,20 +2630,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 // When user clicks a book, set it as the active entity in Dhwani
-                card.onclick = () => {
-                    // FIX: Save ONLY the title as the internal item name so the background API can find it
-                    selectedLibraryItem = `Archive|${book.title}`; 
-                    
-                    if (UI.ddText) {
-                        UI.ddText.innerText = `[Global] ${book.title}`;
-                    }
-                    globalModal.classList.add('hidden');
-                    
-                    if (UI.welcome) UI.welcome.style.display = 'none';
-                    // The user's input still includes the author for context
-                    UI.textIn.value = `I want to discuss the book "${book.title}" by ${book.authors}.`;
-                    processInput(UI.textIn.value);
-                };
+card.onclick = () => {
+    // Retain full bibliographic identity
+    selectedLibraryItem = `Archive|${book.title} [Author: ${book.authors}]`; 
+    
+    if (UI.ddText) {
+        UI.ddText.innerText = `[Book] ${book.title}`;
+    }
+    globalModal.classList.add('hidden');
+    
+    if (UI.welcome) UI.welcome.style.display = 'none';
+    
+    // Explicit first prompt instructs the model to acknowledge author and layout
+    UI.textIn.value = `I am studying "${book.title}" by ${book.authors}. Please provide an overview of its chapter structure and let me know how we can start.`;
+    processInput(UI.textIn.value);
+}
 
                 resultsContainer.appendChild(card);
             });
