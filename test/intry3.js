@@ -1588,7 +1588,7 @@ async function processInput(userText) {
         
         // Custom greeting if it's a global archive book
 		if (selectedLibraryItem.startsWith('Archive|')) {
-            greetingText = `Hello ${userName}. I am Dhwani, a master professor of the book "${config.texts}". I am ready to break down its chapters, theories, and concepts for you.`;
+            greetingText = `Hello ${userName}. I am Dhwani, a interpreter of the book "${config.texts}". I am ready to break down its chapters, theories, and concepts for you.`;
         } else {
             // Standard ancient library greeting
             greetingText = getDhwaniGreeting(UI.lang.value, config.persona, config.texts);
