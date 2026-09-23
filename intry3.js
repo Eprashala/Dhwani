@@ -2803,14 +2803,23 @@ document.addEventListener("DOMContentLoaded", () => {
             const gbResponse = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=10&printType=books`);
             const gbData = await gbResponse.json();
 
-            // If Google Books succeeds and isn't blocking us
+		// If Google Books succeeds and isn't blocking us
             if (gbResponse.ok && gbData.items && gbData.items.length > 0) {
-                booksData = gbData.items.map(book => ({
-                    title: book.volumeInfo.title || "Unknown Title",
-                    authors: book.volumeInfo.authors ? book.volumeInfo.authors.join(", ") : "Unknown Author",
-                    thumbnail: book.volumeInfo.imageLinks ? book.volumeInfo.imageLinks.thumbnail : 'https://via.placeholder.com/128x192.png?text=No+Cover',
-                    snippet: book.volumeInfo.description ? book.volumeInfo.description.substring(0, 120) + "..." : "No description available."
-                }));
+                booksData = gbData.items.map(book => {
+                    // 1. Force HTTPS on Google Book Thumbnails to prevent Mixed Content blocking
+                    let thumbUrl = 'https://via.placeholder.com/128x192.png?text=No+Cover';
+                    if (book.volumeInfo.imageLinks) {
+                        thumbUrl = book.volumeInfo.imageLinks.thumbnail || book.volumeInfo.imageLinks.smallThumbnail || thumbUrl;
+                        thumbUrl = thumbUrl.replace(/^http:\/\//i, 'https://');
+                    }
+                    
+                    return {
+                        title: book.volumeInfo.title || "Unknown Title",
+                        authors: book.volumeInfo.authors ? book.volumeInfo.authors.join(", ") : "Unknown Author",
+                        thumbnail: thumbUrl,
+                        snippet: book.volumeInfo.description ? book.volumeInfo.description.substring(0, 120) + "..." : "No description available."
+                    };
+                });
             } else {
                 // 2. FALLBACK: Open Library API (100% free, ignores IP blocks, no API key needed)
                 const olResponse = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(query)}&limit=10`);
