@@ -237,10 +237,32 @@ document.addEventListener("DOMContentLoaded", async () => {
 		btnCloseApp: document.getElementById('btn-close-app'),
 		btnExport: document.getElementById('btn-export-session'),
         btnImport: document.getElementById('btn-import-session'),
-        fileImport: document.getElementById('file-import-input')
+        fileImport: document.getElementById('file-import-input'),
+		btnLibrary: document.getElementById('btn-open-library'),
+        libraryModal: document.getElementById('library-modal'),
+        btnCloseLibrary: document.getElementById('btn-close-library'),
+        libraryContainer: document.getElementById('library-list-container'),
+        headerTitle: document.getElementById('main-header-title'),
+        btnImportBook: document.getElementById('btn-import-book'),
+        importBookInput: document.getElementById('import-book-input')
     };
 
 	if (UI.overlay) {
+		const urlParams = new URLSearchParams(window.location.search);
+        const urlBookId = urlParams.get('id');
+
+        if (urlBookId) {
+            const request = indexedDB.open("EprashalaRAG", 1);
+            request.onsuccess = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains("bookData")) return;
+                const getReq = db.transaction("bookData", "readonly").objectStore("bookData").get(urlBookId);
+                getReq.onsuccess = () => {
+                    if (getReq.result) activateBookMode(getReq.result);
+                };
+            };
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
         await ChatDB.init(); // Initialize robust database layer
         await loadLibraryConfig();
         if (UI.ddBtn) initCustomDropdown(); // Only call this ONCE, after the config loads!
@@ -854,6 +876,50 @@ function loadSpecificSession(targetId) {
 }
 
 function setupEventListeners() {
+	
+	// --- BOOK LIBRARY & IMPORT LISTENERS ---
+    if (UI.btnLibrary) UI.btnLibrary.onclick = openLibraryModal;
+    if (UI.btnCloseLibrary) UI.btnCloseLibrary.onclick = () => UI.libraryModal.classList.add('hidden');
+
+    if (UI.btnImportBook && UI.importBookInput) {
+        UI.btnImportBook.onclick = (e) => {
+            e.stopPropagation();
+            UI.importBookInput.value = '';
+            UI.importBookInput.click();
+        };
+
+        UI.importBookInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const parsed = JSON.parse(event.target.result);
+                    let importedBook = null;
+
+                    if (Array.isArray(parsed)) {
+                        const fallbackTitle = parsed[0].book_title || file.name.replace(/\.[^.]+$/, '');
+                        importedBook = { id: 'book-' + Date.now(), title: fallbackTitle, dateAdded: new Date().toISOString(), chunks: parsed };
+                    } else if (parsed && Array.isArray(parsed.chunks)) {
+                        importedBook = { id: 'book-' + Date.now(), title: parsed.title || file.name, dateAdded: new Date().toISOString(), chunks: parsed.chunks };
+                    } else {
+                        alert("Invalid JSON format.");
+                        return;
+                    }
+
+                    const request = indexedDB.open("EprashalaRAG", 1);
+                    request.onsuccess = (ev) => {
+                        const tx = ev.target.result.transaction("bookData", "readwrite");
+                        tx.objectStore("bookData").put(importedBook, importedBook.id);
+                        tx.oncomplete = () => { alert("Imported!"); renderBookLibrary(); };
+                    };
+                } catch (err) { alert("Could not parse JSON."); }
+            };
+            reader.readAsText(file);
+        };
+    }
+	
     // 1. Chat Log Listener (Plays audio and single PDFs)
     UI.log.addEventListener('click', (e) => {
         const playBtn = e.target.closest('.btn-play-msg');
@@ -1324,6 +1390,151 @@ const handleMicDown = async (e) => {
 	
 }
 
+let isBookMode = false;
+let activeBookChunks = [];
+let activeBookTitle = "";
+
+function openLibraryModal() {
+    UI.libraryModal.classList.remove('hidden');
+    renderBookLibrary();
+}
+
+function activateBookMode(bookObj) {
+    isBookMode = true;
+    activeBookChunks = bookObj.chunks;
+    activeBookTitle = bookObj.title;
+
+    // Hide the ancient library dropdown
+    const ddContainer = document.getElementById('custom-dropdown-container');
+    if (ddContainer) ddContainer.style.display = 'none';
+
+    if (UI.headerTitle) {
+        UI.headerTitle.innerHTML = `<span class="text-sky-400 text-xs">Conversing with Book:</span><br><span class="text-white text-lg font-normal break-words">${activeBookTitle}</span>`;
+    }
+
+    clearData();
+    const initMsgId = renderMessage("System", `📚 <b>${activeBookTitle}</b> loaded securely from your phone's storage.<br><br>Tap the mic and ask me anything about this book!`, true);
+    if (!state.isMuted) {
+        const btn = document.getElementById(`play-btn-${initMsgId}`);
+        if (btn) window.toggleSingleMessagePlay(btn);
+    }
+}
+
+function retrieveRelevantChunks(query, topK = 8) {
+    if (!activeBookChunks || activeBookChunks.length === 0) return [];
+    const queryTerms = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    if (!queryTerms.length) return activeBookChunks.slice(0, topK);
+
+    const scored = activeBookChunks.map(chunk => {
+        let score = 0;
+        const textLower = chunk.text.toLowerCase();
+        queryTerms.forEach(term => {
+            const matches = (textLower.match(new RegExp(term, 'g')) || []).length;
+            score += matches * (1 + 10 / (chunk.char_count || 100)); 
+        });
+        return { chunk, score };
+    });
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, topK).map(s => s.chunk);
+}
+
+function renderBookLibrary() {
+    UI.libraryContainer.innerHTML = '<div class="text-center text-slate-500 text-sm mt-10">Loading library...</div>';
+    
+    const request = indexedDB.open("EprashalaRAG", 1);
+    request.onsuccess = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains("bookData")) {
+            UI.libraryContainer.innerHTML = '<div class="text-center text-slate-500 text-sm mt-10">Library is empty.<br><br>Click the ➕📖 icon in the top right to scan a book, or Import a JSON.</div>';
+            return;
+        }
+        
+        const tx = db.transaction("bookData", "readonly");
+        const getAllReq = tx.objectStore("bookData").getAll();
+
+        getAllReq.onsuccess = () => {
+            const books = getAllReq.result;
+            if (!books || books.length === 0) {
+                UI.libraryContainer.innerHTML = '<div class="text-center text-slate-500 text-sm mt-10">Library is empty.</div>';
+                return;
+            }
+
+            UI.libraryContainer.innerHTML = '';
+            books.sort((a,b) => new Date(b.dateAdded || 0) - new Date(a.dateAdded || 0));
+
+            books.forEach(book => {
+                const card = document.createElement('div');
+                card.className = "w-full text-left bg-slate-800/80 hover:bg-slate-700/80 p-3.5 rounded-xl transition-all border border-slate-700 hover:border-sky-500/50 flex flex-col gap-2.5 cursor-pointer shadow-sm group";
+                
+                const safeTitle = typeof book.title === 'string' ? book.title : 'book';
+                const dateObj = new Date(book.dateAdded || Date.now());
+                const chunkCount = Array.isArray(book.chunks) ? book.chunks.length : 0;
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-start gap-2">
+                        <div class="flex-1 min-w-0">
+                            <div class="font-bold text-sky-100 text-sm truncate book-title-display">${safeTitle}</div>
+                            <div class="text-[11px] text-slate-400 mt-0.5">${chunkCount} chunks • ${dateObj.toLocaleDateString()}</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-end gap-1.5 pt-2 border-t border-slate-700/50 mt-1">
+                        <button class="edit-book-btn p-1.5 text-slate-400 hover:text-sky-300 hover:bg-slate-600/50 rounded-lg transition-colors" title="Rename Book">✏️</button>
+                        <button class="share-book-btn p-1.5 text-slate-400 hover:text-green-400 hover:bg-slate-600/50 rounded-lg transition-colors" title="Share Book JSON">📤</button>
+                        <button class="delete-book-btn p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-600/50 rounded-lg transition-colors" title="Delete Book">🗑️</button>
+                    </div>
+                `;
+
+                card.onclick = (ev) => {
+                    if (ev.target.closest('button')) return;
+                    activateBookMode(book);
+                    UI.libraryModal.classList.add('hidden');
+                };
+
+                card.querySelector('.edit-book-btn').onclick = (ev) => {
+                    ev.stopPropagation();
+                    const newTitle = prompt("Enter a new title:", safeTitle);
+                    if (newTitle && newTitle.trim()) {
+                        book.title = newTitle.trim();
+                        const updateTx = db.transaction("bookData", "readwrite");
+                        updateTx.objectStore("bookData").put(book, book.id);
+                        updateTx.oncomplete = () => renderBookLibrary();
+                    }
+                };
+
+                card.querySelector('.share-book-btn').onclick = async (ev) => {
+                    ev.stopPropagation();
+                    const cleanFileName = safeTitle.toLowerCase().replace(/[^a-z0-9]+/g, '_') + '_rag.json';
+                    const jsonString = JSON.stringify(book, null, 2);
+                    const blob = new Blob([jsonString], { type: 'application/json' });
+                    const file = new File([blob], cleanFileName, { type: 'application/json' });
+
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        try { await navigator.share({ files: [file], title: safeTitle }); return; } catch (err) {}
+                    }
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = cleanFileName;
+                    a.click();
+                };
+
+                card.querySelector('.delete-book-btn').onclick = (ev) => {
+                    ev.stopPropagation();
+                    if (confirm(`Delete "${safeTitle}"?`)) {
+                        const delTx = db.transaction("bookData", "readwrite");
+                        delTx.objectStore("bookData").delete(book.id);
+                        delTx.oncomplete = () => renderBookLibrary();
+                    }
+                };
+
+                UI.libraryContainer.appendChild(card);
+            });
+        };
+    };
+}
+
+
+
 			function initSpeechRecognition() {
 				const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
 				if (!SpeechRec) return;
@@ -1725,13 +1936,26 @@ async function getAIResponse(history, config) {
     const isArchive = (group === 'Archive');
 
     let prompt = "";
-    
-    // 1. FIX: Declare variables OUTSIDE the if/else blocks to prevent ReferenceErrors
     let bookTitle = "";
     let bookAuthor = "";
     let bookOverview = "";
+	
+	if (isBookMode) {
+        const userQuery = history[history.length - 1].parts[0].text || "";
+        const topChunks = retrieveRelevantChunks(userQuery, 8);
+        const contextText = topChunks.map(c => `[Page ${c.page_start}]: ${c.text}`).join('\n\n');
 
-    if (isArchive) {
+        prompt = `You are the interactive voice avatar of the book titled "${activeBookTitle}".
+        Answer the user's questions based on the following retrieved book excerpts. 
+        
+        CRITICAL INSTRUCTION: If the exact specific word the user asked for is not found, intelligently scan the excerpts for related descriptive concepts and synthesize a helpful answer based on that broader context. 
+        Always mention the relevant page number(s) in your answer. Keep your response highly conversational, clear, and direct so it sounds natural when spoken aloud by a TTS engine. Do NOT use complex LaTeX.
+        
+        RELEVANT BOOK EXCERPTS:
+        ${contextText}`;
+    }
+
+    else if (isArchive) {
         // Use the metadata already loaded by the search UI
         const bookInfo = window.currentBookContext || { title: itemName, authors: "", snippet: "" };
         bookTitle = bookInfo.title || itemName;
