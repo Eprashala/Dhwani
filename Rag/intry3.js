@@ -2798,7 +2798,7 @@ function logQAToServer(userQuery, botReply) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
-        keepalive: true // Ensures the log sends even if the user closes the tab immediately
+        
     }).catch(err => console.debug("Logging skipped:", err));
 }
 
