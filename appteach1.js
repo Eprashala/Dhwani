@@ -45,7 +45,7 @@ function enforceFullscreen() {
 
 
 // --- 1. DATA STRUCTURES & CONFIG ---
-const PROXY_BASE_URL = "https://eprashala-proxy-511804777001.asia-south1.run.app";
+const PROXY_BASE_URL = "https://eprashala.pythonanywhere.com";
 
 async function fetchGeminiChat(payloadObject, abortSignal, modelId) {
     const userKey = document.getElementById('custom-api-key-input').value.trim() || '';
