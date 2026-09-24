@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Eprashala Book RAG Scanner</title>
+
+    <link rel="stylesheet" href="style.css">
+
+    <!-- PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs"
+            type="module"></script>
+
+    <!-- Tesseract.js -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+</head>
+
+<body>
+
+<div class="app">
+
+    <!-- HEADER -->
+    <header class="header">
+
+        <div>
+            <h1>Eprashala Book RAG Scanner</h1>
+
+            <p>
+                Convert books into structured,
+                RAG-ready JSON knowledge
+            </p>
+        </div>
+
+        <div class="version">
+            EPRASHALA-RAG<br>
+            <span>v1.0</span>
+        </div>
+
+    </header>
+
+
+    <!-- BOOK INFORMATION -->
+
+    <section class="card">
+
+        <h2>1. Book Information</h2>
+
+        <div class="form-grid">
+
+            <div class="form-group">
+
+                <label>Book Title</label>
+
+                <input
+                    id="bookTitle"
+                    type="text"
+                    placeholder="Enter book title"
+                >
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label>Author</label>
+
+                <input
+                    id="bookAuthor"
+                    type="text"
+                    placeholder="Enter author name"
+                >
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label>Language</label>
+
+                <select id="language">
+
+                    <option value="auto">
+                        Auto Detect
+                    </option>
+
+                    <option value="eng">
+                        English
+                    </option>
+
+                    <option value="mar">
+                        Marathi
+                    </option>
+
+                    <option value="hin">
+                        Hindi
+                    </option>
+
+                    <option value="san">
+                        Sanskrit
+                    </option>
+
+                    <option value="guj">
+                        Gujarati
+                    </option>
+
+                    <option value="ben">
+                        Bengali
+                    </option>
+
+                    <option value="tam">
+                        Tamil
+                    </option>
+
+                    <option value="tel">
+                        Telugu
+                    </option>
+
+                    <option value="kan">
+                        Kannada
+                    </option>
+
+                    <option value="mal">
+                        Malayalam
+                    </option>
+
+                    <option value="ori">
+                        Odia
+                    </option>
+
+                    <option value="pan">
+                        Punjabi
+                    </option>
+
+                    <option value="urd">
+                        Urdu
+                    </option>
+
+                </select>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- UPLOAD -->
+
+    <section class="card">
+
+        <h2>2. Upload Book</h2>
+
+        <div
+            id="dropZone"
+            class="drop-zone"
+        >
+
+            <div class="upload-icon">
+                📚
+            </div>
+
+            <h3>
+                Drop your book here
+            </h3>
+
+            <p>
+                PDF, JPG, PNG or JPEG
+            </p>
+
+            <button
+                id="chooseFile"
+                class="primary-button"
+            >
+                Choose File
+            </button>
+
+            <input
+                id="fileInput"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                hidden
+            >
+
+            <div
+                id="fileName"
+                class="file-name"
+            ></div>
+
+        </div>
+
+    </section>
+
+
+    <!-- OCR SETTINGS -->
+
+    <section class="card">
+
+        <h2>3. Processing Settings</h2>
+
+        <div class="settings">
+
+            <div>
+
+                <label>OCR Scale</label>
+
+                <select id="ocrScale">
+
+                    <option value="1.5">
+                        1.5× — Fast
+                    </option>
+
+                    <option value="2" selected>
+                        2× — Recommended
+                    </option>
+
+                    <option value="3">
+                        3× — High Quality
+                    </option>
+
+                </select>
+
+            </div>
+
+            <div>
+
+                <label>OCR Automatically</label>
+
+                <select id="ocrMode">
+
+                    <option value="auto">
+                        Automatic
+                    </option>
+
+                    <option value="always">
+                        Always OCR
+                    </option>
+
+                </select>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- START -->
+
+    <section class="card action-card">
+
+        <button
+            id="startButton"
+            class="start-button"
+        >
+            🚀 START SCANNING
+        </button>
+
+    </section>
+
+
+    <!-- PROGRESS -->
+
+    <section
+        id="progressCard"
+        class="card"
+    >
+
+        <h2>4. Processing</h2>
+
+        <div class="progress-info">
+
+            <span id="statusText">
+                Waiting...
+            </span>
+
+            <span id="progressPercent">
+                0%
+            </span>
+
+        </div>
+
+        <div class="progress-container">
+
+            <div
+                id="progressBar"
+                class="progress-bar"
+            ></div>
+
+        </div>
+
+        <div class="page-info">
+
+            <span>
+                Page:
+                <strong id="currentPage">0</strong>
+                /
+                <strong id="totalPages">0</strong>
+            </span>
+
+            <span id="processingMode">
+                -
+            </span>
+
+        </div>
+
+    </section>
+
+
+    <!-- TEXT PREVIEW -->
+
+    <section class="card">
+
+        <div class="section-heading">
+
+            <h2>5. Extracted Text</h2>
+
+            <span id="characterCount">
+                0 characters
+            </span>
+
+        </div>
+
+        <textarea
+            id="textPreview"
+            readonly
+            placeholder="Extracted text will appear here..."
+        ></textarea>
+
+    </section>
+
+
+    <!-- JSON -->
+
+    <section class="card">
+
+        <h2>6. RAG JSON</h2>
+
+        <div
+            id="jsonStatus"
+            class="json-status"
+        >
+            No JSON generated yet.
+        </div>
+
+        <button
+            id="downloadButton"
+            class="download-button"
+            disabled
+        >
+            ⬇ Download RAG JSON
+        </button>
+
+    </section>
+
+
+    <!-- FOOTER -->
+
+    <footer>
+
+        Eprashala • Digital Knowledge Engine
+
+    </footer>
+
+</div>
+
+
+<script type="module" src="app.js"></script>
+
+</body>
+</html>
