@@ -439,11 +439,11 @@ window.triggerEditLastInput = (e) => {
 
 function getModelInfo(val) {
     val = parseInt(val);
-    if(val === 20) return { name: "Gemini 3.1 Flash-Lite", id: "gemini-3.1-flash-lite" };
-    if(val === 40) return { name: "Gemini 3.5 Flash", id: "gemini-3.5-flash" };
-    if(val === 60) return { name: "Gemini Live Preview", id: "gemini-3.1-flash-live-preview" }; 
-    if(val === 80) return { name: "Gemini 3.1 Pro Preview", id: "gemini-3.1-pro-preview" }; 
-    return { name: "Gemini 3.1 Pro Preview", id: "gemini-3.1-pro-preview" }; // Fallback default
+    if(val === 20) return { name: "Fastest", id: "gemini-flash-lite-latest" };
+    if(val === 40) return { name: "Fast", id: "gemini-flash-latest" };
+    if(val === 60) return { name: "Thinking ", id: "gemini-3.6-flash" }; 
+    if(val === 80) return { name: "Pro Thinking", id: "gemini-3.1-pro-preview" }; 
+    return { name: "Max Thinking", id: "gemini-pro-latest" }; // Fallback default
 }
 
 function updateRightSliderLabels() {
