@@ -1084,7 +1084,7 @@ if (UI.btnLibrary) UI.btnLibrary.onclick = openLibraryModal;
     UI.btnRestart.onclick = (e) => { 
         e.stopPropagation(); 
         const qCount = calculateQuizQuestions();
-        if (qCount > 0 && UI.role.value !== 'Teacher') { 
+		if (qCount > 0) {
             UI.quizQCount.innerText = qCount;
             UI.quizModal.classList.remove('hidden');
         } else {
@@ -1276,16 +1276,13 @@ async function processInput(userText, isHiddenQuizTrigger = false) {
         const res = await getAIResponse(chatHistory);
         let displayRes = res.trim();
         
-        // --- SCORE INTERCEPTOR ---
-        if (UI.role.value !== 'Teacher') {
-            const scoreMatch = displayRes.match(/\[SCORE:(\d+)\]/);
-            if (scoreMatch) {
-                const runs = parseInt(scoreMatch[1], 10);
-                updateScore(runs);
-                displayRes = displayRes.replace(scoreMatch[0], '').trim();
-            } else if (chatHistory.length > 2) {
-                updateScore(1); 
-            }
+		const scoreMatch = displayRes.match(/\[SCORE:(\d+)\]/);
+        if (scoreMatch) {
+            const runs = parseInt(scoreMatch[1], 10);
+            updateScore(runs);
+            displayRes = displayRes.replace(scoreMatch[0], '').trim();
+        } else if (chatHistory.length > 2) {
+            updateScore(1); 
         }
         
         state.lastAIMessage = displayRes;
@@ -2242,7 +2239,7 @@ function renderFAQSuggestions(matches) {
             const textInput = document.getElementById('text-input');
             textInput.value = ''; 
             
-            const userName = document.getElementById('manual-name')?.value || document.getElementById('user-role')?.value || "Student";
+            const userName = document.getElementById('manual-name')?.value || "Reader";
             const botName = typeof activeBookTitle !== 'undefined' ? activeBookTitle : "Book";
 
             // 1. Render User Question
