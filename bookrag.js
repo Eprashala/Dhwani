@@ -125,6 +125,7 @@ const UI = {
     modelSlider: document.getElementById('model-slider'),
     ratioVal: document.getElementById('ratio-val'),
     modelVal: document.getElementById('model-val'),
+	outOfBookToggle: document.getElementById('out-of-book-toggle'),
     
     // Multimodal & Crop Additions
     btnQuizManual: document.getElementById('btn-quiz-manual'), 
@@ -586,7 +587,9 @@ function loadData() {
 				
 				const savedHighlight = localStorage.getItem('edu_highlight');	
 		}
-				
+	if (UI.outOfBookToggle) {
+        UI.outOfBookToggle.checked = localStorage.getItem('edu_open_knowledge') === 'true';
+    }			
     if (UI.remember.checked) {
         const savedHist = localStorage.getItem('edu_all_history');
         if (savedHist) {
@@ -1031,6 +1034,13 @@ if (UI.btnLibrary) UI.btnLibrary.onclick = openLibraryModal;
             }
         } catch (err) { alert('Could not access clipboard.'); }
     });
+	
+	if (UI.outOfBookToggle) {
+        UI.outOfBookToggle.addEventListener('change', () => {
+            localStorage.setItem('edu_open_knowledge', UI.outOfBookToggle.checked);
+        });
+    }
+
 
     if (UI.btnStop) {
         UI.btnStop.onclick = (e) => {
@@ -1362,15 +1372,40 @@ async function getAIResponse(history) {
     const topChunks = retrieveRelevantChunks(userQuery, 8);
     const contextText = topChunks.map(c => `[Page ${c.page_start}]: ${c.text}`).join('\n\n');
 
-    const prompt = `You are the interactive voice avatar of the book titled "${activeBookTitle}".
-    Answer the user's questions based on the following retrieved book excerpts. 
-    
-    CRITICAL INSTRUCTION: You MUST write your entire response in the following language: ${selectedLangName}. If the exact specific word the user asked for is not found, intelligently scan the excerpts for related descriptive concepts and synthesize a helpful answer based on that broader context. 
-    
-    Always mention the relevant page number(s) in your answer. Keep your response highly conversational, clear, and direct so it sounds natural when spoken aloud by a TTS engine. Do NOT use complex LaTeX. Use Markdown for basic formatting.
-    
-    RELEVANT BOOK EXCERPTS:
-    ${contextText}`;
+    // NEW: Retrieve Open Knowledge state and User Age
+    const isOpenKnowledge = UI.outOfBookToggle ? UI.outOfBookToggle.checked : false;
+    const userAge = UI.age.value || localStorage.getItem('edu_age') || "a student";
+
+    let prompt = "";
+
+    if (isOpenKnowledge) {
+        // OPEN MODE: Acts as a tutor, uses outside analogies based on age
+        prompt = `You are an expert, friendly teacher and the interactive voice avatar of the book titled "${activeBookTitle}".
+        You are explaining concepts to a ${userAge}-year-old.
+        
+        CORE CONTEXT (From the book):
+        ${contextText}
+        
+        CRITICAL INSTRUCTIONS:
+        1. Use the book excerpts above as your primary truth. Always mention the relevant page number(s) if you use them.
+        2. OPEN KNOWLEDGE ALLOWED: If the excerpts do not fully answer the question, or if analogies would help, use your broad educational knowledge to explain the concept.
+        3. Make your explanations highly engaging, simple, and age-appropriate for a ${userAge}-year-old.
+        4. If you bring in outside examples, briefly mention that you are adding extra context not found in the book.
+        5. Write your entire response in this language: ${selectedLangName}. Do NOT use complex LaTeX.`;
+    } else {
+        // STRICT MODE: Classic RAG, refuses to answer if not in the book
+        prompt = `You are the interactive voice avatar of the book titled "${activeBookTitle}".
+        Answer the user's questions based STRICTLY on the following retrieved book excerpts. 
+        
+        RELEVANT BOOK EXCERPTS:
+        ${contextText}
+        
+        CRITICAL INSTRUCTIONS:
+        1. Answer ONLY using the provided excerpts.
+        2. If the answer is not present in the text, politely say "I'm sorry, but that information isn't in this book. You can turn on 'Allow Outside Knowledge' to let me search for the answer!"
+        3. Always mention the relevant page number(s) in your answer.
+        4. Write your entire response in this language: ${selectedLangName}. Do NOT use complex LaTeX.`;
+    }
 
     const payload = { 
         contents: history.slice(-10), 
