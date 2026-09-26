@@ -532,6 +532,10 @@
             <div class="sub">Downloads language packs on first use. "Force OCR" below ignores DRM locks.</div>
           </div>
           <div class="field">
+            <label class="checkfield"><input type="checkbox" id="extractImages" checked> Extract descriptions from images & diagrams</label>
+            <div class="sub">Uses Gemini Vision to read charts/pictures. Takes extra time per page. Requires API key.</div>
+          </div>
+		  <div class="field">
             <label class="checkfield"><input type="checkbox" id="stripHeaders" checked> Strip repeated headers/footers</label>
           </div>
           <div class="field">
@@ -655,6 +659,7 @@
     chunkSize: $('chunkSize'),
     overlapSentences: $('overlapSentences'),
     ocrLang: $('ocrLang'),
+	extractImages: $('extractImages'),
     stripHeaders: $('stripHeaders'),
     forceOcr: $('forceOcr'),
     processBtn: $('processBtn'),
@@ -908,20 +913,25 @@
     });
   }
 
-  // ---------------------------------------------------------------
-  // Extraction: PDF (text layer + OCR fallback per page)
+// ---------------------------------------------------------------
+  // Extraction: PDF (text layer + OCR + Logical Page Tracking)
   // ---------------------------------------------------------------
   async function extractPdf(file, opts, onPageProgress){
     const buf = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
     const pages = [];
     let ocrWorker = null;
+    const apiKey = els.ragApiKey.value.trim();
+    
+    let currentLogicalPage = 0;
+    let offsetLocked = false;
 
     for (let i = 1; i <= pdf.numPages; i++){
       onPageProgress(i, pdf.numPages);
       const page = await pdf.getPage(i);
       let pageText = '';
 
+      // 1. Text Layer Extraction
       if (!opts.forceOcr){
         const content = await page.getTextContent();
         let buf2 = '';
@@ -932,24 +942,95 @@
         pageText = buf2.trim();
       }
 
+      const ops = await page.getOperatorList();
+      const hasImages = ops.fnArray.includes(pdfjsLib.OPS.paintImageXObject);
       const looksScanned = opts.forceOcr || pageText.replace(/\s+/g,'').length < 20;
 
+      // 2. OCR Fallback
       if (looksScanned){
         log('Page ' + i + '/' + pdf.numPages + ' looks scanned — running OCR…');
-        if (!ocrWorker){
-          ocrWorker = await Tesseract.createWorker(opts.ocrLang || 'eng');
-        }
+        if (!ocrWorker) ocrWorker = await Tesseract.createWorker(opts.ocrLang || 'eng');
         const viewport = page.getViewport({ scale: 3 });
         const canvas = document.createElement('canvas');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        const ctx = canvas.getContext('2d');
-        await page.render({ canvasContext: ctx, viewport }).promise;
+        canvas.width = viewport.width; canvas.height = viewport.height;
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
         const { data } = await ocrWorker.recognize(canvas);
         pageText = data.text.trim();
       }
 
-      pages.push({ pageNum: i, text: pageText });
+      // 3. Gemini Vision
+      if (opts.extractImages && hasImages && apiKey && apiKey.length > 10 && !looksScanned) {
+          const viewport = page.getViewport({ scale: 2 }); 
+          const canvas = document.createElement('canvas');
+          canvas.width = viewport.width; canvas.height = viewport.height;
+          await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+          const base64Img = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+          try {
+              const payload = {
+                  contents: [{ role: "user", parts: [
+                      { text: "Describe ONLY the diagrams, charts, or tables in detail. Do not transcribe standard paragraph text." },
+                      { inlineData: { mimeType: "image/jpeg", data: base64Img } }
+                  ]}],
+                  generationConfig: { maxOutputTokens: 400 }
+              };
+              const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+              const data = await res.json();
+              if (data.candidates && data.candidates[0].content.parts[0].text) {
+                  pageText += `\n\n[Diagram Description: ${data.candidates[0].content.parts[0].text.trim()}]\n`;
+              }
+          } catch(err) { log('Vision AI failed on page ' + i, 'err'); }
+      }
+
+      // 4. NEW: Ultra-Resilient Logical Page Number Detection
+      let detectedPageNum = null;
+      const lines = pageText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      
+      // Target the top 4 and bottom 4 lines where page numbers live
+      const edgeLines = [...lines.slice(0, 4), ...lines.slice(-4)];
+
+      for (let line of edgeLines) {
+          // Crush all spaces to fix pdf.js fragmenting (e.g. "9 4" becomes "94", "P a g e" becomes "page")
+          let cleanLine = line.replace(/\s+/g, '').toLowerCase(); 
+          
+          // Strip out common pagination text and border characters
+          cleanLine = cleanLine.replace(/page|p\.|chapter|unit|\[\vert{}\]|-|_|\||\//g, '');
+
+          // If the remaining string is strictly a number
+          if (/^[1-9][0-9]{0,3}$/.test(cleanLine)) {
+              let num = parseInt(cleanLine, 10);
+              
+              // Sanity check: Ensure we didn't lock onto a copyright year (e.g., 2026)
+              if (num < pdf.numPages + 100) {
+                  detectedPageNum = num;
+                  break;
+              }
+          }
+      }
+
+      if (detectedPageNum !== null) {
+          if (!offsetLocked) {
+              currentLogicalPage = detectedPageNum; // Lock in the first valid number
+              offsetLocked = true;
+          } else {
+              // Allow sequential reading or small skips (like skipping a blank page)
+              if (Math.abs(detectedPageNum - (currentLogicalPage + 1)) <= 5) {
+                  currentLogicalPage = detectedPageNum;
+              } 
+              // Allow a sequence reset if the book officially starts Chapter 1 after the preface
+              else if (detectedPageNum <= 3) {
+                  currentLogicalPage = detectedPageNum;
+              }
+              else {
+                  currentLogicalPage++; // Fallback to safe sequential counting if the number jumped wildly
+              }
+          }
+      } else {
+          // If absolutely no number is found on this page, just increment from the last known page
+          if (i === 1) currentLogicalPage = 1;
+          else currentLogicalPage++;
+      }
+
+      pages.push({ pageNum: currentLogicalPage, text: pageText });
     }
 
     if (ocrWorker) await ocrWorker.terminate();
@@ -987,6 +1068,7 @@
     const opts = {
       ocrLang: els.ocrLang.value.trim() || 'eng',
       forceOcr: els.forceOcr.checked,
+	  extractImages: els.extractImages.checked
     };
     const stripHeaders = els.stripHeaders.checked;
 

@@ -1319,15 +1319,24 @@ async function processInput(userText, isHiddenQuizTrigger = false) {
 function retrieveRelevantChunks(query, topK = 4) {
     if (!activeBookChunks || activeBookChunks.length === 0) return [];
     
-    const queryTerms = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    // FIX: Lowered limit to 1 so 2-digit numbers like "90" aren't deleted
+    const queryTerms = query.toLowerCase().split(/\s+/).filter(w => w.length > 1); 
     if (!queryTerms.length) return activeBookChunks.slice(0, topK);
 
     const scored = activeBookChunks.map(chunk => {
         let score = 0;
         const textLower = chunk.text.toLowerCase();
+        
         queryTerms.forEach(term => {
-            const matches = (textLower.match(new RegExp(term, 'g')) || []).length;
+            // Safe regex to prevent crashes from special characters like ? or (
+            const safeTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); 
+            const matches = (textLower.match(new RegExp(safeTerm, 'g')) || []).length;
             score += matches * (1 + 10 / (chunk.char_count || 100)); 
+            
+            // NEW: If the user types "90", heavily boost the score of chunks originating from page 90
+            if (chunk.page_start && chunk.page_start.toString() === term) {
+                score += 500; // Massive score boost to guarantee this chunk is selected
+            }
         });
         return { chunk, score };
     });
